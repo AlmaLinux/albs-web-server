@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+
+  db:
+    image: postgres:13
+    env_file:
+      - vars.env
+    environment:
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --encoding=UTF8 --locale=en_US.UTF-8 --data-checksums
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+    ports:
+      - 5432:5432
+    volumes:
+      - "./volumes/postgresql/data:/var/lib/postgresql/data"
+
+  web_server:
+    image: al-web-server:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile
+      context: .
+    # TODO: prepare to deal with migrations and so on
+    #       and database inititialisation
+    command: "bash -c 'source env/bin/activate && /wait_for_it.sh db:5432 && PYTHONPATH='.' python alws/models.py && uvicorn --host 0.0.0.0 alws.app:app'"
+    restart: on-failure
+    depends_on:
+      - db
+
+  frontend:
+    image: albs-frontend:latest
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-frontend
+    command: "npm run dev"
+    volumes:
+      - "../albs-frontend:/code"
+    restart: on-failure
+    depends_on:
+      - web_server
+
+  build_node:
+    image: albs-node:latest
+    privileged: true
+    build:
+      # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-node here instead
+      context: ../albs-node
+      dockerfile: Dockerfile
+    volumes:
+      # TODO: Hack for developement, put placeholder here instead
+      - "../albs-node/slave-config:/root/.config"
+    restart: on-failure
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_build_node.py -v -t 4'"
+    depends_on:
+      - web_server
+
+  pulp:
+    image: pulp/pulp
+    ports:
+      - 8081:80
+    volumes:
+      - "./volumes/pulp/settings:/etc/pulp"
+      - "./volumes/pulp/pulp_storage:/var/lib/pulp"
+      - "./volumes/pulp/pgsql:/var/lib/pgsql"
+      - "./volumes/pulp/containers:/var/lib/containers"
+    devices:
+      - "/dev/fuse"
+    restart: on-failure
+
+  nginx:
+    image: nginx
+    ports:
+      - 8080:80
+    volumes:
+      - "./nginx_configs:/etc/nginx/conf.d"
+    depends_on:
+      - web_server
+      - frontend

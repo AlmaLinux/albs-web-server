@@ -1,0 +1,7 @@
+fastapi[all]
+uvicorn
+asyncpg
+pydantic
+sqlalchemy
+aiohttp
+PyJWT
