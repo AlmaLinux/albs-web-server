@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
 
+    database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
+
     github_client: str
     github_client_secret: str
 
