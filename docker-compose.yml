@@ -32,6 +32,7 @@ services:
     image: albs-frontend:latest
     build:
       dockerfile: Dockerfile
+      # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-frontend here instead
       context: ../albs-frontend
     command: "npm run dev"
     volumes:
@@ -43,13 +44,15 @@ services:
   build_node:
     image: albs-node:latest
     privileged: true
+    env_file:
+      - vars.env
     build:
       # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-node here instead
       context: ../albs-node
       dockerfile: Dockerfile
     volumes:
       # TODO: Hack for developement, put placeholder here instead
-      - "../albs-node/slave-config:/root/.config"
+      - "../albs-node/node-config:/root/.config"
     restart: on-failure
     command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_build_node.py -v -t 4'"
     depends_on:

@@ -3,6 +3,7 @@ import itertools
 from fastapi import APIRouter, Depends
 
 from alws import crud, database
+from alws.build_planner import get_s3_build_directory
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import build_node_schema
 
@@ -42,6 +43,7 @@ async def get_task(
         return
     response = {
         'id': task.id,
+        's3_artifacts_dir': get_s3_build_directory(task.build.id, task.id),
         'arch': task.arch,
         'ref': task.ref,
         'platform': task.platform,

@@ -1,3 +1,5 @@
+import os
+import boto3
 import asyncio
 import typing
 import itertools
@@ -16,10 +18,24 @@ from alws.utils.pulp_client import PulpClient
 __all__ = ['BuildPlanner']
 
 
+def get_s3_build_directory(build_id: int, task_id: int) -> str:
+    return os.path.join(
+        settings.s3_artifacts_dir,
+        str(build_id),
+        str(task_id)
+    ) + '/'
+
+
 class BuildPlanner:
 
     def __init__(self, db: Session, user_id: int, platforms: typing.List[str]):
         self._db = db
+        self._s3_client = boto3.client(
+            's3',
+            region_name=settings.s3_region,
+            aws_access_key_id=settings.s3_access_key_id,
+            aws_secret_access_key=settings.s3_secret_access_key
+        )
         self._build = models.Build(user_id=user_id)
         self._task_index = 0
         self._platform_names = platforms
@@ -53,6 +69,13 @@ class BuildPlanner:
         )
         await self._db.run_sync(self.sync_append_build_repo, repo)
 
+    def init_s3_build_directory(self, db: Session):
+        for task in self._build.tasks:
+            self._s3_client.put_object(
+                Bucket=settings.s3_bucket,
+                Key=get_s3_build_directory(self._build.id, task.id)
+            )
+
     def sync_append_build_repo(self, db: Session, repo: models.BuildRepo):
         self._build.repos.append(repo)
 
@@ -71,7 +94,10 @@ class BuildPlanner:
                     arch,
                     self._build
                 ))
-        await asyncio.gather(*repos)
+        await asyncio.gather(
+            *repos,
+            self._db.run_sync(self.init_s3_build_directory)
+        )
 
     async def add_task(self, task: build_schema.BuildTask):
         ref = models.BuildTaskRef(**task.dict())

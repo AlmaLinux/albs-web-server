@@ -1,6 +1,8 @@
+import os
 import typing
 import datetime
 
+import boto3
 import sqlalchemy
 from sqlalchemy import update, delete
 from sqlalchemy.future import select
@@ -12,13 +14,13 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus
-from alws.build_planner import BuildPlanner
+from alws.build_planner import BuildPlanner, get_s3_build_directory
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_node_schema
 )
 
 
-__all__ = ['create_build', 'get_build', 'create_platform', 'get_platforms']
+__all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
 
 
 async def create_build(
@@ -38,32 +40,26 @@ async def create_build(
         await planner.init_build_repos()
         await db.commit()
     # TODO: this is ugly hack for now
-    return await get_build(db, db_build.id)
+    return await get_builds(db, db_build.id)
 
 
-async def get_build(db: Session, build_id: int) -> models.Build:
-    query = models.Build.id == build_id
-    result = await db.execute(
-        select(models.Build).where(query).options(
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.platform),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.ref),
-            selectinload(models.Build.user)
-        )
+async def get_builds(
+            db: Session,
+            build_id: typing.Optional[int] = None
+        ) -> typing.List[models.Build]:
+    query = select(models.Build).order_by(models.Build.id.desc()).options(
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.platform),
+        selectinload(models.Build.tasks).selectinload(models.BuildTask.ref),
+        selectinload(models.Build.user),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.artifacts)
     )
-    return result.scalars().first()
-
-
-async def get_builds(db: Session) -> typing.List[models.Build]:
-    result = await db.execute(
-        select(models.Build).order_by(models.Build.id.desc()).options(
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.platform),
-            selectinload(models.Build.tasks).selectinload(models.BuildTask.ref),
-            selectinload(models.Build.user)
-        )
-    )
+    if build_id is not None:
+        query = query.where(models.Build.id == build_id)
+    result = await db.execute(query)
+    if build_id:
+        return result.scalars().first()
     return result.scalars().all()
 
 
@@ -145,8 +141,13 @@ async def build_done(
         if not request.success:
             status = BuildTaskStatus.FAILED
         query = models.BuildTask.id == request.task_id
-        build_task = await db.execute(select(models.BuildTask).where(
-            query).with_for_update())
+        build_task = await db.execute(
+            select(models.BuildTask).where(query).options(
+                selectinload(models.BuildTask.build).selectinload(
+                    models.Build.repos
+                )
+            ).with_for_update()
+        )
         build_task = build_task.scalars().first()
         build_task.status = status
         remove_query = (
@@ -155,24 +156,28 @@ async def build_done(
         await db.execute(
             delete(models.BuildTaskDependency).where(remove_query)
         )
-
-        build_query = models.Build.id == build_task.build_id
-        build = await db.execute(
-            select(models.Build).where(build_query).options(
-                selectinload(models.Build.repos)
-            )
-        )
-        build = build.scalars().first()
         pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,
             settings.pulp_password
         )
+        artifacts = []
         for artifact in request.artifacts:
-            repo = next(build_repo for build_repo in build.repos
-                        if build_repo.arch == artifact.arch)
-            await pulp_client.create_rpm_package(
-                artifact.name, artifact.pulp_href, repo.pulp_href)
+            href = artifact.href
+            if artifact.type == 'rpm':
+                repo = next(build_repo for build_repo in build_task.build.repos
+                            if build_repo.arch == artifact.arch)
+                await pulp_client.create_rpm_package(
+                    artifact.name, artifact.href, repo.pulp_href)
+            artifacts.append(
+                models.BuildTaskArtifact(
+                    build_task_id=build_task.id,
+                    name=artifact.name,
+                    type=artifact.type,
+                    href=href
+                )
+            )
+        db.add_all(artifacts)
 
 
 async def github_login(
@@ -186,6 +191,9 @@ async def github_login(
             settings.github_client_secret
         )
         github_info = await get_github_user_info(github_user_token)
+        if not any(item for item in github_info['organizations']
+                   if item['login'] == 'AlmaLinux'):
+            return
         new_user = models.User(
             username=github_info['login'],
             email=github_info['email']
@@ -222,3 +230,30 @@ async def get_user(
         query = models.User.email == user_email
     db_user = await db.execute(select(models.User).where(query))
     return db_user.scalars().first()
+
+
+async def get_artifact(
+            db: Session,
+            artifact_id: int
+        ):
+    query = models.BuildTaskArtifact.id == artifact_id
+    artifact = await db.execute(
+        select(models.BuildTaskArtifact).where(query).options(
+            selectinload(models.BuildTaskArtifact.build_task))
+    )
+    if not artifact:
+        return
+    artifact = artifact.scalars().first()
+    result = {'id': artifact.id, 'name': artifact.name}
+    content_dir = get_s3_build_directory(
+        artifact.build_task.build_id, artifact.build_task.id)
+    artifact_path = os.path.join(content_dir, artifact.name)
+    s3_client = boto3.client(
+        's3',
+        region_name=settings.s3_region,
+        aws_access_key_id=settings.s3_access_key_id,
+        aws_secret_access_key=settings.s3_secret_access_key
+    )
+    result['content'] = s3_client.get_object(
+        Bucket=settings.s3_bucket, Key=artifact_path)['Body'].read()
+    return result

@@ -34,6 +34,17 @@ class BuildPlatform(BaseModel):
         orm_mode = True
 
 
+class BuildTaskArtifact(BaseModel):
+
+    id: int
+    name: str
+    type: str
+    href: str
+
+    class Config:
+        orm_mode = True
+
+
 class BuildTask(BaseModel):
 
     id: int
@@ -43,6 +54,7 @@ class BuildTask(BaseModel):
     arch: str
     platform: BuildPlatform
     ref: BuildTaskRef
+    artifacts: typing.List[BuildTaskArtifact]
 
     class Config:
         orm_mode = True

@@ -141,6 +141,8 @@ class BuildTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    ref = relationship('BuildTaskRef')
+    artifacts = relationship('BuildTaskArtifact')
     platform = relationship('Platform')
     build = relationship('Build', back_populates='tasks')
     dependencies = relationship(
@@ -149,7 +151,6 @@ class BuildTask(Base):
         primaryjoin=(BuildTaskDependency.c.build_task_id == id),
         secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id)
     )
-    ref = relationship('BuildTaskRef')
 
 
 class BuildTaskRef(Base):
@@ -161,6 +162,22 @@ class BuildTaskRef(Base):
     ref_type = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
+
+
+class BuildTaskArtifact(Base):
+
+    __tablename__ = 'build_artifacts'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    build_task_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_tasks.id'),
+        nullable=False
+    )
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    build_task = relationship('BuildTask')
 
 
 class User(Base):

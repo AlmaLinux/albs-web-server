@@ -31,7 +31,7 @@ async def get_builds(db: database.Session = Depends(get_db)):
 
 @router.get('/{build_id}/', response_model=build_schema.Build)
 async def get_build(build_id: int, db: database.Session = Depends(get_db)):
-    db_build = await crud.get_build(db, build_id)
+    db_build = await crud.get_builds(db, build_id)
     if db_build is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

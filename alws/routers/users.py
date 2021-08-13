@@ -18,7 +18,14 @@ async def github_login_or_signup(
             user: user_schema.LoginGithub,
             db: database.Session = Depends(get_db)
         ):
-    return await crud.github_login(db, user)
+    user = await crud.github_login(db, user)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='You should be a part of almalinux github organization to '
+                   'login.'
+        )
+    return user
 
 
 @router.get(

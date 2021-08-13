@@ -48,6 +48,7 @@ class Task(BaseModel):
 
     id: int
     arch: str
+    s3_artifacts_dir: str
     ref: TaskRef
     platform: TaskPlatform
     created_by: TaskCreatedBy
@@ -65,7 +66,8 @@ class Ping(BaseModel):
 class BuildDoneArtifact(BaseModel):
 
     name: str
-    pulp_href: str
+    type: typing.Literal['rpm', 'build_log']
+    href: str
 
     @property
     def arch(self):

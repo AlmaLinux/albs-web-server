@@ -30,6 +30,8 @@ async def get_github_user_info(token: str):
             response.raise_for_status()
             response = await response.json()
     response['email'] = (await get_github_user_emails(token))[0]['email']
+    response['organizations'] = await get_github_user_organizations(
+        response['organizations_url'])
     return response
 
 
@@ -38,5 +40,12 @@ async def get_github_user_emails(token: str):
     headers = {'authorization': f'token {token}'}
     async with aiohttp.ClientSession() as session:
         async with session.get(user_endpoint, headers=headers) as response:
+            response.raise_for_status()
+            return await response.json()
+
+
+async def get_github_user_organizations(url: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
             response.raise_for_status()
             return await response.json()
