@@ -30,6 +30,8 @@ services:
 
   frontend:
     image: albs-frontend:latest
+    env_file:
+      - vars.env
     build:
       dockerfile: Dockerfile
       # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-frontend here instead

@@ -10,3 +10,4 @@ RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
     && pip3 install -r /tmp/requirements.txt && deactivate
 COPY alws /code/alws
 WORKDIR /code
+CMD ["/bin/bash", "-c", "source env/bin/activate && uvicorn --workers 4 --host 0.0.0.0 alws.app:app"]
