@@ -21,6 +21,8 @@ services:
     build:
       dockerfile: Dockerfile
       context: .
+    volumes:
+      - "./alws:/code/alws"
     # TODO: prepare to deal with migrations and so on
     #       and database inititialisation
     command: "bash -c 'source env/bin/activate && /wait_for_it.sh db:5432 && PYTHONPATH='.' python alws/models.py && uvicorn --host 0.0.0.0 alws.app:app'"
