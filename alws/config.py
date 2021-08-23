@@ -15,11 +15,5 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
-    s3_region: str
-    s3_bucket: str
-    s3_artifacts_dir: str
-    s3_access_key_id: str
-    s3_secret_access_key: str
-
 
 settings = Settings()

@@ -13,20 +13,51 @@ class PulpClient:
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
 
+    async def create_build_log_repo(self, name: str) -> str:
+        ENDPOINT = 'pulp/api/v3/repositories/file/file/'
+        payload = {'name': name, 'autopublish': True}
+        response = await self.make_post_request(ENDPOINT, data=payload)
+        repo_href = response['pulp_href']
+        await self.create_file_publication(repo_href)
+        distro = await self.create_file_distro(name, repo_href)
+        return distro, repo_href
+
     async def create_build_rpm_repo(self, name: str) -> str:
         ENDPOINT = 'pulp/api/v3/repositories/rpm/rpm/'
         payload = {'name': name, 'autopublish': True}
         response = await self.make_post_request(ENDPOINT, data=payload)
         repo_href = response['pulp_href']
-        await self.create_publication(repo_href)
-        distro = await self.create_distro(name, repo_href)
+        await self.create_rpm_publication(repo_href)
+        distro = await self.create_rpm_distro(name, repo_href)
         return distro, repo_href
 
-    async def create_publication(self, repository: str):
+    async def create_file_publication(self, repository: str):
+        ENDPOINT = 'pulp/api/v3/publications/file/file/'
+        payload = {'repository': repository}
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        await self.wait_for_task(task['task'])
+
+    async def create_rpm_publication(self, repository: str):
         ENDPOINT = 'pulp/api/v3/publications/rpm/rpm/'
         payload = {'repository': repository}
         task = await self.make_post_request(ENDPOINT, data=payload)
         await self.wait_for_task(task['task'])
+
+    async def create_file(
+                self,
+                file_name: str,
+                artifact_href: str,
+                repo: str
+            ) -> str:
+        ENDPOINT = 'pulp/api/v3/content/file/files/'
+        payload = {
+            'relative_path': file_name,
+            'artifact': artifact_href,
+            'repository': repo
+        }
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources'][0]
 
     async def create_rpm_package(
                 self,
@@ -44,7 +75,19 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0]
 
-    async def create_distro(self, name: str, repository: str) -> str:
+    async def create_file_distro(self, name: str, repository: str) -> str:
+        ENDPOINT = 'pulp/api/v3/distributions/file/file/'
+        payload = {
+            'repository': repository,
+            'name': f'{name}-distro',
+            'base_path': f'build_logs/{name}'
+        }
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        task_result = await self.wait_for_task(task['task'])
+        distro = await self.get_distro(task_result['created_resources'][0])
+        return distro['base_url']
+
+    async def create_rpm_distro(self, name: str, repository: str) -> str:
         ENDPOINT = 'pulp/api/v3/distributions/rpm/rpm/'
         payload = {
             'repository': repository,
@@ -70,12 +113,18 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
             async with session.get(full_url) as response:
+                json = await response.json()
+                print(json)
                 response.raise_for_status()
+                return json
                 return await response.json()
 
     async def make_post_request(self, endpoint: str, data: Optional[dict]):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
             async with session.post(full_url, json=data) as response:
+                json = await response.json()
+                print(json)
                 response.raise_for_status()
+                return json
                 return await response.json()
