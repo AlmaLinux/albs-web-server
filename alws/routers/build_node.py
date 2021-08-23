@@ -53,4 +53,8 @@ async def get_task(
     for repo in itertools.chain(task.platform.repos, task.build.repos):
         if repo.arch == task.arch and repo.type != 'build_log':
             response['repositories'].append(repo)
+    for build in task.build.linked_builds:
+        for repo in build.repos:
+            if repo.arch == task.arch:
+                response['repositories'].append(repo)
     return response
