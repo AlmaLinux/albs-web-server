@@ -31,6 +31,11 @@ async def create_build(
         await planner.load_platforms()
         for task in build.tasks:
             await planner.add_task(task)
+        if build.linked_builds:
+            for linked_id in build.linked_builds:
+                linked_build = await get_builds(db, linked_id)
+                if linked_build:
+                    await planner.add_linked_builds(linked_build)
         db_build = planner.create_build()
         db.add(db_build)
         await db.flush()
@@ -51,7 +56,8 @@ async def get_builds(
         selectinload(models.Build.tasks).selectinload(models.BuildTask.ref),
         selectinload(models.Build.user),
         selectinload(models.Build.tasks).selectinload(
-            models.BuildTask.artifacts)
+            models.BuildTask.artifacts),
+        selectinload(models.Build.linked_builds)
     )
     if build_id is not None:
         query = query.where(models.Build.id == build_id)
@@ -109,7 +115,10 @@ async def get_available_build_task(
                 selectinload(models.BuildTask.platform).selectinload(
                     models.Platform.repos),
                 selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user)
+                    models.Build.user),
+                selectinload(models.BuildTask.build).selectinload(
+                    models.Build.linked_builds).selectinload(
+                    models.Build.repos)
             ).order_by(models.BuildTask.id)
         )
         db_task = db_task.scalars().first()

@@ -1,7 +1,7 @@
 import typing
 import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, Field
 
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build']
@@ -21,6 +21,7 @@ class BuildCreate(BaseModel):
 
     platforms: typing.List[str]
     tasks: typing.List[BuildTaskRef]
+    linked_builds: typing.Optional[typing.List[int]]
 
 
 class BuildPlatform(BaseModel):
@@ -76,6 +77,11 @@ class Build(BaseModel):
     created_at: datetime.datetime
     tasks: typing.List[BuildTask]
     user: BuildUser
+    linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
+
+    @validator('linked_builds', pre=True)
+    def linked_builds_validator(cls, v):
+        return [item if isinstance(item, int) else item.id for item in v]
 
     class Config:
         orm_mode = True

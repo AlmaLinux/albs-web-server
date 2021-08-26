@@ -83,6 +83,9 @@ class BuildPlanner:
                     ))
         await asyncio.gather(*tasks)
 
+    async def add_linked_builds(self, linked_build):
+        self._build.linked_builds.append(linked_build)
+
     async def add_task(self, task: build_schema.BuildTask):
         ref = models.BuildTaskRef(**task.dict())
         for platform in self._platforms:

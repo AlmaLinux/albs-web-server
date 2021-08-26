@@ -78,6 +78,24 @@ BuildRepo = sqlalchemy.Table(
 )
 
 
+BuildDependency = sqlalchemy.Table(
+    'build_dependency',
+    Base.metadata,
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'build_dependency',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        primary_key=True
+    )
+)
+
+
 class Build(Base):
 
     __tablename__ = 'builds'
@@ -97,6 +115,12 @@ class Build(Base):
     tasks = relationship('BuildTask', back_populates='build')
     repos = relationship('Repository', secondary=BuildRepo)
     user = relationship('User')
+    linked_builds = relationship(
+        'Build',
+        secondary=BuildDependency,
+        primaryjoin=(BuildDependency.c.build_id == id),
+        secondaryjoin=(BuildDependency.c.build_dependency == id)
+    )
 
 
 BuildTaskDependency = sqlalchemy.Table(

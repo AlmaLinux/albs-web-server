@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 __all__ = ['Task']
@@ -52,6 +52,7 @@ class Task(BaseModel):
     platform: TaskPlatform
     created_by: TaskCreatedBy
     repositories: typing.List[TaskRepo]
+    linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
 
     class Config:
         orm_mode = True
