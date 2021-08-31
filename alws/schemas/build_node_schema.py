@@ -11,16 +11,12 @@ class TaskRepo(BaseModel):
     name: str
     url: str
 
-    # TODO: remove this
-    channel = 0
-
     class Config:
         orm_mode = True
 
 
 class TaskRef(BaseModel):
 
-    ref_type: str
     url: str
     git_ref: typing.Optional[str]
 

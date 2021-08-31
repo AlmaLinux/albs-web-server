@@ -9,7 +9,6 @@ __all__ = ['BuildTaskRef', 'BuildCreate', 'Build']
 
 class BuildTaskRef(BaseModel):
 
-    ref_type: typing.Literal['srpm', 'git_tag', 'git_branch']
     url: str
     git_ref: typing.Optional[str]
 

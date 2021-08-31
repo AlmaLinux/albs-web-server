@@ -183,7 +183,6 @@ class BuildTaskRef(Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     # TODO: think if type can be integer
-    ref_type = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
 
