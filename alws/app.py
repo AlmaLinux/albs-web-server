@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from alws.routers import builds, platforms, users, build_node
+from alws.routers import builds, platforms, users, build_node, projects
 
 
 app = FastAPI(
@@ -8,5 +8,5 @@ app = FastAPI(
 )
 
 
-for module in (builds, platforms, users, build_node):
+for module in (builds, platforms, users, build_node, projects):
     app.include_router(module.router, prefix='/api/v1')
