@@ -12,6 +12,7 @@ import json
 import os
 import logging
 import requests
+import re
 from ruamel.yaml import YAML
 
 from paho.mqtt import client as mqtt_client
@@ -90,14 +91,14 @@ def create_build(received_data: PushedEvent,
     """
 
     git_url = received_data.repository.clone_url
-    git_ref = received_data.ref.split('/')[-1]
+    git_ref = re.sub('refs/tags/', '', received_data.ref)
     build_query = {
         'platforms': ['Alma8'],
         'tasks': [
             {
                 # this is only for local dev testing
-                'url': git_url.replace('localhost', '192.168.1.118'),
-                # 'url': git_url
+                # 'url': git_url.replace('localhost', '192.168.1.118'),
+                'url': git_url,
                 'git_ref': git_ref
             }
         ]
@@ -146,8 +147,12 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
                         f'ref {received.ref} commit {received.after} '
                         f'from repository {received.repository.name}')
             try:
-                created = create_build(received, config)
-                LOGGER.info(f'Build {created} was successfully created')
+                if 'tags' in received.ref:
+                    LOGGER.info('Making a new build for found new tag...')
+                    created = create_build(received, config)
+                    LOGGER.info(f'Build {created} was successfully created')
+                else:
+                    LOGGER.info('Skipping new commit')
             except Exception as error:
                 LOGGER.error(f'Failed to create a build. Traceback: {error}')
                 client.reconnect()

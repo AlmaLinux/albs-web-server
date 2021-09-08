@@ -1,5 +1,5 @@
 ---
-mqtt_queue_host: 127.0.0.1
+mqtt_queue_host: 192.168.1.118
 mqtt_queue_port: 1883
 mqtt_queue_topic_unmodified: gitea-webhooks-unmodified
 mqtt_queue_topic_modified: gitea-webhooks-modified
@@ -9,4 +9,4 @@ mqtt_queue_username:
 mqtt_queue_password:
 mqtt_queue_clean_session: False
 albs_jwt_token:
-albs_address: http://127.0.0.1:8080
+albs_address: http://192.168.1.118:8080
