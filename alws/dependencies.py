@@ -1,5 +1,6 @@
 from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
+import aioredis
 
 from alws import database
 from alws.config import settings
@@ -12,6 +13,14 @@ __all__ = ['get_db', 'JWTBearer']
 async def get_db() -> database.Session:
     async with database.Session() as session:
         yield session
+
+
+async def get_redis() -> aioredis.Redis:
+    client = aioredis.from_url(settings.redis_url)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 class JWTBearer(HTTPBearer):
