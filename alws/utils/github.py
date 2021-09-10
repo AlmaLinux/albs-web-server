@@ -47,6 +47,7 @@ async def get_github_user_emails(token: str):
 
 
 async def get_github_user_organizations(token: str):
+    return []
     org_endpoint = 'https://api.github.com/user/memberships/orgs'
     headers = {'authorization': f'token {token}'}
     async with aiohttp.ClientSession() as session:
