@@ -73,6 +73,17 @@ services:
     depends_on:
       - redis
 
+  gitea_listener:
+    image: albs-gitea-listener:latest
+    env_file:
+      - vars.env
+    build:
+      context: ./alws/scripts/albs-gitea-listener
+      dockerfile: Dockerfile
+    restart: on-failure
+    depends_on:
+      - mosquitto
+
   pulp:
     image: pulp/pulp
     ports:
@@ -85,6 +96,11 @@ services:
     devices:
       - "/dev/fuse"
     restart: on-failure
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "11883:1883"
 
   redis:
     image: redis
