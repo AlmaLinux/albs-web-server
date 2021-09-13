@@ -93,7 +93,7 @@ def create_build(received_data: PushedEvent,
     git_url = received_data.repository.clone_url
     git_ref = re.sub('refs/tags/', '', received_data.ref)
     build_query = {
-        'platforms': ['Alma8'],
+        'platforms': ['Alma84'],
         'tasks': [
             {
                 # this is only for local dev testing
