@@ -76,3 +76,8 @@ class BuildDone(BaseModel):
     task_id: int
     success: bool
     artifacts: typing.List[BuildDoneArtifact]
+
+
+class RequestTask(BaseModel):
+
+    supported_arches: typing.List[str]
