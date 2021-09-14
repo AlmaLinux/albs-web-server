@@ -104,7 +104,7 @@ async def get_available_build_task(
             select(models.BuildTask).where(query).with_for_update().filter(
                     sqlalchemy.and_(
                         models.BuildTask.status < BuildTaskStatus.COMPLETED,
-                        models.BuildTask.arch._in(request.supported_arches),
+                        models.BuildTask.arch.in_(request.supported_arches),
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
                             models.BuildTask.ts.__eq__(None)
