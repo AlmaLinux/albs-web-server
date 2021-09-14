@@ -62,27 +62,27 @@ services:
     depends_on:
       - web_server
 
-  git_cacher:
-    image: albs-git-cacher:latest
-    env_file:
-      - vars.env
-    build:
-      context: ./alws/scripts/git_cacher
-      dockerfile: Dockerfile
-    restart: on-failure
-    depends_on:
-      - redis
-
   gitea_listener:
     image: albs-gitea-listener:latest
     env_file:
       - vars.env
     build:
-      context: ./alws/scripts/albs-gitea-listener
-      dockerfile: Dockerfile
+      context: ./alws/scripts
+      dockerfile: albs-gitea-listener/Dockerfile
     restart: on-failure
     depends_on:
       - mosquitto
+
+  git_cacher:
+    image: albs-git-cacher:latest
+    env_file:
+      - vars.env
+    build:
+      context: ./alws/scripts
+      dockerfile: git_cacher/Dockerfile
+    restart: on-failure
+    depends_on:
+      - redis
 
   pulp:
     image: pulp/pulp
