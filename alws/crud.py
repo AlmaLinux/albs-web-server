@@ -5,6 +5,7 @@ import sqlalchemy
 from sqlalchemy import update, delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
@@ -48,8 +49,9 @@ async def create_build(
 
 async def get_builds(
             db: Session,
-            build_id: typing.Optional[int] = None
-        ) -> typing.List[models.Build]:
+            build_id: typing.Optional[int] = None,
+            page_number: typing.Optional[int] = None
+        ) -> typing.Union[typing.List[models.Build], dict]:
     query = select(models.Build).order_by(models.Build.id.desc()).options(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.platform),
@@ -59,11 +61,19 @@ async def get_builds(
             models.BuildTask.artifacts),
         selectinload(models.Build.linked_builds)
     )
+    if page_number:
+        query = query.slice(10 * page_number - 10, 10 * page_number)
     if build_id is not None:
         query = query.where(models.Build.id == build_id)
     result = await db.execute(query)
     if build_id:
         return result.scalars().first()
+    elif page_number:
+        total_builds = await db.execute(func.count(models.Build.id))
+        total_builds = total_builds.scalar()
+        return {'builds': result.scalars().all(),
+                'total_builds': total_builds,
+                'current_page': page_number}
     return result.scalars().all()
 
 

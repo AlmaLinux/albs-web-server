@@ -24,9 +24,11 @@ async def create_build(
     return db_build
 
 
-@router.get('/', response_model=typing.List[build_schema.Build])
-async def get_builds(db: database.Session = Depends(get_db)):
-    return await crud.get_builds(db)
+@router.get('/', response_model=typing.Union[
+    typing.List[build_schema.Build], build_schema.BuildsResponse])
+async def get_builds_per_page(pageNumber: int,
+                              db: database.Session = Depends(get_db)):
+    return await crud.get_builds(db, page_number=pageNumber)
 
 
 @router.get('/{build_id}/', response_model=build_schema.Build)
