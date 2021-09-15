@@ -57,7 +57,9 @@ class PulpClient:
         }
         task = await self.make_post_request(ENDPOINT, data=payload)
         task_result = await self.wait_for_task(task['task'])
-        return task_result['created_resources'][0]
+        hrefs = [item for item in task_result['created_resources']
+                 if 'file/files' in item]
+        return hrefs[0] if hrefs else None
 
     async def create_rpm_package(
                 self,
@@ -73,7 +75,9 @@ class PulpClient:
         }
         task = await self.make_post_request(ENDPOINT, data=payload)
         task_result = await self.wait_for_task(task['task'])
-        return task_result['created_resources'][0]
+        hrefs = [item for item in task_result['created_resources']
+                 if 'rpm/packages' in item]
+        return hrefs[0] if hrefs else None
 
     async def create_file_distro(self, name: str, repository: str) -> str:
         ENDPOINT = 'pulp/api/v3/distributions/file/file/'

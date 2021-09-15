@@ -1,3 +1,4 @@
+import re
 import typing
 
 from pydantic import BaseModel, Field
@@ -69,6 +70,10 @@ class BuildDoneArtifact(BaseModel):
     def arch(self):
         # TODO: this is awful way to check pkg arch
         return self.name.split('.')[-2]
+
+    @property
+    def is_debuginfo(self):
+        return bool(re.search(r'-debug(info|source)', self.name))
 
 
 class BuildDone(BaseModel):

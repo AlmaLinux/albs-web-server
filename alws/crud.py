@@ -172,7 +172,7 @@ async def build_done(
         )
         artifacts = []
         for artifact in request.artifacts:
-            href = artifact.href
+            href = None
             arch = build_task.arch
             if artifact.type == 'rpm' and artifact.arch == 'src':
                 arch = artifact.arch
@@ -180,12 +180,13 @@ async def build_done(
                 build_repo for build_repo in build_task.build.repos
                 if build_repo.arch == arch
                 and build_repo.type == artifact.type
+                and build_repo.debug == artifact.is_debuginfo
             )
             if artifact.type == 'rpm':
-                await pulp_client.create_rpm_package(
+                href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
             elif artifact.type == 'build_log':
-                await pulp_client.create_file(
+                href = await pulp_client.create_file(
                     artifact.name, artifact.href, repo.pulp_href)
             artifacts.append(
                 models.BuildTaskArtifact(

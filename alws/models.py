@@ -57,6 +57,7 @@ class Repository(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
 
 

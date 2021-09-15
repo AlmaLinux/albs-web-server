@@ -16,9 +16,15 @@ class BuildTaskRef(BaseModel):
         orm_mode = True
 
 
+class BuildCreatePlatforms(BaseModel):
+
+    name: str
+    arch_list: typing.List[str]
+
+
 class BuildCreate(BaseModel):
 
-    platforms: typing.List[str]
+    platforms: typing.List[BuildCreatePlatforms]
     tasks: typing.List[BuildTaskRef]
     linked_builds: typing.Optional[typing.List[int]]
 
