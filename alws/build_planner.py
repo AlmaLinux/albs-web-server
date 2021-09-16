@@ -48,9 +48,10 @@ class BuildPlanner:
                 arch: str,
                 build: models.Build,
                 repo_type: str,
-                is_debug: typing.Optional[bool] = False
+                is_debug: typing.Optional[bool] = False,
+                task_id: typing.Optional[int] = None
             ) -> models.Repository:
-        suffix = 'br' if repo_type != 'build_log' else 'artifacts'
+        suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
         repo_name = (
             f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}{suffix}'
@@ -74,6 +75,9 @@ class BuildPlanner:
     def sync_append_build_repo(self, db: Session, repo: models.BuildRepo):
         self._build.repos.append(repo)
 
+    def sync_get_build_tasks(self, db: Session):
+        return self._build.tasks
+
     async def init_build_repos(self):
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -82,27 +86,33 @@ class BuildPlanner:
         )
         tasks = []
         for platform in self._platforms:
-            for repo_type in ('rpm', 'build_log'):
-                for arch in ['src'] + self._request_platforms[platform.name]:
-                    if arch == 'src' and repo_type == 'build_log':
-                        continue
-                    tasks.append(self.create_build_repo(
-                        pulp_client,
-                        platform,
-                        arch,
-                        self._build,
-                        repo_type
-                    ))
-                    if arch == 'src' or repo_type == 'build_log':
-                        continue
-                    tasks.append(self.create_build_repo(
-                        pulp_client,
-                        platform,
-                        arch,
-                        self._build,
-                        repo_type,
-                        True
-                    ))
+            for arch in ['src'] + self._request_platforms[platform.name]:
+                tasks.append(self.create_build_repo(
+                    pulp_client,
+                    platform,
+                    arch,
+                    self._build,
+                    'rpm'
+                ))
+                if arch == 'src':
+                    continue
+                tasks.append(self.create_build_repo(
+                    pulp_client,
+                    platform,
+                    arch,
+                    self._build,
+                    'rpm',
+                    True
+                ))
+        for task in await self._db.run_sync(self.sync_get_build_tasks):
+            tasks.append(self.create_build_repo(
+                pulp_client,
+                task.platform,
+                task.arch,
+                self._build,
+                'build_log',
+                task_id=task.id
+            ))
         await asyncio.gather(*tasks)
 
     async def add_linked_builds(self, linked_build):
