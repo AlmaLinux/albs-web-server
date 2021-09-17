@@ -4,7 +4,7 @@ import datetime
 from pydantic import BaseModel, validator, Field
 
 
-__all__ = ['BuildTaskRef', 'BuildCreate', 'Build']
+__all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 
 class BuildTaskRef(BaseModel):
@@ -90,3 +90,10 @@ class Build(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class BuildsResponse(BaseModel):
+
+    builds: typing.List[Build]
+    total_builds: typing.Optional[int]
+    current_page: typing.Optional[int]

@@ -9,6 +9,9 @@ import aioredis
 import pydantic
 
 
+__all__ = ['load_redis_cache', 'save_redis_cache']
+
+
 class Config(pydantic.BaseSettings):
 
     redis_url: str = 'redis://redis:6379'

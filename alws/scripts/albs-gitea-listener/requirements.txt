@@ -2,3 +2,5 @@ paho-mqtt==1.5.1
 pydantic==1.8.2
 ruamel.yaml==0.17.13
 requests
+aioredis
+aiohttp
