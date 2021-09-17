@@ -161,8 +161,8 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
                         f'ref {received.ref} commit {received.after} '
                         f'from repository {received.repository.name}')
             LOGGER.info('Checking gitea cache')
-            redis_client = aioredis.from_url('redis://redis:6379')
-            redis_key = 'gitea_cache'
+            redis_client = aioredis.from_url(config.redis_host)
+            redis_key = config.redis_cache_key
             loop = asyncio.get_event_loop()
             gitea_cache = loop.run_until_complete(get_gitea_cache(
                 redis_client, redis_key))
@@ -179,7 +179,6 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
                     if 'heads' in received.ref:
                         git_ref = re.sub('refs/heads/', '', received.ref)
                         if received.ref not in gitea_cache[repo]['branches']:
-                            LOGGER.info('HERE')
                             gitea_cache[repo]['branches'].append(git_ref)
                     LOGGER.info('Skipping new commit')
 

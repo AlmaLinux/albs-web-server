@@ -30,6 +30,8 @@ class GiteaListenerConfig(BaseModel):
     mqtt_queue_clean_session: bool
     albs_jwt_token: str
     albs_address: str
+    redis_host: str = 'redis://redis:6379'
+    redis_cache_key: str = 'gitea_cache'
 
 
 class ShortUser(BaseModel):
