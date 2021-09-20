@@ -22,6 +22,14 @@ async def create_platform(
     return await crud.create_platform(db, platform)
 
 
+@router.put('/', response_model=platform_schema.Platform)
+async def modify_platform(
+            platform: platform_schema.PlatformModify,
+            db: database.Session = Depends(get_db)
+        ):
+    return await crud.modify_platform(db, platform)
+
+
 @router.get('/', response_model=typing.List[platform_schema.Platform])
 async def get_platforms(db: database.Session = Depends(get_db)):
     return await crud.get_platforms(db)

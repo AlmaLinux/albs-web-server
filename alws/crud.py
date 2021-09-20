@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
+from alws.errors import DataNotFoundError, BuildError
 from alws.config import settings
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
@@ -75,6 +76,49 @@ async def get_builds(
                 'total_builds': total_builds,
                 'current_page': page_number}
     return result.scalars().all()
+
+
+async def modify_platform(
+            db: Session,
+            platform: platform_schema.PlatformModify
+        ) -> models.Platform:
+    query = models.Platform.name == platform.name
+    async with db.begin():
+        db_platform = await db.execute(
+            select(models.Platform).where(query).options(
+                selectinload(models.Platform.repos)
+            ).with_for_update()
+        )
+        db_platform = db_platform.scalars().first()
+        if not db_platform:
+            raise DataNotFoundError(
+                f'Platform with name: "{platform.name}" does not exists'
+            )
+        for key in ('type', 'distr_type', 'distr_version', 'arch_list',
+                    'data'):
+            value = getattr(platform, key, None)
+            if value is not None:
+                setattr(db_platform, key, value)
+        db_repos = {repo.name: repo for repo in db_platform.repos}
+        new_repos = {repo.name: repo for repo in platform.repos}
+        for repo in platform.repos:
+            if repo.name in db_repos:
+                db_repo = db_repos[repo.name]
+                for key in repo.dict().keys():
+                    setattr(db_repo, key, getattr(repo, key))
+            else:
+                db_platform.repos.append(models.Repository(**repo.dict()))
+        to_remove = []
+        for repo_name in db_repos:
+            if repo_name not in new_repos:
+                to_remove.append(repo_name)
+        remove_query = models.Repository.name.in_(to_remove)
+        await db.execute(
+            delete(models.BuildTaskDependency).where(remove_query)
+        )
+        await db.commit()
+    await db.refresh(db_platform)
+    return db_platform
 
 
 async def create_platform(
@@ -168,6 +212,9 @@ async def build_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
+        if build_task.status not in (
+                BuildTaskStatus.IDLE, BuildTaskStatus.STARTED):
+            raise BuildError(f'Build task {build_task.id} already completed')
         build_task.status = status
         remove_query = (
             models.BuildTaskDependency.c.build_task_dependency == request.task_id

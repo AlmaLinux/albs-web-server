@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
 from alws import models
+from alws.errors import DataNotFoundError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus
@@ -38,8 +39,13 @@ class BuildPlanner:
             models.Platform.name.in_(platform_names)))
         self._platforms = self._platforms.scalars().all()
         if len(self._platforms) != len(platform_names):
-            # TODO: raise error
-            pass
+            found_platforms = {platform.name for platform in self._platforms}
+            missing_platforms = ', '.join(
+                name for name in platform_names if name not in found_platforms
+            )
+            raise DataNotFoundError(
+                f'platforms: {missing_platforms} cannot be found in database'
+            )
 
     async def create_build_repo(
                 self,
