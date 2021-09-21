@@ -192,7 +192,9 @@ async def ping_tasks(
         ):
     query = models.BuildTask.id.in_(task_list)
     now = datetime.datetime.now()
-    await db.execute(update(models.BuildTask).where(query).values(ts=now))
+    async with db.begin():
+        await db.execute(update(models.BuildTask).where(query).values(ts=now))
+        await db.commit()
 
 
 async def build_done(
