@@ -47,7 +47,7 @@ class GiteaClient:
     def __init__(self, host: str, log: logging.Logger):
         self.host = host
         self.log = log
-        self.requests_lock = asyncio.Semaphore(10)
+        self.requests_lock = asyncio.Semaphore(5)
 
     async def make_request(self, endpoint: str, params: dict = None):
         full_url = urllib.parse.urljoin(self.host, endpoint)
@@ -61,17 +61,18 @@ class GiteaClient:
     async def _list_all_pages(self, endpoint: str) -> typing.List:
         items = []
         page = 1
+        # This is max gitea limit, default is 30
+        items_per_page = 50
         while True:
             payload = {
-                # This is max gitea limit, default is 30
-                'limit': 50,
+                'limit': items_per_page,
                 'page': page
             }
             response = await self.make_request(endpoint, payload)
-            if len(response) == 0:
+            items.extend(response)
+            if len(response) < items_per_page:
                 break
             page += 1
-            items.extend(response)
         return items
 
     async def list_repos(self, organization: str) -> typing.List:
