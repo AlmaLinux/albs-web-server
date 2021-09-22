@@ -79,7 +79,7 @@ class BuildDoneArtifact(BaseModel):
 class BuildDone(BaseModel):
 
     task_id: int
-    success: bool
+    status: typing.Literal['done', 'failed', 'excluded']
     artifacts: typing.List[BuildDoneArtifact]
 
 

@@ -202,9 +202,6 @@ async def build_done(
             request: build_node_schema.BuildDone
         ):
     async with db.begin():
-        status = BuildTaskStatus.COMPLETED
-        if not request.success:
-            status = BuildTaskStatus.FAILED
         query = models.BuildTask.id == request.task_id
         build_task = await db.execute(
             select(models.BuildTask).where(query).options(
@@ -214,9 +211,13 @@ async def build_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if build_task.status not in (
-                BuildTaskStatus.IDLE, BuildTaskStatus.STARTED):
+        if BuildTaskStatus.is_finished(build_task.status):
             raise BuildError(f'Build task {build_task.id} already completed')
+        status = BuildTaskStatus.COMPLETED
+        if request.status == 'failed':
+            status = BuildTaskStatus.FAILED
+        elif request.status == 'excluded':
+            status = BuildTaskStatus.EXCLUDED
         build_task.status = status
         remove_query = (
             models.BuildTaskDependency.c.build_task_dependency == request.task_id
