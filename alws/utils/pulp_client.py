@@ -31,6 +31,13 @@ class PulpClient:
         distro = await self.create_rpm_distro(name, repo_href)
         return distro, repo_href
 
+    async def modify_repository(self, repo_from: str, repo_to: str,
+                                content: str):
+        ENDPOINT = f'{repo_to}modify/'
+        payload = {content: [repo_from]}
+        response = await self.make_post_request(ENDPOINT, data=payload)
+        return response
+
     async def create_file_publication(self, repository: str):
         ENDPOINT = 'pulp/api/v3/publications/file/file/'
         payload = {'repository': repository}

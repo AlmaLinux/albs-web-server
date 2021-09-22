@@ -16,8 +16,11 @@ from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
-    build_schema, user_schema, platform_schema, build_node_schema
+    build_schema, user_schema, platform_schema, build_node_schema,
+    distro_schema
 )
+from alws.utils.distro_utils import create_empty_repo
+from fastapi import HTTPException, status
 
 
 __all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
@@ -141,9 +144,113 @@ async def create_platform(
     return db_platform
 
 
+async def create_distro(
+        db: Session,
+        distribution: distro_schema.DistroCreate
+) -> models.Distribution:
+
+    db_distro = await db.execute(select(models.Distribution).where(
+        models.Distribution.name.__eq__(distribution.name)))
+    db_distro = db_distro.scalars().first()
+
+    if db_distro:
+        error_msg = f'{distribution.name} distribution already exists'
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=error_msg)
+    else:
+        distro_platforms = await db.execute(select(models.Platform).where(
+            models.Platform.name.in_(distribution.platforms)))
+        distro_platforms = distro_platforms.scalars().all()
+
+        db_distribution = models.Distribution(
+            name=distribution.name
+        )
+        for platform in distro_platforms:
+            db_distribution.platforms.append(platform)
+
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        await create_empty_repo(pulp_client, db_distribution)
+        db.add(db_distribution)
+        await db.commit()
+        await db.refresh(db_distribution)
+        return db_distribution
+
+
 async def get_platforms(db):
     db_platforms = await db.execute(select(models.Platform))
     return db_platforms.scalars().all()
+
+
+async def get_distributions(db):
+    db_distros = await db.execute(select(models.Distribution))
+    return db_distros.scalars().all()
+
+
+async def modify_distribution(build_id: int, distribution: str, db: Session,
+                              modification: str):
+
+    db_distro = await db.execute(select(models.Distribution).where(
+        models.Distribution.name.__eq__(distribution)
+    ).options(selectinload(models.Distribution.repositories),
+              selectinload(models.Distribution.packages)).with_for_update())
+    db_distro = db_distro.scalars().first()
+
+    db_build_tasks = await db.execute(select(models.BuildTask).where(
+        models.BuildTask.build_id.__eq__(build_id)
+    ).options(selectinload(models.BuildTask.artifacts)))
+    db_build_tasks = db_build_tasks.scalars().all()
+
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+
+    db_build = await db.execute(select(models.Build).where(
+        models.Build.id.__eq__(build_id)))
+    db_build = db_build.scalars().first()
+
+    if modification == 'add':
+        if db_build in db_distro.packages:
+            error_msg = f'Packages of build {build_id} have already been' \
+                        f' added to {distribution} distribution'
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_msg)
+        else:
+            db_distro.packages.append(db_build)
+    if modification == 'remove':
+        if db_build not in db_distro.packages:
+            error_msg = f'Packages of build {build_id} cannot be removed ' \
+                        f'from {distribution} distribution ' \
+                        f'as they are not added there'
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=error_msg)
+        else:
+            remove_query = models.Build.id.__eq__(build_id)
+            await db.execute(
+                delete(models.DistributionPackages).where(remove_query)
+            )
+    await db.commit()
+    await db.refresh(db_distro)
+    for task in db_build_tasks:
+        for artifact in task.artifacts:
+            if artifact.type == 'rpm':
+                for distro_repo in db_distro.repositories:
+                    if distro_repo.arch in artifact.name:
+                        res = await pulp_client.modify_repository(
+                            repo_from=artifact.href,
+                            repo_to=distro_repo.pulp_href,
+                            content=f'{modification}_content_units')
+                        if res.get('task', None):
+                            continue
+                        else:
+                            error_msg = 'Could not add packages to distribution'
+                            raise HTTPException(
+                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=error_msg)
+    return True
 
 
 async def get_available_build_task(
