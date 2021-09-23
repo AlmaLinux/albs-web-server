@@ -2,7 +2,7 @@ fastapi[all]==0.68.0
 uvicorn==0.13.4
 asyncpg==0.24.0
 pydantic==1.8.2
-SQLAlchemy==1.4.22
+SQLAlchemy==1.4.25
 aiohttp==3.7.4.post0
 PyJWT==2.1.0
 alembic==1.6.5
