@@ -236,9 +236,12 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
     await db.refresh(db_distro)
     for task in db_build_tasks:
         for artifact in task.artifacts:
+            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                artifact)
             if artifact.type == 'rpm':
                 for distro_repo in db_distro.repositories:
-                    if distro_repo.arch in artifact.name:
+                    if (distro_repo.arch == task.arch and
+                            distro_repo.debug == build_artifact.is_debuginfo):
                         res = await pulp_client.modify_repository(
                             repo_from=artifact.href,
                             repo_to=distro_repo.pulp_href,

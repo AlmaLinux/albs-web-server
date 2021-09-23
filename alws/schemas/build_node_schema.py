@@ -66,6 +66,9 @@ class BuildDoneArtifact(BaseModel):
     type: typing.Literal['rpm', 'build_log']
     href: str
 
+    class Config:
+        orm_mode = True
+
     @property
     def arch(self):
         # TODO: this is awful way to check pkg arch
@@ -73,7 +76,8 @@ class BuildDoneArtifact(BaseModel):
 
     @property
     def is_debuginfo(self):
-        return bool(re.search(r'-debug(info|source)', self.name))
+        regex = re.compile(r'-debug(info|source)-\d')
+        return bool(re.search(regex, self.name))
 
 
 class BuildDone(BaseModel):
