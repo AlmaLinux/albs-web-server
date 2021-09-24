@@ -1,6 +1,6 @@
 import asyncio
 import urllib
-from typing import Optional
+from typing import Optional, List
 
 import aiohttp
 
@@ -31,10 +31,13 @@ class PulpClient:
         distro = await self.create_rpm_distro(name, repo_href)
         return distro, repo_href
 
-    async def modify_repository(self, repo_from: str, repo_to: str,
-                                content: str):
-        ENDPOINT = f'{repo_to}modify/'
-        payload = {content: [repo_from]}
+    async def modify_repository(self, repo_to: str, add: List[str] = None,
+                                remove: List[str] = None):
+        ENDPOINT = urllib.parse.urljoin(repo_to, 'modify/')
+        if add:
+            payload = {'add_content_units': add}
+        if remove:
+            payload = {'remove_content_units': remove}
         response = await self.make_post_request(ENDPOINT, data=payload)
         return response
 

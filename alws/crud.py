@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import DataNotFoundError, BuildError
+from alws.errors import DataNotFoundError, BuildError, DistributionError
 from alws.config import settings
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
@@ -20,7 +20,6 @@ from alws.schemas import (
     distro_schema
 )
 from alws.utils.distro_utils import create_empty_repo
-from fastapi import HTTPException, status
 
 
 __all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
@@ -149,15 +148,15 @@ async def create_distro(
         distribution: distro_schema.DistroCreate
 ) -> models.Distribution:
 
-    db_distro = await db.execute(select(models.Distribution).where(
-        models.Distribution.name.__eq__(distribution.name)))
-    db_distro = db_distro.scalars().first()
+    async with db.begin():
+        db_distro = await db.execute(select(models.Distribution).where(
+            models.Distribution.name.__eq__(distribution.name)))
+        db_distro = db_distro.scalars().first()
 
-    if db_distro:
-        error_msg = f'{distribution.name} distribution already exists'
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=error_msg)
-    else:
+        if db_distro:
+            error_msg = f'{distribution.name} distribution already exists'
+            raise DistributionError(error_msg)
+
         distro_platforms = await db.execute(select(models.Platform).where(
             models.Platform.name.in_(distribution.platforms)))
         distro_platforms = distro_platforms.scalars().all()
@@ -165,8 +164,7 @@ async def create_distro(
         db_distribution = models.Distribution(
             name=distribution.name
         )
-        for platform in distro_platforms:
-            db_distribution.platforms.append(platform)
+        db_distribution.platforms.extend(distro_platforms)
 
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -177,7 +175,7 @@ async def create_distro(
         db.add(db_distribution)
         await db.commit()
         await db.refresh(db_distribution)
-        return db_distribution
+    return db_distribution
 
 
 async def get_platforms(db):
@@ -193,66 +191,61 @@ async def get_distributions(db):
 async def modify_distribution(build_id: int, distribution: str, db: Session,
                               modification: str):
 
-    db_distro = await db.execute(select(models.Distribution).where(
-        models.Distribution.name.__eq__(distribution)
-    ).options(selectinload(models.Distribution.repositories),
-              selectinload(models.Distribution.packages)).with_for_update())
-    db_distro = db_distro.scalars().first()
+    async with db.begin():
+        db_distro = await db.execute(select(models.Distribution).where(
+            models.Distribution.name.__eq__(distribution)
+        ).options(selectinload(models.Distribution.repositories),
+                  selectinload(models.Distribution.builds)))
+        db_distro = db_distro.scalars().first()
 
-    db_build_tasks = await db.execute(select(models.BuildTask).where(
-        models.BuildTask.build_id.__eq__(build_id)
-    ).options(selectinload(models.BuildTask.artifacts)))
-    db_build_tasks = db_build_tasks.scalars().all()
+        db_build = await db.execute(select(models.Build).where(
+            models.Build.id.__eq__(build_id)
+        ).options(selectinload(models.BuildTask)))
+        db_build = db_build.scalars().first()
 
-    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                             settings.pulp_password)
+        pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                                 settings.pulp_password)
 
-    db_build = await db.execute(select(models.Build).where(
-        models.Build.id.__eq__(build_id)))
-    db_build = db_build.scalars().first()
-
-    if modification == 'add':
-        if db_build in db_distro.packages:
-            error_msg = f'Packages of build {build_id} have already been' \
-                        f' added to {distribution} distribution'
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=error_msg)
-        else:
-            db_distro.packages.append(db_build)
-    if modification == 'remove':
-        if db_build not in db_distro.packages:
-            error_msg = f'Packages of build {build_id} cannot be removed ' \
-                        f'from {distribution} distribution ' \
-                        f'as they are not added there'
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                                detail=error_msg)
-        else:
+        if modification == 'add':
+            if db_build in db_distro.builds:
+                error_msg = f'Packages of build {build_id} have already been' \
+                            f' added to {distribution} distribution'
+                raise DistributionError(error_msg)
+            db_distro.builds.append(db_build)
+        if modification == 'remove':
+            if db_build not in db_distro.builds:
+                error_msg = f'Packages of build {build_id} cannot be removed ' \
+                            f'from {distribution} distribution ' \
+                            f'as they are not added there'
+                raise DistributionError(error_msg)
             remove_query = models.Build.id.__eq__(build_id)
             await db.execute(
-                delete(models.DistributionPackages).where(remove_query)
+                delete(models.DistributionBuilds).where(remove_query)
             )
-    await db.commit()
-    await db.refresh(db_distro)
-    for task in db_build_tasks:
-        for artifact in task.artifacts:
-            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
-                artifact)
-            if artifact.type == 'rpm':
-                for distro_repo in db_distro.repositories:
-                    if (distro_repo.arch == task.arch and
-                            distro_repo.debug == build_artifact.is_debuginfo):
-                        res = await pulp_client.modify_repository(
-                            repo_from=artifact.href,
-                            repo_to=distro_repo.pulp_href,
-                            content=f'{modification}_content_units')
-                        if res.get('task', None):
-                            continue
-                        else:
-                            error_msg = 'Could not add packages to distribution'
-                            raise HTTPException(
-                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                                detail=error_msg)
+
+        await db.commit()
+        await db.refresh(db_distro)
+        for task in db_build.tasks:
+            for artifact in task.artifacts:
+                build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                    artifact)
+                if artifact.type == 'rpm':
+                    for distro_repo in db_distro.repositories:
+                        if (distro_repo.arch == task.arch and
+                                distro_repo.debug == build_artifact.is_debuginfo):
+                            if modification == 'add':
+                                res = await pulp_client.modify_repository(
+                                    add=[artifact.href],
+                                    repo_to=distro_repo.pulp_href)
+                            else:
+                                res = await pulp_client.modify_repository(
+                                    remove=[artifact.href],
+                                    repo_to=distro_repo.pulp_href)
+                            if res.get('task', None):
+                                continue
+                            else:
+                                error_msg = 'Could not add packages to distribution'
+                                raise DistributionError(error_msg)
     return True
 
 

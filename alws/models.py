@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from alws.database import Base, engine
 
 
-__all__ = ['Platform', 'Build', 'BuildTask']
+__all__ = ['Platform', 'Build', 'BuildTask', 'Distribution']
 
 
 PlatformRepo = sqlalchemy.Table(
@@ -65,7 +65,7 @@ DistributionRepositories = sqlalchemy.Table(
 )
 
 
-DistributionPackages = sqlalchemy.Table(
+DistributionBuilds = sqlalchemy.Table(
     'distribution_packages',
     Base.metadata,
     sqlalchemy.Column(
@@ -115,7 +115,7 @@ class Distribution(Base):
     )
     platforms = relationship('Platform', secondary=PlatformDependency)
     repositories = relationship('Repository', secondary=DistributionRepositories)
-    packages = relationship('Build', secondary=DistributionPackages)
+    builds = relationship('Build', secondary=DistributionBuilds)
 
 
 class Repository(Base):
