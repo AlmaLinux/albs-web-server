@@ -34,7 +34,7 @@ async def add_to_distribution(
         return {'success': True}
     except DistributionError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=error)
+                            detail=str(error))
 
 
 @router.post('/remove/{build_id}/{distribution}/',
@@ -50,7 +50,7 @@ async def remove_from_distribution(
         return {'success': True}
     except DistributionError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=error)
+                            detail=str(error))
 
 
 @router.get('/', response_model=typing.List[distro_schema.Distribution])
