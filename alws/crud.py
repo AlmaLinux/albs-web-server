@@ -246,20 +246,10 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
     if modification == 'add':
         for key, value in add_modify.items():
-            res = await pulp_client.modify_repository(
-                add=value, repo_to=key
-            )
-            if not res.get('task', None):
-                error_msg = 'Could not add packages to distribution'
-                raise DistributionError(error_msg)
+            await pulp_client.modify_repository(add=value, repo_to=key)
     else:
-        for key, value in add_modify.items():
-            res = await pulp_client.modify_repository(
-                remove=value, repo_to=key
-            )
-            if not res.get('task', None):
-                error_msg = 'Could not add packages to distribution'
-                raise DistributionError(error_msg)
+        for key, value in remove_modify.items():
+            await pulp_client.modify_repository(remove=value, repo_to=key)
 
 
 async def get_available_build_task(
