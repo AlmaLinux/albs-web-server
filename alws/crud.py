@@ -246,7 +246,6 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                             else:
                                 error_msg = 'Could not add packages to distribution'
                                 raise DistributionError(error_msg)
-    return True
 
 
 async def get_available_build_task(
