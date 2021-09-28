@@ -237,22 +237,14 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                     if (distro_repo.arch == task.arch and
                             distro_repo.debug == build_artifact.is_debuginfo):
                         if modification == 'add':
-                            add_modify[
-                                (task.arch,
-                                 build_artifact.is_debuginfo,
-                                 distro_repo.pulp_href)
-                            ].append(artifact.href)
+                            add_modify[distro_repo.pulp_href].append(artifact.href)
                         else:
-                            remove_modify[
-                                (task.arch,
-                                 build_artifact.is_debuginfo,
-                                 distro_repo.pulp_href)
-                            ].append(artifact.href)
+                            remove_modify[distro_repo.pulp_href].append(artifact.href)
 
     if modification == 'add':
         for key, value in add_modify:
             res = await pulp_client.modify_repository(
-                add=value, repo_to=key[2]
+                add=value, repo_to=key
             )
             if not res.get('task', None):
                 error_msg = 'Could not add packages to distribution'
@@ -260,7 +252,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
     else:
         for key, value in add_modify:
             res = await pulp_client.modify_repository(
-                remove=value, repo_to=key[2]
+                remove=value, repo_to=key
             )
             if not res.get('task', None):
                 error_msg = 'Could not add packages to distribution'
