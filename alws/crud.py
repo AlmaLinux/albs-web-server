@@ -1,5 +1,6 @@
 import typing
 import datetime
+import collections
 
 import sqlalchemy
 from sqlalchemy import update, delete
@@ -174,7 +175,7 @@ async def create_distro(
         await create_empty_repo(pulp_client, db_distribution)
         db.add(db_distribution)
         await db.commit()
-        await db.refresh(db_distribution)
+    await db.refresh(db_distribution)
     return db_distribution
 
 
@@ -224,28 +225,46 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
             )
 
         await db.commit()
-        await db.refresh(db_distro)
-        for task in db_build.tasks:
-            for artifact in task.artifacts:
-                build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
-                    artifact)
-                if artifact.type == 'rpm':
-                    for distro_repo in db_distro.repositories:
-                        if (distro_repo.arch == task.arch and
-                                distro_repo.debug == build_artifact.is_debuginfo):
-                            if modification == 'add':
-                                res = await pulp_client.modify_repository(
-                                    add=[artifact.href],
-                                    repo_to=distro_repo.pulp_href)
-                            else:
-                                res = await pulp_client.modify_repository(
-                                    remove=[artifact.href],
-                                    repo_to=distro_repo.pulp_href)
-                            if res.get('task', None):
-                                continue
-                            else:
-                                error_msg = 'Could not add packages to distribution'
-                                raise DistributionError(error_msg)
+    await db.refresh(db_distro)
+    add_modify = collections.defaultdict(list)
+    remove_modify = collections.defaultdict(list)
+    for task in db_build.tasks:
+        for artifact in task.artifacts:
+            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                artifact)
+            if artifact.type == 'rpm':
+                for distro_repo in db_distro.repositories:
+                    if (distro_repo.arch == task.arch and
+                            distro_repo.debug == build_artifact.is_debuginfo):
+                        if modification == 'add':
+                            add_modify[
+                                (task.arch,
+                                 build_artifact.is_debuginfo,
+                                 distro_repo.pulp_href)
+                            ].append(artifact.href)
+                        else:
+                            remove_modify[
+                                (task.arch,
+                                 build_artifact.is_debuginfo,
+                                 distro_repo.pulp_href)
+                            ].append(artifact.href)
+
+    if modification == 'add':
+        for key, value in add_modify:
+            res = await pulp_client.modify_repository(
+                add=value, repo_to=key[2]
+            )
+            if not res.get('task', None):
+                error_msg = 'Could not add packages to distribution'
+                raise DistributionError(error_msg)
+    else:
+        for key, value in add_modify:
+            res = await pulp_client.modify_repository(
+                remove=value, repo_to=key[2]
+            )
+            if not res.get('task', None):
+                error_msg = 'Could not add packages to distribution'
+                raise DistributionError(error_msg)
 
 
 async def get_available_build_task(
