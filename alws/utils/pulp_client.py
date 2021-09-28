@@ -38,7 +38,8 @@ class PulpClient:
             payload = {'add_content_units': add}
         if remove:
             payload = {'remove_content_units': remove}
-        response = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        response = await self.wait_for_task(task['task'])
         return response
 
     async def create_file_publication(self, repository: str):
