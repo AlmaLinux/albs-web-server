@@ -34,10 +34,11 @@ class PulpClient:
     async def modify_repository(self, repo_to: str, add: List[str] = None,
                                 remove: List[str] = None):
         ENDPOINT = urllib.parse.urljoin(repo_to, 'modify/')
+        payload = {}
         if add:
-            payload = {'add_content_units': add}
+            payload['add_content_units'] = add
         if remove:
-            payload = {'remove_content_units': remove}
+            payload = ['remove_content_units'] = remove
         task = await self.make_post_request(ENDPOINT, data=payload)
         response = await self.wait_for_task(task['task'])
         return response
