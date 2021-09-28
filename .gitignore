@@ -131,3 +131,4 @@ dmypy.json
 volumes/
 .idea
 vars.env
+.DS_Store
