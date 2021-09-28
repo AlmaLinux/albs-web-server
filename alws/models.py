@@ -235,6 +235,7 @@ class BuildTask(Base):
         sqlalchemy.ForeignKey('build_task_refs.id'),
         nullable=False
     )
+    pgp_key_id = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from alws import crud, database
 from alws.dependencies import get_db, JWTBearer
-from alws.schemas import build_node_schema
+from alws.schemas import build_task_schema
 
 
 router = APIRouter(
@@ -16,7 +16,7 @@ router = APIRouter(
 
 @router.post('/ping')
 async def ping(
-            node_status: build_node_schema.Ping,
+            node_status: build_task_schema.Ping,
             db: database.Session = Depends(get_db)
         ):
     if not node_status.active_tasks:
@@ -26,7 +26,7 @@ async def ping(
 
 @router.post('/build_done')
 async def build_done(
-            build_done: build_node_schema.BuildDone,
+            build_done: build_task_schema.BuildDone,
             db: database.Session = Depends(get_db)
         ):
     await crud.build_done(db, build_done)
@@ -36,9 +36,9 @@ async def build_done(
     return {'ok': True}
 
 
-@router.get('/get_task', response_model=build_node_schema.Task)
+@router.get('/get_task', response_model=build_task_schema.Task)
 async def get_task(
-            request: build_node_schema.RequestTask,
+            request: build_task_schema.RequestTask,
             db: database.Session = Depends(get_db)
         ):
     task = await crud.get_available_build_task(db, request)

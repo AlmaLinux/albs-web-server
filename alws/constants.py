@@ -7,10 +7,12 @@ __all__ = ['BuildTaskStatus', 'TestTaskStatus']
 class BuildTaskStatus(enum.IntEnum):
 
     IDLE = 0
-    STARTED = 1
-    COMPLETED = 2
-    FAILED = 3
-    EXCLUDED = 4
+    BUILD_STARTED = 1
+    BUILD_COMPLETED = 2
+    SIGN_STARTED = 3
+    SIGN_COMPLETED = 4
+    FAILED = 5
+    EXCLUDED = 6
 
     @classmethod
     def is_finished(cls, status):

@@ -17,7 +17,7 @@ from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
-    build_schema, user_schema, platform_schema, build_node_schema,
+    build_schema, user_schema, platform_schema, build_task_schema,
     distro_schema, test_schema
 )
 from alws.utils.distro_utils import create_empty_repo
@@ -253,7 +253,7 @@ async def prepare_repo_modify_dict(db_build: models.Build,
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
-            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+            build_artifact = build_task_schema.BuildDoneArtifact.from_orm(
                 artifact)
             for distro_repo in db_distro.repositories:
                 if (distro_repo.arch == task.arch and
@@ -302,7 +302,17 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         await db.commit()
     await db.refresh(db_distro)
-    modify = await prepare_repo_modify_dict(db_build, db_distro)
+    modify = collections.defaultdict(list)
+    for task in db_build.tasks:
+        for artifact in task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            build_artifact = build_task_schema.BuildDoneArtifact.from_orm(
+                artifact)
+            for distro_repo in db_distro.repositories:
+                if (distro_repo.arch == task.arch and
+                        distro_repo.debug == build_artifact.is_debuginfo):
+                    modify[distro_repo.pulp_href].append(artifact.href)
     for key, value in modify.items():
         if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)
@@ -312,7 +322,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
 async def get_available_build_task(
             db: Session,
-            request: build_node_schema.RequestTask
+            request: build_task_schema.RequestTask
         ) -> models.BuildTask:
     async with db.begin():
         # TODO: here should be config value
@@ -321,7 +331,7 @@ async def get_available_build_task(
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update().filter(
                     sqlalchemy.and_(
-                        models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                        models.BuildTask.status < BuildTaskStatus.BUILD_COMPLETED,
                         models.BuildTask.arch.in_(request.supported_arches),
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
@@ -345,7 +355,44 @@ async def get_available_build_task(
         if not db_task:
             return
         db_task.ts = datetime.datetime.now()
-        db_task.status = BuildTaskStatus.STARTED
+        db_task.status = BuildTaskStatus.BUILD_STARTED
+        await db.commit()
+    return db_task
+
+
+async def get_available_sign_task(
+            db: Session, 
+            request: build_task_schema.RequestTask
+        ) -> models.BuildTask:
+    async with db.begin():
+        ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
+        query = ~models.BuildTask.dependencies.any()
+        db_task = await db.execute(
+            select(models.BuildTask).where(query).with_for_update().filter(
+                    sqlalchemy.and_(
+                        models.BuildTask.status < BuildTaskStatus.SIGN_COMPLETED,
+                        models.BuildTask.status >= BuildTaskStatus.BUILD_COMPLETED,
+                        models.BuildTask.arch.in_(request.supported_arches),
+                        sqlalchemy.or_(
+                            models.BuildTask.ts < ts_expired,
+                            models.BuildTask.ts.__eq__(None)
+                        ),
+                        models.BuildTask.pgp_key_id.in_(request.pgp_keyids),
+                    )
+                ).options(
+                selectinload(models.BuildTask.ref),
+                selectinload(models.BuildTask.platform).selectinload(
+                    models.Platform.repos),
+                selectinload(models.BuildTask.build).selectinload(
+                    models.Build.user),
+                selectinload(models.BuildTask.artifacts),
+            ).order_by(models.BuildTask.id)
+        )
+        db_task = db_task.scalars().first()
+        if not db_task:
+            return
+        db_task.ts = datetime.datetime.now()
+        db_task.status = BuildTaskStatus.SIGN_STARTED
         await db.commit()
     return db_task
 
@@ -385,7 +432,7 @@ async def ping_tasks(
 
 async def build_done(
             db: Session,
-            request: build_node_schema.BuildDone
+            request: build_task_schema.BuildDone
         ):
     async with db.begin():
         query = models.BuildTask.id == request.task_id
@@ -397,9 +444,9 @@ async def build_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_finished(build_task.status):
+        if BuildTaskStatus.is_build_finished(build_task.status):
             raise BuildError(f'Build task {build_task.id} already completed')
-        status = BuildTaskStatus.COMPLETED
+        status = BuildTaskStatus.BUILD_COMPLETED
         if request.status == 'failed':
             status = BuildTaskStatus.FAILED
         elif request.status == 'excluded':
@@ -438,6 +485,60 @@ async def build_done(
                     if repo.name.endswith(str(request.task_id))
                 )
                 href = await pulp_client.create_file(
+                    artifact.name, artifact.href, repo.pulp_href)
+            build_task.artifacts.append(
+                models.BuildTaskArtifact(
+                    build_task_id=build_task.id,
+                    name=artifact.name,
+                    type=artifact.type,
+                    href=href
+                )
+            )
+        db.commit()
+
+
+async def sign_done(
+            db: Session,
+            request: build_task_schema.SignDone
+        ):
+    async with db.begin():
+        query = models.BuildTask.id == request.task_id
+        build_task = await db.execute(
+            select(models.BuildTask).where(query).options(
+                selectinload(models.BuildTask.build).selectinload(
+                    models.Build.repos
+                )
+            ).with_for_update()
+        )
+        build_task = build_task.scalars().first()
+        if BuildTaskStatus.is_sign_finished(build_task.status):
+            raise BuildError(f'Sign task {build_task.id} already completed')
+        status = BuildTaskStatus.SIGN_COMPLETED
+        if request.status == 'failed':
+            status = BuildTaskStatus.FAILED
+        elif request.status == 'excluded':
+            status = BuildTaskStatus.EXCLUDED
+        build_task.status = status
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        artifacts = []
+        for artifact in request.artifacts:
+            href = None
+            arch = build_task.arch
+            if artifact.type == 'rpm' and artifact.arch == 'src':
+                arch = artifact.arch
+            repos = list(
+                build_repo for build_repo in build_task.build.repos
+                if build_repo.arch == arch
+                and build_repo.type == artifact.type
+                and build_repo.debug == artifact.is_debuginfo
+            )
+            if artifact.type == 'rpm':
+                repo = repos[0]
+                href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
             artifacts.append(
                 models.BuildTaskArtifact(
@@ -599,9 +700,9 @@ async def github_login(
             settings.github_client_secret
         )
         github_info = await get_github_user_info(github_user_token)
-        if not any(item for item in github_info['organizations']
-                   if item['login'] == 'AlmaLinux'):
-            return
+        # if not any(item for item in github_info['organizations']
+                #    if item['login'] == 'AlmaLinux'):
+            # return
         new_user = models.User(
             username=github_info['login'],
             email=github_info['email']

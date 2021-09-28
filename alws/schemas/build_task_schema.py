@@ -60,7 +60,7 @@ class Ping(BaseModel):
     active_tasks: typing.List[int]
 
 
-class BuildDoneArtifact(BaseModel):
+class TaskDoneArtifact(BaseModel):
 
     name: str
     type: typing.Literal['rpm', 'build_log']
@@ -84,9 +84,17 @@ class BuildDone(BaseModel):
 
     task_id: int
     status: typing.Literal['done', 'failed', 'excluded']
-    artifacts: typing.List[BuildDoneArtifact]
+    artifacts: typing.List[TaskDoneArtifact]
+
+
+class SignDone(BaseModel):
+
+    task_id: int
+    status: typing.Literal['done', 'failed', 'excluded']
+    artifacts: typing.List[TaskDoneArtifact]
 
 
 class RequestTask(BaseModel):
 
     supported_arches: typing.List[str]
+    pgp_keyids: typing.List[str]

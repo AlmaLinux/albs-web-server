@@ -10,6 +10,7 @@ __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 class BuildTaskRef(BaseModel):
 
     url: str
+    pgp_key_id: str
     git_ref: typing.Optional[str]
 
     class Config:
