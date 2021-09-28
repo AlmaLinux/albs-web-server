@@ -196,12 +196,15 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
         db_distro = await db.execute(select(models.Distribution).where(
             models.Distribution.name.__eq__(distribution)
         ).options(selectinload(models.Distribution.repositories),
-                  selectinload(models.Distribution.builds)))
+                  selectinload(models.Distribution.builds))
+        )
         db_distro = db_distro.scalars().first()
 
         db_build = await db.execute(select(models.Build).where(
             models.Build.id.__eq__(build_id)
-        ).options(selectinload(models.BuildTask)))
+        ).options(selectinload(models.Build.tasks).selectinload(
+                  models.BuildTask.artifacts))
+        )
         db_build = db_build.scalars().first()
 
         pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
@@ -242,7 +245,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                             remove_modify[distro_repo.pulp_href].append(artifact.href)
 
     if modification == 'add':
-        for key, value in add_modify:
+        for key, value in add_modify.items():
             res = await pulp_client.modify_repository(
                 add=value, repo_to=key
             )
@@ -250,7 +253,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                 error_msg = 'Could not add packages to distribution'
                 raise DistributionError(error_msg)
     else:
-        for key, value in add_modify:
+        for key, value in add_modify.items():
             res = await pulp_client.modify_repository(
                 remove=value, repo_to=key
             )
