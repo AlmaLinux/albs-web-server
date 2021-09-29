@@ -38,7 +38,7 @@ class PulpClient:
         if add:
             payload['add_content_units'] = add
         if remove:
-            payload = ['remove_content_units'] = remove
+            payload['remove_content_units'] = remove
         task = await self.make_post_request(ENDPOINT, data=payload)
         response = await self.wait_for_task(task['task'])
         return response

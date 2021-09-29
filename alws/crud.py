@@ -229,26 +229,21 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         await db.commit()
     await db.refresh(db_distro)
-    add_modify = collections.defaultdict(list)
-    remove_modify = collections.defaultdict(list)
+    modify = collections.defaultdict(list)
     for task in db_build.tasks:
         for artifact in task.artifacts:
+            if artifact.type != 'rpm':
+                continue
             build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
                 artifact)
-            if artifact.type == 'rpm':
-                for distro_repo in db_distro.repositories:
-                    if (distro_repo.arch == task.arch and
-                            distro_repo.debug == build_artifact.is_debuginfo):
-                        if modification == 'add':
-                            add_modify[distro_repo.pulp_href].append(artifact.href)
-                        else:
-                            remove_modify[distro_repo.pulp_href].append(artifact.href)
-
-    if modification == 'add':
-        for key, value in add_modify.items():
+            for distro_repo in db_distro.repositories:
+                if (distro_repo.arch == task.arch and
+                        distro_repo.debug == build_artifact.is_debuginfo):
+                    modify[distro_repo.pulp_href].append(artifact.href)
+    for key, value in modify.items():
+        if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)
-    else:
-        for key, value in remove_modify.items():
+        else:
             await pulp_client.modify_repository(remove=value, repo_to=key)
 
 
