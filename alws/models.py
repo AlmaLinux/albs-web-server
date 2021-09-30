@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from alws.database import Base, engine
 
 
-__all__ = ['Platform', 'Build', 'BuildTask']
+__all__ = ['Platform', 'Build', 'BuildTask', 'Distribution']
 
 
 PlatformRepo = sqlalchemy.Table(
@@ -24,6 +24,60 @@ PlatformRepo = sqlalchemy.Table(
         'repository_id',
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('repositories.id'),
+        primary_key=True
+    )
+)
+
+
+PlatformDependency = sqlalchemy.Table(
+    'platform_dependency',
+    Base.metadata,
+    sqlalchemy.Column(
+        'distribution_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('distributions.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        primary_key=True
+    )
+)
+
+
+DistributionRepositories = sqlalchemy.Table(
+    'distribution_repositories',
+    Base.metadata,
+    sqlalchemy.Column(
+        'distribution_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('distributions.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'repository_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id'),
+        primary_key=True
+    )
+)
+
+
+DistributionBuilds = sqlalchemy.Table(
+    'distribution_packages',
+    Base.metadata,
+    sqlalchemy.Column(
+        'distribution_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('distributions.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
         primary_key=True
     )
 )
@@ -46,6 +100,22 @@ class Platform(Base):
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     data = sqlalchemy.Column(JSONB, nullable=False)
     repos = relationship('Repository', secondary=PlatformRepo)
+
+
+class Distribution(Base):
+
+    __tablename__ = 'distributions'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(
+        sqlalchemy.Text,
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    platforms = relationship('Platform', secondary=PlatformDependency)
+    repositories = relationship('Repository', secondary=DistributionRepositories)
+    builds = relationship('Build', secondary=DistributionBuilds)
 
 
 class Repository(Base):
@@ -167,7 +237,7 @@ class BuildTask(Base):
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
     ref = relationship('BuildTaskRef')
-    artifacts = relationship('BuildTaskArtifact')
+    artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
     platform = relationship('Platform')
     build = relationship('Build', back_populates='tasks')
     dependencies = relationship(
@@ -201,7 +271,7 @@ class BuildTaskArtifact(Base):
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    build_task = relationship('BuildTask')
+    build_task = relationship('BuildTask', back_populates='artifacts')
 
 
 class User(Base):

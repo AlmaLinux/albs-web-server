@@ -1,6 +1,6 @@
 import asyncio
 import urllib
-from typing import Optional
+from typing import Optional, List
 
 import aiohttp
 
@@ -30,6 +30,18 @@ class PulpClient:
         await self.create_rpm_publication(repo_href)
         distro = await self.create_rpm_distro(name, repo_href)
         return distro, repo_href
+
+    async def modify_repository(self, repo_to: str, add: List[str] = None,
+                                remove: List[str] = None):
+        ENDPOINT = urllib.parse.urljoin(repo_to, 'modify/')
+        payload = {}
+        if add:
+            payload['add_content_units'] = add
+        if remove:
+            payload['remove_content_units'] = remove
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        response = await self.wait_for_task(task['task'])
+        return response
 
     async def create_file_publication(self, repository: str):
         ENDPOINT = 'pulp/api/v3/publications/file/file/'

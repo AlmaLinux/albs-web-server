@@ -4,3 +4,7 @@ class BuildError(Exception):
 
 class DataNotFoundError(Exception):
     pass
+
+
+class DistributionError(Exception):
+    pass

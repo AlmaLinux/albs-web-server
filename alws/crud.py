@@ -1,5 +1,6 @@
 import typing
 import datetime
+import collections
 
 import sqlalchemy
 from sqlalchemy import update, delete
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import DataNotFoundError, BuildError
+from alws.errors import DataNotFoundError, BuildError, DistributionError
 from alws.config import settings
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
@@ -16,8 +17,10 @@ from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
-    build_schema, user_schema, platform_schema, build_node_schema
+    build_schema, user_schema, platform_schema, build_node_schema,
+    distro_schema
 )
+from alws.utils.distro_utils import create_empty_repo
 
 
 __all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
@@ -141,9 +144,107 @@ async def create_platform(
     return db_platform
 
 
+async def create_distro(
+        db: Session,
+        distribution: distro_schema.DistroCreate
+) -> models.Distribution:
+
+    async with db.begin():
+        db_distro = await db.execute(select(models.Distribution).where(
+            models.Distribution.name.__eq__(distribution.name)))
+        db_distro = db_distro.scalars().first()
+
+        if db_distro:
+            error_msg = f'{distribution.name} distribution already exists'
+            raise DistributionError(error_msg)
+
+        distro_platforms = await db.execute(select(models.Platform).where(
+            models.Platform.name.in_(distribution.platforms)))
+        distro_platforms = distro_platforms.scalars().all()
+
+        db_distribution = models.Distribution(
+            name=distribution.name
+        )
+        db_distribution.platforms.extend(distro_platforms)
+
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        await create_empty_repo(pulp_client, db_distribution)
+        db.add(db_distribution)
+        await db.commit()
+    await db.refresh(db_distribution)
+    return db_distribution
+
+
 async def get_platforms(db):
     db_platforms = await db.execute(select(models.Platform))
     return db_platforms.scalars().all()
+
+
+async def get_distributions(db):
+    db_distros = await db.execute(select(models.Distribution))
+    return db_distros.scalars().all()
+
+
+async def modify_distribution(build_id: int, distribution: str, db: Session,
+                              modification: str):
+
+    async with db.begin():
+        db_distro = await db.execute(select(models.Distribution).where(
+            models.Distribution.name.__eq__(distribution)
+        ).options(selectinload(models.Distribution.repositories),
+                  selectinload(models.Distribution.builds))
+        )
+        db_distro = db_distro.scalars().first()
+
+        db_build = await db.execute(select(models.Build).where(
+            models.Build.id.__eq__(build_id)
+        ).options(selectinload(models.Build.tasks).selectinload(
+                  models.BuildTask.artifacts))
+        )
+        db_build = db_build.scalars().first()
+
+        pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                                 settings.pulp_password)
+
+        if modification == 'add':
+            if db_build in db_distro.builds:
+                error_msg = f'Packages of build {build_id} have already been' \
+                            f' added to {distribution} distribution'
+                raise DistributionError(error_msg)
+            db_distro.builds.append(db_build)
+        if modification == 'remove':
+            if db_build not in db_distro.builds:
+                error_msg = f'Packages of build {build_id} cannot be removed ' \
+                            f'from {distribution} distribution ' \
+                            f'as they are not added there'
+                raise DistributionError(error_msg)
+            remove_query = models.Build.id.__eq__(build_id)
+            await db.execute(
+                delete(models.DistributionBuilds).where(remove_query)
+            )
+
+        await db.commit()
+    await db.refresh(db_distro)
+    modify = collections.defaultdict(list)
+    for task in db_build.tasks:
+        for artifact in task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                artifact)
+            for distro_repo in db_distro.repositories:
+                if (distro_repo.arch == task.arch and
+                        distro_repo.debug == build_artifact.is_debuginfo):
+                    modify[distro_repo.pulp_href].append(artifact.href)
+    for key, value in modify.items():
+        if modification == 'add':
+            await pulp_client.modify_repository(add=value, repo_to=key)
+        else:
+            await pulp_client.modify_repository(remove=value, repo_to=key)
 
 
 async def get_available_build_task(

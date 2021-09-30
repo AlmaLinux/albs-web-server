@@ -1,7 +1,7 @@
 import typing
 import datetime
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, conlist
 
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
@@ -24,8 +24,8 @@ class BuildCreatePlatforms(BaseModel):
 
 class BuildCreate(BaseModel):
 
-    platforms: typing.List[BuildCreatePlatforms]
-    tasks: typing.List[BuildTaskRef]
+    platforms: conlist(BuildCreatePlatforms, min_items=1)
+    tasks: conlist(BuildTaskRef, min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
 
 
