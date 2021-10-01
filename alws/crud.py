@@ -23,7 +23,8 @@ from alws.schemas import (
 from alws.utils.distro_utils import create_empty_repo
 
 
-__all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
+__all__ = ['create_build', 'get_builds', 'create_platform',
+           'get_platforms', 'update_failed_build_items']
 
 
 async def create_build(
@@ -288,6 +289,28 @@ async def get_available_build_task(
         db_task.status = BuildTaskStatus.STARTED
         await db.commit()
     return db_task
+
+
+def add_build_task_dependencies(db: Session, task: models.BuildTask,
+                                last_task: models.BuildTask):
+    task.dependencies.append(last_task)
+
+
+async def update_failed_build_items(db: Session, build_id: int):
+    query = select(models.BuildTask).where(
+        sqlalchemy.and_(
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status == BuildTaskStatus.FAILED)
+    ).order_by(models.BuildTask.index, models.BuildTask.id)
+    async with db.begin():
+        last_task = None
+        failed_tasks = await db.execute(query)
+        for task in failed_tasks.scalars():
+            task.status = BuildTaskStatus.IDLE
+            if last_task is not None:
+                await db.run_sync(add_build_task_dependencies, task, last_task)
+            last_task = task
+        await db.commit()
 
 
 async def ping_tasks(
