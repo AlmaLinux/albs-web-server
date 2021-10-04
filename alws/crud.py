@@ -378,10 +378,21 @@ async def create_test_tasks(db: Session, build_task_id: int):
     )
     async with db.begin():
         build_task_query = await db.execute(
-            select(models.BuildTask).where(models.BuildTask.id == build_task_id)
+            select(models.BuildTask).where(
+                models.BuildTask.id == build_task_id)
             .options(selectinload(models.BuildTask.artifacts))
         )
         build_task = build_task_query.scalars().first()
+
+        latest_revision_query = select(
+            func.max(models.TestTask.revision)).filter(
+            models.TestTask.build_task_id == build_task_id)
+        result = await db.execute(latest_revision_query)
+        latest_revision = result.scalars().first()
+        if latest_revision:
+            new_revision = latest_revision + 1
+        else:
+            new_revision = 1
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -395,13 +406,23 @@ async def create_test_tasks(db: Session, build_task_id: int):
                                package_name=artifact_info['name'],
                                package_version=artifact_info['version'],
                                env_arch=build_task.arch,
-                               status=TestTaskStatus.CREATED)
+                               status=TestTaskStatus.CREATED,
+                               revision=new_revision)
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
     async with db.begin():
         db.add_all(test_tasks)
         await db.commit()
+
+
+async def restart_build_tests(db: Session, build_id: int):
+    async with db.begin():
+        build_task_ids = await db.execute(
+            select(models.BuildTask.id).where(
+                models.BuildTask.build_id == build_id))
+    for build_task_id in build_task_ids:
+        await create_test_tasks(db, build_task_id[0])
 
 
 async def complete_test_task(db: Session, task_id: int,
@@ -424,6 +445,24 @@ async def complete_test_task(db: Session, task_id: int,
         task.alts_response = test_result.dict()
         db.add(task)
         await db.commit()
+
+
+async def get_test_tasks_by_build_task(
+        db: Session, build_task_id: int, latest: bool = True,
+        revision: int = None):
+    async with db.begin():
+        query = select(models.TestTask).where(
+            models.TestTask.build_task_id == build_task_id)
+        # If latest=False, but revision is not set, should return
+        # latest results anyway
+        if (not latest and not revision) or latest:
+            subquery = select(func.max(models.TestTask.revision)).filter(
+                models.TestTask.build_task_id == build_task_id).scalar_subquery()
+            query = query.filter(models.TestTask.revision == subquery)
+        elif revision:
+            query = query.filter(models.TestTask.revision == revision)
+        result = await db.execute(query)
+        return result.scalars().all()
 
 
 async def github_login(

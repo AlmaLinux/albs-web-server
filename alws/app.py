@@ -27,5 +27,5 @@ async def shutdown():
     terminate_event.set()
 
 
-for module in (builds, platforms, users, build_node, projects, tests):
+for module in (builds, platforms, users, build_node, projects, distro, tests):
     app.include_router(module.router, prefix='/api/v1')

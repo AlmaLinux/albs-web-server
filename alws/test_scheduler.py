@@ -50,12 +50,13 @@ class TestTaskScheduler(threading.Thread):
                             if item.type == 'rpm']
             for build in task.build_task.build.linked_builds:
                 rpm_repos = [{'name': item.name, 'baseurl': item.url}
-                             for item in build.repo
-                             if item.type == 'rpm']
+                             for item in build.repos
+                             if item.type == 'rpm'
+                             and item.arch == task.build_task.arch]
                 repositories.extend(rpm_repos)
             platform = task.build_task.platform
             try:
-                logging.error(f'Scheduling testing for {task.package_name}-'
+                logging.debug(f'Scheduling testing for {task.package_name}-'
                               f'{task.package_version}-{task.package_release}')
                 callback_href = f'/api/v1/tests/{task.id}/result/'
                 response = await self._alts_client.schedule_task(
@@ -64,7 +65,7 @@ class TestTaskScheduler(threading.Thread):
                     callback_href, package_release=task.package_release,
                     repositories=repositories)
                 updated_tasks.append(task)
-                logging.error(f'Got response from ALTS: {response}')
+                logging.debug(f'Got response from ALTS: {response}')
             except Exception as e:
                 logging.error(f'Cannot schedule test task: {e}')
                 logging.error(f'Traceback info: {traceback.format_exc()}')

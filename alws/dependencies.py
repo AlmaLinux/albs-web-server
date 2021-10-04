@@ -20,7 +20,7 @@ async def get_redis() -> aioredis.Redis:
     try:
         yield client
     finally:
-        client.close()
+        await client.close()
 
 
 class JWTBearer(HTTPBearer):

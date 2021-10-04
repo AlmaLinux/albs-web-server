@@ -304,6 +304,7 @@ class TestTask(Base):
     build_task = relationship('BuildTask', back_populates='test_tasks')
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     alts_response = sqlalchemy.Column(JSONB, nullable=True)
+    revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
 
 
 async def create_tables():
