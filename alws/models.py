@@ -193,6 +193,7 @@ class Build(Base):
         primaryjoin=(BuildDependency.c.build_id == id),
         secondaryjoin=(BuildDependency.c.build_dependency == id)
     )
+    mock_options = sqlalchemy.Column(JSONB)
 
 
 BuildTaskDependency = sqlalchemy.Table(

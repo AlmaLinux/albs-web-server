@@ -27,6 +27,7 @@ class BuildCreate(BaseModel):
     platforms: conlist(BuildCreatePlatforms, min_items=1)
     tasks: conlist(BuildTaskRef, min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 class BuildPlatform(BaseModel):
@@ -83,6 +84,7 @@ class Build(BaseModel):
     tasks: typing.List[BuildTask]
     user: BuildUser
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
 
     @validator('linked_builds', pre=True)
     def linked_builds_validator(cls, v):
