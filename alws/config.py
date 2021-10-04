@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     pulp_host: str = 'http://pulp'
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
-    alts_host: str
+    alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
 
     redis_url: str = 'redis://redis:6379'
