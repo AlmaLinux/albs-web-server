@@ -14,11 +14,11 @@ from alws.config import settings
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_node_schema,
-    distro_schema
+    distro_schema, test_schema
 )
 from alws.utils.distro_utils import create_empty_repo
 
@@ -133,6 +133,7 @@ async def create_platform(
         type=platform.type,
         distr_type=platform.distr_type,
         distr_version=platform.distr_version,
+        test_dist_name=platform.test_dist_name,
         data=platform.data,
         arch_list=platform.arch_list
     )
@@ -363,6 +364,103 @@ async def build_done(
                 )
             )
         db.add_all(artifacts)
+        db.add(build_task)
+        await db.commit()
+
+
+async def create_test_tasks(db: Session, build_task_id: int):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    async with db.begin():
+        build_task_query = await db.execute(
+            select(models.BuildTask).where(
+                models.BuildTask.id == build_task_id)
+            .options(selectinload(models.BuildTask.artifacts))
+        )
+        build_task = build_task_query.scalars().first()
+
+        latest_revision_query = select(
+            func.max(models.TestTask.revision)).filter(
+            models.TestTask.build_task_id == build_task_id)
+        result = await db.execute(latest_revision_query)
+        latest_revision = result.scalars().first()
+        if latest_revision:
+            new_revision = latest_revision + 1
+        else:
+            new_revision = 1
+
+    test_tasks = []
+    for artifact in build_task.artifacts:
+        if artifact.type != 'rpm':
+            continue
+        artifact_info = await pulp_client.get_rpm_package(
+            artifact.href,
+            include_fields=['name', 'version', 'release', 'arch']
+        )
+        task = models.TestTask(build_task_id=build_task_id,
+                               package_name=artifact_info['name'],
+                               package_version=artifact_info['version'],
+                               env_arch=build_task.arch,
+                               status=TestTaskStatus.CREATED,
+                               revision=new_revision)
+        if artifact_info.get('release'):
+            task.package_release = artifact_info['release']
+        test_tasks.append(task)
+    async with db.begin():
+        db.add_all(test_tasks)
+        await db.commit()
+
+
+async def restart_build_tests(db: Session, build_id: int):
+    async with db.begin():
+        build_task_ids = await db.execute(
+            select(models.BuildTask.id).where(
+                models.BuildTask.build_id == build_id))
+    for build_task_id in build_task_ids:
+        await create_test_tasks(db, build_task_id[0])
+
+
+async def complete_test_task(db: Session, task_id: int,
+                             test_result: test_schema.TestTaskResult):
+    async with db.begin():
+        tasks = await db.execute(select(models.TestTask).where(
+            models.TestTask.id == task_id).with_for_update())
+        task = tasks.scalars().first()
+        status = TestTaskStatus.COMPLETED
+        for key, item in test_result.result.items():
+            if key == 'tests':
+                for test_item in item.values():
+                    if not test_item.get('success', False):
+                        status = TestTaskStatus.FAILED
+                        break
+            elif not item.get('success', False):
+                status = TestTaskStatus.FAILED
+                break
+        task.status = status
+        task.alts_response = test_result.dict()
+        db.add(task)
+        await db.commit()
+
+
+async def get_test_tasks_by_build_task(
+        db: Session, build_task_id: int, latest: bool = True,
+        revision: int = None):
+    async with db.begin():
+        query = select(models.TestTask).where(
+            models.TestTask.build_task_id == build_task_id)
+        # If latest=False, but revision is not set, should return
+        # latest results anyway
+        if (not latest and not revision) or latest:
+            subquery = select(func.max(models.TestTask.revision)).filter(
+                models.TestTask.build_task_id == build_task_id).scalar_subquery()
+            query = query.filter(models.TestTask.revision == subquery)
+        elif revision:
+            query = query.filter(models.TestTask.revision == revision)
+        result = await db.execute(query)
+        return result.scalars().all()
 
 
 async def github_login(
