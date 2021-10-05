@@ -42,7 +42,7 @@ async def create_build(
                 if linked_build:
                     await planner.add_linked_builds(linked_build)
         if build.mock_options:
-            await planner.add_mock_options(build.mock_options)
+            planner.add_mock_options(build.mock_options)
         db_build = planner.create_build()
         db.add(db_build)
         await db.flush()
