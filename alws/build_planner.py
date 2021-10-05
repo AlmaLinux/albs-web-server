@@ -147,7 +147,7 @@ class BuildPlanner:
                 self._build.tasks.append(build_task)
         self._task_index += 1
 
-    async def add_mock_options(self, mock_options: dict):
+    def add_mock_options(self, mock_options: dict):
         self._build.mock_options = mock_options
 
     def create_build(self):
