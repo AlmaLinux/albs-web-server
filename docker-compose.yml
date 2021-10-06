@@ -10,25 +10,78 @@ services:
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --encoding=UTF8 --locale=en_US.UTF-8 --data-checksums
       - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
     ports:
-      - 5432:5432
+      - "5432:5432"
     volumes:
-      - "./volumes/postgresql/data:/var/lib/postgresql/data"
+      - "../data/volumes/postgresql/data:/var/lib/postgresql/data"
+
+  rabbitmq:
+    image: rabbitmq:3.8-management
+    container_name: "rabbitmq-ts"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    env_file:
+      - vars.env
+    restart: always
+
+  alts-celery:
+    image: alts-celery:latest
+    build:
+      dockerfile: Dockerfile.celery
+      context: ../alts
+    environment:
+      CELERY_CONFIG_PATH: "/celery_config.yaml"
+      EXTERNAL_NETWORK: "albs-web-server_default"
+    command: "bash -c 'source env/bin/activate && celery
+        -A alts.worker.app worker --pool=threads --concurrency=20
+        --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
+        --without-mingle --without-heartbeat'"
+    restart: on-failure
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../alts/configs/alts_config.yaml:/celery_config.yaml
+    depends_on:
+      - rabbitmq
+
+  alts-scheduler:
+    image: alts-scheduler:latest
+    build:
+      dockerfile: Dockerfile.scheduler
+      context: ../alts
+    ports:
+      - "8082:8000"
+    environment:
+      CELERY_CONFIG_PATH: "/scheduler_config.yaml"
+      SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
+    command: "bash -c 'source env/bin/activate && uvicorn --host 0.0.0.0
+        alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+    restart: on-failure
+    volumes:
+      - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
+    depends_on:
+      - rabbitmq
 
   web_server:
     image: al-web-server:latest
     env_file:
       - vars.env
+    ports:
+      - "8088:8000"
     build:
       dockerfile: Dockerfile
       context: .
     volumes:
       - "./alws:/code/alws"
-    # TODO: prepare to deal with migrations and so on
-    #       and database inititialisation
-    command: "bash -c 'source env/bin/activate && /wait_for_it.sh db:5432 && PYTHONPATH='.' python alws/models.py && uvicorn --host 0.0.0.0 alws.app:app'"
+    command:
+        bash -c 'source env/bin/activate &&
+                 /wait_for_it.sh db:5432 &&
+                 PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
+                 uvicorn --host 0.0.0.0 alws.app:app'
     restart: on-failure
     depends_on:
       - db
+      - pulp
 
   frontend:
     image: albs-frontend:latest
@@ -62,37 +115,37 @@ services:
     depends_on:
       - web_server
 
-  git_cacher:
-    image: albs-git-cacher:latest
-    env_file:
-      - vars.env
-    build:
-      context: ./alws/scripts/git_cacher
-      dockerfile: Dockerfile
-    restart: on-failure
-    depends_on:
-      - redis
-
   gitea_listener:
     image: albs-gitea-listener:latest
     env_file:
       - vars.env
     build:
-      context: ./alws/scripts/albs-gitea-listener
-      dockerfile: Dockerfile
+      context: ./alws/scripts
+      dockerfile: albs-gitea-listener/Dockerfile
     restart: on-failure
     depends_on:
       - mosquitto
 
+  git_cacher:
+    image: albs-git-cacher:latest
+    env_file:
+      - vars.env
+    build:
+      context: ./alws/scripts
+      dockerfile: git_cacher/Dockerfile
+    restart: on-failure
+    depends_on:
+      - redis
+
   pulp:
-    image: pulp/pulp
+    image: pulp/pulp:3.15
     ports:
       - 8081:80
     volumes:
-      - "./volumes/pulp/settings:/etc/pulp"
-      - "./volumes/pulp/pulp_storage:/var/lib/pulp"
-      - "./volumes/pulp/pgsql:/var/lib/pgsql"
-      - "./volumes/pulp/containers:/var/lib/containers"
+      - "../data/volumes/pulp/settings:/etc/pulp"
+      - "../data/volumes/pulp/pulp_storage:/var/lib/pulp"
+      - "../data/volumes/pulp/pgsql:/var/lib/pgsql"
+      - "../data/volumes/pulp/containers:/var/lib/containers"
     devices:
       - "/dev/fuse"
     restart: on-failure

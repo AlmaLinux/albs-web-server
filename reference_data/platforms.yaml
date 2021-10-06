@@ -1,11 +1,12 @@
 ---
-  name: Alma84
+  name: AlmaLinux-8
   distr_type: rhel
   distr_version: '8'
   type: rpm
   arch_list:
     - i686
     - x86_64
+    - ppc64le
   data:
     definitions:
       distribution: AlmaLinux
@@ -55,48 +56,23 @@
       name: alma8-powertools
       type: rpm
       url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/x86_64/os/
-
----
-  name: Alma84-power
-  distr_type: rhel
-  distr_version: '8'
-  type: rpm
-  arch_list:
-    - ppc64le
-  data:
-    definitions:
-      distribution: AlmaLinux
-      packager: AlmaLinux Packaging Team <packager@almalinux.org>
-      vendor: AlmaLinux
-    mock:
-      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz
-        sed make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk
-        rpm-build info patch util-linux findutils grep zlib zlib-devel libxml2-devel
-        scl-utils scl-utils-build git
-      dnf_common_opts:
-        - --setopt=deltarpm=False
-        - --allowerasing
-        - --nobest
-        - --setopt=install_weak_deps=False
-      dnf_install_command: install dnf dnf-plugins-core shadow-utils
-      package_manager: dnf
-      releasever: '8'
-      use_bootstrap_container: false
-    mock_dist: el8
-    timeout: 43200
-    yum:
-      best: false
-      module_platform_id: platform:el8
-  repos:
     - arch: ppc64le
       name: centos8-baseos
       url: http://centos.osuosl.org/8/BaseOS/ppc64le/os/
+      type: rpm
     - arch: ppc64le
       name: centos8-appstream
       url: http://centos.osuosl.org/8/AppStream/ppc64le/os/
+      type: rpm
     - arch: ppc64le
       name: centos8-powertools
       url: http://centos.osuosl.org/8/PowerTools/ppc64le/os/
+      type: rpm
     - arch: ppc64le
       name: centos8-highavailability
       url: http://centos.osuosl.org/8/HighAvailability/ppc64le/os/
+      type: rpm
+    - arch: ppc64le
+      name: alma8-ppc64le-devel
+      url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
+      type: rpm

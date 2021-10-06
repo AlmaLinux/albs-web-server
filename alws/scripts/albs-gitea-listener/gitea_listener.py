@@ -13,12 +13,26 @@ import os
 import logging
 import requests
 import re
+import aioredis
+import asyncio
+import traceback
 from ruamel.yaml import YAML
 
 from paho.mqtt import client as mqtt_client
 from gitea_models import GiteaListenerConfig, PushedEvent
+from git_cacher import load_redis_cache, save_redis_cache
 
 LOGGER: logging.Logger
+
+
+async def get_gitea_cache(redis_client, redis_key):
+    cached_data = await load_redis_cache(redis_client, redis_key)
+    return cached_data
+
+
+async def save_gitea_cache(redis_client, redis_key, new_cache):
+    updated_cache = await save_redis_cache(redis_client, redis_key, new_cache)
+    return updated_cache
 
 
 def connect_mqtt(config: GiteaListenerConfig) -> mqtt_client:
@@ -146,20 +160,41 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
             LOGGER.info(f'Received new event from {msg.topic} topic: '
                         f'ref {received.ref} commit {received.after} '
                         f'from repository {received.repository.name}')
+            LOGGER.info('Checking gitea cache')
+            redis_client = aioredis.from_url(config.redis_host)
+            redis_key = config.redis_cache_key
+            loop = asyncio.get_event_loop()
+            gitea_cache = loop.run_until_complete(get_gitea_cache(
+                redis_client, redis_key))
             try:
+                repo = received.repository.full_name
                 if 'tags' in received.ref:
                     LOGGER.info('Making a new build for found new tag...')
+                    git_ref = re.sub('refs/tags/', '', received.ref)
+                    if received.ref not in gitea_cache[repo]['tags']:
+                        gitea_cache[repo]['tags'].append(git_ref)
                     created = create_build(received, config)
                     LOGGER.info(f'Build {created} was successfully created')
                 else:
+                    if 'heads' in received.ref:
+                        git_ref = re.sub('refs/heads/', '', received.ref)
+                        if received.ref not in gitea_cache[repo]['branches']:
+                            gitea_cache[repo]['branches'].append(git_ref)
                     LOGGER.info('Skipping new commit')
+
+                loop.run_until_complete(save_gitea_cache(redis_client,
+                                                         redis_key,
+                                                         gitea_cache))
+
             except Exception as error:
                 LOGGER.error(f'Failed to create a build. Traceback: {error}')
+                LOGGER.error(traceback.format_exc())
                 client.reconnect()
 
         except Exception as error:
             LOGGER.error(f'Failed to receive new event from {msg.topic} topic.'
                          f'\nTraceback: {error}')
+            LOGGER.error(traceback.format_exc())
             client.reconnect()
 
     client.subscribe([(config.mqtt_queue_topic_unmodified,

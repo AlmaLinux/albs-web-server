@@ -29,7 +29,9 @@ async def build_done(
             build_done: build_node_schema.BuildDone,
             db: database.Session = Depends(get_db)
         ):
-    return await crud.build_done(db, build_done)
+    await crud.build_done(db, build_done)
+    await crud.create_test_tasks(db, build_done.task_id)
+    return {'ok': True}
 
 
 @router.get('/get_task', response_model=build_node_schema.Task)

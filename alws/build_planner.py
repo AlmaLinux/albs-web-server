@@ -1,12 +1,12 @@
 import asyncio
 import typing
-import itertools
 import collections
 
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
 from alws import models
+from alws.errors import DataNotFoundError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus
@@ -18,21 +18,34 @@ __all__ = ['BuildPlanner']
 
 class BuildPlanner:
 
-    def __init__(self, db: Session, user_id: int, platforms: typing.List[str]):
+    def __init__(
+                self,
+                db: Session,
+                user_id: int,
+                platforms: typing.List[build_schema.BuildCreatePlatforms]
+            ):
         self._db = db
         self._build = models.Build(user_id=user_id)
         self._task_index = 0
-        self._platform_names = platforms
+        self._request_platforms = {
+            platform.name: platform.arch_list for platform in platforms
+        }
         self._platforms = []
         self._tasks_cache = collections.defaultdict(list)
 
     async def load_platforms(self):
+        platform_names = list(self._request_platforms.keys())
         self._platforms = await self._db.execute(select(models.Platform).where(
-            models.Platform.name.in_(self._platform_names)))
+            models.Platform.name.in_(platform_names)))
         self._platforms = self._platforms.scalars().all()
-        if len(self._platforms) != len(self._platform_names):
-            # TODO: raise error
-            pass
+        if len(self._platforms) != len(platform_names):
+            found_platforms = {platform.name for platform in self._platforms}
+            missing_platforms = ', '.join(
+                name for name in platform_names if name not in found_platforms
+            )
+            raise DataNotFoundError(
+                f'platforms: {missing_platforms} cannot be found in database'
+            )
 
     async def create_build_repo(
                 self,
@@ -40,10 +53,15 @@ class BuildPlanner:
                 platform: models.Platform,
                 arch: str,
                 build: models.Build,
-                repo_type: str
+                repo_type: str,
+                is_debug: typing.Optional[bool] = False,
+                task_id: typing.Optional[int] = None
             ) -> models.Repository:
-        suffix = 'br' if repo_type != 'build_log' else 'artifacts'
-        repo_name = f'{platform.name}-{arch}-{self._build.id}-{suffix}'
+        suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
+        debug_suffix = 'debug-' if is_debug else ''
+        repo_name = (
+            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}{suffix}'
+        )
         if repo_type == 'rpm':
             repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
                 repo_name)
@@ -55,12 +73,16 @@ class BuildPlanner:
             url=repo_url,
             arch=arch,
             pulp_href=pulp_href,
-            type=repo_type
+            type=repo_type,
+            debug=is_debug
         )
         await self._db.run_sync(self.sync_append_build_repo, repo)
 
     def sync_append_build_repo(self, db: Session, repo: models.BuildRepo):
         self._build.repos.append(repo)
+
+    def sync_get_build_tasks(self, db: Session):
+        return self._build.tasks
 
     async def init_build_repos(self):
         pulp_client = PulpClient(
@@ -70,17 +92,33 @@ class BuildPlanner:
         )
         tasks = []
         for platform in self._platforms:
-            for repo_type in ('rpm', 'build_log'):
-                for arch in itertools.chain(('src', ), platform.arch_list):
-                    if arch == 'src' and repo_type == 'build_log':
-                        continue
-                    tasks.append(self.create_build_repo(
-                        pulp_client,
-                        platform,
-                        arch,
-                        self._build,
-                        repo_type
-                    ))
+            for arch in ['src'] + self._request_platforms[platform.name]:
+                tasks.append(self.create_build_repo(
+                    pulp_client,
+                    platform,
+                    arch,
+                    self._build,
+                    'rpm'
+                ))
+                if arch == 'src':
+                    continue
+                tasks.append(self.create_build_repo(
+                    pulp_client,
+                    platform,
+                    arch,
+                    self._build,
+                    'rpm',
+                    True
+                ))
+        for task in await self._db.run_sync(self.sync_get_build_tasks):
+            tasks.append(self.create_build_repo(
+                pulp_client,
+                task.platform,
+                task.arch,
+                self._build,
+                'build_log',
+                task_id=task.id
+            ))
         await asyncio.gather(*tasks)
 
     async def add_linked_builds(self, linked_build):
@@ -90,7 +128,7 @@ class BuildPlanner:
         ref = models.BuildTaskRef(**task.dict())
         for platform in self._platforms:
             arch_tasks = []
-            for arch in platform.arch_list:
+            for arch in self._request_platforms[platform.name]:
                 build_task = models.BuildTask(
                     arch=arch,
                     platform_id=platform.id,

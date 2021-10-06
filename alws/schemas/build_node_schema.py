@@ -1,3 +1,4 @@
+import re
 import typing
 
 from pydantic import BaseModel, Field
@@ -65,16 +66,24 @@ class BuildDoneArtifact(BaseModel):
     type: typing.Literal['rpm', 'build_log']
     href: str
 
+    class Config:
+        orm_mode = True
+
     @property
     def arch(self):
         # TODO: this is awful way to check pkg arch
         return self.name.split('.')[-2]
 
+    @property
+    def is_debuginfo(self):
+        regex = re.compile(r'-debug(info|source)-\d')
+        return bool(re.search(regex, self.name))
+
 
 class BuildDone(BaseModel):
 
     task_id: int
-    success: bool
+    status: typing.Literal['done', 'failed', 'excluded']
     artifacts: typing.List[BuildDoneArtifact]
 
 

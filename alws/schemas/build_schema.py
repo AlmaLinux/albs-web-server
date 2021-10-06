@@ -1,10 +1,10 @@
 import typing
 import datetime
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, conlist
 
 
-__all__ = ['BuildTaskRef', 'BuildCreate', 'Build']
+__all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 
 class BuildTaskRef(BaseModel):
@@ -16,10 +16,16 @@ class BuildTaskRef(BaseModel):
         orm_mode = True
 
 
+class BuildCreatePlatforms(BaseModel):
+
+    name: str
+    arch_list: typing.List[str]
+
+
 class BuildCreate(BaseModel):
 
-    platforms: typing.List[str]
-    tasks: typing.List[BuildTaskRef]
+    platforms: conlist(BuildCreatePlatforms, min_items=1)
+    tasks: conlist(BuildTaskRef, min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
 
 
@@ -84,3 +90,10 @@ class Build(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class BuildsResponse(BaseModel):
+
+    builds: typing.List[Build]
+    total_builds: typing.Optional[int]
+    current_page: typing.Optional[int]
