@@ -392,6 +392,25 @@ async def create_test_tasks(db: Session, build_task_id: int):
         else:
             new_revision = 1
 
+    # Create logs repository
+    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+    repo_url, repo_href = await pulp_client.create_log_repo(
+        repo_name, distro_path_start='test_logs')
+
+    repository = models.Repository(
+        name=repo_name, url=repo_url, arch=build_task.arch,
+        pulp_href=repo_href, type='test_log', debug=False
+    )
+    async with db.begin():
+        db.add(repository)
+        await db.commit()
+
+    async with db.begin():
+        r_query = select(models.Repository).where(
+            models.Repository.name == repo_name)
+        results = await db.execute(r_query)
+        repository = results.scalars().first()
+
     test_tasks = []
     for artifact in build_task.artifacts:
         if artifact.type != 'rpm':
@@ -405,7 +424,8 @@ async def create_test_tasks(db: Session, build_task_id: int):
                                package_version=artifact_info['version'],
                                env_arch=build_task.arch,
                                status=TestTaskStatus.CREATED,
-                               revision=new_revision)
+                               revision=new_revision,
+                               repository_id=repository.id)
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
@@ -425,9 +445,15 @@ async def restart_build_tests(db: Session, build_id: int):
 
 async def complete_test_task(db: Session, task_id: int,
                              test_result: test_schema.TestTaskResult):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     async with db.begin():
         tasks = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id).with_for_update())
+            models.TestTask.id == task_id).options(
+            selectinload(models.TestTask.repository)).with_for_update())
         task = tasks.scalars().first()
         status = TestTaskStatus.COMPLETED
         for key, item in test_result.result.items():
@@ -436,12 +462,27 @@ async def complete_test_task(db: Session, task_id: int,
                     if not test_item.get('success', False):
                         status = TestTaskStatus.FAILED
                         break
+            # Skip logs from processing
+            elif key == 'logs':
+                continue
             elif not item.get('success', False):
                 status = TestTaskStatus.FAILED
                 break
         task.status = status
         task.alts_response = test_result.dict()
+        logs = []
+        for log in test_result.result.get('logs', []):
+            if task.repository:
+                href = await pulp_client.create_file(
+                    log['name'], log['href'], task.repository.pulp_href)
+            else:
+                href = log['href']
+            log_record = models.TestTaskArtifact(
+                name=log['name'], href=href, test_task_id=task.id)
+            logs.append(log_record)
+
         db.add(task)
+        db.add_all(logs)
         await db.commit()
 
 
