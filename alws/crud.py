@@ -286,21 +286,6 @@ async def get_available_build_task(
             return
         db_task.ts = datetime.datetime.now()
         db_task.status = BuildTaskStatus.STARTED
-        db_build = await get_builds(db, build_id=db_task.build_id)
-
-        if db_build.mock_options:
-            for k, v in db_build.mock_options.items():
-                if k in ('module_enable', 'target_arch'):
-                    db_task.platform.data['mock'][k] = v
-                elif k == 'yum_exclude':
-                    db_task.platform.data['yum']['exclude'] = ' '.join(v)
-                elif k in ('with', 'without'):
-                    for i in v:
-                        db_task.platform.data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
-                else:
-                    for item in v:
-                        for v_k, v_v in item.items():
-                            db_task.platform.data['definitions'][v_k] = v_v
         await db.commit()
     return db_task
 

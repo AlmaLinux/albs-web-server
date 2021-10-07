@@ -140,7 +140,7 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
             async with session.get(full_url, params=params) as response:
-                json = await response.json()
+                json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json
 
@@ -148,6 +148,6 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
             async with session.post(full_url, json=data) as response:
-                json = await response.json()
+                json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json
