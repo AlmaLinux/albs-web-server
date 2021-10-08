@@ -194,6 +194,7 @@ class Build(Base):
         secondaryjoin=(BuildDependency.c.build_dependency == id)
     )
     mock_options = sqlalchemy.Column(JSONB)
+    pgp_key_id = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
 
 
 BuildTaskDependency = sqlalchemy.Table(
@@ -235,7 +236,6 @@ class BuildTask(Base):
         sqlalchemy.ForeignKey('build_task_refs.id'),
         nullable=False
     )
-    pgp_key_id = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
