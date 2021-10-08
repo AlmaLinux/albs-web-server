@@ -700,9 +700,9 @@ async def github_login(
             settings.github_client_secret
         )
         github_info = await get_github_user_info(github_user_token)
-        # if not any(item for item in github_info['organizations']
-                #    if item['login'] == 'AlmaLinux'):
-            # return
+        if not any(item for item in github_info['organizations']
+                   if item['login'] == 'AlmaLinux'):
+            return
         new_user = models.User(
             username=github_info['login'],
             email=github_info['email']
