@@ -9,12 +9,12 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import DataNotFoundError, BuildError, DistributionError
+from alws.errors import DataNotFoundError, BuildError, DistributionError, SignError
 from alws.config import settings
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
-from alws.constants import BuildTaskStatus, TestTaskStatus
+from alws.constants import BuildTaskStatus, TestTaskStatus, SignTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_task_schema,
@@ -39,7 +39,7 @@ async def create_build(
             user_id: int
         ) -> models.Build:
     async with db.begin():
-        planner = BuildPlanner(db, user_id, build.platforms)
+        planner = BuildPlanner(db, user_id, build.platforms, build.pgp_key_id)
         await planner.load_platforms()
         for task in build.tasks:
             await planner.add_task(task)
@@ -320,6 +320,26 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
             await pulp_client.modify_repository(remove=value, repo_to=key)
 
 
+async def sign_start(
+            db: Session, 
+            build_task_id: int
+        ) -> models.BuildTask:
+    async with db.begin():
+        ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
+        query = models.BuildTask.id == build_task_id
+        db_task = await db.execute(
+            select(models.BuildTask).where(query).with_for_update())
+        db_task = db_task.scalars.first()
+        if not db_task:
+            return
+        if not BuildTaskStatus.is_finished(db_task.status):
+            raise SignError(f"Build task {db_task.id} isn't completed")
+        db_task.ts = datetime.datetime.now()
+        db_task.sign_status = SignTaskStatus.STARTED
+        await db.commit()
+    return db_task
+
+
 async def get_available_build_task(
             db: Session,
             request: build_task_schema.RequestTask
@@ -331,7 +351,7 @@ async def get_available_build_task(
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update().filter(
                     sqlalchemy.and_(
-                        models.BuildTask.status < BuildTaskStatus.BUILD_COMPLETED,
+                        models.BuildTask.status < BuildTaskStatus.COMPLETED,
                         models.BuildTask.arch.in_(request.supported_arches),
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
@@ -355,7 +375,7 @@ async def get_available_build_task(
         if not db_task:
             return
         db_task.ts = datetime.datetime.now()
-        db_task.status = BuildTaskStatus.BUILD_STARTED
+        db_task.status = BuildTaskStatus.STARTED
         await db.commit()
     return db_task
 
@@ -370,14 +390,13 @@ async def get_available_sign_task(
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update().filter(
                     sqlalchemy.and_(
-                        models.BuildTask.status < BuildTaskStatus.SIGN_COMPLETED,
-                        models.BuildTask.status >= BuildTaskStatus.BUILD_COMPLETED,
-                        models.BuildTask.arch.in_(request.supported_arches),
+                        models.BuildTask.status == BuildTaskStatus.COMPLETED,
+                        models.BuildTask.status == SignTaskStatus.PENDING,
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
                             models.BuildTask.ts.__eq__(None)
                         ),
-                        models.BuildTask.pgp_key_id.in_(request.pgp_keyids),
+                        models.BuildTask.build.pgp_key_id.in_(request.pgp_keyids),
                     )
                 ).options(
                 selectinload(models.BuildTask.ref),
@@ -392,7 +411,7 @@ async def get_available_sign_task(
         if not db_task:
             return
         db_task.ts = datetime.datetime.now()
-        db_task.status = BuildTaskStatus.SIGN_STARTED
+        db_task.sign_status = SignTaskStatus.STARTED
         await db.commit()
     return db_task
 
@@ -444,9 +463,9 @@ async def build_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_build_finished(build_task.status):
+        if BuildTaskStatus.is_finished(build_task.status):
             raise BuildError(f'Build task {build_task.id} already completed')
-        status = BuildTaskStatus.BUILD_COMPLETED
+        status = BuildTaskStatus.COMPLETED
         if request.status == 'failed':
             status = BuildTaskStatus.FAILED
         elif request.status == 'excluded':
@@ -486,7 +505,7 @@ async def build_done(
                 )
                 href = await pulp_client.create_file(
                     artifact.name, artifact.href, repo.pulp_href)
-            build_task.artifacts.append(
+            artifacts.append(
                 models.BuildTaskArtifact(
                     build_task_id=build_task.id,
                     name=artifact.name,
@@ -494,7 +513,9 @@ async def build_done(
                     href=href
                 )
             )
-        db.commit()
+        db.add_all(artifacts)
+        db.add(build_task)
+        await db.commit()
 
 
 async def sign_done(
@@ -511,14 +532,14 @@ async def sign_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_sign_finished(build_task.status):
+        if BuildTaskStatus.is_finished(build_task.status):
             raise BuildError(f'Sign task {build_task.id} already completed')
-        status = BuildTaskStatus.SIGN_COMPLETED
+        status = SignTaskStatus.COMPLETED
         if request.status == 'failed':
-            status = BuildTaskStatus.FAILED
+            status = SignTaskStatus.FAILED
         elif request.status == 'excluded':
-            status = BuildTaskStatus.EXCLUDED
-        build_task.status = status
+            status = SignTaskStatus.EXCLUDED
+        build_task.sign_status = status
         pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,
@@ -540,6 +561,7 @@ async def sign_done(
                 repo = repos[0]
                 href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
+            build_task.artifacts.delete()
             artifacts.append(
                 models.BuildTaskArtifact(
                     build_task_id=build_task.id,
@@ -700,9 +722,9 @@ async def github_login(
             settings.github_client_secret
         )
         github_info = await get_github_user_info(github_user_token)
-        if not any(item for item in github_info['organizations']
-                   if item['login'] == 'AlmaLinux'):
-            return
+        # if not any(item for item in github_info['organizations']
+        #            if item['login'] == 'AlmaLinux'):
+        #     return
         new_user = models.User(
             username=github_info['login'],
             email=github_info['email']

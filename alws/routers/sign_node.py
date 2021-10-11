@@ -14,14 +14,12 @@ router = APIRouter(
 )
 
 
-@router.post('/ping')
-async def ping(
-            node_status: build_task_schema.Ping,
+@router.post('/{build_task_id}/sign_start', response_model=build_task_schema.Task)
+async def sign_start(
+            build_task_id: int,
             db: database.Session = Depends(get_db)
         ):
-    if not node_status.active_tasks:
-        return
-    await crud.ping_tasks(db, node_status.active_tasks)
+    return await crud.sign_start(db, build_task_id)
 
 
 @router.post('/sign_done')

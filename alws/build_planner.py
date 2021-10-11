@@ -9,7 +9,7 @@ from alws import models
 from alws.errors import DataNotFoundError
 from alws.config import settings
 from alws.schemas import build_schema
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, SignTaskStatus
 from alws.utils.pulp_client import PulpClient
 
 
@@ -22,10 +22,11 @@ class BuildPlanner:
                 self,
                 db: Session,
                 user_id: int,
-                platforms: typing.List[build_schema.BuildCreatePlatforms]
+                platforms: typing.List[build_schema.BuildCreatePlatforms],
+                pgp_key_id: str
             ):
         self._db = db
-        self._build = models.Build(user_id=user_id)
+        self._build = models.Build(user_id=user_id, pgp_key_id=pgp_key_id)
         self._task_index = 0
         self._request_platforms = {
             platform.name: platform.arch_list for platform in platforms
@@ -133,6 +134,7 @@ class BuildPlanner:
                     arch=arch,
                     platform_id=platform.id,
                     status=BuildTaskStatus.IDLE,
+                    sign_status=SignTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref
                 )

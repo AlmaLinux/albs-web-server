@@ -10,7 +10,6 @@ __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 class BuildTaskRef(BaseModel):
 
     url: str
-    pgp_key_id: str
     git_ref: typing.Optional[str]
 
     class Config:
@@ -29,6 +28,7 @@ class BuildCreate(BaseModel):
     tasks: conlist(BuildTaskRef, min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    pgp_key_id: str
 
 
 class BuildPlatform(BaseModel):

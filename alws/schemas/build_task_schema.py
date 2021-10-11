@@ -97,4 +97,3 @@ class SignDone(BaseModel):
 class RequestTask(BaseModel):
 
     supported_arches: typing.List[str]
-    pgp_keyids: typing.List[str]
