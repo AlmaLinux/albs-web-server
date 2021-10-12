@@ -66,7 +66,7 @@ class BuildPlanner:
             repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
                 repo_name)
         else:
-            repo_url, pulp_href = await pulp_client.create_build_log_repo(
+            repo_url, pulp_href = await pulp_client.create_log_repo(
                 repo_name)
         repo = models.Repository(
             name=repo_name,

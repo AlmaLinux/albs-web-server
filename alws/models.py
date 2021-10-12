@@ -306,6 +306,27 @@ class TestTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     alts_response = sqlalchemy.Column(JSONB, nullable=True)
     revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    artifacts = relationship('TestTaskArtifact', back_populates='test_task')
+    repository_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id', name='test_task_repo_fk'),
+        nullable=True
+    )
+    repository = relationship('Repository')
+
+
+class TestTaskArtifact(Base):
+
+    __tablename__ = 'test_task_artifacts'
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    test_task_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('test_tasks.id'),
+        nullable=False
+    )
+    test_task = relationship('TestTask', back_populates='artifacts')
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
 async def create_tables():

@@ -14,13 +14,15 @@ class PulpClient:
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
 
-    async def create_build_log_repo(self, name: str) -> str:
+    async def create_log_repo(
+            self, name: str, distro_path_start: str = 'build_logs') -> str:
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
         response = await self.make_post_request(ENDPOINT, data=payload)
         repo_href = response['pulp_href']
         await self.create_file_publication(repo_href)
-        distro = await self.create_file_distro(name, repo_href)
+        distro = await self.create_file_distro(
+            name, repo_href, base_path_start=distro_path_start)
         return distro, repo_href
 
     async def create_build_rpm_repo(self, name: str) -> str:
@@ -92,12 +94,13 @@ class PulpClient:
                  if 'rpm/packages' in item]
         return hrefs[0] if hrefs else None
 
-    async def create_file_distro(self, name: str, repository: str) -> str:
+    async def create_file_distro(self, name: str, repository: str,
+                                 base_path_start: str = 'build_logs') -> str:
         ENDPOINT = 'pulp/api/v3/distributions/file/file/'
         payload = {
             'repository': repository,
             'name': f'{name}-distro',
-            'base_path': f'build_logs/{name}'
+            'base_path': f'{base_path_start}/{name}'
         }
         task = await self.make_post_request(ENDPOINT, data=payload)
         task_result = await self.wait_for_task(task['task'])
