@@ -2,7 +2,7 @@ import threading
 
 from fastapi import FastAPI
 
-from alws.routers import builds, platforms, users, build_node, projects, distro, tests
+from alws.routers import builds, platforms, users, build_node, projects, distro, tests, sign_node
 from alws.test_scheduler import TestTaskScheduler
 
 
@@ -27,5 +27,5 @@ async def shutdown():
     terminate_event.set()
 
 
-for module in (builds, platforms, users, build_node, projects, distro, tests):
+for module in (builds, platforms, users, build_node, sign_node, projects, distro, tests):
     app.include_router(module.router, prefix='/api/v1')
