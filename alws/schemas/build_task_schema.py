@@ -80,6 +80,11 @@ class TaskDoneArtifact(BaseModel):
         return bool(re.search(regex, self.name))
 
 
+class SingStart(BaseModel):
+
+    task_id: int
+
+
 class BuildDone(BaseModel):
 
     task_id: int
