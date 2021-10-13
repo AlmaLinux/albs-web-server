@@ -329,7 +329,7 @@ async def sign_start(
         query = models.BuildTask.id == build_task_id
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update())
-        db_task = db_task.scalars.first()
+        db_task = db_task.scalars().first()
         if not db_task:
             return
         if not BuildTaskStatus.is_finished(db_task.status):
