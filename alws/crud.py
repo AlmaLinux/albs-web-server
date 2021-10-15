@@ -322,18 +322,22 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
 async def sign_start(
             db: Session, 
-            build_task_id: int
+            request: build_task_schema.SignStart
         ) -> models.BuildTask:
     async with db.begin():
         ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        query = models.BuildTask.id == build_task_id
+        query = models.BuildTask.id == request.task_id
         db_task = await db.execute(
-            select(models.BuildTask).where(query).with_for_update())
+            select(models.BuildTask).where(query).with_for_update().options(
+                selectinload(models.BuildTask.build)
+            )
+        )
         db_task = db_task.scalars().first()
         if not db_task:
             return
         if not BuildTaskStatus.is_finished(db_task.status):
             raise SignError(f"Build task {db_task.id} isn't completed")
+        db_task.build.pgp_key_id = request.pgp_key_id
         db_task.ts = datetime.datetime.now()
         db_task.sign_status = SignTaskStatus.STARTED
         await db.commit()

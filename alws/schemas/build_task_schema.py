@@ -99,6 +99,12 @@ class SignDone(BaseModel):
     artifacts: typing.List[TaskDoneArtifact]
 
 
+class SignStart(BaseModel):
+
+    task_id: int
+    pgp_key_id: str
+
+
 class RequestTask(BaseModel):
 
     supported_arches: typing.List[str]
