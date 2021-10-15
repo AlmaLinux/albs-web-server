@@ -23,7 +23,14 @@ from alws.schemas import (
 from alws.utils.distro_utils import create_empty_repo
 
 
-__all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
+__all__ = [
+    'add_distributions_after_rebuild',
+    'create_build',
+    'create_platform',
+    'get_builds',
+    'get_platforms',
+    'update_failed_build_items',
+]
 
 
 async def create_build(
@@ -192,6 +199,69 @@ async def get_distributions(db):
     return db_distros.scalars().all()
 
 
+async def add_distributions_after_rebuild(
+        db: Session,
+        request: build_node_schema.BuildDone,
+):
+
+    subquery = select(models.BuildTask.build_id).where(
+        models.BuildTask.id == request.task_id).scalar_subquery()
+    build_query = select(models.Build).where(
+        models.Build.id == subquery,
+    ).options(
+        selectinload(
+            models.Build.tasks).selectinload(models.BuildTask.artifacts),
+    )
+    db_build = await db.execute(build_query)
+    db_build = db_build.scalars().first()
+
+    build_completed = all((
+        task.status >= BuildTaskStatus.COMPLETED
+        for task in db_build.tasks
+    ))
+    if not build_completed:
+        return
+
+    distr_query = select(models.Distribution).join(
+        models.Distribution.builds,
+    ).where(models.Build.id == db_build.id).options(
+        selectinload(models.Distribution.builds),
+        selectinload(models.Distribution.repositories),
+    )
+    db_distros = await db.execute(distr_query)
+    db_distros = db_distros.scalars().all()
+
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+
+    for db_distro in db_distros:
+        modify = await prepare_repo_modify_dict(db_build, db_distro)
+        for modification in ('remove', 'add'):
+            for key, value in modify.items():
+                if modification == 'add':
+                    await pulp_client.modify_repository(
+                        add=value, repo_to=key)
+                else:
+                    await pulp_client.modify_repository(
+                        remove=value, repo_to=key)
+
+
+async def prepare_repo_modify_dict(db_build: models.Build,
+                                   db_distro: models.Distribution):
+    modify = collections.defaultdict(list)
+    for task in db_build.tasks:
+        for artifact in task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                artifact)
+            for distro_repo in db_distro.repositories:
+                if (distro_repo.arch == task.arch and
+                        distro_repo.debug == build_artifact.is_debuginfo):
+                    modify[distro_repo.pulp_href].append(artifact.href)
+    return modify
+
+
 async def modify_distribution(build_id: int, distribution: str, db: Session,
                               modification: str):
 
@@ -232,17 +302,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         await db.commit()
     await db.refresh(db_distro)
-    modify = collections.defaultdict(list)
-    for task in db_build.tasks:
-        for artifact in task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
-                artifact)
-            for distro_repo in db_distro.repositories:
-                if (distro_repo.arch == task.arch and
-                        distro_repo.debug == build_artifact.is_debuginfo):
-                    modify[distro_repo.pulp_href].append(artifact.href)
+    modify = await prepare_repo_modify_dict(db_build, db_distro)
     for key, value in modify.items():
         if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)
@@ -288,6 +348,28 @@ async def get_available_build_task(
         db_task.status = BuildTaskStatus.STARTED
         await db.commit()
     return db_task
+
+
+def add_build_task_dependencies(db: Session, task: models.BuildTask,
+                                last_task: models.BuildTask):
+    task.dependencies.append(last_task)
+
+
+async def update_failed_build_items(db: Session, build_id: int):
+    query = select(models.BuildTask).where(
+        sqlalchemy.and_(
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status == BuildTaskStatus.FAILED)
+    ).order_by(models.BuildTask.index, models.BuildTask.id)
+    async with db.begin():
+        last_task = None
+        failed_tasks = await db.execute(query)
+        for task in failed_tasks.scalars():
+            task.status = BuildTaskStatus.IDLE
+            if last_task is not None:
+                await db.run_sync(add_build_task_dependencies, task, last_task)
+            last_task = task
+        await db.commit()
 
 
 async def ping_tasks(

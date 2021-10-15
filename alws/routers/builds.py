@@ -40,3 +40,9 @@ async def get_build(build_id: int, db: database.Session = Depends(get_db)):
             detail=f'Build with {build_id=} is not found'
         )
     return db_build
+
+
+@router.patch('/{build_id}/restart-failed', response_model=build_schema.Build)
+async def restart_failed_build_items(build_id: int,
+                                     db: database.Session = Depends(get_db)):
+    return await crud.update_failed_build_items(db, build_id)

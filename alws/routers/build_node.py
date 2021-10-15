@@ -30,6 +30,8 @@ async def build_done(
             db: database.Session = Depends(get_db)
         ):
     await crud.build_done(db, build_done)
+    # need add some logic after discussing with team
+    # await crud.add_distributions_after_rebuild(db, build_done)
     await crud.create_test_tasks(db, build_done.task_id)
     return {'ok': True}
 
