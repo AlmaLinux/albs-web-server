@@ -20,7 +20,7 @@ def upgrade():
     op.add_column(
         "builds",
         sa.Column(
-            "pgp_key_id", sa.Text(), nullable=False
+            "pgp_key_id", sa.Text(), nullable=True
         ),
     )
 
