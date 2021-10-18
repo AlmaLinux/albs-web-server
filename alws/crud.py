@@ -307,7 +307,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
-            build_artifact = build_task_schema.BuildDoneArtifact.from_orm(
+            build_artifact = build_task_schema.TaskDoneArtifact.from_orm(
                 artifact)
             for distro_repo in db_distro.repositories:
                 if (distro_repo.arch == task.arch and
