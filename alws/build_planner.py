@@ -22,11 +22,10 @@ class BuildPlanner:
                 self,
                 db: Session,
                 user_id: int,
-                platforms: typing.List[build_schema.BuildCreatePlatforms],
-                pgp_key_id: str
+                platforms: typing.List[build_schema.BuildCreatePlatforms]
             ):
         self._db = db
-        self._build = models.Build(user_id=user_id, pgp_key_id=pgp_key_id)
+        self._build = models.Build(user_id=user_id)
         self._task_index = 0
         self._request_platforms = {
             platform.name: platform.arch_list for platform in platforms
