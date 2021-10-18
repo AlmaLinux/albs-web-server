@@ -39,7 +39,7 @@ async def create_build(
             user_id: int
         ) -> models.Build:
     async with db.begin():
-        planner = BuildPlanner(db, user_id, build.platforms, build.pgp_key_id)
+        planner = BuildPlanner(db, user_id, build.platforms)
         await planner.load_platforms()
         for task in build.tasks:
             await planner.add_task(task)
