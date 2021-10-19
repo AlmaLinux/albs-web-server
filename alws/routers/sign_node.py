@@ -50,6 +50,7 @@ async def get_sign_task(
         'ref': task.ref,
         'platform': task.platform,
         'packages': [],
+        'pgp_keyid': task.build.pgp_key_id,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

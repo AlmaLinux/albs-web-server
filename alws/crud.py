@@ -407,7 +407,7 @@ async def get_available_sign_task(
                 selectinload(models.BuildTask.platform).selectinload(
                     models.Platform.repos),
                 selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user),
+                    models.Build.user, models.Build.pgp_key_id),
                 selectinload(models.BuildTask.artifacts),
             ).order_by(models.BuildTask.id)
         )
