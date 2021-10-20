@@ -11,14 +11,15 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.errors import DataNotFoundError, BuildError, DistributionError
 from alws.config import settings
+from alws.releases import get_release_plan, execute_release_plan, EmptyReleasePlan, MissingRepository
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
-from alws.constants import BuildTaskStatus, TestTaskStatus
+from alws.constants import BuildTaskStatus, TestTaskStatus, ReleaseStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_node_schema,
-    distro_schema, test_schema
+    distro_schema, test_schema, release_schema
 )
 from alws.utils.distro_utils import create_empty_repo
 
@@ -451,6 +452,31 @@ async def build_done(
         db.add(build_task)
         await db.commit()
 
+    async with db.begin():
+        rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
+            models.BuildTaskArtifact.build_task_id == build_task.id,
+            models.BuildTaskArtifact.type == 'rpm'))
+        srpm = None
+        binary_rpms = []
+        for rpm in rpms_result.scalars().all():
+            if rpm.name.endswith('.src.rpm'):
+                srpm = models.SourceRpm()
+                srpm.artifact = rpm
+                srpm.build = build_task.build
+            else:
+                binary_rpm = models.BinaryRpm()
+                binary_rpm.artifact = rpm
+                binary_rpm.build = build_task.build
+                binary_rpms.append(binary_rpm)
+        db.add(srpm)
+        await db.commit()
+    await db.refresh(srpm)
+    for binary_rpm in binary_rpms:
+        binary_rpm.source_rpm = srpm
+
+    db.add_all(binary_rpms)
+    await db.commit()
+
 
 async def create_test_tasks(db: Session, build_task_id: int):
     pulp_client = PulpClient(
@@ -638,3 +664,121 @@ async def get_user(
         query = models.User.email == user_email
     db_user = await db.execute(select(models.User).where(query))
     return db_user.scalars().first()
+
+
+async def get_releases(db: Session) -> typing.List[models.Release]:
+    release_result = await db.execute(select(models.Release).options(
+        selectinload(models.Release.created_by)))
+    return release_result.scalars().all()
+
+
+async def create_new_release(
+            db: Session, user_id: int, payload: release_schema.ReleaseCreate
+        ) -> models.Release:
+    async with db.begin():
+        user_q = select(models.User).where(models.User.id == user_id)
+        user_result = await db.execute(user_q)
+        platform_result = await db.execute(select(models.Platform).where(
+            models.Platform.id.in_(
+                (payload.platform_id, payload.reference_platform_id))))
+        platforms = platform_result.scalars().all()
+        base_platform = [item for item in platforms
+                         if item.id == payload.platform_id][0]
+        reference_platform = [item for item in platforms
+                              if item.id == payload.reference_platform_id][0]
+
+        user = user_result.scalars().first()
+        new_release = models.Release()
+        new_release.build_ids = payload.builds
+        new_release.platform = base_platform
+        new_release.plan = await get_release_plan(
+            db, payload.builds, base_platform.name,
+            base_platform.distr_version, reference_platform.name,
+            reference_platform.distr_version
+        )
+        new_release.created_by = user
+        db.add(new_release)
+        await db.commit()
+
+    await db.refresh(new_release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == new_release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def update_release(
+        db: Session, release_id: int,
+        payload: release_schema.ReleaseUpdate
+) -> models.Release:
+    async with db.begin():
+        release_result = await db.execute(select(models.Release).where(
+            models.Release.id == release_id).with_for_update())
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        if payload.plan:
+            release.plan = payload.plan
+        if payload.builds and payload.builds != release.build_ids:
+            release.build_ids = payload.builds
+            platform_result = await db.execute(select(models.Platform).where(
+                models.Platform.id.in_(
+                    (release.platform_id, release.reference_platform_id))))
+            platforms = platform_result.scalars().all()
+            base_platform = [item for item in platforms
+                             if item.id == release.platform_id][0]
+            reference_platform = [
+                item for item in platforms
+                if item.id == release.reference_platform_id][0]
+            release.plan = await get_release_plan(
+                db, payload.builds, base_platform.name,
+                base_platform.distr_version, reference_platform.name,
+                reference_platform.distr_version)
+        db.add(release)
+        await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def commit_release(db: Session, release_id: int) -> (models.Release, str):
+    async with db.begin():
+        release_result = await db.execute(
+            select(models.Release).where(
+                models.Release.id == release_id).with_for_update()
+        )
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        builds_q = select(models.Build).where(
+            models.Build.id.in_(release.build_ids))
+        builds_result = await db.execute(builds_q)
+        for build in builds_result.scalars().all():
+            build.release = release
+            db.add(build)
+        release.status = ReleaseStatus.IN_PROGRESS
+        db.add(release)
+        await db.commit()
+    try:
+        await execute_release_plan(release_id, db)
+    except (EmptyReleasePlan, MissingRepository) as e:
+        message = f'Cannot commit release: {str(e)}'
+        release.status = ReleaseStatus.FAILED
+    else:
+        message = 'Successfully committed release'
+        release.status = ReleaseStatus.COMPLETED
+    db.add(release)
+    await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first(), message
