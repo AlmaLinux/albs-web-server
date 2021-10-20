@@ -538,8 +538,8 @@ async def sign_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_finished(build_task.status):
-            raise BuildError(f'Sign task {build_task.id} already completed')
+        if SignTaskStatus.is_finished(build_task.sign_status):
+            raise SignError(f'Sign task {build_task.id} already completed')
         status = SignTaskStatus.COMPLETED
         if request.status == 'failed':
             status = SignTaskStatus.FAILED
