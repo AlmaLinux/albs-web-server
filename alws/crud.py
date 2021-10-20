@@ -398,7 +398,7 @@ async def get_available_sign_task(
             select(models.BuildTask).where(where_query).with_for_update().filter(
                     sqlalchemy.and_(
                         models.BuildTask.status == BuildTaskStatus.COMPLETED,
-                        models.BuildTask.sign_status == SignTaskStatus.PENDING,
+                        models.BuildTask.sign_status == SignTaskStatus.STARTED,
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
                             models.BuildTask.ts.__eq__(None)
