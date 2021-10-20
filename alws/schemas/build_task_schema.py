@@ -50,7 +50,7 @@ class Task(BaseModel):
     created_by: TaskCreatedBy
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
-    pgp_keyids: typing.Optional[typing.List[str]]
+    pgp_keyid: typing.Optional[str]
 
     class Config:
         orm_mode = True
@@ -109,3 +109,4 @@ class SignStart(BaseModel):
 class RequestTask(BaseModel):
 
     supported_arches: typing.List[str]
+    pgp_keyids: typing.Optional[typing.List[str]]
