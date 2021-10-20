@@ -50,7 +50,7 @@ class Task(BaseModel):
     created_by: TaskCreatedBy
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
-    pgp_keyid: typing.Optional[str]
+    pgp_keyids: typing.Optional[typing.List[str]]
 
     class Config:
         orm_mode = True
