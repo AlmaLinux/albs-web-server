@@ -14,12 +14,13 @@ router = APIRouter(
 )
 
 
-@router.post('/{build_task_id}/sign_start', response_model=build_task_schema.SingStart)
+@router.post('/{task_id}/sign_start', response_model=build_task_schema.SignStartDone)
 async def sign_start(
-            sign_start: build_task_schema.SignStart,
+            task_id: int,
+            sign_start: build_task_schema.RequestSignStart,
             db: database.Session = Depends(get_db)
         ):
-    task = await crud.sign_start(db, sign_start)
+    task = await crud.sign_start(db, task_id, sign_start)
     if not task:
         return
     response = {
@@ -38,7 +39,7 @@ async def sign_done(
 
 @router.get('/get_task', response_model=build_task_schema.Task)
 async def get_sign_task(
-            request: build_task_schema.RequestTask,
+            request: build_task_schema.RequestSignTask,
             db: database.Session = Depends(get_db)
         ):
     task = await crud.get_available_sign_task(db, request)

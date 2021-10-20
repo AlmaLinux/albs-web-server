@@ -38,7 +38,7 @@ async def build_done(
 
 @router.get('/get_task', response_model=build_task_schema.Task)
 async def get_task(
-            request: build_task_schema.RequestTask,
+            request: build_task_schema.RequestBuildTask,
             db: database.Session = Depends(get_db)
         ):
     task = await crud.get_available_build_task(db, request)

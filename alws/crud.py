@@ -322,11 +322,12 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
 async def sign_start(
             db: Session, 
-            request: build_task_schema.SignStart
+            task_id: int,
+            request: build_task_schema.RequestSignStart
         ) -> models.BuildTask:
     async with db.begin():
         ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        query = models.BuildTask.id == request.task_id
+        query = models.BuildTask.id == task_id
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update().options(
                 selectinload(models.BuildTask.build)
@@ -346,7 +347,7 @@ async def sign_start(
 
 async def get_available_build_task(
             db: Session,
-            request: build_task_schema.RequestTask
+            request: build_task_schema.RequestSignTask
         ) -> models.BuildTask:
     async with db.begin():
         # TODO: here should be config value
@@ -386,28 +387,29 @@ async def get_available_build_task(
 
 async def get_available_sign_task(
             db: Session, 
-            request: build_task_schema.RequestTask
+            request: build_task_schema.RequestSignTask
         ) -> models.BuildTask:
     async with db.begin():
         ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        query = ~models.BuildTask.dependencies.any()
+        where_query = sqlalchemy.and_(
+            models.BuildTask.build.has(models.Build.pgp_key_id.in_(request.pgp_keyids))
+        )
         db_task = await db.execute(
-            select(models.BuildTask).where(query).with_for_update().filter(
+            select(models.BuildTask).where(where_query).with_for_update().filter(
                     sqlalchemy.and_(
                         models.BuildTask.status == BuildTaskStatus.COMPLETED,
-                        models.BuildTask.status == SignTaskStatus.PENDING,
+                        models.BuildTask.sign_status == SignTaskStatus.PENDING,
                         sqlalchemy.or_(
                             models.BuildTask.ts < ts_expired,
                             models.BuildTask.ts.__eq__(None)
-                        ),
-                        models.BuildTask.build.pgp_key_id.in_(request.pgp_keyids),
+                        )
                     )
                 ).options(
                 selectinload(models.BuildTask.ref),
                 selectinload(models.BuildTask.platform).selectinload(
                     models.Platform.repos),
                 selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user, models.Build.pgp_key_id),
+                    models.Build.user),
                 selectinload(models.BuildTask.artifacts),
             ).order_by(models.BuildTask.id)
         )

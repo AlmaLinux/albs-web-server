@@ -81,11 +81,6 @@ class TaskDoneArtifact(BaseModel):
         return bool(re.search(regex, self.name))
 
 
-class SingStart(BaseModel):
-
-    task_id: int
-
-
 class BuildDone(BaseModel):
 
     task_id: int
@@ -100,13 +95,21 @@ class SignDone(BaseModel):
     artifacts: typing.List[TaskDoneArtifact]
 
 
-class SignStart(BaseModel):
+class RequestSignStart(BaseModel):
 
-    task_id: int
     pgp_key_id: str
 
 
-class RequestTask(BaseModel):
+class SignStartDone(BaseModel):
+
+    task_id: int
+
+
+class RequestBuildTask(BaseModel):
 
     supported_arches: typing.List[str]
-    pgp_keyids: typing.Optional[typing.List[str]]
+
+
+class RequestSignTask(BaseModel):
+
+    pgp_keyids: typing.List[str]
