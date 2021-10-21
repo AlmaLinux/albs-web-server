@@ -450,6 +450,62 @@ async def build_done(
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()
+    if build_task.arch == 'x86_64' and status == BuildTaskStatus.COMPLETED:
+        src_pkg_name = next(
+            artifact.name for artifact in request.artifacts
+            if artifact.arch == 'src'
+        )
+        # in next commit there will be a response from API
+        is_multilib = True
+        if is_multilib:
+            await add_multilib_packages(db, build_task)
+
+
+async def add_multilib_packages(db: Session, build_task: models.BuildTask):
+    async with db.begin():
+        subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
+            models.BuildTask.build_id == build_task.build_id,
+            models.BuildTask.index == build_task.index,
+            models.BuildTask.arch == 'i686',
+        )).scalar_subquery()
+        query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
+            models.BuildTaskArtifact.build_task_id == subquery,
+            models.BuildTaskArtifact.type == 'rpm',
+            models.BuildTaskArtifact.name.not_like('%-debuginfo-%'),
+            models.BuildTaskArtifact.name.not_like('%-debugsource-%'),
+            models.BuildTaskArtifact.name.not_like('%src.rpm%'),
+        ))
+        db_artifacts = await db.execute(query)
+        db_artifacts = db_artifacts.scalars().all()
+
+        modify_repo_href = next(
+            repo.pulp_href for repo in build_task.build.repos
+            if repo.arch == 'x86_64'
+            and repo.type == 'rpm'
+            and repo.debug == False
+        )
+        pkg_hrefs = [artifact.href for artifact in db_artifacts]
+        artifacts = []
+        for artifact in db_artifacts:
+            artifacts.append(
+                models.BuildTaskArtifact(
+                    build_task_id=build_task.id,
+                    name=artifact.name,
+                    type=artifact.type,
+                    href=artifact.href,
+                )
+            )
+            pkg_hrefs.append(artifact.href)
+        db.add_all(artifacts)
+        await db.commit()
+
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    await pulp_client.modify_repository(
+        repo_to=modify_repo_href, add=pkg_hrefs)
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
