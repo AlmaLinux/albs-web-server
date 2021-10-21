@@ -372,6 +372,44 @@ async def update_failed_build_items(db: Session, build_id: int):
         await db.commit()
 
 
+async def remove_build_job(db: Session, build_id: int):
+    query_bj = select(models.Build).where(
+        models.Build.id == build_id).options(
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.artifacts),
+        selectinload(models.Build.repos),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.test_tasks).selectinload(
+            models.TestTask.artifacts)
+    )
+    artifacts = []
+    async with db.begin():
+        build = await db.execute(query_bj)
+        if not build:
+            return
+        build = build.scalars().first()
+        for bt in build.tasks:
+            for build_artifact in bt.artifacts:
+                artifacts.append(build_artifact.href)
+            for tt in bt.test_tasks:
+                for test_artifact in tt.artifacts:
+                    artifacts.append(test_artifact.href)
+        for br in build.repos:
+            artifacts.append(br.pulp_href)
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        for artifact in artifacts:
+            await pulp_client.make_delete_request(artifact)
+    async with db.begin():
+        await db.execute(
+            delete(models.Build).where(models.Build.id == build_id))
+        await db.commit()
+
+
+
 async def ping_tasks(
             db: Session,
             task_list: typing.List[int]

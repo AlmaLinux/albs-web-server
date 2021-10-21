@@ -46,3 +46,9 @@ async def get_build(build_id: int, db: database.Session = Depends(get_db)):
 async def restart_failed_build_items(build_id: int,
                                      db: database.Session = Depends(get_db)):
     return await crud.update_failed_build_items(db, build_id)
+
+
+@router.delete('/{build_id}/remove', status_code=204)
+async def restart_failed_build_items(build_id: int,
+                                     db: database.Session = Depends(get_db)):
+    return await crud.remove_build_job(db, build_id)
