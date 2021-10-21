@@ -154,3 +154,10 @@ class PulpClient:
                 json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json
+
+    async def make_delete_request(self, endpoint: str):
+        full_url = urllib.parse.urljoin(self._host, endpoint)
+        async with aiohttp.ClientSession(auth=self._auth) as session:
+            async with session.delete(full_url) as response:
+                json = await response.json(content_type=None)
+                return json
