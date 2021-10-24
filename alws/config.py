@@ -1,3 +1,5 @@
+import typing
+
 from pydantic import BaseSettings
 
 
@@ -10,6 +12,9 @@ class Settings(BaseSettings):
     alts_token: str
 
     redis_url: str = 'redis://redis:6379'
+
+    beholder_host: str
+    beholder_token: typing.Optional[str]
 
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
     sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
