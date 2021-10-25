@@ -141,13 +141,13 @@ BuildRepo = sqlalchemy.Table(
     sqlalchemy.Column(
         'build_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('builds.id'),
         primary_key=True
     ),
     sqlalchemy.Column(
         'repository_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('repositories.id'),
         primary_key=True
     )
 )
@@ -215,13 +215,13 @@ BuildTaskDependency = sqlalchemy.Table(
     sqlalchemy.Column(
         'build_task_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('build_tasks.id'),
         primary_key=True
     ),
     sqlalchemy.Column(
         'build_task_dependency',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('build_tasks.id'),
         primary_key=True
     )
 )
@@ -235,7 +235,7 @@ class BuildTask(Base):
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('builds.id'),
         # saw https://stackoverflow.com/questions/
         # 5033547/sqlalchemy-cascade-delete
         nullable=False
@@ -247,7 +247,7 @@ class BuildTask(Base):
     )
     ref_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_task_refs.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('build_task_refs.id'),
         nullable=False
     )
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
@@ -283,7 +283,7 @@ class BuildTaskArtifact(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('build_tasks.id'),
         nullable=False
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -357,7 +357,7 @@ class TestTask(Base):
     env_arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('build_tasks.id'),
         nullable=False
     )
     build_task = relationship('BuildTask', back_populates='test_tasks')
@@ -367,8 +367,7 @@ class TestTask(Base):
     artifacts = relationship('TestTaskArtifact', back_populates='test_task')
     repository_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id', name='test_task_repo_fk',
-                              ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('repositories.id', name='test_task_repo_fk'),
         nullable=True
     )
     repository = relationship('Repository')
@@ -380,7 +379,7 @@ class TestTaskArtifact(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     test_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('test_tasks.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey('test_tasks.id'),
         nullable=False
     )
     test_task = relationship('TestTask', back_populates='artifacts')
