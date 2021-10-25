@@ -11,6 +11,8 @@ from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus
 from alws.utils.pulp_client import PulpClient
+from alws.utils.modularity import ModuleWrapper
+from alws.utils.gitea import download_modules_yaml
 
 
 __all__ = ['BuildPlanner']
@@ -31,6 +33,7 @@ class BuildPlanner:
             platform.name: platform.arch_list for platform in platforms
         }
         self._platforms = []
+        self._modules_by_target = {}
         self._tasks_cache = collections.defaultdict(list)
 
     async def load_platforms(self):
@@ -57,6 +60,7 @@ class BuildPlanner:
                 is_debug: typing.Optional[bool] = False,
                 task_id: typing.Optional[int] = None
             ) -> models.Repository:
+        # TODO: here we should insert every modules.yaml into repositories
         suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
         repo_name = (
@@ -65,6 +69,11 @@ class BuildPlanner:
         if repo_type == 'rpm':
             repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
                 repo_name)
+            module = self._modules_by_target.get((platform.name, arch))
+            if module:
+                await pulp_client.modify_repository(
+                    pulp_href, add=[module.pulp_href]
+                )
         else:
             repo_url, pulp_href = await pulp_client.create_log_repo(
                 repo_name)
@@ -108,7 +117,7 @@ class BuildPlanner:
                     arch,
                     self._build,
                     'rpm',
-                    True
+                    is_debug=True
                 ))
         for task in await self._db.run_sync(self.sync_get_build_tasks):
             tasks.append(self.create_build_repo(
@@ -125,16 +134,66 @@ class BuildPlanner:
         self._build.linked_builds.append(linked_build)
 
     async def add_task(self, task: build_schema.BuildTask):
-        ref = models.BuildTaskRef(**task.dict())
+        if not task.is_module:
+            await self._add_single_ref(**task.dict())
+            return
+        refs, module = await self._get_module_refs(task)
+        # TODO: prepare module template before inserting
+        # TODO: also, we should merge all of them before insert
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        for platform in self._platforms:
+            for arch in self._request_platforms[platform.name]:
+                # TODO: Set module arch before insert
+                module_pulp_href, sha256 = await pulp_client.create_module(
+                    module.render())
+                db_module = models.RpmModule(
+                    name=module.name,
+                    version=module.version,
+                    stream=module.stream,
+                    context=module.context,
+                    arch=module.arch,
+                    pulp_href=module_pulp_href,
+                    sha256=sha256
+                )
+                self._modules_by_target[(platform.name, arch)] = db_module
+        self._db.add_all(list(self._modules_by_target.values()))
+        for ref in refs:
+            await self._add_single_ref(ref)
+
+    async def _get_module_refs(self, task: build_schema.BuildTask):
+        module = ModuleWrapper.from_template(
+            await download_modules_yaml(
+                task.ref.url,
+                task.ref.git_ref,
+                task.ref.ref_type
+            )
+        )
+        result = []
+        for component in module.iter_components():
+            result.append(models.BuildTaskRef(
+                # TODO: fix this hardcode
+                url=f'https://git.almalinux.org/rpms/{component.name}.git',
+                # TODO: c8 should be taken from platform config
+                git_ref=f'c8-stream-{module.stream}'
+            ))
+        return result, module
+
+    async def _add_single_ref(self, ref: models.BuildTaskRef):
         for platform in self._platforms:
             arch_tasks = []
             for arch in self._request_platforms[platform.name]:
+                module = self._modules_by_target.get((platform.name, arch))
                 build_task = models.BuildTask(
                     arch=arch,
                     platform_id=platform.id,
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
-                    ref=ref
+                    ref=ref,
+                    rpm_module=module
                 )
                 task_key = (platform.name, arch)
                 self._tasks_cache[task_key].append(build_task)

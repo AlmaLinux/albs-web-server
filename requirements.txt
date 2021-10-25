@@ -11,3 +11,4 @@ aioredis==2.0.0
 psycopg2-binary==2.9.1
 jmespath==0.10.0
 pytest==6.2.5
+PyYAML==5.4.1
