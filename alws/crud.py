@@ -383,19 +383,30 @@ async def remove_build_job(db: Session, build_id: int):
             models.TestTask.artifacts)
     )
     artifacts = []
+    repo_ids = []
+    build_task_ids = []
+    build_task_artifact_ids = []
+    test_task_ids = []
+    test_task_artifact_ids = []
     async with db.begin():
         build = await db.execute(query_bj)
+        build = build.scalars().first()
         if not build:
             return
-        build = build.scalars().first()
         for bt in build.tasks:
+            build_task_ids.append(bt.id)
             for build_artifact in bt.artifacts:
+                build_task_artifact_ids.append(build_artifact.id)
                 artifacts.append(build_artifact.href)
             for tt in bt.test_tasks:
+                test_task_ids.append(tt.id)
+                repo_ids.append(tt.repository_id)
                 for test_artifact in tt.artifacts:
+                    build_task_artifact_ids.append(test_artifact.id)
                     artifacts.append(test_artifact.href)
         for br in build.repos:
             artifacts.append(br.pulp_href)
+            repo_ids.append(br.id)
         pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,
@@ -403,7 +414,32 @@ async def remove_build_job(db: Session, build_id: int):
         )
         for artifact in artifacts:
             await pulp_client.make_delete_request(artifact)
-    async with db.begin():
+        await db.execute(
+            delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
+        )
+        await db.execute(
+            delete(models.BuildTaskArtifact).where(
+                models.BuildTaskArtifact.id.in_(build_task_artifact_ids))
+        )
+        await db.execute(
+            delete(models.TestTaskArtifact).where(
+                models.TestTaskArtifact.id.in_(test_task_artifact_ids))
+        )
+        await db.execute(
+            delete(models.TestTask).where(
+                models.TestTask.id.in_(test_task_ids))
+        )
+        await db.execute(
+            delete(models.BuildTask).where(
+                models.BuildTask.id.in_(build_task_ids))
+        )
+        await db.execute(
+            delete(models.Repository).where(
+                models.Repository.id.in_(repo_ids))
+        )
+        await db.execute(
+            delete(models.BuildTask).where(models.BuildTask.build_id == build_id)
+        )
         await db.execute(
             delete(models.Build).where(models.Build.id == build_id))
         await db.commit()
