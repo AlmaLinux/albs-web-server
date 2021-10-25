@@ -11,6 +11,11 @@ class BuildTaskRef(BaseModel):
 
     url: str
     git_ref: typing.Optional[str]
+    ref_type: typing.Optional[typing.Literal['git_branch', 'git_tag']]
+
+    @property
+    def is_module(self):
+        return '/modules/' in self.url
 
     class Config:
         orm_mode = True

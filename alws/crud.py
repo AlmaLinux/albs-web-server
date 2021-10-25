@@ -22,6 +22,7 @@ from alws.schemas import (
     distro_schema, test_schema, release_schema
 )
 from alws.utils.distro_utils import create_empty_repo
+from alws.utils.modularity import ModuleWrapper
 
 
 __all__ = [
@@ -478,7 +479,8 @@ async def build_done(
             select(models.BuildTask).where(query).options(
                 selectinload(models.BuildTask.build).selectinload(
                     models.Build.repos
-                )
+                ),
+                selectinload(models.BuildTask.rpm_module)
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
@@ -501,6 +503,20 @@ async def build_done(
             settings.pulp_user,
             settings.pulp_password
         )
+        build_module = None
+        module_repo = None
+        if build_task.rpm_module:
+            module_repo = next(
+                build_repo for build_repo in build_task.build.repos
+                if build_repo.arch == build_task.arch
+                and not build_repo.debug
+                and build_repo.type == 'rpm'
+            )
+            repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
+                module_repo.url, build_task.rpm_module.sha256)
+            # TODO: here actually should be module index,
+            #       from which we can borrow needed module
+            build_module = ModuleWrapper(repo_modules_yaml)
         artifacts = []
         for artifact in request.artifacts:
             href = None
@@ -517,6 +533,8 @@ async def build_done(
                 repo = repos[0]
                 href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
+                if build_module:
+                    build_module.add_rpm_artifact(artifact.name)
             elif artifact.type == 'build_log':
                 repo = next(
                     repo for repo in repos
@@ -532,6 +550,14 @@ async def build_done(
                     href=href
                 )
             )
+        if build_module:
+            module_pulp_href, sha256 = await pulp_client.create_module(
+                build_module.render())
+            await pulp_client.modify_repository(
+                module_repo.pulp_href, add=[module_pulp_href]
+            )
+            build_module.sha256 = sha256
+            build_module.pulp_href = module_pulp_href
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()

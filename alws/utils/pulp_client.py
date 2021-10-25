@@ -1,9 +1,13 @@
+import io
+import hashlib
 import asyncio
 import typing
 import urllib.parse
 from typing import Optional, List
 
 import aiohttp
+
+from alws.utils.modularity import ModuleWrapper, get_random_unique_version
 
 
 class PulpClient:
@@ -27,12 +31,87 @@ class PulpClient:
 
     async def create_build_rpm_repo(self, name: str) -> str:
         ENDPOINT = 'pulp/api/v3/repositories/rpm/rpm/'
-        payload = {'name': name, 'autopublish': True}
+        payload = {'name': name, 'autopublish': True,
+                   'retain_repo_versions': 1}
         response = await self.make_post_request(ENDPOINT, data=payload)
         repo_href = response['pulp_href']
         await self.create_rpm_publication(repo_href)
         distro = await self.create_rpm_distro(name, repo_href)
         return distro, repo_href
+
+    async def create_module(self, content: str):
+        ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
+        artifact_href, sha256 = await self.upload_file(content)
+        module = ModuleWrapper(content)
+        payload = {
+            'relative_path': 'modules.yaml',
+            'artifact': artifact_href,
+            'name': module.name,
+            'stream': module.stream,
+            # Instead of real module version, we're inserting
+            # mocked one, so we can update template in the future,
+            # since pulp have this global index:
+            # unique_together = ("name", "stream", "version", "context",
+            #                    "arch")
+            'version': get_random_unique_version(),
+            'context': module.context,
+            'arch': module.arch,
+            'artifacts': [],
+            'dependencies': []
+        }
+        task = await self.make_post_request(ENDPOINT, data=payload)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources'][0], sha256
+
+    async def check_if_artifact_exists(self, sha256: str) -> str:
+        ENDPOINT = 'pulp/api/v3/artifacts/'
+        payload = {
+            'sha256': sha256
+        }
+        response = await self.make_get_request(ENDPOINT, params=payload)
+        if response['count']:
+            return response['results'][0]['pulp_href']
+
+    async def _upload_file(self, content, sha256):
+        response = await self.make_post_request(
+            'pulp/api/v3/uploads/', {'size': len(content)}
+        )
+        upload_href = response['pulp_href']
+        payload = {
+            'file': io.StringIO(content)
+        }
+        headers = {
+            'Content-Range': f'bytes 0-{len(content) - 1}/{len(content)}'
+        }
+        await self.make_put_request(
+            upload_href, data=payload, headers=headers
+        )
+        task = await self.make_post_request(
+            f'{upload_href}commit/', data={'sha256': sha256}
+        )
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources'][0]
+
+    # TODO: move this to utils, make it looks better
+    def _hash_content(self, content):
+        hasher = hashlib.new('sha256')
+        hasher.update(content.encode())
+        return hasher.hexdigest()
+
+    async def upload_file(self, content=None):
+        file_sha256 = self._hash_content(content)
+        reference = await self.check_if_artifact_exists(file_sha256)
+        if not reference:
+            reference = await self._upload_file(content, file_sha256)
+        return reference, file_sha256
+
+    async def get_repo_modules_yaml(self, url: str, sha256: str):
+        full_url = urllib.parse.urljoin(url, f'repodata/{sha256}-modules.yaml')
+        async with aiohttp.ClientSession(auth=self._auth) as session:
+            async with session.get(full_url) as response:
+                text = await response.text()
+                response.raise_for_status()
+                return text
 
     async def modify_repository(self, repo_to: str, add: List[str] = None,
                                 remove: List[str] = None):
@@ -155,10 +234,21 @@ class PulpClient:
                 response.raise_for_status()
                 return json
 
-    async def make_post_request(self, endpoint: str, data: Optional[dict]):
+    async def make_post_request(self, endpoint: str, data: Optional[dict],
+                                headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.post(full_url, json=data) as response:
+            async with session.post(full_url, json=data, headers=headers) as response:
+                json = await response.json(content_type=None)
+                response.raise_for_status()
+                return json
+
+    async def make_put_request(self, endpoint: str, data: Optional[dict],
+                               headers: Optional[dict] = None):
+        full_url = urllib.parse.urljoin(self._host, endpoint)
+        async with aiohttp.ClientSession(auth=self._auth) as session:
+            # TODO: data/json
+            async with session.put(full_url, data=data, headers=headers) as response:
                 json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json
