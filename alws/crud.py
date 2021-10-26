@@ -11,13 +11,6 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.errors import DataNotFoundError, BuildError, DistributionError
 from alws.config import settings
-from alws.utils.beholder_client import (
-    add_multilib_packages,
-    is_multilib_package,
-)
-from alws.utils.pulp_client import PulpClient
-from alws.utils.github import get_user_github_token, get_github_user_info
-from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
@@ -25,6 +18,13 @@ from alws.schemas import (
     distro_schema, test_schema
 )
 from alws.utils.distro_utils import create_empty_repo
+from alws.utils.github import get_user_github_token, get_github_user_info
+from alws.utils.jwt_utils import generate_JWT_token
+from alws.utils.multilib import (
+    add_multilib_packages,
+    get_multilib_packages,
+)
+from alws.utils.pulp_client import PulpClient
 
 
 __all__ = [
@@ -461,9 +461,9 @@ async def build_done(
             artifact.name for artifact in request.artifacts
             if artifact.arch == 'src' and artifact.type == 'rpm'
         )
-        is_multilib = await is_multilib_package(db, build_task, src_rpm)
-        if is_multilib:
-            await add_multilib_packages(db, build_task)
+        multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
+        if multilib_pkgs:
+            await add_multilib_packages(db, build_task, multilib_pkgs)
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
