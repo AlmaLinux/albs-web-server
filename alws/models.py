@@ -130,7 +130,8 @@ class Repository(Base):
     url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
-    production = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
+    production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
+                                   nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
 
 
