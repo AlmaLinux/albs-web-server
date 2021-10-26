@@ -399,10 +399,7 @@ async def get_available_sign_task(
                     sqlalchemy.and_(
                         models.BuildTask.status == BuildTaskStatus.COMPLETED,
                         models.BuildTask.sign_status == SignTaskStatus.STARTED,
-                        sqlalchemy.or_(
-                            models.BuildTask.ts < ts_expired,
-                            models.BuildTask.ts.__eq__(None)
-                        )
+                        models.BuildTask.ts < ts_expired,
                     )
                 ).options(
                 selectinload(models.BuildTask.ref),
