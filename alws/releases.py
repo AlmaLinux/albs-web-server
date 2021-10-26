@@ -14,8 +14,10 @@ from alws.utils.pulp_client import PulpClient
 
 
 __all__ = [
-    # 'execute_release_plan',
+    'execute_release_plan',
     'get_release_plan',
+    'EmptyReleasePlan',
+    'MissingRepository',
 ]
 
 
