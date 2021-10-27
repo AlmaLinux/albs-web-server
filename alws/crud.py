@@ -413,7 +413,7 @@ async def remove_build_job(db: Session, build_id: int):
             settings.pulp_password
         )
         for artifact in artifacts:
-            await pulp_client.make_delete_request(artifact)
+            await pulp_client.remove_artifact(artifact)
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
