@@ -20,9 +20,11 @@ def upgrade():
     op.add_column(
         "build_tasks",
         sa.Column(
-            "sign_status", sa.Integer(), nullable=False
+            "sign_status", sa.Integer(), nullable=True
         ),
     )
+    op.execute("UPDATE build_tasks SET sign_status=0")
+    op.alter_column("build_tasks", "sign_status", nullable=False)
 
 
 def downgrade():
