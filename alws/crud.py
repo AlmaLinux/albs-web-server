@@ -201,7 +201,7 @@ async def get_distributions(db):
 
 async def add_distributions_after_rebuild(
         db: Session,
-        request: build_node_schema.BuildDone,
+        request: build_task_schema.BuildDone,
 ):
 
     subquery = select(models.BuildTask.build_id).where(
