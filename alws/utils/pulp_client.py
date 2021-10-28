@@ -129,9 +129,12 @@ class PulpClient:
             params['exclude_fields'] = exclude_fields
         return await self.make_get_request(package_href, params=params)
 
-    async def remove_artifact(self, artifact_href: str):
+    async def remove_artifact(self, artifact_href: str,
+                              need_wait_sync: bool=False):
         self.make_delete_request(artifact_href)
-        distro = await self.get_distro(artifact_href)
+        if need_wait_sync:
+            remove_task = await self.get_distro(artifact_href)
+            return remove_task
 
 
     async def get_distro(self, distro_href: str):

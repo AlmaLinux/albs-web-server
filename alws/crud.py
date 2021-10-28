@@ -384,6 +384,7 @@ async def remove_build_job(db: Session, build_id: int):
             models.TestTask.artifacts)
     )
     artifacts = []
+    repos = []
     repo_ids = []
     build_task_ids = []
     build_task_artifact_ids = []
@@ -406,7 +407,7 @@ async def remove_build_job(db: Session, build_id: int):
                     build_task_artifact_ids.append(test_artifact.id)
                     artifacts.append(test_artifact.href)
         for br in build.repos:
-            artifacts.append(br.pulp_href)
+            repos.append(br.pulp_href)
             repo_ids.append(br.id)
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -415,6 +416,8 @@ async def remove_build_job(db: Session, build_id: int):
         )
         for artifact in artifacts:
             await pulp_client.remove_artifact(artifact)
+        for repo in repos:
+            await pulp_client.remove_artifact(artifact, need_wait_sync=True)
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
