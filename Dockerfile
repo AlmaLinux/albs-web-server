@@ -9,5 +9,6 @@ COPY requirements.txt /tmp/requirements.txt
 RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY alws /code/alws
+COPY tests /code/tests
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && uvicorn --workers 4 --host 0.0.0.0 alws.app:app"]
