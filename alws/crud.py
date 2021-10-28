@@ -416,7 +416,7 @@ async def remove_build_job(db: Session, build_id: int):
         for artifact in artifacts:
             await pulp_client.remove_artifact(artifact)
         for repo in repos:
-            await pulp_client.remove_artifact(artifact, need_wait_sync=True)
+            await pulp_client.remove_artifact(repo, need_wait_sync=True)
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
