@@ -131,7 +131,7 @@ class Repository(Base):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
-                                   nullable=False)
+                                   nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
 
 
