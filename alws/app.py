@@ -9,6 +9,7 @@ from alws.routers import (
     platforms,
     projects,
     releases,
+    repositories,
     tests,
     users,
 )
@@ -37,5 +38,5 @@ async def shutdown():
 
 
 for module in (builds, build_node, distro, platforms, projects, releases,
-               tests, users):
+               repositories, tests, users):
     app.include_router(module.router, prefix='/api/v1')

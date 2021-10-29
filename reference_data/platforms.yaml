@@ -7,6 +7,7 @@
   arch_list:
     - i686
     - x86_64
+    - aarch64
     - ppc64le
   data:
     definitions:
@@ -32,48 +33,92 @@
     yum:
       best: false
       module_platform_id: platform:el8
-  repos:
+  repositories:
     - arch: i686
-      name: alma8-baseos
+      name: almalinux-8-baseos
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/i686/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/i686/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: i686
-      name: alma8-appstream
+      name: almalinux-8-appstream
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/i686/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/i686/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: i686
-      name: alma8-powertools
+      name: almalinux-8-powertools
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/i686/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/i686/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: x86_64
-      name: alma8-baseos
+      name: almalinux-8-baseos
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/x86_64/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/x86_64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: x86_64
-      name: alma8-appstream
+      name: almalinux-8-appstream
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/x86_64/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/x86_64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: x86_64
-      name: alma8-powertools
+      name: almalinux-8-powertools
       type: rpm
-      url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/x86_64/os/
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/x86_64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-baseos
+      type: rpm
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/aarch64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-appstream
+      type: rpm
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/aarch64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-powertools
+      type: rpm
+      remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/aarch64/os/
+      production: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
     - arch: ppc64le
-      name: centos8-baseos
-      url: http://centos.osuosl.org/8/BaseOS/ppc64le/os/
+      name: centos-8-baseos
+      remote_url: http://centos.osuosl.org/8/BaseOS/ppc64le/os/
       type: rpm
+      production: false
     - arch: ppc64le
-      name: centos8-appstream
-      url: http://centos.osuosl.org/8/AppStream/ppc64le/os/
+      name: centos-8-appstream
+      remote_url: http://centos.osuosl.org/8/AppStream/ppc64le/os/
       type: rpm
+      production: false
     - arch: ppc64le
-      name: centos8-powertools
-      url: http://centos.osuosl.org/8/PowerTools/ppc64le/os/
+      name: centos-8-powertools
+      remote_url: http://centos.osuosl.org/8/PowerTools/ppc64le/os/
       type: rpm
+      production: false
     - arch: ppc64le
-      name: centos8-highavailability
-      url: http://centos.osuosl.org/8/HighAvailability/ppc64le/os/
+      name: centos-8-highavailability
+      remote_url: http://centos.osuosl.org/8/HighAvailability/ppc64le/os/
       type: rpm
+      production: false
     - arch: ppc64le
-      name: alma8-ppc64le-devel
-      url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
+      name: almalinux-8-ppc64le-devel
+      remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
+      production: false
