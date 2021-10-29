@@ -33,3 +33,19 @@ async def modify_platform(
 @router.get('/', response_model=typing.List[platform_schema.Platform])
 async def get_platforms(db: database.Session = Depends(get_db)):
     return await crud.get_platforms(db)
+
+
+@router.patch('/{platform_id}/add-repositories',
+              response_model=platform_schema.Platform)
+async def add_repositories_to_platform(platform_id: int,
+                                       repositories_ids: typing.List[int],
+                                       db: database.Session = Depends(get_db)):
+    return await crud.add_to_platform(db, platform_id, repositories_ids)
+
+
+@router.patch('/{platform_id}/remove-repositories',
+              response_model=platform_schema.Platform)
+async def add_repositories_to_platform(platform_id: int,
+                                       repositories_ids: typing.List[int],
+                                       db: database.Session = Depends(get_db)):
+    return await crud.remove_from_platform(db, platform_id, repositories_ids)

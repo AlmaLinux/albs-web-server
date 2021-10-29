@@ -15,7 +15,7 @@ class PulpClient:
         self._auth = aiohttp.BasicAuth(self._username, self._password)
 
     async def create_log_repo(
-            self, name: str, distro_path_start: str = 'build_logs') -> str:
+            self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
         response = await self.make_post_request(ENDPOINT, data=payload)
@@ -25,14 +25,21 @@ class PulpClient:
             name, repo_href, base_path_start=distro_path_start)
         return distro, repo_href
 
-    async def create_build_rpm_repo(self, name: str) -> str:
-        ENDPOINT = 'pulp/api/v3/repositories/rpm/rpm/'
-        payload = {'name': name, 'autopublish': True}
-        response = await self.make_post_request(ENDPOINT, data=payload)
+    async def create_rpm_repository(
+            self, name, auto_publish: bool = False,
+            create_publication: bool = False) -> (str, str):
+        endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        payload = {'name': name, 'autopublish': auto_publish}
+        response = await self.make_post_request(endpoint, data=payload)
         repo_href = response['pulp_href']
-        await self.create_rpm_publication(repo_href)
-        distro = await self.create_rpm_distro(name, repo_href)
-        return distro, repo_href
+        if create_publication:
+            await self.create_rpm_publication(repo_href)
+        distribution = await self.create_rpm_distro(name, repo_href)
+        return distribution, repo_href
+
+    async def create_build_rpm_repo(self, name: str) -> (str, str):
+        return await self.create_rpm_repository(
+            name, auto_publish=True, create_publication=True)
 
     async def modify_repository(self, repo_to: str, add: List[str] = None,
                                 remove: List[str] = None):
@@ -136,6 +143,35 @@ class PulpClient:
             remove_task = await self.get_distro(artifact_href)
             return remove_task
 
+    async def create_rpm_remote(self, remote_name: str, remote_url: str,
+                                remote_policy: str = 'on_demand') -> str:
+        """
+        Policy variants: 'on_demand', 'immediate', 'streamed'
+        """
+        ENDPOINT = 'pulp/api/v3/remotes/rpm/rpm/'
+        payload = {
+            'name': remote_name,
+            'url': remote_url,
+            'policy': remote_policy
+        }
+        result = await self.make_post_request(ENDPOINT, payload)
+        return result['pulp_href']
+
+    async def sync_rpm_repo_from_remote(self, repo_href: str, remote_href: str,
+                                        sync_policy: str = 'additive',
+                                        wait_for_result: bool = False):
+        """
+        Policy variants: 'additive', 'mirror_complete', 'mirror_content_only'
+        """
+        ENDPOINT = f'{repo_href}/sync/'
+        payload = {
+            'remote': remote_href,
+            'sync_policy': sync_policy
+        }
+        task = await self.make_post_request(ENDPOINT, payload)
+        if wait_for_result:
+            return await self.wait_for_task(task['task'])
+        return task
 
     async def get_distro(self, distro_href: str):
         return await self.make_get_request(distro_href)
