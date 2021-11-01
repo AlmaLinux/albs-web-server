@@ -456,7 +456,13 @@ async def build_done(
         db.add(build_task)
         await db.commit()
 
-    if build_task.arch == 'x86_64' and status == BuildTaskStatus.COMPLETED:
+    multilib_conditions = (
+        build_task.arch == 'x86_64',
+        status == BuildTaskStatus.COMPLETED,
+        bool(settings.beholder_host),
+        bool(settings.beholder_token),
+    )
+    if all(multilib_conditions):
         src_rpm = next(
             artifact.name for artifact in request.artifacts
             if artifact.arch == 'src' and artifact.type == 'rpm'

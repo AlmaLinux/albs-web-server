@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
 
-    beholder_host: str
+    beholder_host: typing.Optional[str]
     beholder_token: typing.Optional[str]
 
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
