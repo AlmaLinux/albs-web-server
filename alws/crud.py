@@ -413,8 +413,15 @@ async def remove_build_job(db: Session, build_id: int):
             settings.pulp_user,
             settings.pulp_password
         )
-        for artifact in artifacts:
-            await pulp_client.remove_artifact(artifact)
+        # FIXME
+        # it seems we cannot just delete any files because
+        # https://docs.pulpproject.org/pulpcore/restapi.html#tag/Content:-Files
+        # does not content delete option, but artifact does:
+        # https://docs.pulpproject.org/pulpcore/restapi.html#operation/
+        # artifacts_delete
+        # "Remove Artifact only if it is not associated with any Content."
+        # for artifact in artifacts:
+            # await pulp_client.remove_artifact(artifact)
         for repo in repos:
             await pulp_client.remove_artifact(repo, need_wait_sync=True)
         await db.execute(
