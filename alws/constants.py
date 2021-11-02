@@ -1,7 +1,7 @@
 import enum
 
 
-__all__ = ['BuildTaskStatus', 'TestTaskStatus']
+__all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus']
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -20,5 +20,12 @@ class BuildTaskStatus(enum.IntEnum):
 class TestTaskStatus(enum.IntEnum):
     CREATED = 1
     STARTED = 2
+    COMPLETED = 3
+    FAILED = 4
+
+
+class ReleaseStatus(enum.IntEnum):
+    SCHEDULED = 1
+    IN_PROGRESS = 2
     COMPLETED = 3
     FAILED = 4
