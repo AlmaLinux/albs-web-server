@@ -27,19 +27,45 @@ class PulpClient:
 
     async def create_rpm_repository(
             self, name, auto_publish: bool = False,
-            create_publication: bool = False) -> (str, str):
+            create_publication: bool = False,
+            base_path_start: str = 'builds') -> (str, str):
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         payload = {'name': name, 'autopublish': auto_publish}
         response = await self.make_post_request(endpoint, data=payload)
         repo_href = response['pulp_href']
         if create_publication:
             await self.create_rpm_publication(repo_href)
-        distribution = await self.create_rpm_distro(name, repo_href)
+        distribution = await self.create_rpm_distro(
+            name, repo_href, base_path_start=base_path_start)
         return distribution, repo_href
 
     async def create_build_rpm_repo(self, name: str) -> (str, str):
         return await self.create_rpm_repository(
             name, auto_publish=True, create_publication=True)
+
+    async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        params = {'name': name}
+        response = await self.make_get_request(endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
+    async def get_rpm_distro(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/distributions/rpm/rpm/'
+        params = {'name__contains': name}
+        response = await self.make_get_request(endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
+    async def get_rpm_remote(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/remotes/rpm/rpm/'
+        params = {'name__contains': name}
+        response = await self.make_get_request(endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
 
     async def modify_repository(self, repo_to: str, add: List[str] = None,
                                 remove: List[str] = None):
@@ -114,12 +140,13 @@ class PulpClient:
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
 
-    async def create_rpm_distro(self, name: str, repository: str) -> str:
+    async def create_rpm_distro(self, name: str, repository: str,
+                                base_path_start: str = 'builds') -> str:
         ENDPOINT = 'pulp/api/v3/distributions/rpm/rpm/'
         payload = {
             'repository': repository,
             'name': f'{name}-distro',
-            'base_path': f'builds/{name}'
+            'base_path': f'{base_path_start}/{name}'
         }
         task = await self.make_post_request(ENDPOINT, data=payload)
         task_result = await self.wait_for_task(task['task'])
@@ -163,14 +190,19 @@ class PulpClient:
         """
         Policy variants: 'additive', 'mirror_complete', 'mirror_content_only'
         """
-        ENDPOINT = f'{repo_href}/sync/'
+        endpoint = f'{repo_href}sync/'
+        if sync_policy == 'additive':
+            mirror = False
+        else:
+            mirror = True
         payload = {
             'remote': remote_href,
-            'sync_policy': sync_policy
+            'mirror': mirror
         }
-        task = await self.make_post_request(ENDPOINT, payload)
+        task = await self.make_post_request(endpoint, payload)
         if wait_for_result:
-            return await self.wait_for_task(task['task'])
+            result = await self.wait_for_task(task['task'])
+            return result
         return task
 
     async def get_distro(self, distro_href: str):

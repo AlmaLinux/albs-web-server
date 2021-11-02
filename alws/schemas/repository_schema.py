@@ -3,7 +3,8 @@ import typing
 from pydantic import BaseModel
 
 
-__all__ = ['Repository', 'RepositoryCreate']
+__all__ = ['Repository', 'RepositoryCreate', 'RepositoryUpdate',
+           'RepositorySearch', 'RepositorySync']
 
 
 class Repository(BaseModel):
@@ -27,6 +28,16 @@ class RepositoryCreate(BaseModel):
     type: str
     debug: bool
     production: bool = False
+    pulp_href: typing.Optional[str]
+
+
+class RepositorySearch(BaseModel):
+    name: typing.Optional[str]
+    arch: typing.Optional[str]
+    url: typing.Optional[str]
+    type: typing.Optional[str]
+    debug: typing.Optional[bool]
+    production: typing.Optional[bool]
     pulp_href: typing.Optional[str]
 
 

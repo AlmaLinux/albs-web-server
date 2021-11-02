@@ -926,7 +926,7 @@ async def create_repositories(
 
 
 async def create_repository(
-        db: Session, payload: repository_schema.RepositoryCreate
+        db: Session, payload: repository_schema.RepositoryCreate,
 ) -> models.Repository:
     query = select(models.Repository).where(
         models.Repository.name == payload.name,
@@ -946,14 +946,32 @@ async def create_repository(
     return repository
 
 
+async def search_repository(
+        db: Session, payload: repository_schema.RepositorySearch
+) -> models.Repository:
+    query = select(models.Repository)
+    for key, value in payload.dict().items():
+        if key == 'name':
+            query = query.where(models.Repository.name == value)
+        elif key == 'arch':
+            query = query.where(models.Repository.arch == value)
+        elif key == 'type':
+            query = query.where(models.Repository.type == value)
+        elif key == 'debug':
+            query = query.where(models.Repository.debug == value)
+    async with db.begin():
+        result = await db.execute(query)
+        return result.scalars().first()
+
+
 async def update_repository(
         db: Session, repository_id: int,
         payload: repository_schema.RepositoryUpdate
 ) -> models.Repository:
     async with db.begin():
-        result = await db.execute(select(models.Repository).where(
-            models.Repository.id == repository_id))
-        repository = result.scalars().first()
+        repository = await db.execute(select(
+            models.Repository).get(repository_id))
+        # repository = result.scalars().first()
         for field, value in payload.dict():
             setattr(repository, field, value)
         db.add(repository)
@@ -1034,20 +1052,24 @@ async def create_repository_remote(
         settings.pulp_user,
         settings.pulp_password
     )
-    async with db.begin():
-        result = await db.execute(query)
-        if result.scalars().first():
-            raise ValueError('Remote already exists')
+    result = await db.execute(query)
+    remote = result.scalars().first()
+    if remote:
+        return remote
+    pulp_remote = await pulp_client.get_rpm_remote(payload.name)
+    if pulp_remote:
+        remote_href = pulp_remote['pulp_href']
+    else:
         remote_href = await pulp_client.create_rpm_remote(
             payload.name, payload.url, remote_policy=payload.policy)
-        remote = models.RepositoryRemote(
-            name=payload.name,
-            arch=payload.arch,
-            url=payload.url,
-            pulp_href=remote_href,
-        )
-        db.add(remote)
-        await db.commit()
+    remote = models.RepositoryRemote(
+        name=payload.name,
+        arch=payload.arch,
+        url=payload.url,
+        pulp_href=remote_href,
+    )
+    db.add(remote)
+    await db.commit()
     await db.refresh(remote)
     return remote
 
@@ -1056,13 +1078,8 @@ async def update_repository_remote(
         db: Session, remote_id: int,
         payload: remote_schema.RemoteUpdate
 ) -> models.RepositoryRemote:
-    query = select(models.RepositoryRemote).where(
-        models.RepositoryRemote.id == remote_id)
     async with db.begin():
-        result = await db.execute(query)
-        remote = result.scalars().first()
-        if not remote:
-            raise ValueError('Remote not found')
+        remote = select(models.RepositoryRemote).get(remote_id)
         for key, value in payload.dict().items():
             setattr(remote, key, value)
         db.add(remote)
@@ -1074,20 +1091,10 @@ async def update_repository_remote(
 async def sync_repo_from_remote(db: Session, repository_id: int,
                                 payload: repository_schema.RepositorySync,
                                 wait_for_result: bool = False):
-    repo_q = select(models.Repository).where(
-        models.Repository.id == repository_id)
-    remote_q = select(models.RepositoryRemote).where(
-        models.RepositoryRemote.id == payload.remote_id)
     async with db.begin():
-        repo_result = await db.execute(repo_q)
-        remote_result = await db.execute(remote_q)
-        repository = repo_result.scalars().first()
-        remote = remote_result.scalars().first()
+        repository = select(models.Repository).get(repository_id)
+        remote = select(models.RepositoryRemote).get(payload.remote_id)
 
-    if not repository:
-        raise ValueError('Repository not found')
-    if not remote:
-        raise ValueError('Remote not found')
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,

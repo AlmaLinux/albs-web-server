@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import TestTaskStatus
-from alws.database import SyncSession
+from alws.database import Session
 from alws.utils.alts_client import AltsClient
 
 
@@ -27,7 +27,7 @@ class TestTaskScheduler(threading.Thread):
         return self._loop.run_until_complete(func(*args, **kwargs))
 
     async def _schedule_tasks_for_execution(self):
-        session = SyncSession()
+        session = Session().sync_session
         tasks_query = session.execute(
             select(models.TestTask).where(
                 models.TestTask.status == TestTaskStatus.CREATED).options(
