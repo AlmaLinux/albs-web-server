@@ -153,8 +153,9 @@ async def create_platform(
         data=platform.data,
         arch_list=platform.arch_list
     )
-    for repo in platform.repos:
-        db_platform.repos.append(models.Repository(**repo.dict()))
+    if platform.repos:
+        for repo in platform.repos:
+            db_platform.repos.append(models.Repository(**repo.dict()))
     db.add(db_platform)
     await db.commit()
     await db.refresh(db_platform)
