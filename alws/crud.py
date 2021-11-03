@@ -22,6 +22,7 @@ from alws.schemas import (
     distro_schema, test_schema, release_schema
 )
 from alws.utils.distro_utils import create_empty_repo
+from alws.utils.noarch import save_noarch_packages
 
 
 __all__ = [
@@ -535,6 +536,8 @@ async def build_done(
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()
+
+    await save_noarch_packages(db, build_task)
 
     async with db.begin():
         rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
