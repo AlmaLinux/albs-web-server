@@ -386,29 +386,28 @@ async def get_available_build_task(
 
 
 async def get_available_sign_task(
-            db: Session, 
+            db: Session,
             request: build_task_schema.RequestSignTask
         ) -> models.BuildTask:
     async with db.begin():
+        # TODO: move minutes to config
         ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        where_query = sqlalchemy.and_(
-            models.BuildTask.build.has(models.Build.pgp_key_id.in_(request.pgp_keyids))
+        where_query = models.SignTask.has(
+            models.SignTask.pgp_key_id.in_(request.pgp_keyids)
         )
         db_task = await db.execute(
-            select(models.BuildTask).where(where_query).with_for_update().filter(
+            select(models.SignTask).where(where_query).with_for_update().filter(
                     sqlalchemy.and_(
-                        models.BuildTask.status == BuildTaskStatus.COMPLETED,
-                        models.BuildTask.sign_status == SignTaskStatus.STARTED,
-                        models.BuildTask.ts < ts_expired,
+                        models.SignTask.status < SignTaskStatus.COMPLETED,
+                        sqlalchemy.or_(
+                            models.BuildTask.ts < ts_expired,
+                            models.BuildTask.ts.__eq__(None)
+                        )
                     )
                 ).options(
-                selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.platform).selectinload(
-                    models.Platform.repos),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user),
-                selectinload(models.BuildTask.artifacts),
-            ).order_by(models.BuildTask.id)
+                    selectinload(models.SignTask.build_task).selectinload(
+                        models.BuildTask.artifacts),
+            ).order_by(models.SignTask.id)
         )
         db_task = db_task.scalars().first()
         if not db_task:

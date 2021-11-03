@@ -194,7 +194,6 @@ class Build(Base):
         secondaryjoin=(BuildDependency.c.build_dependency == id)
     )
     mock_options = sqlalchemy.Column(JSONB)
-    pgp_key_id = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
 
 
 BuildTaskDependency = sqlalchemy.Table(
@@ -237,7 +236,6 @@ class BuildTask(Base):
         nullable=False
     )
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    sign_status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
     ref = relationship('BuildTaskRef')
@@ -251,6 +249,7 @@ class BuildTask(Base):
         secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id)
     )
     test_tasks = relationship('TestTask', back_populates='build_task')
+    sign_tasks = relationship('SignTask', back_populates='build_task')
 
 
 class BuildTaskRef(Base):
@@ -288,6 +287,23 @@ class User(Base):
     email = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     jwt_token = sqlalchemy.Column(sqlalchemy.TEXT)
     github_token = sqlalchemy.Column(sqlalchemy.TEXT)
+
+
+class SignTask(Base):
+
+    __tablename__ = 'sign_tasks'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    pgp_key_id = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    sign_node_response = sqlalchemy.Column(JSONB, nullable=True)
+    build_task_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_tasks.id'),
+        nullable=False
+    )
+    build_task = relationship('BuildTask', back_populates='sign_tasks')
 
 
 class TestTask(Base):

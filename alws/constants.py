@@ -20,18 +20,17 @@ class BuildTaskStatus(enum.IntEnum):
 class SignTaskStatus(enum.IntEnum):
 
     IDLE = 0
-    PENDING = 1
-    STARTED = 2
-    COMPLETED = 3
-    FAILED = 4
-    EXCLUDED = 5
+    STARTED = 1
+    COMPLETED = 2
+    FAILED = 3
 
     @classmethod
     def is_finished(cls, status):
-        return status not in (cls.IDLE, cls.COMPLETED)
+        return status not in (cls.IDLE, cls.STARTED)
 
 
 class TestTaskStatus(enum.IntEnum):
+
     CREATED = 1
     STARTED = 2
     COMPLETED = 3
