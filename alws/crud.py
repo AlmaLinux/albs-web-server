@@ -373,6 +373,90 @@ async def update_failed_build_items(db: Session, build_id: int):
         await db.commit()
 
 
+async def remove_build_job(db: Session, build_id: int):
+    query_bj = select(models.Build).where(
+        models.Build.id == build_id).options(
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.artifacts),
+        selectinload(models.Build.repos),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.test_tasks).selectinload(
+            models.TestTask.artifacts)
+    )
+    artifacts = []
+    repos = []
+    repo_ids = []
+    build_task_ids = []
+    build_task_artifact_ids = []
+    test_task_ids = []
+    test_task_artifact_ids = []
+    async with db.begin():
+        build = await db.execute(query_bj)
+        build = build.scalars().first()
+        if not build:
+            return
+        for bt in build.tasks:
+            build_task_ids.append(bt.id)
+            for build_artifact in bt.artifacts:
+                build_task_artifact_ids.append(build_artifact.id)
+                artifacts.append(build_artifact.href)
+            for tt in bt.test_tasks:
+                test_task_ids.append(tt.id)
+                repo_ids.append(tt.repository_id)
+                for test_artifact in tt.artifacts:
+                    build_task_artifact_ids.append(test_artifact.id)
+                    artifacts.append(test_artifact.href)
+        for br in build.repos:
+            repos.append(br.pulp_href)
+            repo_ids.append(br.id)
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        # FIXME
+        # it seems we cannot just delete any files because
+        # https://docs.pulpproject.org/pulpcore/restapi.html#tag/Content:-Files
+        # does not content delete option, but artifact does:
+        # https://docs.pulpproject.org/pulpcore/restapi.html#operation/
+        # artifacts_delete
+        # "Remove Artifact only if it is not associated with any Content."
+        # for artifact in artifacts:
+            # await pulp_client.remove_artifact(artifact)
+        for repo in repos:
+            await pulp_client.remove_artifact(repo, need_wait_sync=True)
+        await db.execute(
+            delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
+        )
+        await db.execute(
+            delete(models.BuildTaskArtifact).where(
+                models.BuildTaskArtifact.id.in_(build_task_artifact_ids))
+        )
+        await db.execute(
+            delete(models.TestTaskArtifact).where(
+                models.TestTaskArtifact.id.in_(test_task_artifact_ids))
+        )
+        await db.execute(
+            delete(models.TestTask).where(
+                models.TestTask.id.in_(test_task_ids))
+        )
+        await db.execute(
+            delete(models.BuildTask).where(
+                models.BuildTask.id.in_(build_task_ids))
+        )
+        await db.execute(
+            delete(models.Repository).where(
+                models.Repository.id.in_(repo_ids))
+        )
+        await db.execute(
+            delete(models.BuildTask).where(models.BuildTask.build_id == build_id)
+        )
+        await db.execute(
+            delete(models.Build).where(models.Build.id == build_id))
+        await db.commit()
+
+
+
 async def ping_tasks(
             db: Session,
             task_list: typing.List[int]

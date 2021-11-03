@@ -236,6 +236,8 @@ class BuildTask(Base):
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
+        # saw https://stackoverflow.com/questions/
+        # 5033547/sqlalchemy-cascade-delete
         nullable=False
     )
     platform_id = sqlalchemy.Column(
