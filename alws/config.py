@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
 
+    packages_oracle_host: str = 'http://beholder-web:5000'
+    packages_oracle_token: typing.Optional[str]
+
     redis_url: str = 'redis://redis:6379'
 
     beholder_host: typing.Optional[str]
