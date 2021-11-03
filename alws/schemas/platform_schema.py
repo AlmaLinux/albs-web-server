@@ -12,6 +12,7 @@ class PlatformRepo(BaseModel):
     arch: str
     url: str
     type: str
+    production: bool = False
 
 
 class PlatformModify(BaseModel):

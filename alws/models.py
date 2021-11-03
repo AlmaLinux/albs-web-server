@@ -5,6 +5,7 @@ import sqlalchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
+from alws.constants import ReleaseStatus
 from alws.database import Base, engine
 
 
@@ -129,6 +130,8 @@ class Repository(Base):
     url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
+    production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
+                                   nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
 
 
@@ -193,6 +196,17 @@ class Build(Base):
         primaryjoin=(BuildDependency.c.build_id == id),
         secondaryjoin=(BuildDependency.c.build_dependency == id)
     )
+    mock_options = sqlalchemy.Column(JSONB)
+    release_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_releases.id',
+                              name='build_releases_id_fkey'),
+        nullable=True
+    )
+    release = relationship('Release')
+    source_rpms = relationship('SourceRpm', back_populates='build')
+    binary_rpms = relationship('BinaryRpm', back_populates='build')
+    released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
 
 
 BuildTaskDependency = sqlalchemy.Table(
@@ -276,6 +290,49 @@ class BuildTaskArtifact(Base):
     build_task = relationship('BuildTask', back_populates='artifacts')
 
 
+class SourceRpm(Base):
+    __tablename__ = 'source_rpms'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    build_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        nullable=False
+    )
+    build = relationship('Build', back_populates='source_rpms')
+    artifact_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_artifacts.id'),
+        nullable=False
+    )
+    artifact = relationship('BuildTaskArtifact')
+    binary_rpms = relationship('BinaryRpm', back_populates='source_rpm')
+
+
+class BinaryRpm(Base):
+    __tablename__ = 'binary_rpms'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    build_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        nullable=False
+    )
+    build = relationship('Build', back_populates='binary_rpms')
+    artifact_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_artifacts.id'),
+        nullable=False
+    )
+    artifact = relationship('BuildTaskArtifact')
+    source_rpm_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('source_rpms.id'),
+        nullable=False
+    )
+    source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
+
+
 class User(Base):
 
     __tablename__ = 'users'
@@ -305,6 +362,52 @@ class TestTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     alts_response = sqlalchemy.Column(JSONB, nullable=True)
     revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    artifacts = relationship('TestTaskArtifact', back_populates='test_task')
+    repository_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id', name='test_task_repo_fk'),
+        nullable=True
+    )
+    repository = relationship('Repository')
+
+
+class TestTaskArtifact(Base):
+
+    __tablename__ = 'test_task_artifacts'
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    test_task_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('test_tasks.id'),
+        nullable=False
+    )
+    test_task = relationship('TestTask', back_populates='artifacts')
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+
+
+class Release(Base):
+    __tablename__ = 'build_releases'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    build_ids = sqlalchemy.Column(
+        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False)
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        nullable=False
+    )
+    platform = relationship('Platform')
+    plan = sqlalchemy.Column(JSONB, nullable=True)
+    created_by_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('users.id'),
+        nullable=False
+    )
+    status = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        default=ReleaseStatus.SCHEDULED
+    )
+    created_by = relationship('User')
 
 
 async def create_tables():

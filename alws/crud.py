@@ -11,19 +11,27 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.errors import DataNotFoundError, BuildError, DistributionError
 from alws.config import settings
+from alws.releases import get_release_plan, execute_release_plan, EmptyReleasePlan, MissingRepository
 from alws.utils.pulp_client import PulpClient
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
-from alws.constants import BuildTaskStatus, TestTaskStatus
+from alws.constants import BuildTaskStatus, TestTaskStatus, ReleaseStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_node_schema,
-    distro_schema, test_schema
+    distro_schema, test_schema, release_schema
 )
 from alws.utils.distro_utils import create_empty_repo
 
 
-__all__ = ['create_build', 'get_builds', 'create_platform', 'get_platforms']
+__all__ = [
+    'add_distributions_after_rebuild',
+    'create_build',
+    'create_platform',
+    'get_builds',
+    'get_platforms',
+    'update_failed_build_items',
+]
 
 
 async def create_build(
@@ -41,6 +49,8 @@ async def create_build(
                 linked_build = await get_builds(db, linked_id)
                 if linked_build:
                     await planner.add_linked_builds(linked_build)
+        if build.mock_options:
+            planner.add_mock_options(build.mock_options)
         db_build = planner.create_build()
         db.add(db_build)
         await db.flush()
@@ -190,6 +200,69 @@ async def get_distributions(db):
     return db_distros.scalars().all()
 
 
+async def add_distributions_after_rebuild(
+        db: Session,
+        request: build_node_schema.BuildDone,
+):
+
+    subquery = select(models.BuildTask.build_id).where(
+        models.BuildTask.id == request.task_id).scalar_subquery()
+    build_query = select(models.Build).where(
+        models.Build.id == subquery,
+    ).options(
+        selectinload(
+            models.Build.tasks).selectinload(models.BuildTask.artifacts),
+    )
+    db_build = await db.execute(build_query)
+    db_build = db_build.scalars().first()
+
+    build_completed = all((
+        task.status >= BuildTaskStatus.COMPLETED
+        for task in db_build.tasks
+    ))
+    if not build_completed:
+        return
+
+    distr_query = select(models.Distribution).join(
+        models.Distribution.builds,
+    ).where(models.Build.id == db_build.id).options(
+        selectinload(models.Distribution.builds),
+        selectinload(models.Distribution.repositories),
+    )
+    db_distros = await db.execute(distr_query)
+    db_distros = db_distros.scalars().all()
+
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+
+    for db_distro in db_distros:
+        modify = await prepare_repo_modify_dict(db_build, db_distro)
+        for modification in ('remove', 'add'):
+            for key, value in modify.items():
+                if modification == 'add':
+                    await pulp_client.modify_repository(
+                        add=value, repo_to=key)
+                else:
+                    await pulp_client.modify_repository(
+                        remove=value, repo_to=key)
+
+
+async def prepare_repo_modify_dict(db_build: models.Build,
+                                   db_distro: models.Distribution):
+    modify = collections.defaultdict(list)
+    for task in db_build.tasks:
+        for artifact in task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
+                artifact)
+            for distro_repo in db_distro.repositories:
+                if (distro_repo.arch == task.arch and
+                        distro_repo.debug == build_artifact.is_debuginfo):
+                    modify[distro_repo.pulp_href].append(artifact.href)
+    return modify
+
+
 async def modify_distribution(build_id: int, distribution: str, db: Session,
                               modification: str):
 
@@ -230,17 +303,7 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         await db.commit()
     await db.refresh(db_distro)
-    modify = collections.defaultdict(list)
-    for task in db_build.tasks:
-        for artifact in task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
-                artifact)
-            for distro_repo in db_distro.repositories:
-                if (distro_repo.arch == task.arch and
-                        distro_repo.debug == build_artifact.is_debuginfo):
-                    modify[distro_repo.pulp_href].append(artifact.href)
+    modify = await prepare_repo_modify_dict(db_build, db_distro)
     for key, value in modify.items():
         if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)
@@ -286,6 +349,28 @@ async def get_available_build_task(
         db_task.status = BuildTaskStatus.STARTED
         await db.commit()
     return db_task
+
+
+def add_build_task_dependencies(db: Session, task: models.BuildTask,
+                                last_task: models.BuildTask):
+    task.dependencies.append(last_task)
+
+
+async def update_failed_build_items(db: Session, build_id: int):
+    query = select(models.BuildTask).where(
+        sqlalchemy.and_(
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status == BuildTaskStatus.FAILED)
+    ).order_by(models.BuildTask.index, models.BuildTask.id)
+    async with db.begin():
+        last_task = None
+        failed_tasks = await db.execute(query)
+        for task in failed_tasks.scalars():
+            task.status = BuildTaskStatus.IDLE
+            if last_task is not None:
+                await db.run_sync(add_build_task_dependencies, task, last_task)
+            last_task = task
+        await db.commit()
 
 
 async def ping_tasks(
@@ -367,6 +452,31 @@ async def build_done(
         db.add(build_task)
         await db.commit()
 
+    async with db.begin():
+        rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
+            models.BuildTaskArtifact.build_task_id == build_task.id,
+            models.BuildTaskArtifact.type == 'rpm'))
+        srpm = None
+        binary_rpms = []
+        for rpm in rpms_result.scalars().all():
+            if rpm.name.endswith('.src.rpm'):
+                srpm = models.SourceRpm()
+                srpm.artifact = rpm
+                srpm.build = build_task.build
+            else:
+                binary_rpm = models.BinaryRpm()
+                binary_rpm.artifact = rpm
+                binary_rpm.build = build_task.build
+                binary_rpms.append(binary_rpm)
+        db.add(srpm)
+        await db.commit()
+    await db.refresh(srpm)
+    for binary_rpm in binary_rpms:
+        binary_rpm.source_rpm = srpm
+
+    db.add_all(binary_rpms)
+    await db.commit()
+
 
 async def create_test_tasks(db: Session, build_task_id: int):
     pulp_client = PulpClient(
@@ -392,6 +502,25 @@ async def create_test_tasks(db: Session, build_task_id: int):
         else:
             new_revision = 1
 
+    # Create logs repository
+    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+    repo_url, repo_href = await pulp_client.create_log_repo(
+        repo_name, distro_path_start='test_logs')
+
+    repository = models.Repository(
+        name=repo_name, url=repo_url, arch=build_task.arch,
+        pulp_href=repo_href, type='test_log', debug=False
+    )
+    async with db.begin():
+        db.add(repository)
+        await db.commit()
+
+    async with db.begin():
+        r_query = select(models.Repository).where(
+            models.Repository.name == repo_name)
+        results = await db.execute(r_query)
+        repository = results.scalars().first()
+
     test_tasks = []
     for artifact in build_task.artifacts:
         if artifact.type != 'rpm':
@@ -405,7 +534,8 @@ async def create_test_tasks(db: Session, build_task_id: int):
                                package_version=artifact_info['version'],
                                env_arch=build_task.arch,
                                status=TestTaskStatus.CREATED,
-                               revision=new_revision)
+                               revision=new_revision,
+                               repository_id=repository.id)
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
@@ -425,9 +555,15 @@ async def restart_build_tests(db: Session, build_id: int):
 
 async def complete_test_task(db: Session, task_id: int,
                              test_result: test_schema.TestTaskResult):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     async with db.begin():
         tasks = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id).with_for_update())
+            models.TestTask.id == task_id).options(
+            selectinload(models.TestTask.repository)).with_for_update())
         task = tasks.scalars().first()
         status = TestTaskStatus.COMPLETED
         for key, item in test_result.result.items():
@@ -436,12 +572,27 @@ async def complete_test_task(db: Session, task_id: int,
                     if not test_item.get('success', False):
                         status = TestTaskStatus.FAILED
                         break
+            # Skip logs from processing
+            elif key == 'logs':
+                continue
             elif not item.get('success', False):
                 status = TestTaskStatus.FAILED
                 break
         task.status = status
         task.alts_response = test_result.dict()
+        logs = []
+        for log in test_result.result.get('logs', []):
+            if task.repository:
+                href = await pulp_client.create_file(
+                    log['name'], log['href'], task.repository.pulp_href)
+            else:
+                href = log['href']
+            log_record = models.TestTaskArtifact(
+                name=log['name'], href=href, test_task_id=task.id)
+            logs.append(log_record)
+
         db.add(task)
+        db.add_all(logs)
         await db.commit()
 
 
@@ -513,3 +664,121 @@ async def get_user(
         query = models.User.email == user_email
     db_user = await db.execute(select(models.User).where(query))
     return db_user.scalars().first()
+
+
+async def get_releases(db: Session) -> typing.List[models.Release]:
+    release_result = await db.execute(select(models.Release).options(
+        selectinload(models.Release.created_by)))
+    return release_result.scalars().all()
+
+
+async def create_new_release(
+            db: Session, user_id: int, payload: release_schema.ReleaseCreate
+        ) -> models.Release:
+    async with db.begin():
+        user_q = select(models.User).where(models.User.id == user_id)
+        user_result = await db.execute(user_q)
+        platform_result = await db.execute(select(models.Platform).where(
+            models.Platform.id.in_(
+                (payload.platform_id, payload.reference_platform_id))))
+        platforms = platform_result.scalars().all()
+        base_platform = [item for item in platforms
+                         if item.id == payload.platform_id][0]
+        reference_platform = [item for item in platforms
+                              if item.id == payload.reference_platform_id][0]
+
+        user = user_result.scalars().first()
+        new_release = models.Release()
+        new_release.build_ids = payload.builds
+        new_release.platform = base_platform
+        new_release.plan = await get_release_plan(
+            db, payload.builds, base_platform.name,
+            base_platform.distr_version, reference_platform.name,
+            reference_platform.distr_version
+        )
+        new_release.created_by = user
+        db.add(new_release)
+        await db.commit()
+
+    await db.refresh(new_release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == new_release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def update_release(
+        db: Session, release_id: int,
+        payload: release_schema.ReleaseUpdate
+) -> models.Release:
+    async with db.begin():
+        release_result = await db.execute(select(models.Release).where(
+            models.Release.id == release_id).with_for_update())
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        if payload.plan:
+            release.plan = payload.plan
+        if payload.builds and payload.builds != release.build_ids:
+            release.build_ids = payload.builds
+            platform_result = await db.execute(select(models.Platform).where(
+                models.Platform.id.in_(
+                    (release.platform_id, release.reference_platform_id))))
+            platforms = platform_result.scalars().all()
+            base_platform = [item for item in platforms
+                             if item.id == release.platform_id][0]
+            reference_platform = [
+                item for item in platforms
+                if item.id == release.reference_platform_id][0]
+            release.plan = await get_release_plan(
+                db, payload.builds, base_platform.name,
+                base_platform.distr_version, reference_platform.name,
+                reference_platform.distr_version)
+        db.add(release)
+        await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def commit_release(db: Session, release_id: int) -> (models.Release, str):
+    async with db.begin():
+        release_result = await db.execute(
+            select(models.Release).where(
+                models.Release.id == release_id).with_for_update()
+        )
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        builds_q = select(models.Build).where(
+            models.Build.id.in_(release.build_ids))
+        builds_result = await db.execute(builds_q)
+        for build in builds_result.scalars().all():
+            build.release = release
+            db.add(build)
+        release.status = ReleaseStatus.IN_PROGRESS
+        db.add(release)
+        await db.commit()
+    try:
+        await execute_release_plan(release_id, db)
+    except (EmptyReleasePlan, MissingRepository) as e:
+        message = f'Cannot commit release: {str(e)}'
+        release.status = ReleaseStatus.FAILED
+    else:
+        message = 'Successfully committed release'
+        release.status = ReleaseStatus.COMPLETED
+    db.add(release)
+    await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first(), message

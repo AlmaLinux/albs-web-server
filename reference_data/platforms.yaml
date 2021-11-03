@@ -2,6 +2,7 @@
   name: AlmaLinux-8
   distr_type: rhel
   distr_version: '8'
+  test_dist_name: almalinux
   type: rpm
   arch_list:
     - i686

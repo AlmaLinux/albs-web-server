@@ -66,7 +66,7 @@ class BuildPlanner:
             repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
                 repo_name)
         else:
-            repo_url, pulp_href = await pulp_client.create_build_log_repo(
+            repo_url, pulp_href = await pulp_client.create_log_repo(
                 repo_name)
         repo = models.Repository(
             name=repo_name,
@@ -146,6 +146,9 @@ class BuildPlanner:
                 arch_tasks.append(build_task)
                 self._build.tasks.append(build_task)
         self._task_index += 1
+
+    def add_mock_options(self, mock_options: dict):
+        self._build.mock_options = mock_options
 
     def create_build(self):
         return self._build

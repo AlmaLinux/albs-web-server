@@ -9,3 +9,4 @@ PyJWT==2.1.0
 alembic==1.7.3
 aioredis==2.0.0
 pytest==6.2.5
+jmespath==0.10.0
