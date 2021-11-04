@@ -131,7 +131,7 @@ class PulpClient:
 
     async def remove_artifact(self, artifact_href: str,
                               need_wait_sync: bool=False):
-        self.make_delete_request(artifact_href)
+        await self.make_delete_request(artifact_href)
         if need_wait_sync:
             remove_task = await self.get_distro(artifact_href)
             return remove_task
