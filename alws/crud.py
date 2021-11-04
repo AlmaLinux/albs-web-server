@@ -972,7 +972,6 @@ async def update_repository(
     async with db.begin():
         repository = await db.execute(select(
             models.Repository).get(repository_id))
-        # repository = result.scalars().first()
         for field, value in payload.dict():
             setattr(repository, field, value)
         db.add(repository)
