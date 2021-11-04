@@ -137,6 +137,7 @@ def main():
         sync(pulp_client.sync_rpm_repo_from_remote(
             repository.pulp_href, remote.pulp_href, sync_policy=repo_sync_policy,
             wait_for_result=True))
+        sync(pulp_client.create_rpm_publication(repository.pulp_href))
         logger.info('Repository %s sync is completed', repository)
 
 

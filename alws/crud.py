@@ -991,29 +991,18 @@ async def delete_repository(db: Session, repository_id: int):
 async def add_to_platform(db: Session, platform_id: int,
                           repository_ids: typing.List[int]) -> models.Platform:
     platform_result = await db.execute(select(models.Platform).where(
-        models.Platform.id == platform_id).with_for_update())
+        models.Platform.id == platform_id).options(
+        selectinload(models.Platform.repos)).with_for_update())
     platform = platform_result.scalars().first()
     repositories_result = await db.execute(select(models.Repository).where(
         models.Repository.id.in_(repository_ids)))
     repositories = repositories_result.scalars().all()
-    platform_repos_result = await db.execute(select(
-        models.PlatformRepo.c.platform_id,
-        models.PlatformRepo.c.repository_id).where(
-        models.PlatformRepo.c.platform_id == platform_id,
-        models.PlatformRepo.c.repository_id.in_(repository_ids)
-    ))
-    repos = platform_repos_result.scalars().all()
-    platform_repo_ids = [item.id for item in
-                         repos]
-    for repo in repositories:
-        if repo.id not in platform_repo_ids:
-            platform_repo = models.PlatformRepo(
-                repository_id=repo.id, platform_id=platform_id)
-            db.add(platform_repo)
 
-    platform.repos.append(repositories)
+    new_repos_list = list(set(repositories + platform.repos))
+
+    platform.repos = new_repos_list
     db.add(platform)
-    db.add_all(repositories)
+    db.add_all(new_repos_list)
     await db.commit()
 
     platform_result = await db.execute(select(models.Platform).where(
