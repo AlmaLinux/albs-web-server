@@ -21,8 +21,8 @@ __all__ = [
 async def get_multilib_packages(
         db: Session,
         build_task: models.BuildTask,
-        src_rpm,
-) -> list:
+        src_rpm: str,
+) -> dict:
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
@@ -30,7 +30,7 @@ async def get_multilib_packages(
     ))
     db_build_tasks = await db.execute(query)
     task_arches = [task.arch for task in db_build_tasks.scalars().all()]
-    result = []
+    result = {}
     if 'i686' not in task_arches:
         return result
 
@@ -48,27 +48,33 @@ async def get_multilib_packages(
         logging.exception("Cannot get multilib packages: %s", exc)
         return result
     multilib_packages = jmespath.search(
-        "packages[?arch=='i686'].{name: join('-', [name, version, "
-        "join('.', [release, arch, 'rpm'])]), repos: repositories}",
+        "packages[?arch=='i686'].{name: name, version: version, "
+        "repos: repositories}",
         pkg_info,
     )
     multilib_packages = jmespath.search(
-        "[*].{name: name, is_multilib: repos[?arch=='x86_64'].arch[] | "
-        "contains(@, 'x86_64')}",
+        "[*].{name: name, version: version, "
+        "is_multilib: repos[?arch=='x86_64'].arch[] | contains(@, 'x86_64')}",
         multilib_packages,
     )
-    result = [
-        pkg['name'] for pkg in multilib_packages
+    result = {
+        pkg['name']: pkg['version']
+        for pkg in multilib_packages
         if pkg['is_multilib'] is True
-    ]
+    }
     return result
 
 
 async def add_multilib_packages(
         db: Session,
         build_task: models.BuildTask,
-        multilib_packages: list,
+        multilib_packages: dict,
 ):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
     async with db.begin():
         subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
             models.BuildTask.build_id == build_task.build_id,
@@ -78,7 +84,6 @@ async def add_multilib_packages(
         query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
             models.BuildTaskArtifact.build_task_id == subquery,
             models.BuildTaskArtifact.type == 'rpm',
-            models.BuildTaskArtifact.name.in_(multilib_packages),
             models.BuildTaskArtifact.name.not_like('%-debuginfo-%'),
             models.BuildTaskArtifact.name.not_like('%-debugsource-%'),
             models.BuildTaskArtifact.name.not_like('%src.rpm%'),
@@ -96,22 +101,24 @@ async def add_multilib_packages(
         pkg_hrefs = []
 
         for artifact in db_artifacts:
-            artifacts.append(
-                models.BuildTaskArtifact(
-                    build_task_id=build_task.id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    href=artifact.href,
-                )
-            )
-            pkg_hrefs.append(artifact.href)
+            for pkg_name, pkg_version in multilib_packages.items():
+                if artifact.name.startswith(pkg_name):
+                    rpm_pkg = await pulp_client.get_rpm_package(
+                        package_href=artifact.href,
+                        include_fields=['name', 'version'],
+                    )
+                    if rpm_pkg and rpm_pkg['version'] == pkg_version:
+                        artifacts.append(
+                            models.BuildTaskArtifact(
+                                build_task_id=build_task.id,
+                                name=artifact.name,
+                                type=artifact.type,
+                                href=artifact.href,
+                            )
+                        )
+                        pkg_hrefs.append(artifact.href)
         db.add_all(artifacts)
         await db.commit()
 
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password
-    )
     await pulp_client.modify_repository(
         repo_to=modify_repo_href, add=pkg_hrefs)

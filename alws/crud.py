@@ -457,6 +457,21 @@ async def build_done(
         db.add(build_task)
         await db.commit()
 
+    multilib_conditions = (
+        build_task.arch == 'x86_64',
+        status == BuildTaskStatus.COMPLETED,
+        bool(settings.beholder_host),
+        bool(settings.beholder_token),
+    )
+    if all(multilib_conditions):
+        src_rpm = next(
+            artifact.name for artifact in request.artifacts
+            if artifact.arch == 'src' and artifact.type == 'rpm'
+        )
+        multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
+        if multilib_pkgs:
+            await add_multilib_packages(db, build_task, multilib_pkgs)
+
     async with db.begin():
         rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
             models.BuildTaskArtifact.build_task_id == build_task.id,
@@ -481,21 +496,6 @@ async def build_done(
 
     db.add_all(binary_rpms)
     await db.commit()
-
-    multilib_conditions = (
-        build_task.arch == 'x86_64',
-        status == BuildTaskStatus.COMPLETED,
-        bool(settings.beholder_host),
-        bool(settings.beholder_token),
-    )
-    if all(multilib_conditions):
-        src_rpm = next(
-            artifact.name for artifact in request.artifacts
-            if artifact.arch == 'src' and artifact.type == 'rpm'
-        )
-        multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
-        if multilib_pkgs:
-            await add_multilib_packages(db, build_task, multilib_pkgs)
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
