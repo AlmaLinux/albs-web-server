@@ -62,18 +62,10 @@ class OracleClient:
                 return json
 
 
-async def get_release_plan(db: Session, build_ids: typing.List[int],
-                           base_dist_name: str, base_dist_version: str,
-                           reference_dist_name: str,
-                           reference_dist_version: str) -> dict:
-    # FIXME: put actual endpoint to use
-    endpoint = f'/api/v1/distros/{reference_dist_name}/' \
-               f'{reference_dist_version}/projects/'
-    packages = []
-    global_repos = set()
-    repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
-    packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
+async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
+        -> typing.Tuple[typing.List[dict], typing.List[str]]:
     src_rpm_names = []
+    packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
     pulp_packages = []
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -83,16 +75,19 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
 
     builds_q = select(models.Build).where(
         models.Build.id.in_(build_ids)).options(
-            selectinload(
-                models.Build.source_rpms).selectinload(
-                    models.SourceRpm.artifact),
-            selectinload(
-                models.Build.binary_rpms).selectinload(
-                    models.BinaryRpm.artifact)
+        selectinload(
+            models.Build.source_rpms).selectinload(
+            models.SourceRpm.artifact),
+        selectinload(
+            models.Build.binary_rpms).selectinload(
+            models.BinaryRpm.artifact)
     )
     build_result = await db.execute(builds_q)
     for build in build_result.scalars().all():
         for src_rpm in build.source_rpms:
+            # Failsafe to not process logs
+            if src_rpm.artifact.type != 'rpm':
+                continue
             src_rpm_names.append(src_rpm.artifact.name)
             pkg_info = await pulp_client.get_rpm_package(
                 src_rpm.artifact.href, include_fields=packages_fields)
@@ -108,6 +103,37 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             pkg_info['artifact_href'] = binary_rpm.artifact.href
             pkg_info['full_name'] = binary_rpm.artifact.name
             pulp_packages.append(pkg_info)
+    return pulp_packages, src_rpm_names
+
+
+async def get_release_plan(db: Session, build_ids: typing.List[int],
+                           base_dist_name: str, base_dist_version: str,
+                           reference_dist_name: str,
+                           reference_dist_version: str) -> dict:
+    # FIXME: put actual endpoint to use
+    endpoint = f'/api/v1/distros/{reference_dist_name}/' \
+               f'{reference_dist_version}/projects/'
+    packages = []
+    repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
+    pulp_packages, src_rpm_names = await __get_pulp_packages(db, build_ids)
+    repo_q = select(models.Repository).where(
+        models.Repository.production.is_(True))
+    result = await db.execute(repo_q)
+    prod_repos = [
+        {
+            'name': repo.name,
+            'arch': repo.arch,
+            'debug': repo.debug
+        }
+        for repo in result.scalars().all()
+    ]
+
+    if not settings.package_oracle_enabled:
+        return {
+            'packages': [{'package': pkg, 'repositories': []}
+                         for pkg in pulp_packages],
+            'repositories': prod_repos
+        }
 
     oracle_response = await OracleClient(settings.packages_oracle_host).post(
         endpoint, src_rpm_names)
@@ -136,14 +162,13 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     debug = ref_repo_name.endswith('debuginfo')
                     release_repo = RepoType(
                         release_repo_name, repo['arch'], debug)
-                    global_repos.add(release_repo)
                     release_repositories.add(release_repo)
                 pkg_info['repositories'] = [
                     item._asdict() for item in release_repositories]
             packages.append(pkg_info)
     return {
         'packages': packages,
-        'repositories': [item._asdict() for item in global_repos]
+        'repositories': prod_repos
     }
 
 
