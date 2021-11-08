@@ -3,7 +3,7 @@ uvicorn==0.15.0
 asyncpg==0.24.0
 psycopg2-binary==2.9.1
 pydantic==1.8.2
-SQLAlchemy==1.4.25
+SQLAlchemy==1.4.26
 aiohttp==3.7.4.post0
 PyJWT==2.3.0
 alembic==1.7.4
