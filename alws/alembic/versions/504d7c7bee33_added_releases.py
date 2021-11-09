@@ -50,7 +50,7 @@ def upgrade():
     op.add_column('builds', sa.Column('release_id', sa.Integer(), nullable=True))
     op.add_column('builds', sa.Column('released', sa.Boolean(), nullable=True))
     op.create_foreign_key('build_releases_id_fkey', 'builds', 'build_releases', ['release_id'], ['id'])
-    op.add_column('repositories', sa.Column('production', sa.Boolean(), default=False, nullable=False))
+    op.add_column('repositories', sa.Column('production', sa.Boolean(), default=False, nullable=True))
     # ### end Alembic commands ###
 
 
