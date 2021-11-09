@@ -552,7 +552,8 @@ async def build_done(
                 binary_rpm.artifact = rpm
                 binary_rpm.build = build_task.build
                 binary_rpms.append(binary_rpm)
-        db.add(srpm)
+        if srpm:
+            db.add(srpm)
         await db.commit()
     await db.refresh(srpm)
     for binary_rpm in binary_rpms:
