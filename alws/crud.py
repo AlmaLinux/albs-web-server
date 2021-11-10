@@ -993,6 +993,8 @@ async def add_to_platform(db: Session, platform_id: int,
         models.Platform.id == platform_id).options(
         selectinload(models.Platform.repos)).with_for_update())
     platform = platform_result.scalars().first()
+    if not platform:
+        raise ValueError(f'Platform with id {platform_id} is missing')
     repositories_result = await db.execute(select(models.Repository).where(
         models.Repository.id.in_(repository_ids)))
     repositories = repositories_result.scalars().all()
