@@ -1,6 +1,7 @@
-import typing
-import datetime
 import collections
+import datetime
+import logging
+import typing
 
 import sqlalchemy
 from sqlalchemy import update, delete
@@ -424,10 +425,17 @@ async def remove_build_job(db: Session, build_id: int):
         # for artifact in artifacts:
             # await pulp_client.remove_artifact(artifact)
         for repo in repos:
-            await pulp_client.remove_artifact(repo, need_wait_sync=True)
+            try:
+                await pulp_client.remove_artifact(repo, need_wait_sync=True)
+            except Exception as err:
+                logging.exception("Cannot delete repo from pulp: %s", err)
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
+        await db.execute(delete(models.BinaryRpm).where(
+            models.BinaryRpm.build_id == build_id))
+        await db.execute(delete(models.SourceRpm).where(
+            models.SourceRpm.build_id == build_id))
         await db.execute(
             delete(models.BuildTaskArtifact).where(
                 models.BuildTaskArtifact.id.in_(build_task_artifact_ids))
