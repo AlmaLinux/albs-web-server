@@ -1,4 +1,5 @@
 import logging
+import re
 
 import jmespath
 import sqlalchemy
@@ -84,21 +85,14 @@ async def add_multilib_packages(
         query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
             models.BuildTaskArtifact.build_task_id == subquery,
             models.BuildTaskArtifact.type == 'rpm',
-            models.BuildTaskArtifact.name.not_like('%-debuginfo-%'),
-            models.BuildTaskArtifact.name.not_like('%-debugsource-%'),
             models.BuildTaskArtifact.name.not_like('%src.rpm%'),
         ))
         db_artifacts = await db.execute(query)
         db_artifacts = db_artifacts.scalars().all()
 
-        modify_repo_href = next(
-            repo.pulp_href for repo in build_task.build.repos
-            if repo.arch == 'x86_64'
-            and repo.type == 'rpm'
-            and repo.debug is False
-        )
         artifacts = []
         pkg_hrefs = []
+        debug_pkg_hrefs = []
 
         for artifact in db_artifacts:
             for pkg_name, pkg_version in multilib_packages.items():
@@ -107,7 +101,7 @@ async def add_multilib_packages(
                         package_href=artifact.href,
                         include_fields=['name', 'version'],
                     )
-                    if rpm_pkg and rpm_pkg['version'] == pkg_version:
+                    if rpm_pkg.get('version', '') == pkg_version:
                         artifacts.append(
                             models.BuildTaskArtifact(
                                 build_task_id=build_task.id,
@@ -116,9 +110,16 @@ async def add_multilib_packages(
                                 href=artifact.href,
                             )
                         )
-                        pkg_hrefs.append(artifact.href)
+                        if re.search(r'-debug(info|source)$', rpm_pkg['name']):
+                            debug_pkg_hrefs.append(artifact.href)
+                        else:
+                            pkg_hrefs.append(artifact.href)
         db.add_all(artifacts)
         await db.commit()
 
-    await pulp_client.modify_repository(
-        repo_to=modify_repo_href, add=pkg_hrefs)
+    for repo in build_task.build.repos:
+        if repo.arch != 'x86_64' and repo.type != 'rpm':
+            continue
+        hrefs_to_add = debug_pkg_hrefs if repo.debug else pkg_hrefs
+        await pulp_client.modify_repository(
+            repo_to=repo.pulp_href, add=hrefs_to_add)
