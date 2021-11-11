@@ -18,7 +18,7 @@ class TestTask(BaseModel):
     package_release: typing.Optional[str]
     status: int
     revision: int
-    alts_response: dict
+    alts_response: typing.Optional[dict]
 
     class Config:
         orm_mode = True

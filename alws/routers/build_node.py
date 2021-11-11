@@ -32,7 +32,8 @@ async def build_done(
     await crud.build_done(db, build_done)
     # need add some logic after discussing with team
     # await crud.add_distributions_after_rebuild(db, build_done)
-    await crud.create_test_tasks(db, build_done.task_id)
+    if build_done.status == 'done':
+        await crud.create_test_tasks(db, build_done.task_id)
     return {'ok': True}
 
 
