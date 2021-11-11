@@ -384,7 +384,6 @@ async def remove_build_job(db: Session, build_id: int):
             models.BuildTask.test_tasks).selectinload(
             models.TestTask.artifacts)
     )
-    artifacts = []
     repos = []
     repo_ids = []
     build_task_ids = []
@@ -400,13 +399,11 @@ async def remove_build_job(db: Session, build_id: int):
             build_task_ids.append(bt.id)
             for build_artifact in bt.artifacts:
                 build_task_artifact_ids.append(build_artifact.id)
-                artifacts.append(build_artifact.href)
             for tt in bt.test_tasks:
                 test_task_ids.append(tt.id)
                 repo_ids.append(tt.repository_id)
                 for test_artifact in tt.artifacts:
-                    build_task_artifact_ids.append(test_artifact.id)
-                    artifacts.append(test_artifact.href)
+                    test_task_artifact_ids.append(test_artifact.id)
         for br in build.repos:
             repos.append(br.pulp_href)
             repo_ids.append(br.id)
