@@ -40,7 +40,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/i686/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: i686
       name: almalinux-8-appstream
@@ -48,7 +48,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/i686/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: i686
       name: almalinux-8-powertools
@@ -56,7 +56,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/i686/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: x86_64
       name: almalinux-8-baseos
@@ -64,7 +64,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: x86_64
       name: almalinux-8-appstream
@@ -72,7 +72,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: x86_64
       name: almalinux-8-powertools
@@ -80,7 +80,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: aarch64
       name: almalinux-8-baseos
@@ -88,7 +88,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/BaseOS/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: aarch64
       name: almalinux-8-appstream
@@ -96,7 +96,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/AppStream/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: aarch64
       name: almalinux-8-powertools
@@ -104,7 +104,7 @@
       remote_url: https://koji.cloudlinux.com/cloudlinux/almalinux/8/PowerTools/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
+      remote_sync_policy: streamed
       repository_sync_policy: additive
     - arch: ppc64le
       name: centos-8-baseos

@@ -10,3 +10,5 @@ alembic==1.7.4
 aioredis==2.0.0
 pytest==6.2.5
 jmespath==0.10.0
+PyYAML==5.4.1
+syncer==1.3.0

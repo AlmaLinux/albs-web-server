@@ -2,7 +2,7 @@ import asyncio
 import datetime
 
 import sqlalchemy
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, DeclarativeMeta
 from sqlalchemy.dialects.postgresql import JSONB
 
 from alws.constants import ReleaseStatus
@@ -120,9 +120,19 @@ class Distribution(Base):
     builds = relationship('Build', secondary=DistributionBuilds)
 
 
-class Repository(Base):
+class CustomRepoRepr(Base):
+    __abstract__ = True
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self.name} {self.arch} {self.url}'
+
+
+class Repository(CustomRepoRepr):
 
     __tablename__ = 'repositories'
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint('name', 'arch', 'type', 'debug'),
+    )
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -133,6 +143,19 @@ class Repository(Base):
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
+
+
+class RepositoryRemote(CustomRepoRepr):
+    __tablename__ = 'repository_remotes'
+    __tableargs__ = [
+        sqlalchemy.UniqueConstraint('name', 'arch', 'url')
+    ]
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
 BuildRepo = sqlalchemy.Table(
