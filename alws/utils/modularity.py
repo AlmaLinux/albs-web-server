@@ -17,8 +17,8 @@ def get_random_unique_version():
 class ModuleRpmComponent(pydantic.BaseModel):
 
     name: str
-    rationale: str
     ref: str
+    rationale: str
     buildorder: int
 
 
@@ -26,9 +26,9 @@ class ModuleWrapper(pydantic.BaseModel):
 
     name: str
     stream: str
-    version: str
-    context: str
-    arch: str
+    version: typing.Optional[str]
+    context: typing.Optional[str]
+    arch: typing.Optional[str]
     artifacts: typing.List = []
     data: dict
 
@@ -51,12 +51,12 @@ class ModuleWrapper(pydantic.BaseModel):
             data=data
         )
 
-    def generate_version(self):
+    def generate_new_version(self) -> str:
         # TODO: instead of 80100 should be platform prefix
-        self.version = '80100' + datetime.datetime.utcnow().strftime(
+        return '80100' + datetime.datetime.utcnow().strftime(
             '%Y%m%d%H%M%S')
 
-    def generate_context(self):
+    def generate_new_context(self) -> str:
         build_context = self.calc_build_context()
         runtime_context = self.cacl_runtime_context()
         hashes = '{0}:{1}'.format(build_context, runtime_context)
@@ -106,9 +106,6 @@ class ModuleWrapper(pydantic.BaseModel):
         js = json.dumps(collections.OrderedDict(sorted(requires.items())))
         return hashlib.sha1(js.encode('utf-8')).hexdigest()
 
-    def set_arch(self, arch: str):
-        self.arch = arch
-
     def calc_dist_macro(self, build_index: int, dist_prefix: str) -> str:
         dist_str = '.'.join([
             self.name,
@@ -120,16 +117,25 @@ class ModuleWrapper(pydantic.BaseModel):
         return f'.module_{dist_prefix}+{build_index}+{dist_hash}'
 
     def set_arch_list(self, arch_list: typing.List[str]):
-        pass
+        for v in self.data['components']['rpms'].values():
+            v['arches'] = arch_list[:]
 
     def add_rpm_artifact(self, artifact: str):
-        # TODO: Don't forget about filters
-        self.artifacts.append(artifact)
+        if not self.is_artifact_filtered(artifact):
+            self.artifacts.append(artifact)
 
-    # TODO: also sort result by buildorder
+    def is_artifact_filtered(self, artifact: str) -> bool:
+        for filter_name in self.data.get('filter', {}).get('rpms', []):
+            if artifact.startswith(filter_name):
+                return True
+        return False
+
     def iter_components(self):
-        for k, v in self.data['components']['rpms'].items():
-            yield ModuleRpmComponent(name=k, **v)
+        components = [
+            ModuleRpmComponent(name=k, **v)
+            for k, v in self.data['components']['rpms'].items()
+        ]
+        yield from sorted(components, key=lambda i: i.buildorder)
 
     def render(self) -> str:
         data = self.dict()

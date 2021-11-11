@@ -1,8 +1,8 @@
 """Add modularity
 
-Revision ID: 484222016fc0
-Revises: c7abd57ad0c0
-Create Date: 2021-10-30 19:06:48.947557
+Revision ID: 8b443fc4d71b
+Revises: 504d7c7bee33
+Create Date: 2021-11-09 17:30:29.784065
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '484222016fc0'
-down_revision = 'c7abd57ad0c0'
+revision = '8b443fc4d71b'
+down_revision = '504d7c7bee33'
 branch_labels = None
 depends_on = None
 

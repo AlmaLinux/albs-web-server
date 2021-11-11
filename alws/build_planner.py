@@ -55,11 +55,10 @@ class BuildPlanner:
                 pulp_client: PulpClient,
                 platform: models.Platform,
                 arch: str,
-                build: models.Build,
                 repo_type: str,
                 is_debug: typing.Optional[bool] = False,
                 task_id: typing.Optional[int] = None
-            ) -> models.Repository:
+            ):
         # TODO: here we should insert every modules.yaml into repositories
         suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
@@ -106,7 +105,6 @@ class BuildPlanner:
                     pulp_client,
                     platform,
                     arch,
-                    self._build,
                     'rpm'
                 ))
                 if arch == 'src':
@@ -115,7 +113,6 @@ class BuildPlanner:
                     pulp_client,
                     platform,
                     arch,
-                    self._build,
                     'rpm',
                     is_debug=True
                 ))
@@ -124,7 +121,6 @@ class BuildPlanner:
                 pulp_client,
                 task.platform,
                 task.arch,
-                self._build,
                 'build_log',
                 task_id=task.id
             ))
@@ -133,7 +129,7 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
-    async def add_task(self, task: build_schema.BuildTask):
+    async def add_task(self, task: build_schema.BuildTaskRef):
         if not task.is_module:
             await self._add_single_ref(**task.dict())
             return
@@ -147,7 +143,8 @@ class BuildPlanner:
         )
         for platform in self._platforms:
             for arch in self._request_platforms[platform.name]:
-                # TODO: Set module arch before insert
+                module.arch = arch
+                module.set_arch_list(platform.arch_list)
                 module_pulp_href, sha256 = await pulp_client.create_module(
                     module.render())
                 db_module = models.RpmModule(
@@ -164,14 +161,16 @@ class BuildPlanner:
         for ref in refs:
             await self._add_single_ref(ref)
 
-    async def _get_module_refs(self, task: build_schema.BuildTask):
+    async def _get_module_refs(self, task: build_schema.BuildTaskRef):
         module = ModuleWrapper.from_template(
             await download_modules_yaml(
-                task.ref.url,
-                task.ref.git_ref,
-                task.ref.ref_type
+                task.url,
+                task.git_ref,
+                task.ref_type
             )
         )
+        module.version = module.generate_new_version()
+        module.context = module.generate_new_context()
         result = []
         for component in module.iter_components():
             result.append(models.BuildTaskRef(

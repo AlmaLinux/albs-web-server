@@ -42,7 +42,7 @@ class PulpClient:
     async def create_module(self, content: str):
         ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
         artifact_href, sha256 = await self.upload_file(content)
-        module = ModuleWrapper(content)
+        module = ModuleWrapper.from_template(content)
         payload = {
             'relative_path': 'modules.yaml',
             'artifact': artifact_href,
