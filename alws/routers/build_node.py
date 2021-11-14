@@ -63,16 +63,7 @@ async def get_task(
             if repo.arch == task.arch and repo.type != 'build_log':
                 response['repositories'].append(repo)
     if task.build.mock_options:
-        platform_data = response['platform'].data
-        for k, v in task.build.mock_options.items():
-            if k in ('module_enable', 'target_arch'):
-                platform_data['mock'][k] = v
-            elif k == 'yum_exclude':
-                platform_data['yum']['exclude'] = ' '.join(v)
-            elif k in ('with', 'without'):
-                for i in v:
-                    platform_data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
-            else:
-                for v_k, v_v in v.items():
-                    platform_data['definitions'][v_k] = v_v
+        response['platform'].add_mock_options(task.build.mock_options)
+    if task.mock_options:
+        response['platform'].add_mock_options(task.mock_options)
     return response

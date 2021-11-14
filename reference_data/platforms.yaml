@@ -3,9 +3,10 @@
   distr_type: rhel
   distr_version: '8'
   test_dist_name: almalinux
-  dist_prefix:
-    modified: a8
-    non_modified: c8
+  #module_dist_prefix:
+  #  modified: a8
+  #  non_modified: c8
+  module_version_prefix: '80400'
   type: rpm
   arch_list:
     - i686

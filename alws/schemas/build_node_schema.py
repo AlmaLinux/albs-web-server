@@ -37,6 +37,20 @@ class TaskPlatform(BaseModel):
     type: typing.Literal['rpm', 'deb']
     data: typing.Dict[str, typing.Any]
 
+    def add_mock_options(self, options):
+        for k, v in options.items():
+            if k in ('module_enable', 'target_arch'):
+                self.data['mock'][k] = v
+            elif k == 'yum_exclude':
+                old_exclude = self.data['yum'].get('exclude', '')
+                self.data['yum']['exclude'] = f'{old_exclude} {" ".join(v)}'
+            elif k in ('with', 'without'):
+                for i in v:
+                    self.data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
+            else:
+                for v_k, v_v in v.items():
+                    self.data['definitions'][v_k] = v_v
+
     class Config:
         orm_mode = True
 

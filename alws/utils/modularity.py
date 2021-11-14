@@ -1,3 +1,4 @@
+import re
 import json
 import time
 import random
@@ -6,55 +7,107 @@ import hashlib
 import datetime
 import collections
 
-import yaml
-import pydantic
+from pydantic import BaseModel
+import gi
+gi.require_version('Modulemd', '2.0')
+from gi.repository import Modulemd
 
 
 def get_random_unique_version():
     return int(str(int(time.time())) + str(random.randint(1000000, 9999999)))
 
 
-class ModuleRpmComponent(pydantic.BaseModel):
+def calc_dist_macro(
+            module_name: str,
+            module_stream: str,
+            module_version: int,
+            module_context: str,
+            build_index: int,
+            dist_prefix: str
+        ) -> str:
+    dist_str = '.'.join([
+        module_name,
+        module_stream,
+        str(module_version),
+        module_context
+    ]).encode('utf-8')
+    dist_hash = hashlib.sha1(dist_str).hexdigest()[:8]
+    return f'.module_{dist_prefix}+{build_index}+{dist_hash}'
+
+
+class RpmArtifact(BaseModel):
 
     name: str
-    ref: str
-    rationale: str
-    buildorder: int
+    version: str
+    release: str
+    epoch: typing.Optional[int]
+    arch: str
+
+    def as_artifact(self):
+        epoch = self.epoch if self.epoch else '0'
+        return f'{self.name}-{epoch}:{self.version}-{self.release}.{self.arch}'
+
+    def as_src_rpm(self):
+        return f'{self.name}-{self.version}-{self.release}.src.rpm'
+
+    def as_dict(self):
+        return {
+            'name': self.name,
+            'version': self.version,
+            'release': self.release,
+            'epoch': self.epoch,
+            'arch': self.arch
+        }
+
+    @staticmethod
+    def from_str(artifact) -> 'RpmArtifact':
+        """
+        Parse package name/epoch/version/release from package artifact record.
+
+        Parameters
+        ----------
+        artifact : str
+            Stream artifact record.
+
+        Returns
+        -------
+        RpmArtifact or None
+            Parsed package metadata or None.
+        """
+        regex = re.compile(
+            r'^(?P<name>[\w+-.]+)-'
+            r'((?P<epoch>\d+):)?'
+            r'(?P<version>\d+?[\w.]*)-'
+            r'(?P<release>\d+?[\w.+]*?)'
+            r'\.(?P<arch>(i686)|(noarch)|(x86_64)|(aarch64)|(src))(\.rpm)?$'
+        )
+        result = re.search(regex, artifact)
+        if not result:
+            return None
+        return RpmArtifact(**result.groupdict(), source=artifact)
 
 
-class ModuleWrapper(pydantic.BaseModel):
+class ModuleWrapper:
 
-    name: str
-    stream: str
-    version: typing.Optional[str]
-    context: typing.Optional[str]
-    arch: typing.Optional[str]
-    artifacts: typing.List = []
-    data: dict
+    def __init__(self, index, module, stream):
+        self._index = index
+        self._module = module
+        self._stream = stream
 
     @classmethod
     def from_template(cls, template: str):
-        data = yaml.safe_load(template)['data']
-        stream = data.pop('stream')
-        name = data.pop('name')
-        version = data.pop('version', None)
-        context = data.pop('context', None)
-        arch = data.pop('arch', None)
-        artifacts = data.pop('artifacts', {}).get('rpms', [])
-        return cls(
-            name=name,
-            stream=stream,
-            version=version,
-            context=context,
-            arch=arch,
-            artifacts=artifacts,
-            data=data
-        )
+        index = Modulemd.ModuleIndex.new()
+        ret, _ = index.update_from_string(template, strict=True)
+        if not ret:
+            raise ValueError('can not parse modules.yaml template')
+        name = index.get_module_names()[0]
+        module = index.get_module(name)
+        stream = module.get_all_streams()[0]
+        return ModuleWrapper(index, module, stream)
 
-    def generate_new_version(self) -> str:
-        # TODO: instead of 80100 should be platform prefix
-        return '80100' + datetime.datetime.utcnow().strftime(
-            '%Y%m%d%H%M%S')
+    def generate_new_version(self, platform_prefix: str) -> int:
+        return int(platform_prefix + datetime.datetime.utcnow().strftime(
+            '%Y%m%d%H%M%S'))
 
     def generate_new_context(self) -> str:
         build_context = self.calc_build_context()
@@ -66,27 +119,24 @@ class ModuleWrapper(pydantic.BaseModel):
         build_deps = {}
         # try to extract a detailed requirements list from the
         # xmd['mbs']['buildrequires'] section first
-        xmd = self.data.get('xmd')
+        xmd = self._stream.get_xmd()
         if xmd:
             build_deps = xmd.get('mbs', {}).get('buildrequires')
             if build_deps:
                 return build_deps
         # convert dependencies['buildrequires'] to the xmd-like format
-        build_requires = self.data['dependencies']
-        for deps in build_requires:
-            for name, streams in deps.get('buildrequires', {}).items():
-                if len(streams) > 1:
-                    raise ValueError(
-                        'multiple stream versions are not supported')
+        for deps in self._stream.get_dependencies():
+            for name in deps.get_buildtime_modules():
+                streams = deps.get_buildtime_streams(name)
                 if streams:
                     build_deps[name] = {'stream': streams[0]}
         return build_deps
 
     def get_runtime_deps(self) -> dict:
         requires = {}
-        dependencies = self.data['dependencies']
-        for deps in dependencies:
-            for name, streams in deps.get('requires', {}).items():
+        for deps in self._stream.get_dependencies():
+            for name in deps.get_runtime_modules():
+                streams = deps.get_runtime_streams(name)
                 requires[name] = requires.get(name, set()).union(streams)
         return {
             name: sorted(list(streams))
@@ -106,39 +156,89 @@ class ModuleWrapper(pydantic.BaseModel):
         js = json.dumps(collections.OrderedDict(sorted(requires.items())))
         return hashlib.sha1(js.encode('utf-8')).hexdigest()
 
-    def calc_dist_macro(self, build_index: int, dist_prefix: str) -> str:
-        dist_str = '.'.join([
-            self.name,
-            self.stream,
-            str(self.version),
-            str(self.context)
-        ]).encode('utf-8')
-        dist_hash = hashlib.sha1(dist_str).hexdigest()[:8]
-        return f'.module_{dist_prefix}+{build_index}+{dist_hash}'
-
     def set_arch_list(self, arch_list: typing.List[str]):
-        for v in self.data['components']['rpms'].values():
-            v['arches'] = arch_list[:]
+        for component_name in self._stream.get_rpm_component_names():
+            component = self._stream.get_rpm_component(component_name)
+            arches = component.get_arches()[:]
+            component.reset_arches()
+            for arch in arches:
+                if arch in arch_list:
+                    component.add_restricted_arch(arch)
 
     def add_rpm_artifact(self, artifact: str):
+        artifact = RpmArtifact.from_str(artifact).as_artifact()
         if not self.is_artifact_filtered(artifact):
-            self.artifacts.append(artifact)
+            self._stream.add_rpm_artifact(artifact)
 
     def is_artifact_filtered(self, artifact: str) -> bool:
-        for filter_name in self.data.get('filter', {}).get('rpms', []):
+        for filter_name in self._stream.get_rpm_filters():
             if artifact.startswith(filter_name):
                 return True
         return False
 
     def iter_components(self):
         components = [
-            ModuleRpmComponent(name=k, **v)
-            for k, v in self.data['components']['rpms'].items()
+            (component_name, self._stream.get_rpm_component(component_name))
+            for component_name in self._stream.get_rpm_component_names()
         ]
-        yield from sorted(components, key=lambda i: i.buildorder)
+        yield from sorted(components, key=lambda i: i[1].get_buildorder())
+
+    def iter_mock_definitions(self):
+        buildopts = self._stream.get_buildopts()
+        if buildopts is None:
+            return
+        macros_template = buildopts.get_rpm_macros() or ''
+        for macros in macros_template.splitlines():
+            macros = macros.strip()
+            if not macros or macros.startswith('#'):
+                continue
+            name, *value = macros.split()
+            # erasing %...
+            name = name[1:]
+            value = ' '.join(value)
+            yield name, value
+
+    def iter_dependencies(self):
+        for dep in self._stream.get_dependencies():
+            for module in dep.get_buildtime_modules():
+                if module == 'platform':
+                    continue
+                if module == self.name:
+                    continue
+                for stream in dep.get_buildtime_streams(module):
+                    yield module, stream
 
     def render(self) -> str:
-        data = self.dict()
-        data.update(data.pop('data'))
-        data['artifacts'] = {'rpms': data.pop('artifacts')}
-        return yaml.safe_dump({'data': data})
+        return self._index.dump_to_string()
+
+    @property
+    def name(self) -> str:
+        return self._stream.get_module_name()
+
+    @property
+    def stream(self) -> str:
+        return self._stream.get_stream_name()
+
+    @property
+    def version(self) -> int:
+        return self._stream.get_version()
+
+    @version.setter
+    def version(self, version: int):
+        self._stream.set_version(version)
+
+    @property
+    def context(self) -> str:
+        return self._stream.get_context()
+
+    @context.setter
+    def context(self, context: str):
+        self._stream.set_context(context)
+
+    @property
+    def arch(self) -> str:
+        return self._stream.get_arch()
+
+    @arch.setter
+    def arch(self, arch: str):
+        self._stream.set_arch(arch)

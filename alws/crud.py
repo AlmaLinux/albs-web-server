@@ -109,7 +109,7 @@ async def modify_platform(
                 f'Platform with name: "{platform.name}" does not exists'
             )
         for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data'):
+                    'data', 'module_version_prefix'):
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
@@ -146,7 +146,8 @@ async def create_platform(
         distr_version=platform.distr_version,
         test_dist_name=platform.test_dist_name,
         data=platform.data,
-        arch_list=platform.arch_list
+        arch_list=platform.arch_list,
+        module_version_prefix=platform.module_version_prefix
     )
     for repo in platform.repos:
         db_platform.repos.append(models.Repository(**repo.dict()))
@@ -554,10 +555,12 @@ async def build_done(
             module_pulp_href, sha256 = await pulp_client.create_module(
                 build_module.render())
             await pulp_client.modify_repository(
-                module_repo.pulp_href, add=[module_pulp_href]
+                module_repo.pulp_href,
+                add=[module_pulp_href],
+                remove=[build_task.rpm_module.pulp_href]
             )
-            build_module.sha256 = sha256
-            build_module.pulp_href = module_pulp_href
+            build_task.rpm_module.sha256 = sha256
+            build_task.rpm_module.pulp_href = module_pulp_href
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()

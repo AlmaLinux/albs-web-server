@@ -92,7 +92,8 @@ class Platform(Base):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    # dist_prefix = sqlalchemy.Column(JSONB, nullable=)
+    module_build_index = sqlalchemy.Column(sqlalchemy.Integer, default=1)
+    module_version_prefix = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     test_dist_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     name = sqlalchemy.Column(
         sqlalchemy.Text,
@@ -259,6 +260,7 @@ class BuildTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    mock_options = sqlalchemy.Column(JSONB)
     ref = relationship('BuildTaskRef')
     artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
     platform = relationship('Platform')
