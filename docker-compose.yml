@@ -131,8 +131,8 @@ services:
     env_file:
       - vars.env
     build:
-      context: ./alws/scripts
-      dockerfile: git_cacher/Dockerfile
+      context: .
+      dockerfile: alws/scripts/git_cacher/Dockerfile
     restart: on-failure
     depends_on:
       - redis
