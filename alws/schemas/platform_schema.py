@@ -24,6 +24,7 @@ class PlatformModify(BaseModel):
     arch_list: typing.Optional[typing.List[str]] = None
     repos: typing.Optional[typing.List[PlatformRepo]] = None
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
+    module_version_prefix: typing.Optional[str] = None
 
 
 class PlatformCreate(BaseModel):
@@ -35,6 +36,7 @@ class PlatformCreate(BaseModel):
     test_dist_name: str
     arch_list: typing.List[str]
     repos: typing.List[PlatformRepo]
+    module_version_prefix: typing.Optional[str]
     data: typing.Dict[str, typing.Any]
 
 

@@ -11,7 +11,7 @@ from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus
 from alws.utils.pulp_client import PulpClient
-from alws.utils.modularity import ModuleWrapper
+from alws.utils.modularity import ModuleWrapper, calc_dist_macro
 from alws.utils.gitea import download_modules_yaml
 
 
@@ -34,6 +34,7 @@ class BuildPlanner:
         }
         self._platforms = []
         self._modules_by_target = {}
+        self._module_build_index = {}
         self._tasks_cache = collections.defaultdict(list)
 
     async def load_platforms(self):
@@ -133,7 +134,7 @@ class BuildPlanner:
         if not task.is_module:
             await self._add_single_ref(**task.dict())
             return
-        refs, module = await self._get_module_refs(task)
+        refs, module_template = await self._get_module_refs(task)
         # TODO: prepare module template before inserting
         # TODO: also, we should merge all of them before insert
         pulp_client = PulpClient(
@@ -141,15 +142,28 @@ class BuildPlanner:
             settings.pulp_user,
             settings.pulp_password
         )
+        module = None
+        mock_options = {'definitions': {}}
         for platform in self._platforms:
             for arch in self._request_platforms[platform.name]:
+                module = ModuleWrapper.from_template(module_template)
+                mock_options['module_enable'] = [
+                    f'{module.name}:{module.stream}'
+                ]
+                mock_options['module_enable'] += [
+                    f'{dep_name}:{dep_stream}'
+                    for dep_name, dep_stream in module.iter_dependencies()
+                ]
+                module.version = module.generate_new_version(
+                    platform.module_version_prefix)
+                module.context = module.generate_new_context()
                 module.arch = arch
                 module.set_arch_list(platform.arch_list)
                 module_pulp_href, sha256 = await pulp_client.create_module(
                     module.render())
                 db_module = models.RpmModule(
                     name=module.name,
-                    version=module.version,
+                    version=str(module.version),
                     stream=module.stream,
                     context=module.context,
                     arch=module.arch,
@@ -158,41 +172,59 @@ class BuildPlanner:
                 )
                 self._modules_by_target[(platform.name, arch)] = db_module
         self._db.add_all(list(self._modules_by_target.values()))
+        for key, value in module.iter_mock_definitions():
+            mock_options['definitions'][key] = value
         for ref in refs:
-            await self._add_single_ref(ref)
+            await self._add_single_ref(ref, mock_options=mock_options)
 
     async def _get_module_refs(self, task: build_schema.BuildTaskRef):
-        module = ModuleWrapper.from_template(
-            await download_modules_yaml(
-                task.url,
-                task.git_ref,
-                task.ref_type
-            )
+        template = await download_modules_yaml(
+            task.url,
+            task.git_ref,
+            task.ref_type
         )
-        module.version = module.generate_new_version()
-        module.context = module.generate_new_context()
+        module = ModuleWrapper.from_template(template)
         result = []
-        for component in module.iter_components():
+        for component_name, component in module.iter_components():
             result.append(models.BuildTaskRef(
                 # TODO: fix this hardcode
-                url=f'https://git.almalinux.org/rpms/{component.name}.git',
+                url=f'https://git.almalinux.org/rpms/{component_name}.git',
                 # TODO: c8 should be taken from platform config
                 git_ref=f'c8-stream-{module.stream}'
             ))
-        return result, module
+        return result, template
 
-    async def _add_single_ref(self, ref: models.BuildTaskRef):
+    async def _add_single_ref(
+            self,
+            ref: models.BuildTaskRef,
+            mock_options: typing.Optional[dict[str, typing.Any]] = None):
         for platform in self._platforms:
             arch_tasks = []
             for arch in self._request_platforms[platform.name]:
                 module = self._modules_by_target.get((platform.name, arch))
+                if module:
+                    build_index = self._module_build_index.get(platform.name)
+                    if build_index is None:
+                        platform.module_build_index += 1
+                        build_index = platform.module_build_index
+                        self._module_build_index[platform.name] = build_index
+                    dist_macro = calc_dist_macro(
+                        module.name,
+                        module.stream,
+                        int(module.version),
+                        module.context,
+                        build_index,
+                        platform.data['mock_dist']
+                    )
+                    mock_options['definitions']['dist'] = dist_macro
                 build_task = models.BuildTask(
                     arch=arch,
                     platform_id=platform.id,
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=module
+                    rpm_module=module,
+                    mock_options=mock_options
                 )
                 task_key = (platform.name, arch)
                 self._tasks_cache[task_key].append(build_task)
