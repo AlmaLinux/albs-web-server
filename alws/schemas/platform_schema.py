@@ -2,17 +2,10 @@ import typing
 
 from pydantic import BaseModel
 
+from alws.schemas.repository_schema import RepositoryCreate
+
 
 __all__ = ['PlatformCreate', 'Platform']
-
-
-class PlatformRepo(BaseModel):
-
-    name: str
-    arch: str
-    url: str
-    type: str
-    production: bool = False
 
 
 class PlatformModify(BaseModel):
@@ -22,7 +15,7 @@ class PlatformModify(BaseModel):
     distr_type: typing.Optional[str] = None
     distr_version: typing.Optional[str] = None
     arch_list: typing.Optional[typing.List[str]] = None
-    repos: typing.Optional[typing.List[PlatformRepo]] = None
+    repos: typing.Optional[typing.List[RepositoryCreate]] = None
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
     module_version_prefix: typing.Optional[str] = None
 
@@ -37,6 +30,7 @@ class PlatformCreate(BaseModel):
     arch_list: typing.List[str]
     repos: typing.List[PlatformRepo]
     module_version_prefix: typing.Optional[str]
+    repos: typing.Optional[typing.List[RepositoryCreate]]
     data: typing.Dict[str, typing.Any]
 
 
