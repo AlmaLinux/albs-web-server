@@ -28,7 +28,6 @@ class PlatformCreate(BaseModel):
     distr_version: str
     test_dist_name: str
     arch_list: typing.List[str]
-    repos: typing.List[PlatformRepo]
     module_version_prefix: typing.Optional[str]
     repos: typing.Optional[typing.List[RepositoryCreate]]
     data: typing.Dict[str, typing.Any]
