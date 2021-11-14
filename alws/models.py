@@ -309,7 +309,6 @@ class BuildTaskRef(Base):
 
 class RpmModule(Base):
 
-    # TODO: make it rpm_modules
     __tablename__ = 'rpm_module'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)

@@ -522,8 +522,6 @@ async def build_done(
             )
             repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
                 module_repo.url, build_task.rpm_module.sha256)
-            # TODO: here actually should be module index,
-            #       from which we can borrow needed module
             build_module = ModuleWrapper.from_template(repo_modules_yaml)
         artifacts = []
         for artifact in request.artifacts:

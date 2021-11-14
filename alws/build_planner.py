@@ -60,7 +60,6 @@ class BuildPlanner:
                 is_debug: typing.Optional[bool] = False,
                 task_id: typing.Optional[int] = None
             ):
-        # TODO: here we should insert every modules.yaml into repositories
         suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
         repo_name = (
@@ -135,8 +134,7 @@ class BuildPlanner:
             await self._add_single_ref(**task.dict())
             return
         refs, module_template = await self._get_module_refs(task)
-        # TODO: prepare module template before inserting
-        # TODO: also, we should merge all of them before insert
+        # TODO: we should merge all of the modules before insert
         pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,

@@ -14,53 +14,53 @@ services:
     volumes:
       - "./volumes/postgresql/data:/var/lib/postgresql/data"
 
-  #rabbitmq:
-  #  image: rabbitmq:3.8-management
-  #  container_name: "rabbitmq-ts"
-  #  ports:
-  #    - "5672:5672"
-  #    - "15672:15672"
-  #  env_file:
-  #    - vars.env
-  #  restart: always
+  rabbitmq:
+    image: rabbitmq:3.8-management
+    container_name: "rabbitmq-ts"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    env_file:
+      - vars.env
+    restart: always
 
-  #alts-celery:
-  #  image: alts-celery:latest
-  #  build:
-  #    dockerfile: Dockerfile.celery
-  #    context: ../alts
-  #  environment:
-  #    CELERY_CONFIG_PATH: "/celery_config.yaml"
-  #    EXTERNAL_NETWORK: "albs-web-server_default"
-  #  command: "bash -c 'source env/bin/activate && celery
-  #      -A alts.worker.app worker --pool=threads --concurrency=20
-  #      --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
-  #      --without-mingle --without-heartbeat'"
-  #  restart: on-failure
-  #  privileged: true
-  #  volumes:
-  #    - /var/run/docker.sock:/var/run/docker.sock
-  #    - ../alts/configs/alts_config.yaml:/celery_config.yaml
-  #  depends_on:
-  #    - rabbitmq
+  alts-celery:
+    image: alts-celery:latest
+    build:
+      dockerfile: Dockerfile.celery
+      context: ../alts
+    environment:
+      CELERY_CONFIG_PATH: "/celery_config.yaml"
+      EXTERNAL_NETWORK: "albs-web-server_default"
+    command: "bash -c 'source env/bin/activate && celery
+        -A alts.worker.app worker --pool=threads --concurrency=20
+        --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
+        --without-mingle --without-heartbeat'"
+    restart: on-failure
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../alts/configs/alts_config.yaml:/celery_config.yaml
+    depends_on:
+      - rabbitmq
 
-  #alts-scheduler:
-  #  image: alts-scheduler:latest
-  #  build:
-  #    dockerfile: Dockerfile.scheduler
-  #    context: ../alts
-  #  ports:
-  #    - "8082:8000"
-  #  environment:
-  #    CELERY_CONFIG_PATH: "/scheduler_config.yaml"
-  #    SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
-  #  command: "bash -c 'source env/bin/activate && uvicorn --host 0.0.0.0
-  #      alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
-  #  restart: on-failure
-  #  volumes:
-  #    - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
-  #  depends_on:
-  #    - rabbitmq
+  alts-scheduler:
+    image: alts-scheduler:latest
+    build:
+      dockerfile: Dockerfile.scheduler
+      context: ../alts
+    ports:
+      - "8082:8000"
+    environment:
+      CELERY_CONFIG_PATH: "/scheduler_config.yaml"
+      SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
+    command: "bash -c 'source env/bin/activate && uvicorn --host 0.0.0.0
+        alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+    restart: on-failure
+    volumes:
+      - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
+    depends_on:
+      - rabbitmq
 
   web_server:
     image: al-web-server:latest
@@ -115,27 +115,27 @@ services:
     depends_on:
       - web_server
 
-  #gitea_listener:
-  #  image: albs-gitea-listener:latest
-  #  env_file:
-  #    - vars.env
-  #  build:
-  #    context: ./alws/scripts
-  #    dockerfile: albs-gitea-listener/Dockerfile
-  #  restart: on-failure
-  #  depends_on:
-  #    - mosquitto
+  gitea_listener:
+    image: albs-gitea-listener:latest
+    env_file:
+      - vars.env
+    build:
+      context: ./alws/scripts
+      dockerfile: albs-gitea-listener/Dockerfile
+    restart: on-failure
+    depends_on:
+      - mosquitto
 
-  #git_cacher:
-  #  image: albs-git-cacher:latest
-  #  env_file:
-  #    - vars.env
-  #  build:
-  #    context: ./alws/scripts
-  #    dockerfile: git_cacher/Dockerfile
-  #  restart: on-failure
-  #  depends_on:
-  #    - redis
+  git_cacher:
+    image: albs-git-cacher:latest
+    env_file:
+      - vars.env
+    build:
+      context: ./alws/scripts
+      dockerfile: git_cacher/Dockerfile
+    restart: on-failure
+    depends_on:
+      - redis
 
   pulp:
     image: pulp/pulp
@@ -150,10 +150,10 @@ services:
       - "/dev/fuse"
     restart: on-failure
 
-  #mosquitto:
-  #  image: eclipse-mosquitto:2.0
-  #  ports:
-  #    - "11883:1883"
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "11883:1883"
 
   redis:
     image: redis

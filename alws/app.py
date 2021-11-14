@@ -21,8 +21,8 @@ graceful_terminate_event = threading.Event()
 @app.on_event('startup')
 async def startup():
     global scheduler, terminate_event, graceful_terminate_event
-    # scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
-    # scheduler.start()
+    scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
+    scheduler.start()
 
 
 @app.on_event('shutdown')
