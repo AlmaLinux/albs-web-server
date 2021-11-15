@@ -6,7 +6,7 @@ pydantic==1.8.2
 SQLAlchemy==1.4.27
 aiohttp==3.8.0
 PyJWT==2.3.0
-alembic==1.7.4
+alembic==1.7.5
 aioredis==2.0.0
 pytest==6.2.5
 jmespath==0.10.0
