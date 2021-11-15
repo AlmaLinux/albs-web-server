@@ -31,6 +31,7 @@ from alws.utils.multilib import (
     add_multilib_packages,
     get_multilib_packages,
 )
+from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
 
 
@@ -562,6 +563,8 @@ async def build_done(
         multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
         if multilib_pkgs:
             await add_multilib_packages(db, build_task, multilib_pkgs)
+
+    await save_noarch_packages(db, build_task)
 
     async with db.begin():
         rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
