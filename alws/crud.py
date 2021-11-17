@@ -18,9 +18,6 @@ from alws.releases import (
     EmptyReleasePlan,
     MissingRepository,
 )
-from alws.utils.pulp_client import PulpClient
-from alws.utils.github import get_user_github_token, get_github_user_info
-from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus, TestTaskStatus, ReleaseStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
@@ -29,7 +26,14 @@ from alws.schemas import (
     repository_schema,
 )
 from alws.utils.distro_utils import create_empty_repo
+from alws.utils.github import get_user_github_token, get_github_user_info
+from alws.utils.jwt_utils import generate_JWT_token
+from alws.utils.multilib import (
+    add_multilib_packages,
+    get_multilib_packages,
+)
 from alws.utils.noarch import save_noarch_packages
+from alws.utils.pulp_client import PulpClient
 
 
 __all__ = [
@@ -489,6 +493,7 @@ async def build_done(
         query = models.BuildTask.id == request.task_id
         build_task = await db.execute(
             select(models.BuildTask).where(query).options(
+                selectinload(models.BuildTask.platform),
                 selectinload(models.BuildTask.build).selectinload(
                     models.Build.repos
                 )
@@ -548,6 +553,21 @@ async def build_done(
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()
+
+    multilib_conditions = (
+        build_task.arch == 'x86_64',
+        status == BuildTaskStatus.COMPLETED,
+        bool(settings.beholder_host),
+        bool(settings.beholder_token),
+    )
+    if all(multilib_conditions):
+        src_rpm = next(
+            artifact.name for artifact in request.artifacts
+            if artifact.arch == 'src' and artifact.type == 'rpm'
+        )
+        multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
+        if multilib_pkgs:
+            await add_multilib_packages(db, build_task, multilib_pkgs)
 
     await save_noarch_packages(db, build_task)
 
