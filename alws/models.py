@@ -92,6 +92,8 @@ class Platform(Base):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    module_build_index = sqlalchemy.Column(sqlalchemy.Integer, default=1)
+    module_version_prefix = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     test_dist_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     name = sqlalchemy.Column(
         sqlalchemy.Text,
@@ -274,9 +276,15 @@ class BuildTask(Base):
         sqlalchemy.ForeignKey('build_task_refs.id'),
         nullable=False
     )
+    rpm_module_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('rpm_module.id'),
+        nullable=True
+    )
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    mock_options = sqlalchemy.Column(JSONB)
     ref = relationship('BuildTaskRef')
     artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
     platform = relationship('Platform')
@@ -288,6 +296,7 @@ class BuildTask(Base):
         secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id)
     )
     test_tasks = relationship('TestTask', back_populates='build_task')
+    rpm_module = relationship('RpmModule')
 
 
 class BuildTaskRef(Base):
@@ -298,6 +307,20 @@ class BuildTaskRef(Base):
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
     ref_type = sqlalchemy.Column(sqlalchemy.Integer)
+
+
+class RpmModule(Base):
+
+    __tablename__ = 'rpm_module'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    version = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    stream = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    context = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
 
 
 class BuildTaskArtifact(Base):
