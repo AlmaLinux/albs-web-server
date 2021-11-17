@@ -131,7 +131,8 @@ class Repository(CustomRepoRepr):
 
     __tablename__ = 'repositories'
     __table_args__ = (
-        sqlalchemy.UniqueConstraint('name', 'arch', 'type', 'debug'),
+        sqlalchemy.UniqueConstraint(
+            'name', 'arch', 'type', 'debug', name='repos_uix'),
     )
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
