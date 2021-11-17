@@ -1,6 +1,7 @@
-import typing
-import datetime
 import collections
+import datetime
+import logging
+import typing
 
 import sqlalchemy
 from sqlalchemy import update, delete
@@ -17,9 +18,6 @@ from alws.releases import (
     EmptyReleasePlan,
     MissingRepository,
 )
-from alws.utils.pulp_client import PulpClient
-from alws.utils.github import get_user_github_token, get_github_user_info
-from alws.utils.jwt_utils import generate_JWT_token
 from alws.constants import BuildTaskStatus, TestTaskStatus, ReleaseStatus
 from alws.build_planner import BuildPlanner
 from alws.schemas import (
@@ -29,6 +27,14 @@ from alws.schemas import (
 )
 from alws.utils.distro_utils import create_empty_repo
 from alws.utils.modularity import ModuleWrapper
+from alws.utils.github import get_user_github_token, get_github_user_info
+from alws.utils.jwt_utils import generate_JWT_token
+from alws.utils.multilib import (
+    add_multilib_packages,
+    get_multilib_packages,
+)
+from alws.utils.noarch import save_noarch_packages
+from alws.utils.pulp_client import PulpClient
 
 
 __all__ = [
@@ -392,7 +398,6 @@ async def remove_build_job(db: Session, build_id: int):
             models.BuildTask.test_tasks).selectinload(
             models.TestTask.artifacts)
     )
-    artifacts = []
     repos = []
     repo_ids = []
     build_task_ids = []
@@ -408,13 +413,11 @@ async def remove_build_job(db: Session, build_id: int):
             build_task_ids.append(bt.id)
             for build_artifact in bt.artifacts:
                 build_task_artifact_ids.append(build_artifact.id)
-                artifacts.append(build_artifact.href)
             for tt in bt.test_tasks:
                 test_task_ids.append(tt.id)
                 repo_ids.append(tt.repository_id)
                 for test_artifact in tt.artifacts:
-                    build_task_artifact_ids.append(test_artifact.id)
-                    artifacts.append(test_artifact.href)
+                    test_task_artifact_ids.append(test_artifact.id)
         for br in build.repos:
             repos.append(br.pulp_href)
             repo_ids.append(br.id)
@@ -433,10 +436,17 @@ async def remove_build_job(db: Session, build_id: int):
         # for artifact in artifacts:
             # await pulp_client.remove_artifact(artifact)
         for repo in repos:
-            await pulp_client.remove_artifact(repo, need_wait_sync=True)
+            try:
+                await pulp_client.remove_artifact(repo, need_wait_sync=True)
+            except Exception as err:
+                logging.exception("Cannot delete repo from pulp: %s", err)
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
+        await db.execute(delete(models.BinaryRpm).where(
+            models.BinaryRpm.build_id == build_id))
+        await db.execute(delete(models.SourceRpm).where(
+            models.SourceRpm.build_id == build_id))
         await db.execute(
             delete(models.BuildTaskArtifact).where(
                 models.BuildTaskArtifact.id.in_(build_task_artifact_ids))
@@ -485,6 +495,7 @@ async def build_done(
         query = models.BuildTask.id == request.task_id
         build_task = await db.execute(
             select(models.BuildTask).where(query).options(
+                selectinload(models.BuildTask.platform),
                 selectinload(models.BuildTask.build).selectinload(
                     models.Build.repos
                 ),
@@ -569,6 +580,23 @@ async def build_done(
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()
+
+    multilib_conditions = (
+        build_task.arch == 'x86_64',
+        status == BuildTaskStatus.COMPLETED,
+        bool(settings.beholder_host),
+        bool(settings.beholder_token),
+    )
+    if all(multilib_conditions):
+        src_rpm = next(
+            artifact.name for artifact in request.artifacts
+            if artifact.arch == 'src' and artifact.type == 'rpm'
+        )
+        multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
+        if multilib_pkgs:
+            await add_multilib_packages(db, build_task, multilib_pkgs)
+
+    await save_noarch_packages(db, build_task)
 
     async with db.begin():
         rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
