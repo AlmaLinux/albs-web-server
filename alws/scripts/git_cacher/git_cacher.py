@@ -1,12 +1,11 @@
 import asyncio
-import typing
-import urllib
 import json
 import logging
 
-import aiohttp
 import aioredis
 import pydantic
+
+from alws.utils.gitea import GiteaClient
 
 
 __all__ = ['load_redis_cache', 'save_redis_cache']
@@ -40,57 +39,6 @@ def setup_logger():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
-
-
-class GiteaClient:
-
-    def __init__(self, host: str, log: logging.Logger):
-        self.host = host
-        self.log = log
-        self.requests_lock = asyncio.Semaphore(5)
-
-    async def make_request(self, endpoint: str, params: dict = None):
-        full_url = urllib.parse.urljoin(self.host, endpoint)
-        self.log.debug(f'Making new request {full_url}, with params: {params}')
-        async with self.requests_lock:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(full_url, params=params) as response:
-                    response.raise_for_status()
-                    return await response.json()
-
-    async def _list_all_pages(self, endpoint: str) -> typing.List:
-        items = []
-        page = 1
-        # This is max gitea limit, default is 30
-        items_per_page = 50
-        while True:
-            payload = {
-                'limit': items_per_page,
-                'page': page
-            }
-            response = await self.make_request(endpoint, payload)
-            items.extend(response)
-            if len(response) < items_per_page:
-                break
-            page += 1
-        return items
-
-    async def list_repos(self, organization: str) -> typing.List:
-        endpoint = f'orgs/{organization}/repos'
-        return await self._list_all_pages(endpoint)
-
-    async def list_tags(self, repo: str) -> typing.List:
-        endpoint = f'repos/{repo}/tags'
-        return await self._list_all_pages(endpoint)
-
-    async def list_branches(self, repo: str) -> typing.List:
-        endpoint = f'repos/{repo}/branches'
-        return await self._list_all_pages(endpoint)
-
-    async def index_repo(self, repo_name: str):
-        tags = await self.list_tags(repo_name)
-        branches = await self.list_branches(repo_name)
-        return {'repo_name': repo_name, 'tags': tags, 'branches': branches}
 
 
 async def run(config, redis_client, logger):

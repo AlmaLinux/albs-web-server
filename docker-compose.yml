@@ -111,7 +111,7 @@ services:
       # TODO: Hack for developement, put placeholder here instead
       - "../albs-node/node-config:/home/alt/.config"
     restart: on-failure
-    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_build_node.py -v -t 4'"
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_build_node.py -v -t 1'"
     depends_on:
       - web_server
 
@@ -131,8 +131,8 @@ services:
     env_file:
       - vars.env
     build:
-      context: ./alws/scripts
-      dockerfile: git_cacher/Dockerfile
+      context: .
+      dockerfile: alws/scripts/git_cacher/Dockerfile
     restart: on-failure
     depends_on:
       - redis

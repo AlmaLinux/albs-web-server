@@ -26,6 +26,7 @@ from alws.schemas import (
     repository_schema,
 )
 from alws.utils.distro_utils import create_empty_repo
+from alws.utils.modularity import ModuleWrapper
 from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
 from alws.utils.multilib import (
@@ -120,7 +121,7 @@ async def modify_platform(
                 f'Platform with name: "{platform.name}" does not exists'
             )
         for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data'):
+                    'data', 'module_version_prefix'):
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
@@ -157,7 +158,8 @@ async def create_platform(
         distr_version=platform.distr_version,
         test_dist_name=platform.test_dist_name,
         data=platform.data,
-        arch_list=platform.arch_list
+        arch_list=platform.arch_list,
+        module_version_prefix=platform.module_version_prefix
     )
     if platform.repos:
         for repo in platform.repos:
@@ -496,7 +498,8 @@ async def build_done(
                 selectinload(models.BuildTask.platform),
                 selectinload(models.BuildTask.build).selectinload(
                     models.Build.repos
-                )
+                ),
+                selectinload(models.BuildTask.rpm_module)
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
@@ -519,6 +522,18 @@ async def build_done(
             settings.pulp_user,
             settings.pulp_password
         )
+        build_module = None
+        module_repo = None
+        if build_task.rpm_module:
+            module_repo = next(
+                build_repo for build_repo in build_task.build.repos
+                if build_repo.arch == build_task.arch
+                and not build_repo.debug
+                and build_repo.type == 'rpm'
+            )
+            repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
+                module_repo.url, build_task.rpm_module.sha256)
+            build_module = ModuleWrapper.from_template(repo_modules_yaml)
         artifacts = []
         for artifact in request.artifacts:
             href = None
@@ -535,6 +550,8 @@ async def build_done(
                 repo = repos[0]
                 href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
+                if build_module:
+                    build_module.add_rpm_artifact(artifact.name)
             elif artifact.type == 'build_log':
                 repo = next(
                     repo for repo in repos
@@ -550,6 +567,16 @@ async def build_done(
                     href=href
                 )
             )
+        if build_module:
+            module_pulp_href, sha256 = await pulp_client.create_module(
+                build_module.render())
+            await pulp_client.modify_repository(
+                module_repo.pulp_href,
+                add=[module_pulp_href],
+                remove=[build_task.rpm_module.pulp_href]
+            )
+            build_task.rpm_module.sha256 = sha256
+            build_task.rpm_module.pulp_href = module_pulp_href
         db.add_all(artifacts)
         db.add(build_task)
         await db.commit()
