@@ -294,9 +294,9 @@ class BuildTaskRef(Base):
     __tablename__ = 'build_task_refs'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    # TODO: think if type can be integer
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
+    ref_type = sqlalchemy.Column(sqlalchemy.Integer)
 
 
 class BuildTaskArtifact(Base):
