@@ -29,3 +29,10 @@ class ReleaseStatus(enum.IntEnum):
     IN_PROGRESS = 2
     COMPLETED = 3
     FAILED = 4
+
+
+class BuildTaskRefType(enum.IntEnum):
+    GIT_BRANCH = 1
+    GIT_TAG = 2
+    SRPM_URL = 3
+    GIT_REF = 4

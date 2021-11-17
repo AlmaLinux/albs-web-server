@@ -133,7 +133,8 @@ class Repository(CustomRepoRepr):
 
     __tablename__ = 'repositories'
     __table_args__ = (
-        sqlalchemy.UniqueConstraint('name', 'arch', 'type', 'debug'),
+        sqlalchemy.UniqueConstraint(
+            'name', 'arch', 'type', 'debug', name='repos_uix'),
     )
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -305,6 +306,7 @@ class BuildTaskRef(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
+    ref_type = sqlalchemy.Column(sqlalchemy.Integer)
 
 
 class RpmModule(Base):
