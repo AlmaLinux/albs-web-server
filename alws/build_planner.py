@@ -131,7 +131,7 @@ class BuildPlanner:
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if not task.is_module:
-            await self._add_single_ref(task)
+            await self._add_single_ref(models.BuildTaskRef(**task.dict()))
             return
         refs, module_template = await self._get_module_refs(task)
         # TODO: we should merge all of the modules before insert
@@ -188,7 +188,8 @@ class BuildPlanner:
                 # TODO: fix this hardcode
                 url=f'https://git.almalinux.org/rpms/{component_name}.git',
                 # TODO: c8 should be taken from platform config
-                git_ref=f'c8-stream-{module.stream}'
+                git_ref=f'c8-stream-{module.stream}',
+                ref_type='git_branch'
             ))
         return result, template
 

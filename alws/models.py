@@ -2,7 +2,7 @@ import asyncio
 import datetime
 
 import sqlalchemy
-from sqlalchemy.orm import relationship, DeclarativeMeta
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
 from alws.constants import ReleaseStatus
