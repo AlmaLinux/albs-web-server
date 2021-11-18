@@ -1,5 +1,6 @@
 import os
 import sys
+import typing
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -10,7 +11,11 @@ import yaml
 from syncer import sync
 
 from alws import crud, database
-from alws.schemas import remote_schema, repository_schema
+from alws.schemas import (
+    platform_schema,
+    remote_schema,
+    repository_schema
+)
 from alws.utils.pulp_client import PulpClient
 
 
@@ -86,6 +91,21 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
         return remote
 
 
+async def add_repositories_to_platform(platform_data: dict,
+                                       repositories_ids: typing.List[int]):
+    platform_name = platform_data.get('name')
+    platform_instance = None
+    async with database.Session() as db:
+        for platform in await crud.get_platforms(db):
+            if platform.name == platform_name:
+                platform_instance = platform
+                break
+        if not platform_instance:
+            platform_instance = await crud.create_platform(
+                db, platform_schema.PlatformCreate(**platform_data))
+        await crud.add_to_platform(db, platform_instance.id, repositories_ids)
+
+
 def main():
     pulp_host = os.environ['PULP_HOST']
     pulp_user = os.environ['PULP_USER']
@@ -107,7 +127,10 @@ def main():
 
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
-    for repo_info in platform_data.get('repositories'):
+    repository_ids = []
+    repositories_data = platform_data.pop('repositories', [])
+
+    for repo_info in repositories_data:
         logger.info('Creating repository from the following data: %s',
                     str(repo_info))
         # If repository is not marked as production, do not remove `url` field
@@ -117,6 +140,7 @@ def main():
         remote_sync_policy = repo_info.pop('remote_sync_policy', None)
         repository = sync(get_repository(
             pulp_client, repo_info, repo_name, is_production, logger))
+        repository_ids.append(repository.id)
 
         logger.debug('Repository instance: %s', repository)
         if args.no_remotes:
@@ -139,6 +163,8 @@ def main():
             wait_for_result=True))
         sync(pulp_client.create_rpm_publication(repository.pulp_href))
         logger.info('Repository %s sync is completed', repository)
+
+    sync(add_repositories_to_platform(platform_data, repository_ids))
 
 
 if __name__ == '__main__':

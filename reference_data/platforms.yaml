@@ -138,9 +138,10 @@
       name: almalinux-8-ppc64le-devel
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
+      debug: false
     - arch: ppc64le
       name: alma8-distribution-ppc64le
-      url: https://build.almalinux.org/pulp/content/builds/almalinux8-AlmaLinux-8-ppc64le-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-AlmaLinux-8-ppc64le-dr/
       type: rpm
       production: false
       debug: false
