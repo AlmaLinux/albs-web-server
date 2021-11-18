@@ -131,7 +131,7 @@ class BuildPlanner:
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if not task.is_module:
-            await self._add_single_ref(**task.dict())
+            await self._add_single_ref(task)
             return
         refs, module_template = await self._get_module_refs(task)
         # TODO: we should merge all of the modules before insert
