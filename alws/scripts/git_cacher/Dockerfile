@@ -8,7 +8,7 @@ RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for
 COPY ./alws/scripts/git_cacher/requirements.txt /tmp/requirements.txt
 RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
-COPY ./alws /code
+COPY ./alws /code/alws
 COPY ./alws/scripts/git_cacher/git_cacher.py /code/
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && python git_cacher.py"]
