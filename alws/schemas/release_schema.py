@@ -17,7 +17,7 @@ class Release(BaseModel):
     id: int
     status: int
     build_ids: typing.List[int]
-    build_tasks: typing.Optional[typing.List[int]]
+    build_tasks_ids: typing.Optional[typing.List[int]]
     plan: typing.Optional[typing.Dict[str, typing.Any]]
     created_by: User
 
