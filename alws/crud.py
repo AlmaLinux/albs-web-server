@@ -837,11 +837,13 @@ async def create_new_release(
         user = user_result.scalars().first()
         new_release = models.Release()
         new_release.build_ids = payload.builds
+        if payload.build_tasks:
+            new_release.build_tasks_ids = payload.build_tasks
         new_release.platform = base_platform
         new_release.plan = await get_release_plan(
             db, payload.builds, base_platform.name,
             base_platform.distr_version, reference_platform.name,
-            reference_platform.distr_version
+            reference_platform.distr_version, build_tasks=payload.build_tasks
         )
         new_release.created_by = user
         db.add(new_release)
@@ -882,7 +884,9 @@ async def update_release(
             release.plan = await get_release_plan(
                 db, payload.builds, base_platform.name,
                 base_platform.distr_version, reference_platform.name,
-                reference_platform.distr_version)
+                reference_platform.distr_version,
+                build_tasks=payload.build_tasks
+            )
         db.add(release)
         await db.commit()
     await db.refresh(release)

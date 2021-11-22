@@ -62,7 +62,9 @@ class OracleClient:
                 return json
 
 
-async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
+async def __get_pulp_packages(
+        db: Session, build_ids: typing.List[int],
+        build_tasks: typing.Optional[typing.List[int]] = None) \
         -> typing.Tuple[typing.List[dict], typing.List[str]]:
     src_rpm_names = []
     packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
@@ -88,6 +90,10 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
             # Failsafe to not process logs
             if src_rpm.artifact.type != 'rpm':
                 continue
+            # Check if artifact belongs to any of required build tasks
+            if (build_tasks and src_rpm.artifact.build_task_id
+                    not in build_tasks):
+                continue
             src_rpm_names.append(src_rpm.artifact.name)
             pkg_info = await pulp_client.get_rpm_package(
                 src_rpm.artifact.href, include_fields=packages_fields)
@@ -98,6 +104,10 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
             # Failsafe to not process logs
             if binary_rpm.artifact.type != 'rpm':
                 continue
+            # Check if artifact belongs to any of required build tasks
+            if (build_tasks and binary_rpm.artifact.build_task_id
+                    not in build_tasks):
+                continue
             pkg_info = await pulp_client.get_rpm_package(
                 binary_rpm.artifact.href, include_fields=packages_fields)
             pkg_info['artifact_href'] = binary_rpm.artifact.href
@@ -106,16 +116,18 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
     return pulp_packages, src_rpm_names
 
 
-async def get_release_plan(db: Session, build_ids: typing.List[int],
-                           base_dist_name: str, base_dist_version: str,
-                           reference_dist_name: str,
-                           reference_dist_version: str) -> dict:
-    # FIXME: put actual endpoint to use
+async def get_release_plan(
+        db: Session, build_ids: typing.List[int],
+        base_dist_name: str, base_dist_version: str,
+        reference_dist_name: str,
+        reference_dist_version: str,
+        build_tasks: typing.Optional[typing.List[int]] = None) -> dict:
     endpoint = f'/api/v1/distros/{reference_dist_name}/' \
                f'{reference_dist_version}/projects/'
     packages = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
-    pulp_packages, src_rpm_names = await __get_pulp_packages(db, build_ids)
+    pulp_packages, src_rpm_names = await __get_pulp_packages(
+        db, build_ids, build_tasks=build_tasks)
     repo_q = select(models.Repository).where(
         models.Repository.production.is_(True))
     result = await db.execute(repo_q)
