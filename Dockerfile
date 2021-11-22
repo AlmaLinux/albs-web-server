@@ -11,5 +11,6 @@ RUN cd /code && virtualenv -p python3.9 --system-site-packages env && source env
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY alws /code/alws
 COPY tests /code/tests
+COPY scripts /code/scripts
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && uvicorn --workers 4 --host 0.0.0.0 alws.app:app"]
