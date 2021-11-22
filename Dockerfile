@@ -9,8 +9,9 @@ RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for
 COPY requirements.txt /tmp/requirements.txt
 RUN cd /code && virtualenv -p python3.9 --system-site-packages env && source env/bin/activate \
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
+COPY reference_data /code/reference_data
+COPY scripts /code/scripts
 COPY alws /code/alws
 COPY tests /code/tests
-COPY scripts /code/scripts
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && uvicorn --workers 4 --host 0.0.0.0 alws.app:app"]
