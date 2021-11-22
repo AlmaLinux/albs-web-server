@@ -9,7 +9,7 @@ from alws import models
 from alws.errors import DataNotFoundError
 from alws.config import settings
 from alws.schemas import build_schema
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.modularity import ModuleWrapper, calc_dist_macro
 from alws.utils.gitea import download_modules_yaml
@@ -189,7 +189,7 @@ class BuildPlanner:
                 url=f'https://git.almalinux.org/rpms/{component_name}.git',
                 # TODO: c8 should be taken from platform config
                 git_ref=f'c8-stream-{module.stream}',
-                ref_type='git_branch'
+                ref_type=BuildTaskRefType.GIT_BRANCH
             ))
         return result, template
 

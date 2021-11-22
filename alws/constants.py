@@ -36,3 +36,13 @@ class BuildTaskRefType(enum.IntEnum):
     GIT_TAG = 2
     SRPM_URL = 3
     GIT_REF = 4
+
+    @classmethod
+    def from_text(cls, value: str) -> int:
+        cls_value = {
+            'git_branch': cls.GIT_BRANCH,
+            'git_tag': cls.GIT_TAG,
+            'srpm_url': cls.SRPM_URL,
+            'git_ref': cls.GIT_REF
+        }[value]
+        return int(cls_value)

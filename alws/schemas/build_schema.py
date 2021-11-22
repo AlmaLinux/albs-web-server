@@ -3,6 +3,8 @@ import datetime
 
 from pydantic import BaseModel, validator, Field, conlist
 
+from alws.constants import BuildTaskRefType
+
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
@@ -11,11 +13,17 @@ class BuildTaskRef(BaseModel):
 
     url: str
     git_ref: typing.Optional[str]
-    ref_type: typing.Optional[int]
+    ref_type: typing.Optional[typing.Union[int, str]]
 
     @property
     def is_module(self):
         return '/modules/' in self.url
+
+    @validator('ref_type', pre=True)
+    def ref_type_validator(cls, v):
+        if v is None:
+            return v
+        return v if isinstance(v, int) else BuildTaskRefType.from_text(v)
 
     class Config:
         orm_mode = True
