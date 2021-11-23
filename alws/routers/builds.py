@@ -50,4 +50,10 @@ async def restart_failed_build_items(build_id: int,
 
 @router.delete('/{build_id}/remove', status_code=204)
 async def remove_build(build_id: int, db: database.Session = Depends(get_db)):
-    return await crud.remove_build_job(db, build_id)
+    result = await crud.remove_build_job(db, build_id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Build with {build_id} is released or not found',
+        )
+    return result

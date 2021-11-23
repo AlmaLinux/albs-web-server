@@ -402,15 +402,17 @@ async def remove_build_job(db: Session, build_id: int):
     repo_ids = []
     build_task_ids = []
     build_task_artifact_ids = []
+    build_task_ref_ids = []
     test_task_ids = []
     test_task_artifact_ids = []
     async with db.begin():
         build = await db.execute(query_bj)
         build = build.scalars().first()
-        if not build:
-            return
+        if build is None or build.released:
+            return False
         for bt in build.tasks:
             build_task_ids.append(bt.id)
+            build_task_ref_ids.append(bt.ref_id)
             for build_artifact in bt.artifacts:
                 build_task_artifact_ids.append(build_artifact.id)
             for tt in bt.test_tasks:
@@ -471,8 +473,19 @@ async def remove_build_job(db: Session, build_id: int):
             delete(models.BuildTask).where(models.BuildTask.build_id == build_id)
         )
         await db.execute(
+            delete(models.BuildDependency).where(sqlalchemy.or_(
+                models.BuildDependency.c.build_dependency == build_id,
+                models.BuildDependency.c.build_id == build_id,
+            ))
+        )
+        await db.execute(
+            delete(models.BuildTaskRef).where(
+                models.BuildTaskRef.id.in_(build_task_ref_ids))
+        )
+        await db.execute(
             delete(models.Build).where(models.Build.id == build_id))
         await db.commit()
+    return True
 
 
 
