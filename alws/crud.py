@@ -388,7 +388,7 @@ async def update_failed_build_items(db: Session, build_id: int):
         await db.commit()
 
 
-async def remove_build_job(db: Session, build_id: int):
+async def remove_build_job(db: Session, build_id: int) -> bool:
     query_bj = select(models.Build).where(
         models.Build.id == build_id).options(
         selectinload(models.Build.tasks).selectinload(
@@ -408,7 +408,9 @@ async def remove_build_job(db: Session, build_id: int):
     async with db.begin():
         build = await db.execute(query_bj)
         build = build.scalars().first()
-        if build is None or build.released:
+        if build is None:
+            raise DataNotFoundError(f'Build with {build_id} not found')
+        if build.released:
             return False
         for bt in build.tasks:
             build_task_ids.append(bt.id)
