@@ -1,9 +1,10 @@
 import itertools
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 
 from alws import crud, database
 from alws.dependencies import get_db, JWTBearer
+from alws.errors import AlreadyBuiltError
 from alws.schemas import build_node_schema
 
 
@@ -26,14 +27,18 @@ async def ping(
 
 @router.post('/build_done')
 async def build_done(
-            build_done: build_node_schema.BuildDone,
+            build_done_: build_node_schema.BuildDone,
+            response: Response,
             db: database.Session = Depends(get_db)
         ):
-    await crud.build_done(db, build_done)
+    try:
+        await crud.build_done(db, build_done_)
+    except AlreadyBuiltError:
+        response.status_code = status.HTTP_409_CONFLICT
     # need add some logic after discussing with team
     # await crud.add_distributions_after_rebuild(db, build_done)
-    if build_done.status == 'done':
-        await crud.create_test_tasks(db, build_done.task_id)
+    if build_done_.status == 'done':
+        await crud.create_test_tasks(db, build_done_.task_id)
     return {'ok': True}
 
 

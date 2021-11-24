@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import DataNotFoundError, BuildError, DistributionError
+from alws.errors import (
+    AlreadyBuiltError,
+    BuildError,
+    DataNotFoundError,
+    DistributionError,
+)
 from alws.config import settings
 from alws.releases import (
     execute_release_plan,
@@ -504,7 +509,8 @@ async def build_done(
         )
         build_task = build_task.scalars().first()
         if BuildTaskStatus.is_finished(build_task.status):
-            raise BuildError(f'Build task {build_task.id} already completed')
+            raise AlreadyBuiltError(
+                f'Build task {build_task.id} already completed')
         status = BuildTaskStatus.COMPLETED
         if request.status == 'failed':
             status = BuildTaskStatus.FAILED
@@ -616,13 +622,13 @@ async def build_done(
                 binary_rpms.append(binary_rpm)
         if srpm:
             db.add(srpm)
-        await db.commit()
-    await db.refresh(srpm)
-    for binary_rpm in binary_rpms:
-        binary_rpm.source_rpm = srpm
+            await db.commit()
+            await db.refresh(srpm)
+            for binary_rpm in binary_rpms:
+                binary_rpm.source_rpm = srpm
 
-    db.add_all(binary_rpms)
-    await db.commit()
+            db.add_all(binary_rpms)
+            await db.commit()
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
