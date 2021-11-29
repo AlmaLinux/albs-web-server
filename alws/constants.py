@@ -39,10 +39,20 @@ class BuildTaskRefType(enum.IntEnum):
 
     @classmethod
     def from_text(cls, value: str) -> int:
-        cls_value = {
-            'git_branch': cls.GIT_BRANCH,
-            'git_tag': cls.GIT_TAG,
-            'srpm_url': cls.SRPM_URL,
-            'git_ref': cls.GIT_REF
-        }[value]
-        return int(cls_value)
+        return int(build_ref_str_mapping[value])
+
+    @classmethod
+    def to_text(cls, value: int) -> str:
+        return build_ref_int_mapping[value]
+
+
+build_ref_str_mapping: dict[str, int] = {
+    'git_branch': BuildTaskRefType.GIT_BRANCH,
+    'git_tag': BuildTaskRefType.GIT_TAG,
+    'srpm_url': BuildTaskRefType.SRPM_URL,
+    'git_ref': BuildTaskRefType.GIT_REF
+}
+
+build_ref_int_mapping: dict[int, str] = {
+    value: key for key, value in build_ref_str_mapping.items()
+}

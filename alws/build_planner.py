@@ -179,7 +179,7 @@ class BuildPlanner:
         template = await download_modules_yaml(
             task.url,
             task.git_ref,
-            task.ref_type
+            BuildTaskRefType.to_text(task.ref_type)
         )
         module = ModuleWrapper.from_template(template)
         result = []

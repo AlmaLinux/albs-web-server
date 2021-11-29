@@ -23,5 +23,17 @@ async def list_alma_projects(
             redis: aioredis.Redis = Depends(get_redis)
         ):
     config = Cacher_config()
-    cache = await load_redis_cache(redis, config.git_cacher_redis_key)
+    cache = await load_redis_cache(redis, config.git_cache_keys['rpms'])
+    return list(cache.values())
+
+
+@router.get(
+    '/alma/modularity',
+    response_model=typing.List[project_schema.Project]
+)
+async def list_alma_modules(
+            redis: aioredis.Redis = Depends(get_redis)
+        ):
+    config = Cacher_config()
+    cache = await load_redis_cache(redis, config.git_cache_keys['modules'])
     return list(cache.values())

@@ -15,7 +15,10 @@ class Config(pydantic.BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
-    git_cacher_redis_key: str = 'gitea_cache'
+    git_cache_keys: dict[str, str] = {
+        'rpms': 'rpms_gitea_cache',
+        'modules': 'modules_gitea_cache'
+    }
 
 
 async def load_redis_cache(redis, cache_key):
@@ -41,13 +44,14 @@ def setup_logger():
     return logger
 
 
-async def run(config, redis_client, logger):
-    cache = await load_redis_cache(redis_client, config.git_cacher_redis_key)
+async def run(config, redis_client, gitea_client, organization):
+    cache = await load_redis_cache(
+        redis_client, config.git_cache_keys[organization]
+    )
     cache_names = set(repo['full_name'] for repo in cache.values())
-    client = GiteaClient(config.gitea_host, logger)
     to_index = []
     git_names = set()
-    for repo in await client.list_repos('rpms'):
+    for repo in await gitea_client.list_repos(organization):
         repo_name = repo['full_name']
         git_names.add(repo_name)
         repo_meta = {
@@ -63,7 +67,7 @@ async def run(config, redis_client, logger):
             cache[repo_name] = repo_meta
             to_index.append(repo_name)
     results = await asyncio.gather(
-        *list(client.index_repo(repo_name) for repo_name in to_index)
+        *list(gitea_client.index_repo(repo_name) for repo_name in to_index)
     )
     for result in results:
         cache_record = cache[result['repo_name']]
@@ -73,16 +77,24 @@ async def run(config, redis_client, logger):
         ]
     for outdated_repo in (cache_names - git_names):
         cache.pop(outdated_repo)
-    await save_redis_cache(redis_client, config.git_cacher_redis_key, cache)
+    await save_redis_cache(
+        redis_client,
+        config.git_cache_keys[organization],
+        cache
+    )
 
 
 async def main():
     config = Config()
     logger = setup_logger()
     redis_client = aioredis.from_url(config.redis_url)
+    gitea_client = GiteaClient(config.gitea_host, logger)
     while True:
         logger.info('Checking cache for updates')
-        await run(config, redis_client, logger)
+        await asyncio.gather(
+            run(config, redis_client, gitea_client, 'rpms'),
+            run(config, redis_client, gitea_client, 'modules')
+        )
         await asyncio.sleep(600)
 
 

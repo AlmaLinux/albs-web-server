@@ -12,7 +12,6 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.errors import (
     AlreadyBuiltError,
-    BuildError,
     DataNotFoundError,
     DistributionError,
 )

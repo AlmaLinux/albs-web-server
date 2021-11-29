@@ -25,6 +25,9 @@ class BuildTaskRef(BaseModel):
             return v
         return v if isinstance(v, int) else BuildTaskRefType.from_text(v)
 
+    def ref_type_to_str(self):
+        return BuildTaskRefType.to_text(self.ref_type)
+
     class Config:
         orm_mode = True
 
