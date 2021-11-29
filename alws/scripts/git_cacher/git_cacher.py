@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import typing
 
 import aioredis
 import pydantic
@@ -15,7 +16,7 @@ class Config(pydantic.BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
-    git_cache_keys: dict[str, str] = {
+    git_cache_keys: typing.Dict[str, str] = {
         'rpms': 'rpms_gitea_cache',
         'modules': 'modules_gitea_cache'
     }
