@@ -1,6 +1,12 @@
 import typing
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    status,
+)
 
 from alws import database, crud
 from alws.dependencies import get_db, JWTBearer
@@ -27,9 +33,17 @@ async def create_build(
 
 @router.get('/', response_model=typing.Union[
     typing.List[build_schema.Build], build_schema.BuildsResponse])
-async def get_builds_per_page(pageNumber: int,
-                              db: database.Session = Depends(get_db)):
-    return await crud.get_builds(db, page_number=pageNumber)
+async def get_builds_per_page(
+    request: Request,
+    pageNumber: int,
+    db: database.Session = Depends(get_db),
+):
+    search_params = build_schema.BuildSearch(**request.query_params)
+    return await crud.get_builds(
+        db=db,
+        page_number=pageNumber,
+        search_params=search_params,
+    )
 
 
 @router.get('/{build_id}/', response_model=build_schema.Build)

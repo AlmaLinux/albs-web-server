@@ -81,9 +81,17 @@ async def create_build(
 async def get_builds(
             db: Session,
             build_id: typing.Optional[int] = None,
-            page_number: typing.Optional[int] = None
+            page_number: typing.Optional[int] = None,
+            search_params: build_schema.BuildSearch = None,
         ) -> typing.Union[typing.List[models.Build], dict]:
-    query = select(models.Build).order_by(models.Build.id.desc()).options(
+    query = select(models.Build).join(
+        models.Build.tasks,
+    ).join(
+        models.BuildTask.ref,
+    ).join(
+        models.BuildTask.artifacts,
+        isouter=True,
+    ).order_by(models.Build.id.desc()).options(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.platform),
         selectinload(models.Build.tasks).selectinload(models.BuildTask.ref),
@@ -91,11 +99,57 @@ async def get_builds(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.artifacts),
         selectinload(models.Build.linked_builds)
+    ).distinct(models.Build.id)
+
+    pulp_params = {
+        'fields': ['pulp_href'],
+    }
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
     )
+
     if page_number:
         query = query.slice(10 * page_number - 10, 10 * page_number)
     if build_id is not None:
         query = query.where(models.Build.id == build_id)
+    if search_params is not None:
+        if search_params.project is not None:
+            query = query.filter(models.BuildTaskRef.url.like(
+                f'%/{search_params.project}%'))
+        if search_params.created_by is not None:
+            query = query.filter(
+                models.Build.user_id == search_params.created_by)
+        if search_params.ref is not None:
+            query = query.filter(sqlalchemy.or_(
+                models.BuildTaskRef.url.like(f'%{search_params.ref}%'),
+                models.BuildTaskRef.git_ref.like(f'%{search_params.ref}%'),
+            ))
+        if search_params.platform_id is not None:
+            query = query.filter(
+                models.BuildTask.platform_id == search_params.platform_id)
+        if search_params.build_task_arch is not None:
+            query = query.filter(
+                models.BuildTask.arch == search_params.build_task_arch)
+        if search_params.is_package_filter:
+            pulp_params.update({
+                key.replace('rpm_', ''): value
+                for key, value in search_params.dict().items()
+                if key.startswith('rpm_') and value is not None
+            })
+            pulp_hrefs = await pulp_client.get_rpm_packages(pulp_params)
+            pulp_hrefs = [row['pulp_href'] for row in pulp_hrefs]
+            query = query.filter(sqlalchemy.and_(
+                models.BuildTaskArtifact.href.in_(pulp_hrefs),
+                models.BuildTaskArtifact.type == 'rpm',
+            ))
+        if search_params.released is not None:
+            query = query.filter(
+                models.Build.released == search_params.released)
+        # TODO: uncomment when sign node will be implement
+        # if search_params.signed is not None:
+        #     query = query.filter(models.Build.signed == search_params.signed)
     result = await db.execute(query)
     if build_id:
         return result.scalars().first()
@@ -831,6 +885,11 @@ async def get_user(
         query = models.User.email == user_email
     db_user = await db.execute(select(models.User).where(query))
     return db_user.scalars().first()
+
+
+async def get_all_users(db: Session) -> typing.List[models.User]:
+    db_users = await db.execute(select(models.User))
+    return db_users.scalars().all()
 
 
 async def get_releases(db: Session) -> typing.List[models.Release]:

@@ -47,3 +47,12 @@ async def get_user(
             detail=f'User "{value}" is not found'
         )
     return db_user
+
+
+@router.get(
+    '/all_users',
+    dependencies=[Depends(JWTBearer())],
+    response_model=typing.List[user_schema.User],
+)
+async def get_all_users(db: database.Session = Depends(get_db)):
+    return await crud.get_all_users(db)
