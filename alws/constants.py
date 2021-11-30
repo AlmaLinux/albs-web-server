@@ -1,4 +1,5 @@
 import enum
+import typing
 
 
 __all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus']
@@ -46,13 +47,13 @@ class BuildTaskRefType(enum.IntEnum):
         return build_ref_int_mapping[value]
 
 
-build_ref_str_mapping: dict[str, int] = {
+build_ref_str_mapping: typing.Dict[str, int] = {
     'git_branch': BuildTaskRefType.GIT_BRANCH,
     'git_tag': BuildTaskRefType.GIT_TAG,
     'srpm_url': BuildTaskRefType.SRPM_URL,
     'git_ref': BuildTaskRefType.GIT_REF
 }
 
-build_ref_int_mapping: dict[int, str] = {
+build_ref_int_mapping: typing.Dict[int, str] = {
     value: key for key, value in build_ref_str_mapping.items()
 }
