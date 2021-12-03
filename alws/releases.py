@@ -5,6 +5,7 @@ from collections import namedtuple
 
 import aiohttp
 import jmespath
+import json
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -49,17 +50,23 @@ class OracleClient:
         async with aiohttp.ClientSession(headers=req_headers) as session:
             async with session.get(
                     self._get_url(endpoint), params=params) as response:
-                json = await response.json(content_type=None)
+                with open('test_repo.log', 'a') as logs:
+                    logs.write("TEEEEEEEEEEEEEEEEEEEEEEEEEEEEEST\n")
+                    logs.write(f"response: {response}\n")
+                    logs.write(f"response.json: {response.json()}\n")
+                data = await response.read()
+                json_data = json.loads(data)
                 response.raise_for_status()
-                return json
+                return json_data
 
     async def post(self, endpoint: str, data: typing.Union[dict, list]):
         async with aiohttp.ClientSession(headers=self._headers) as session:
             async with session.post(
                     self._get_url(endpoint), json=data) as response:
-                json = await response.json(content_type=None)
+                data = await response.read()
+                json_data = json.loads(data)
                 response.raise_for_status()
-                return json
+                return json_data
 
 
 async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
@@ -110,6 +117,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                            base_dist_name: str, base_dist_version: str,
                            reference_dist_name: str,
                            reference_dist_version: str) -> dict:
+    with open('test_repo.log', 'a') as logs:
+        logs.write(f"base_dist_name: {base_dist_name}\n")
+        logs.write(f"build_ids: {build_ids}\n")
     # FIXME: put actual endpoint to use
     endpoint = f'/api/v1/distros/{reference_dist_name}/' \
                f'{reference_dist_version}/projects/'
@@ -121,12 +131,22 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     result = await db.execute(repo_q)
     prod_repos = [
         {
+            'id': repo.id,
             'name': repo.name,
             'arch': repo.arch,
             'debug': repo.debug
         }
         for repo in result.scalars().all()
     ]
+
+    repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
+                     for repo in prod_repos}
+
+    with open('test_repo.log', 'a') as logs:
+        logs.write(f"prod_repos: {prod_repos}\n")
+        logs.write(f"build_ids: {build_ids}\n")
+        logs.write(f"endpoint: {endpoint}\n")
+        logs.write(f"src_rpm_names: {src_rpm_names}\n")
 
     if not settings.package_oracle_enabled:
         return {
@@ -164,7 +184,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                         release_repo_name, repo['arch'], debug)
                     release_repositories.add(release_repo)
                 pkg_info['repositories'] = [
-                    item._asdict() for item in release_repositories]
+                    repos_mapping.get(item) for item in release_repositories]
+                with open('test_repo.log', 'a') as logs:
+                    logs.write(f"pkg_info[repositories]: {pkg_info['repositories']}\n")
             packages.append(pkg_info)
     return {
         'packages': packages,
