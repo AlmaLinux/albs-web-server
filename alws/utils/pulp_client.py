@@ -308,6 +308,48 @@ class PulpClient:
             return result
         return task
 
+    async def create_filesystem_exporter(self, fse_name: str, fse_path: str,
+                                         fse_method: str='write'):
+        endpoint = 'pulp/api/v3/exporters/core/filesystem/'
+
+        params = {
+            'name': fse_name,
+            'path': fse_path,
+            'method': fse_method
+        }
+        result = await self.make_post_request(endpoint, params)
+        return result['pulp_href']
+
+    async def update_filesystem_exporter(self, fse_pulp_href: str,
+                                         fse_name: str, fse_path: str,
+                                         fse_method: str='write'):
+        endpoint = fse_pulp_href
+        params = {
+            'name': fse_name,
+            'path': fse_path,
+            'method': fse_method
+        }
+        result = await self.make_put_request(endpoint, params)
+        return result['pulp_href']
+
+
+    async def delete_filesystem_exporter(self, fse_pulp_href: str):
+        result = await self.make_delete_request(fse_pulp_href)
+        return result
+
+    async def export_to_filesystem(self, fse_pulp_href: str, fse_task: str,
+                                   fse_publication: str,
+                                   fse_repository_version: str):
+        endpoint = urllib.parse.urljoin(repo_to, 'exports/')
+
+        params = {
+            'task': fse_task,
+            'publication': fse_publication,
+            'repository_version': fse_repository_version
+        }
+        result = await self.make_post_request(endpoint, params)
+        return result['task']
+
     async def get_distro(self, distro_href: str):
         return await self.make_get_request(distro_href)
 
