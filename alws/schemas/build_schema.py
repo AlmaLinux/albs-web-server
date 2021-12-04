@@ -1,5 +1,6 @@
 import typing
 import datetime
+import urllib.parse
 
 from pydantic import BaseModel, validator, Field, conlist
 
@@ -18,6 +19,17 @@ class BuildTaskRef(BaseModel):
     @property
     def is_module(self):
         return '/modules/' in self.url
+
+    @property
+    def git_repo_name(self):
+        parsed_url = urllib.parse.urlparse(self.url)
+        git_name = parsed_url.path.split('/')[-1]
+        return git_name.replace('.git', '')
+
+    def module_stream_from_ref(self):
+        if 'stream-' in self.git_ref:
+            return self.git_ref.split('stream-')[-1]
+        return self.git_ref
 
     @validator('ref_type', pre=True)
     def ref_type_validator(cls, v):

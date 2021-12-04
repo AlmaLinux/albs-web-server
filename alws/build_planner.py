@@ -181,7 +181,12 @@ class BuildPlanner:
             task.git_ref,
             BuildTaskRefType.to_text(task.ref_type)
         )
-        module = ModuleWrapper.from_template(template)
+        module = ModuleWrapper.from_template(
+            template,
+            name=task.git_repo_name,
+            stream=task.module_stream_from_ref()
+        )
+        template = module.render()
         result = []
         for component_name, component in module.iter_components():
             result.append(models.BuildTaskRef(

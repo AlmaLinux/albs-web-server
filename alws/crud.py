@@ -270,21 +270,25 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                                    db_distro: models.Distribution):
     modify = collections.defaultdict(list)
     for task in db_build.tasks:
+        if task.status != BuildTaskStatus.COMPLETED:
+            continue
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
             build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
                 artifact)
             for distro_repo in db_distro.repositories:
-                if (distro_repo.arch == task.arch and
-                        distro_repo.debug == build_artifact.is_debuginfo):
+                conditions = [
+                    distro_repo.arch == build_artifact.arch,
+                    distro_repo.debug == build_artifact.is_debuginfo
+                ]
+                if all(conditions):
                     modify[distro_repo.pulp_href].append(artifact.href)
     return modify
 
 
 async def modify_distribution(build_id: int, distribution: str, db: Session,
                               modification: str):
-
     async with db.begin():
         db_distro = await db.execute(select(models.Distribution).where(
             models.Distribution.name.__eq__(distribution)

@@ -95,11 +95,17 @@ class ModuleWrapper:
         self._stream = stream
 
     @classmethod
-    def from_template(cls, template: str):
+    def from_template(cls, template: str, name=None, stream=None):
         index = Modulemd.ModuleIndex.new()
         ret, _ = index.update_from_string(template, strict=True)
         if not ret:
-            raise ValueError('can not parse modules.yaml template')
+            if not all([name, stream]):
+                raise ValueError('can not parse modules.yaml template')
+            stream = Modulemd.ModuleStreamV2.read_string(
+                template, True, name, stream)
+            if not stream:
+                raise ValueError('can not parse modules.yaml template')
+            index.add_module_stream(stream)
         name = index.get_module_names()[0]
         module = index.get_module(name)
         stream = module.get_all_streams()[0]
