@@ -3,7 +3,8 @@ import typing
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from alws.dependencies import get_db, JWTBearer
-from alws import database, crud
+from alws import database
+from alws.crud import user as user_crud
 from alws.schemas import user_schema
 
 
@@ -18,7 +19,7 @@ async def github_login_or_signup(
             user: user_schema.LoginGithub,
             db: database.Session = Depends(get_db)
         ):
-    user = await crud.github_login(db, user)
+    user = await user_crud.github_login(db, user)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -39,7 +40,7 @@ async def get_user(
             email: typing.Optional[str] = None,
             db: database.Session = Depends(get_db)
         ):
-    db_user = await crud.get_user(db, id, name, email)
+    db_user = await user_crud.get_user(db, id, name, email)
     if db_user is None:
         value = id or name or email
         raise HTTPException(

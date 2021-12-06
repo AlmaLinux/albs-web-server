@@ -10,7 +10,9 @@ import logging
 import yaml
 from syncer import sync
 
-from alws import crud, database
+from alws import database
+from alws.crud import repository as repo_crud
+from alws.crud import platform as pl_crud
 from alws.schemas import (
     platform_schema,
     remote_schema,
@@ -61,18 +63,18 @@ async def get_repository(pulp_client: PulpClient, repo_info: dict,
             payload_dict = repo_payload.copy()
             payload_dict['url'] = repo_url
             payload_dict['pulp_href'] = repo_href
-            repository = await crud.search_repository(
+            repository = await repo_crud.search_repository(
                 db, repository_schema.RepositorySearch(**payload_dict))
             if not repository:
-                repository = await crud.create_repository(
+                repository = await repo_crud.create_repository(
                     db, repository_schema.RepositoryCreate(**payload_dict))
         else:
             payload = repo_info.copy()
             payload['url'] = payload['remote_url']
-            repository = await crud.search_repository(
+            repository = await repo_crud.search_repository(
                 db, repository_schema.RepositorySearch(**payload))
             if not repository:
-                repository = await crud.create_repository(
+                repository = await repo_crud.create_repository(
                     db, repository_schema.RepositoryCreate(**payload))
     return repository
 
@@ -86,7 +88,7 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
         remote_payload.pop('production', False)
         remote_payload['url'] = remote_payload['remote_url']
         remote_payload['policy'] = remote_sync_policy
-        remote = await crud.create_repository_remote(
+        remote = await repo_crud.create_repository_remote(
             db, remote_schema.RemoteCreate(**remote_payload))
         return remote
 
@@ -96,14 +98,15 @@ async def add_repositories_to_platform(platform_data: dict,
     platform_name = platform_data.get('name')
     platform_instance = None
     async with database.Session() as db:
-        for platform in await crud.get_platforms(db):
+        for platform in await pl_crud.get_platforms(db):
             if platform.name == platform_name:
                 platform_instance = platform
                 break
         if not platform_instance:
-            platform_instance = await crud.create_platform(
+            platform_instance = await pl_crud.create_platform(
                 db, platform_schema.PlatformCreate(**platform_data))
-        await crud.add_to_platform(db, platform_instance.id, repositories_ids)
+        await repo_crud.add_to_platform(db, platform_instance.id,
+                                        repositories_ids)
 
 
 def main():
