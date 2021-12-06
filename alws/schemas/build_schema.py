@@ -95,6 +95,32 @@ class BuildTask(BaseModel):
         orm_mode = True
 
 
+class BuildSearch(BaseModel):
+
+    created_by: typing.Optional[int]
+    project: typing.Optional[str]
+    ref: typing.Optional[str]
+    rpm_name: typing.Optional[str]
+    rpm_epoch: typing.Optional[str]
+    rpm_version: typing.Optional[str]
+    rpm_release: typing.Optional[str]
+    rpm_arch: typing.Optional[str]
+    platform_id: typing.Optional[int]
+    build_task_arch: typing.Optional[str]
+    released: typing.Optional[bool]
+    signed: typing.Optional[bool]
+
+    @property
+    def is_package_filter(self):
+        return any((
+            self.rpm_name is not None,
+            self.rpm_epoch is not None,
+            self.rpm_version is not None,
+            self.rpm_release is not None,
+            self.rpm_arch is not None,
+        ))
+
+
 class BuildUser(BaseModel):
 
     id: int

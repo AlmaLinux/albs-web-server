@@ -211,6 +211,13 @@ class PulpClient:
                  if 'rpm/packages' in item]
         return hrefs[0] if hrefs else None
 
+    async def get_rpm_packages(self, params: dict = None) -> list:
+        ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
+        response = await self.make_get_request(ENDPOINT, params=params)
+        if response['count'] == 0:
+            return []
+        return list(response['results'])
+
     async def create_file_distro(self, name: str, repository: str,
                                  base_path_start: str = 'build_logs') -> str:
         ENDPOINT = 'pulp/api/v3/distributions/file/file/'
