@@ -331,9 +331,12 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                 continue
             build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
                 artifact)
+            arch = task.arch
+            if build_artifact.arch == 'src':
+                arch = build_artifact.arch
             for distro_repo in db_distro.repositories:
                 conditions = [
-                    distro_repo.arch == build_artifact.arch,
+                    distro_repo.arch == arch,
                     distro_repo.debug == build_artifact.is_debuginfo
                 ]
                 if all(conditions):
