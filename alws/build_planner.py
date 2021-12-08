@@ -1,7 +1,9 @@
+import yaml
 import asyncio
 import typing
 import collections
 
+import aiohttp
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
@@ -35,6 +37,7 @@ class BuildPlanner:
         self._platforms = []
         self._modules_by_target = {}
         self._module_build_index = {}
+        self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
 
     async def load_platforms(self):
@@ -143,6 +146,12 @@ class BuildPlanner:
         module = None
         mock_options = {'definitions': {}}
         for platform in self._platforms:
+            modularity_version = platform.modularity['versions'][-1]
+            if task.module_platform_version:
+                modularity_version = next(
+                    item for item in platform.modularity['versions']
+                    if item['name'] == task.module_platform_version
+                )
             for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_template)
                 mock_options['module_enable'] = [
@@ -152,8 +161,11 @@ class BuildPlanner:
                     f'{dep_name}:{dep_stream}'
                     for dep_name, dep_stream in module.iter_dependencies()
                 ]
-                module.version = module.generate_new_version(
-                    platform.module_version_prefix)
+                if task.module_version is not None:
+                    module.version = int(task.module_version)
+                else:
+                    module.version = module.generate_new_version(
+                        modularity_version['version_prefix'])
                 module.context = module.generate_new_context()
                 module.arch = arch
                 module.set_arch_list(platform.arch_list)
@@ -173,7 +185,11 @@ class BuildPlanner:
         for key, value in module.iter_mock_definitions():
             mock_options['definitions'][key] = value
         for ref in refs:
-            await self._add_single_ref(ref, mock_options=mock_options)
+            await self._add_single_ref(
+                ref,
+                mock_options=mock_options,
+                ref_platform_version=task.module_platform_version
+            )
 
     async def _get_module_refs(self, task: build_schema.BuildTaskRef):
         template = await download_modules_yaml(
@@ -188,20 +204,41 @@ class BuildPlanner:
         )
         template = module.render()
         result = []
-        for component_name, component in module.iter_components():
+        # TODO: we should rethink schema for multiple platforms
+        #       right now there is no option to create tasks with different
+        #       refs for multiple platforms
+        platform = self._platforms[0]
+        platform_prefix_list = platform.modularity['git_tag_prefix']
+        platform_packages_git = platform.modularity['packages_git']
+        for component_name, _ in module.iter_components():
+            ref_prefix = platform_prefix_list['non_modified']
+            if await self.is_ref_modified(platform, component_name):
+                ref_prefix = platform_prefix_list['modified']
             result.append(models.BuildTaskRef(
-                # TODO: fix this hardcode
-                url=f'https://git.almalinux.org/rpms/{component_name}.git',
-                # TODO: c8 should be taken from platform config
-                git_ref=f'c8-stream-{module.stream}',
+                url=f'{platform_packages_git}{component_name}.git',
+                git_ref=f'{ref_prefix}-stream-{module.stream}',
                 ref_type=BuildTaskRefType.GIT_BRANCH
             ))
         return result, template
 
+    async def is_ref_modified(self, platform: models.Platform, ref: str):
+        if self._module_modified_cache.get(platform.name):
+            return ref in self._module_modified_cache[platform.name]
+        url = platform.modularity['modified_packages_url']
+        package_list = []
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                yaml_body = await response.text()
+                response.raise_for_status()
+                package_list = yaml.safe_load(yaml_body)['modified_packages']
+        self._module_modified_cache[platform.name] = package_list
+        return ref in self._module_modified_cache[platform.name]
+
     async def _add_single_ref(
             self,
             ref: models.BuildTaskRef,
-            mock_options: typing.Optional[dict[str, typing.Any]] = None):
+            mock_options: typing.Optional[dict[str, typing.Any]] = None,
+            ref_platform_version: typing.Optional[str] = None):
         for platform in self._platforms:
             arch_tasks = []
             for arch in self._request_platforms[platform.name]:
@@ -212,13 +249,19 @@ class BuildPlanner:
                         platform.module_build_index += 1
                         build_index = platform.module_build_index
                         self._module_build_index[platform.name] = build_index
+                    platform_dist = platform.modularity['versions'][-1]['dist_prefix']
+                    if ref_platform_version:
+                        platform_dist = next(
+                            i for i in platform.modularity['versions']
+                            if i['name'] == ref_platform_version
+                        )['dist_prefix']
                     dist_macro = calc_dist_macro(
                         module.name,
                         module.stream,
                         int(module.version),
                         module.context,
                         build_index,
-                        platform.data['mock_dist']
+                        platform_dist
                     )
                     mock_options['definitions']['dist'] = dist_macro
                 build_task = models.BuildTask(

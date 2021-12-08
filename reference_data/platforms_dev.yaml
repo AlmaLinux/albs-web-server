@@ -3,6 +3,17 @@
   distr_type: rhel
   distr_version: '8'
   test_dist_name: almalinux
+  modularity:
+    git_tag_prefix:
+      modified: a8
+      non_modified: c8
+    versions:
+      - name: '8.4'
+        version_prefix: '80400'
+        dist_prefix: 'el8.4.0'
+      - name: '8.5'
+        version_prefix: '80400'
+        dist_prefix: 'el8.5.0'
   type: rpm
   arch_list:
     - i686
@@ -37,7 +48,7 @@
     - arch: i686
       name: almalinux-8-baseos
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/i686/os/
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/i686/os/
       production: true
       debug: false
       remote_sync_policy: streamed
@@ -45,7 +56,7 @@
     - arch: i686
       name: almalinux-8-appstream
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/i686/os/
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/i686/os/
       production: true
       debug: false
       remote_sync_policy: streamed
@@ -53,7 +64,7 @@
     - arch: i686
       name: almalinux-8-powertools
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/i686/os/
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/i686/os/
       production: true
       debug: false
       remote_sync_policy: streamed

@@ -179,7 +179,7 @@ async def modify_platform(
                 f'Platform with name: "{platform.name}" does not exists'
             )
         for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data', 'module_version_prefix'):
+                    'data', 'modularity'):
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
@@ -217,7 +217,7 @@ async def create_platform(
         test_dist_name=platform.test_dist_name,
         data=platform.data,
         arch_list=platform.arch_list,
-        module_version_prefix=platform.module_version_prefix
+        modularity=platform.modularity
     )
     if platform.repos:
         for repo in platform.repos:

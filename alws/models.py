@@ -93,7 +93,7 @@ class Platform(Base):
     distr_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     module_build_index = sqlalchemy.Column(sqlalchemy.Integer, default=1)
-    module_version_prefix = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    modularity = sqlalchemy.Column(JSONB, nullable=True)
     test_dist_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     name = sqlalchemy.Column(
         sqlalchemy.Text,

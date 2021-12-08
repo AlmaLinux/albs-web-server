@@ -15,10 +15,9 @@ class BuildTaskRef(BaseModel):
     url: str
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[typing.Union[int, str]]
-
-    @property
-    def is_module(self):
-        return '/modules/' in self.url
+    is_module: typing.Optional[bool] = False
+    module_platform_version: typing.Optional[str] = None
+    module_version: typing.Optional[str] = None
 
     @property
     def git_repo_name(self):
