@@ -104,16 +104,16 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
                      for repo in prod_repos}
 
-    if not settings.package_oracle_enabled:
+    if not settings.package_beholder_enabled:
         return {
             'packages': [{'package': pkg, 'repositories': []}
                          for pkg in pulp_packages],
             'repositories': prod_repos
         }
 
-    oracle_response = await BeholderClient(settings.packages_oracle_host).post(
+    beholder_response = await BeholderClient(settings.packages_beholder_host).post(
         endpoint, src_rpm_names)
-    if oracle_response.get('packages', []):
+    if beholder_response.get('packages', []):
         for package in pulp_packages:
             pkg_name = package['name']
             pkg_version = package['version']
@@ -121,7 +121,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             query = f'packages[].packages[?name==\'{pkg_name}\' ' \
                     f'&& version==\'{pkg_version}\' ' \
                     f'&& arch==\'{pkg_arch}\'][]'
-            predicted_package = jmespath.search(query, oracle_response)
+            predicted_package = jmespath.search(query, beholder_response)
             pkg_info = {'package': package, 'repositories': []}
             if predicted_package:
                 # JMESPath will find a list with 1 element inside
