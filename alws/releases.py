@@ -142,8 +142,6 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     release_repositories.add(release_repo)
                 pkg_info['repositories'] = [
                     repos_mapping.get(item) for item in release_repositories]
-                with open('test_repo.log', 'a') as logs:
-                    logs.write(f"pkg_info[repositories]: {pkg_info['repositories']}\n")
             packages.append(pkg_info)
     return {
         'packages': packages,
