@@ -275,6 +275,15 @@ class PulpClient:
         result = await self.make_post_request(ENDPOINT, payload)
         return result['pulp_href']
 
+    async def update_rpm_remote(self, remote_href, remote_url: str,
+                                remote_policy: str = 'on_demand') -> str:
+        payload = {
+            'url': remote_url,
+            'policy': remote_policy
+        }
+        await self.make_patch_request(remote_href, payload)
+        return remote_href
+
     async def sync_rpm_repo_from_remote(self, repo_href: str, remote_href: str,
                                         sync_policy: str = 'additive',
                                         wait_for_result: bool = False):
@@ -329,6 +338,16 @@ class PulpClient:
         async with aiohttp.ClientSession(auth=self._auth) as session:
             # TODO: data/json
             async with session.put(full_url, data=data, headers=headers) as response:
+                json = await response.json(content_type=None)
+                response.raise_for_status()
+                return json
+
+    async def make_patch_request(self, endpoint: str, data: Optional[dict],
+                                 headers: Optional[dict] = None):
+        full_url = urllib.parse.urljoin(self._host, endpoint)
+        async with aiohttp.ClientSession(auth=self._auth) as session:
+            # TODO: data/json
+            async with session.patch(full_url, data=data, headers=headers) as response:
                 json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json

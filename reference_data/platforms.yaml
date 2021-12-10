@@ -28,10 +28,9 @@
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
       vendor: AlmaLinux
     mock:
-      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz
-        sed make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk
-        rpm-build info patch util-linux findutils grep zlib zlib-devel libxml2-devel
-        scl-utils scl-utils-build git
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
+        make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
+        info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
@@ -154,3 +153,75 @@
       type: rpm
       production: false
       debug: false
+    - name: almalinux-8-baseos
+      arch: src
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-appstream
+      arch: src
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-powertools
+      arch: src
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-baseos-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-appstream-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-powertools-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-baseos-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-appstream-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - name: almalinux-8-powertools-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive

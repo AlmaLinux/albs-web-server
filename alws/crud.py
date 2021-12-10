@@ -1191,6 +1191,9 @@ async def create_repository_remote(
     pulp_remote = await pulp_client.get_rpm_remote(payload.name)
     if pulp_remote:
         remote_href = pulp_remote['pulp_href']
+        # Just to be sure that everything is up-to-date
+        await pulp_client.update_rpm_remote(
+            remote_href, payload.url, remote_policy=payload.policy)
     else:
         remote_href = await pulp_client.create_rpm_remote(
             payload.name, payload.url, remote_policy=payload.policy)
