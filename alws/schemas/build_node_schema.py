@@ -47,7 +47,7 @@ class TaskPlatform(BaseModel):
             elif k in ('with', 'without'):
                 for i in v:
                     self.data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
-            else:
+            elif isinstance(v, dict):
                 for v_k, v_v in v.items():
                     self.data['definitions'][v_k] = v_v
 

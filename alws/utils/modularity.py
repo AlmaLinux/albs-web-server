@@ -79,7 +79,7 @@ class RpmArtifact(BaseModel):
             r'((?P<epoch>\d+):)?'
             r'(?P<version>\d+?[\w.]*)-'
             r'(?P<release>\d+?[\w.+]*?)'
-            r'\.(?P<arch>(i686)|(noarch)|(x86_64)|(aarch64)|(src))(\.rpm)?$'
+            r'\.(?P<arch>[\w]*)(\.rpm)?$'
         )
         result = re.search(regex, artifact)
         if not result:
