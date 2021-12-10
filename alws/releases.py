@@ -1,15 +1,14 @@
 import re
 import typing
-import urllib.parse
 from collections import namedtuple
 
-import aiohttp
 import jmespath
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.config import settings
+from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
 
 
@@ -30,36 +29,6 @@ class MissingRepository(ValueError):
 
 
 RepoType = namedtuple('RepoType', ('name', 'arch', 'debug'))
-
-
-class OracleClient:
-    def __init__(self, host: str, token: str = None):
-        self._host = host
-        self._headers = {}
-        if token:
-            self._headers['Authorization'] = f'Bearer {token}'
-
-    def _get_url(self, endpoint: str) -> str:
-        return urllib.parse.urljoin(self._host, endpoint)
-
-    async def get(self, endpoint: str, headers: dict = None, params: dict = None):
-        req_headers = self._headers.copy()
-        if headers:
-            req_headers.update(**headers)
-        async with aiohttp.ClientSession(headers=req_headers) as session:
-            async with session.get(
-                    self._get_url(endpoint), params=params) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
-
-    async def post(self, endpoint: str, data: typing.Union[dict, list]):
-        async with aiohttp.ClientSession(headers=self._headers) as session:
-            async with session.post(
-                    self._get_url(endpoint), json=data) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
 
 
 async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
@@ -110,8 +79,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                            base_dist_name: str, base_dist_version: str,
                            reference_dist_name: str,
                            reference_dist_version: str) -> dict:
-    # FIXME: put actual endpoint to use
-    endpoint = f'/api/v1/distros/{reference_dist_name}/' \
+    clean_ref_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', reference_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
+    endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
     packages = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
@@ -121,6 +93,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     result = await db.execute(repo_q)
     prod_repos = [
         {
+            'id': repo.id,
             'name': repo.name,
             'arch': repo.arch,
             'debug': repo.debug
@@ -128,17 +101,19 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         for repo in result.scalars().all()
     ]
 
-    if not settings.package_oracle_enabled:
+    repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
+                     for repo in prod_repos}
+
+    if not settings.package_beholder_enabled:
         return {
             'packages': [{'package': pkg, 'repositories': []}
                          for pkg in pulp_packages],
             'repositories': prod_repos
         }
 
-    oracle_response = await OracleClient(settings.packages_oracle_host).post(
+    beholder_response = await BeholderClient(settings.packages_beholder_host).post(
         endpoint, src_rpm_names)
-    base_dist_name_lower = base_dist_name.lower()
-    if oracle_response.get('packages', []):
+    if beholder_response.get('packages', []):
         for package in pulp_packages:
             pkg_name = package['name']
             pkg_version = package['version']
@@ -146,7 +121,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             query = f'packages[].packages[?name==\'{pkg_name}\' ' \
                     f'&& version==\'{pkg_version}\' ' \
                     f'&& arch==\'{pkg_arch}\'][]'
-            predicted_package = jmespath.search(query, oracle_response)
+            predicted_package = jmespath.search(query, beholder_response)
             pkg_info = {'package': package, 'repositories': []}
             if predicted_package:
                 # JMESPath will find a list with 1 element inside
@@ -157,14 +132,16 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     ref_repo_name = repo['name']
                     repo_name = (repo_name_regex.search(ref_repo_name)
                                  .groupdict()['name'])
-                    release_repo_name = (f'{base_dist_name_lower}'
+                    release_repo_name = (f'{clean_ref_dist_name_lower}'
                                          f'-{base_dist_version}-{repo_name}')
                     debug = ref_repo_name.endswith('debuginfo')
+                    if repo['arch'] == 'src':
+                        debug = False
                     release_repo = RepoType(
                         release_repo_name, repo['arch'], debug)
                     release_repositories.add(release_repo)
                 pkg_info['repositories'] = [
-                    item._asdict() for item in release_repositories]
+                    repos_mapping.get(item) for item in release_repositories]
             packages.append(pkg_info)
     return {
         'packages': packages,

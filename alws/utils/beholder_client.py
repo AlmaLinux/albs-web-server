@@ -1,3 +1,5 @@
+import json
+import typing
 import urllib.parse
 
 import aiohttp
@@ -21,8 +23,18 @@ class BeholderClient:
         if headers:
             req_headers.update(**headers)
         full_url = self._get_url(endpoint)
-        async with aiohttp.ClientSession(headers=req_headers) as session:
+        async with aiohttp.ClientSession(headers=req_headers, 
+                                         raise_for_status=True) as session:
             async with session.get(full_url, params=params) as response:
-                json = await response.json()
-                response.raise_for_status()
-                return json
+                data = await response.read()
+                json_data = json.loads(data)
+                return json_data
+
+    async def post(self, endpoint: str, data: typing.Union[dict, list]):
+        async with aiohttp.ClientSession(headers=self._headers,
+                                         raise_for_status=True) as session:
+            async with session.post(
+                    self._get_url(endpoint), json=data) as response:
+                data = await response.read()
+                json_data = json.loads(data)
+                return json_data
