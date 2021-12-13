@@ -5,7 +5,7 @@ import sqlalchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
-from alws.constants import ReleaseStatus
+from alws.constants import ReleaseStatus, SignStatus
 from alws.database import Base, engine
 
 
@@ -233,6 +233,8 @@ class Build(Base):
     source_rpms = relationship('SourceRpm', back_populates='build')
     binary_rpms = relationship('BinaryRpm', back_populates='build')
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
+    signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
+                               nullable=True)
 
 
 BuildTaskDependency = sqlalchemy.Table(
@@ -457,6 +459,43 @@ class Release(Base):
         default=ReleaseStatus.SCHEDULED
     )
     created_by = relationship('User')
+
+
+class SignKey(Base):
+    __tablename__ = 'sign_keys'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text)
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True)
+    fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True)
+    public_url = sqlalchemy.Column(sqlalchemy.Text)
+    inserted = sqlalchemy.Column(
+        sqlalchemy.DateTime, default=datetime.datetime.utcnow())
+
+
+class SignTask(Base):
+    __tablename__ = 'sign_tasks'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    build_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        nullable=False
+    )
+    build = relationship('Build')
+    sign_key_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('sign_keys.id'),
+        nullable=False
+    )
+    sign_key = relationship('SignKey')
+    status = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        default=SignStatus.IDLE
+    )
+    error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
 
 async def create_tables():

@@ -1,7 +1,8 @@
-import re
 import typing
 
 from pydantic import BaseModel, Field
+
+from alws.utils.debuginfo import is_debuginfo_rpm
 
 
 __all__ = ['Task']
@@ -90,8 +91,7 @@ class BuildDoneArtifact(BaseModel):
 
     @property
     def is_debuginfo(self):
-        regex = re.compile(r'-debug(info|source)-\d')
-        return bool(re.search(regex, self.name))
+        return is_debuginfo_rpm(self.name)
 
 
 class BuildDone(BaseModel):

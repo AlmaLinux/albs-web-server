@@ -12,3 +12,19 @@ class DataNotFoundError(Exception):
 
 class DistributionError(Exception):
     pass
+
+
+class EmptyReleasePlan(ValueError):
+    pass
+
+
+class MissingRepository(ValueError):
+    pass
+
+
+class SignKeyAlreadyExistsError(ValueError):
+    pass
+
+
+class BuildAlreadySignedError(ValueError):
+    pass

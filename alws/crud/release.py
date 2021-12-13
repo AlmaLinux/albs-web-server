@@ -1,34 +1,17 @@
 import re
 import typing
-from collections import namedtuple
 
 import jmespath
-from sqlalchemy import select
+from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.config import settings
+from alws.constants import ReleaseStatus, RepoType
+from alws.errors import DataNotFoundError, EmptyReleasePlan, MissingRepository
+from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
-
-
-__all__ = [
-    'execute_release_plan',
-    'get_release_plan',
-    'EmptyReleasePlan',
-    'MissingRepository',
-]
-
-
-class EmptyReleasePlan(ValueError):
-    pass
-
-
-class MissingRepository(ValueError):
-    pass
-
-
-RepoType = namedtuple('RepoType', ('name', 'arch', 'debug'))
 
 
 async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
@@ -111,7 +94,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'repositories': prod_repos
         }
 
-    beholder_response = await BeholderClient(settings.packages_beholder_host).post(
+    beholder_response = await BeholderClient(settings.beholder_host).post(
         endpoint, src_rpm_names)
     if beholder_response.get('packages', []):
         for package in pulp_packages:
@@ -197,3 +180,121 @@ async def execute_release_plan(release_id: int, db: Session):
             repo_status[repository_name][arch] = result
 
     return repo_status
+
+
+async def get_releases(db: Session) -> typing.List[models.Release]:
+    release_result = await db.execute(select(models.Release).options(
+        selectinload(models.Release.created_by)))
+    return release_result.scalars().all()
+
+
+async def create_new_release(
+            db: Session, user_id: int, payload: release_schema.ReleaseCreate
+        ) -> models.Release:
+    async with db.begin():
+        user_q = select(models.User).where(models.User.id == user_id)
+        user_result = await db.execute(user_q)
+        platform_result = await db.execute(select(models.Platform).where(
+            models.Platform.id.in_(
+                (payload.platform_id, payload.reference_platform_id))))
+        platforms = platform_result.scalars().all()
+        base_platform = [item for item in platforms
+                         if item.id == payload.platform_id][0]
+        reference_platform = [item for item in platforms
+                              if item.id == payload.reference_platform_id][0]
+
+        user = user_result.scalars().first()
+        new_release = models.Release()
+        new_release.build_ids = payload.builds
+        new_release.platform = base_platform
+        new_release.plan = await get_release_plan(
+            db, payload.builds, base_platform.name,
+            base_platform.distr_version, reference_platform.name,
+            reference_platform.distr_version
+        )
+        new_release.created_by = user
+        db.add(new_release)
+        await db.commit()
+
+    await db.refresh(new_release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == new_release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def update_release(
+        db: Session, release_id: int,
+        payload: release_schema.ReleaseUpdate
+) -> models.Release:
+    async with db.begin():
+        release_result = await db.execute(select(models.Release).where(
+            models.Release.id == release_id).with_for_update())
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        if payload.plan:
+            release.plan = payload.plan
+        if payload.builds and payload.builds != release.build_ids:
+            release.build_ids = payload.builds
+            platform_result = await db.execute(select(models.Platform).where(
+                models.Platform.id.in_(
+                    (release.platform_id, release.reference_platform_id))))
+            platforms = platform_result.scalars().all()
+            base_platform = [item for item in platforms
+                             if item.id == release.platform_id][0]
+            reference_platform = [
+                item for item in platforms
+                if item.id == release.reference_platform_id][0]
+            release.plan = await get_release_plan(
+                db, payload.builds, base_platform.name,
+                base_platform.distr_version, reference_platform.name,
+                reference_platform.distr_version)
+        db.add(release)
+        await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first()
+
+
+async def commit_release(db: Session, release_id: int) -> (models.Release, str):
+    async with db.begin():
+        release_result = await db.execute(
+            select(models.Release).where(
+                models.Release.id == release_id).with_for_update()
+        )
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(f'Release with ID {release_id} not found')
+        builds_q = select(models.Build).where(
+            models.Build.id.in_(release.build_ids))
+        builds_result = await db.execute(builds_q)
+        for build in builds_result.scalars().all():
+            build.release = release
+            db.add(build)
+        release.status = ReleaseStatus.IN_PROGRESS
+        db.add(release)
+        await db.commit()
+    try:
+        await execute_release_plan(release_id, db)
+    except (EmptyReleasePlan, MissingRepository) as e:
+        message = f'Cannot commit release: {str(e)}'
+        release.status = ReleaseStatus.FAILED
+    else:
+        message = 'Successfully committed release'
+        release.status = ReleaseStatus.COMPLETED
+    db.add(release)
+    await db.commit()
+    await db.refresh(release)
+    release_res = await db.execute(select(models.Release).where(
+        models.Release.id == release.id).options(
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)
+    ))
+    return release_res.scalars().first(), message

@@ -3,7 +3,8 @@ import typing
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 
 from alws.dependencies import get_db, JWTBearer
-from alws import database, crud
+from alws import database
+from alws.crud import distribution as distro_crud
 from alws.schemas import distro_schema
 from alws.errors import DistributionError
 
@@ -19,7 +20,7 @@ router = APIRouter(
 async def create_distribution(
         distribution: distro_schema.DistroCreate,
         db: database.Session = Depends(get_db)):
-    return await crud.create_distro(db, distribution)
+    return await distro_crud.create_distro(db, distribution)
 
 
 @router.post('/add/{build_id}/{distribution}/',
@@ -30,7 +31,8 @@ async def add_to_distribution(
         db: database.Session = Depends(get_db)
 ):
     try:
-        await crud.modify_distribution(build_id, distribution, db, 'add')
+        await distro_crud.modify_distribution(
+            build_id, distribution, db, 'add')
         return {'success': True}
     except DistributionError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -45,8 +47,8 @@ async def remove_from_distribution(
         db: database.Session = Depends(get_db)
 ):
     try:
-        await crud.modify_distribution(build_id, distribution,
-                                       db, 'remove')
+        await distro_crud.modify_distribution(
+            build_id, distribution, db, 'remove')
         return {'success': True}
     except DistributionError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -57,4 +59,4 @@ async def remove_from_distribution(
 async def get_distributions(
         db: database.Session = Depends(get_db)
 ):
-    return await crud.get_distributions(db)
+    return await distro_crud.get_distributions(db)

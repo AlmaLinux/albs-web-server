@@ -1,8 +1,11 @@
 import enum
+import re
 import typing
+from collections import namedtuple
 
 
-__all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus']
+__all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
+           'BuildTaskRefType', 'SignStatus', 'RepoType', 'debuginfo_regex']
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -27,6 +30,13 @@ class TestTaskStatus(enum.IntEnum):
 
 class ReleaseStatus(enum.IntEnum):
     SCHEDULED = 1
+    IN_PROGRESS = 2
+    COMPLETED = 3
+    FAILED = 4
+
+
+class SignStatus(enum.IntEnum):
+    IDLE = 1
     IN_PROGRESS = 2
     COMPLETED = 3
     FAILED = 4
@@ -57,3 +67,7 @@ build_ref_str_mapping: typing.Dict[str, int] = {
 build_ref_int_mapping: typing.Dict[int, str] = {
     value: key for key, value in build_ref_str_mapping.items()
 }
+
+debuginfo_regex = re.compile(r'debug(info|source)')
+
+RepoType = namedtuple('RepoType', ('name', 'arch', 'debug'))

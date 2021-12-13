@@ -7,6 +7,8 @@ __all__ = [
     'projects',
     'releases',
     'repositories',
+    'sign_key',
+    'sign_task',
     'tests',
     'users'
 ]

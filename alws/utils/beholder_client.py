@@ -23,7 +23,7 @@ class BeholderClient:
         if headers:
             req_headers.update(**headers)
         full_url = self._get_url(endpoint)
-        async with aiohttp.ClientSession(headers=req_headers, 
+        async with aiohttp.ClientSession(headers=req_headers,
                                          raise_for_status=True) as session:
             async with session.get(full_url, params=params) as response:
                 data = await response.read()

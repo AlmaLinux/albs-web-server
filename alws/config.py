@@ -12,13 +12,10 @@ class Settings(BaseSettings):
     alts_token: str
 
     package_beholder_enabled: bool = True
-    packages_beholder_host: typing.Optional[str] = 'http://beholder-web:5000'
-    packages_beholder_token: typing.Optional[str]
-
-    redis_url: str = 'redis://redis:6379'
-
     beholder_host: typing.Optional[str]
     beholder_token: typing.Optional[str]
+
+    redis_url: str = 'redis://redis:6379'
 
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
     sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'

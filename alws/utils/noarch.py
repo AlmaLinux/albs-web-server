@@ -102,7 +102,8 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
                 )
 
             for repo in build_task.build.repos:
-                if repo.arch != task.arch and repo.type != 'rpm':
+                if (repo.arch == 'src' or repo.type != 'rpm'
+                        or repo.arch != task.arch):
                     continue
                 repo_href = repo.pulp_href
                 add_content = hrefs_to_add
