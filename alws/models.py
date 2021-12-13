@@ -498,6 +498,33 @@ class SignTask(Base):
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
 
+class ExportTask(Base):
+    __tablename__ = 'export_tasks'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    exported_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+
+
+class RepoExporter(Base):
+    __tablename__ = 'repo_exporters'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    path = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    exported_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('export_tasks.id'),
+        nullable=False
+    )
+    repository_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id'),
+        nullable=False
+    )
+    fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+
+
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

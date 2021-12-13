@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     pulp_host: str = 'http://pulp'
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
+    pulp_export_path: str = '/srv/exports'
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
     gitea_host: str = 'https://git.almalinux.org/api/v1/'

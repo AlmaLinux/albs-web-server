@@ -330,25 +330,24 @@ class PulpClient:
             'method': fse_method
         }
         result = await self.make_put_request(endpoint, params)
-        return result['pulp_href']
-
+        return result
 
     async def delete_filesystem_exporter(self, fse_pulp_href: str):
         result = await self.make_delete_request(fse_pulp_href)
         return result
 
-    async def export_to_filesystem(self, fse_pulp_href: str, fse_task: str,
-                                   fse_publication: str,
+    async def export_to_filesystem(self, fse_pulp_href: str,
                                    fse_repository_version: str):
-        endpoint = urllib.parse.urljoin(repo_to, 'exports/')
-
+        endpoint = urllib.parse.urljoin(fse_pulp_href, 'exports/')
+        print('AAAAA')
         params = {
-            'task': fse_task,
-            'publication': fse_publication,
             'repository_version': fse_repository_version
         }
+        print(endpoint)
+        print(params)
+        print('BBBBB')
         result = await self.make_post_request(endpoint, params)
-        return result['task']
+        return result
 
     async def get_distro(self, distro_href: str):
         return await self.make_get_request(distro_href)
@@ -375,6 +374,8 @@ class PulpClient:
             async with aiohttp.ClientSession(auth=self._auth) as session:
                 async with session.post(full_url, json=data, headers=headers) as response:
                     json = await response.json(content_type=None)
+                    import pprint
+                    pprint.pprint(json)
                     response.raise_for_status()
                     return json
 
