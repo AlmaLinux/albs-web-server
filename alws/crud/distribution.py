@@ -13,7 +13,6 @@ from alws.utils.distro_utils import create_empty_repo
 from alws.utils.pulp_client import PulpClient
 
 
-
 async def create_distro(
         db: Session,
         distribution: distro_schema.DistroCreate
@@ -64,8 +63,10 @@ async def add_distributions_after_rebuild(
     build_query = select(models.Build).where(
         models.Build.id == subquery,
     ).options(
-        selectinload(
-            models.Build.tasks).selectinload(models.BuildTask.artifacts),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.artifacts),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.rpm_module),
     )
     db_build = await db.execute(build_query)
     db_build = db_build.scalars().first()
@@ -107,6 +108,15 @@ async def prepare_repo_modify_dict(db_build: models.Build,
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
             continue
+        if task.rpm_module:
+            for distro_repo in db_distro.repositories:
+                conditions = [
+                    distro_repo.arch == task.arch,
+                    not distro_repo.debug
+                ]
+                if all(conditions):
+                    modify[distro_repo.pulp_href].append(
+                        task.rpm_module.pulp_href)
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
@@ -138,9 +148,12 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         db_build = await db.execute(select(models.Build).where(
             models.Build.id.__eq__(build_id)
-        ).options(selectinload(models.Build.tasks).selectinload(
-                  models.BuildTask.artifacts))
-        )
+        ).options(
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.artifacts),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_module)
+        ))
         db_build = db_build.scalars().first()
 
         pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
