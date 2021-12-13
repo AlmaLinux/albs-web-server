@@ -36,6 +36,8 @@ async def build_done(
         await build_node.build_done(db, build_done_)
     except AlreadyBuiltError:
         response.status_code = status.HTTP_409_CONFLICT
+    except Exception:
+        pass
     # need add some logic after discussing with team
     # await crud.add_distributions_after_rebuild(db, build_done)
     if build_done_.status == 'done':
