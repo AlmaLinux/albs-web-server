@@ -339,13 +339,9 @@ class PulpClient:
     async def export_to_filesystem(self, fse_pulp_href: str,
                                    fse_repository_version: str):
         endpoint = urllib.parse.urljoin(fse_pulp_href, 'exports/')
-        print('AAAAA')
         params = {
             'repository_version': fse_repository_version
         }
-        print(endpoint)
-        print(params)
-        print('BBBBB')
         result = await self.make_post_request(endpoint, params)
         return result
 
