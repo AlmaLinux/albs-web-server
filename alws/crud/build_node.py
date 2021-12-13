@@ -189,7 +189,8 @@ async def build_done(
         build_task.arch == 'x86_64',
         status == BuildTaskStatus.COMPLETED,
         bool(settings.beholder_host),
-        bool(settings.beholder_token),
+        # TODO: Beholder doesn't have authorization right now
+        # bool(settings.beholder_token),
     )
     if all(multilib_conditions):
         src_rpm = next(
