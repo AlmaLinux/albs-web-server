@@ -94,7 +94,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'repositories': prod_repos
         }
 
-    beholder_response = await BeholderClient(settings.packages_beholder_host).post(
+    beholder_response = await BeholderClient(settings.beholder_host).post(
         endpoint, src_rpm_names)
     if beholder_response.get('packages', []):
         for package in pulp_packages:

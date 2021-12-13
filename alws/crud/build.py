@@ -111,9 +111,8 @@ async def get_builds(
         if search_params.released is not None:
             query = query.filter(
                 models.Build.released == search_params.released)
-        # TODO: uncomment when sign node will be implement
-        # if search_params.signed is not None:
-        #     query = query.filter(models.Build.signed == search_params.signed)
+        if search_params.signed is not None:
+            query = query.filter(models.Build.signed == search_params.signed)
     result = await db.execute(query)
     if build_id:
         return result.scalars().first()
