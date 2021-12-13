@@ -61,3 +61,8 @@ async def get_user(
         query = models.User.email == user_email
     db_user = await db.execute(select(models.User).where(query))
     return db_user.scalars().first()
+
+
+async def get_all_users(db: Session) -> typing.List[models.User]:
+    db_users = await db.execute(select(models.User))
+    return db_users.scalars().all()

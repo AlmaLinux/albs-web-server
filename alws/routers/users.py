@@ -56,4 +56,4 @@ async def get_user(
     response_model=typing.List[user_schema.User],
 )
 async def get_all_users(db: database.Session = Depends(get_db)):
-    return await crud.get_all_users(db)
+    return await user_crud.get_all_users(db)
