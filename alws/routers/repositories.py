@@ -30,10 +30,10 @@ async def get_repository(repository_id: int, db: database.Session = Depends(get_
     return None
 
 
-@router.post('/exports/', response_model=typing.List[int])
+@router.post('/exports/', response_model=typing.List[str])
 async def fs_export_repository(repository_ids: list,
                                db: database.Session = Depends(get_db)):
     export_task = await repo_exporter.create_pulp_exporters_to_fs(
         db, repository_ids)
-    await repo_exporter.execute_pulp_exporters_to_fs(db, export_task)
-    return export_task
+    export_pashs = await repo_exporter.execute_pulp_exporters_to_fs(db, export_task)
+    return export_pashs
