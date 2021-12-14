@@ -1,5 +1,5 @@
 fastapi[all]==0.70.0
-uvicorn==0.16.0
+uvicorn==0.15.0
 asyncpg==0.25.0
 psycopg2-binary==2.9.2
 pydantic==1.8.2
