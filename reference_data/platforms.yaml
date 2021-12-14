@@ -125,14 +125,32 @@
       production: false
       debug: false
     - arch: ppc64le
+      name: centos-83-baseos
+      remote_url: https://vault.centos.org/8.3.2011/BaseOS/ppc64le/os/
+      type: rpm
+      production: false
+      debug: false
+    - arch: ppc64le
       name: centos-8-appstream
       remote_url: http://centos.osuosl.org/8/AppStream/ppc64le/os/
       type: rpm
       production: false
       debug: false
     - arch: ppc64le
+      name: centos-83-appstream
+      remote_url: https://vault.centos.org/8.3.2011/AppStream/ppc64le/os/
+      type: rpm
+      production: false
+      debug: false
+    - arch: ppc64le
       name: centos-8-powertools
       remote_url: http://centos.osuosl.org/8/PowerTools/ppc64le/os/
+      type: rpm
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-83-powertools
+      remote_url: https://vault.centos.org/8.3.2011/PowerTools/ppc64le/os/
       type: rpm
       production: false
       debug: false
