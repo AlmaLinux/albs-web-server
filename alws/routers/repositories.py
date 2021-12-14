@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 
 from alws import database
 from alws.crud import repository
+from alws.crud import repo_exporter
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import repository_schema
 
@@ -32,6 +33,7 @@ async def get_repository(repository_id: int, db: database.Session = Depends(get_
 @router.post('/exports/', response_model=typing.List[int])
 async def fs_export_repository(repository_ids: list,
                                db: database.Session = Depends(get_db)):
-    export_task = await crud.create_pulp_exporters_to_fs(db, repository_ids)
-    await crud.execute_pulp_exporters_to_fs(db, export_task)
+    export_task = await repo_exporter.create_pulp_exporters_to_fs(
+        db, repository_ids)
+    await repo_exporter.execute_pulp_exporters_to_fs(db, export_task)
     return export_task
