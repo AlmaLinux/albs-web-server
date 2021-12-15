@@ -84,7 +84,7 @@ class RpmArtifact(BaseModel):
         result = re.search(regex, artifact)
         if not result:
             return None
-        return RpmArtifact(**result.groupdict(), source=artifact)
+        return RpmArtifact(**result.groupdict())
 
 
 class ModuleWrapper:
@@ -171,8 +171,14 @@ class ModuleWrapper:
                 if arch in arch_list:
                     component.add_restricted_arch(arch)
 
-    def add_rpm_artifact(self, artifact: str):
-        artifact = RpmArtifact.from_str(artifact).as_artifact()
+    def add_rpm_artifact(self, rpm_pkg: dict):
+        artifact = RpmArtifact(
+            name=rpm_pkg['name'],
+            epoch=int(rpm_pkg['epoch']),
+            version=rpm_pkg['version'],
+            release=rpm_pkg['release'],
+            arch=rpm_pkg['arch']
+        ).as_artifact()
         if not self.is_artifact_filtered(artifact):
             self._stream.add_rpm_artifact(artifact)
 
