@@ -136,8 +136,8 @@ services:
     env_file:
       - vars.env
     build:
-      context: ./alws/scripts
-      dockerfile: albs-gitea-listener/Dockerfile
+      context: .
+      dockerfile: Dockerfile.gitea-listener
     restart: on-failure
     depends_on:
       - mosquitto
@@ -148,7 +148,7 @@ services:
       - vars.env
     build:
       context: .
-      dockerfile: alws/scripts/git_cacher/Dockerfile
+      dockerfile: Dockerfile.git-cacher
     restart: on-failure
     depends_on:
       - redis
