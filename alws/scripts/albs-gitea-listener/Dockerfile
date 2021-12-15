@@ -10,5 +10,6 @@ RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY ./albs-gitea-listener/* /code/
 COPY ./git_cacher/git_cacher.py /code/
+COPY ./alws /code/alws
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && python gitea_listener.py"]
