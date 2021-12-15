@@ -345,6 +345,10 @@ class PulpClient:
         result = await self.make_post_request(endpoint, params)
         return result
 
+    async def get_repo_latest_version(self, repo_href: str):
+        repository_data = await self.make_get_request(repo_href)
+        return repository_data.get('latest_version_href')
+
     async def get_distro(self, distro_href: str):
         return await self.make_get_request(distro_href)
 

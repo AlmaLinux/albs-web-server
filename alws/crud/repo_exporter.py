@@ -1,7 +1,7 @@
 import datetime
 import logging
 import typing
-from pathlib import PurePath
+from pathlib import Path
 
 import sqlalchemy
 from sqlalchemy import update, delete, insert
@@ -50,23 +50,25 @@ async def create_pulp_exporters_to_fs(db: Session,
                 status=0))
         export_task_pk = et_inserted.inserted_primary_key[0]
         response = await db.execute(query)
-        for repo in response.scalars().all():
-            export_path = str(PurePath(settings.pulp_export_path,
-                                       generate_repository_path(
-                                           export_task_pk, repo.name,
-                                           repo.arch, repo.debug)))
-            fs_exporter_href = await pulp_client.create_filesystem_exporter(
-                repo.name, export_path)
-            export_repos.append({
-                'path': export_path,
-                'exported_id': export_task_pk,
-                'repository_id': repo.id,
-                'fs_exporter_href': fs_exporter_href
-            })
-        if export_repos:
+        await db.commit()
+    for repo in response.scalars().all():
+        export_path = str(Path(settings.pulp_export_path,
+                               generate_repository_path(
+                                   export_task_pk, repo.name,
+                                   repo.arch, repo.debug)))
+        fs_exporter_href = await pulp_client.create_filesystem_exporter(
+            repo.name, export_path)
+        export_repos.append({
+            'path': export_path,
+            'exported_id': export_task_pk,
+            'repository_id': repo.id,
+            'fs_exporter_href': fs_exporter_href
+        })
+    if export_repos:
+        async with db.begin():
             await db.execute(
                 insert(models.RepoExporter), export_repos)
-        await db.commit()
+            await db.commit()
     return export_task_pk
 
 
@@ -87,15 +89,17 @@ async def execute_pulp_exporters_to_fs(db: Session,
                 models.ExportTask.id == export_id).values(exported_at=now,
                                                           status=1))
         response = await db.execute(query)
-        exported_paths = []
-        for fs_exporter_href, fse_path, pulp_href in response:
-            repository_data = await pulp_client.make_get_request(pulp_href)
-            latest_version_href = repository_data.get('latest_version_href')
-            fse_task = await pulp_client.export_to_filesystem(
-                fs_exporter_href, latest_version_href)
-            await pulp_client.wait_for_task(fse_task['task'])
-            exported_paths.append(fse_path)
-            await pulp_client.delete_filesystem_exporter(fs_exporter_href)
+        await db.commit()
+    exported_paths = []
+    for fs_exporter_href, fse_path, pulp_href in response:
+        latest_version_href = await pulp_client.get_repo_latest_version(
+            pulp_href)
+        fse_task = await pulp_client.export_to_filesystem(
+            fs_exporter_href, latest_version_href)
+        await pulp_client.wait_for_task(fse_task['task'])
+        exported_paths.append(fse_path)
+        await pulp_client.delete_filesystem_exporter(fs_exporter_href)
+    async with db.begin():
         await db.execute(
             update(models.ExportTask).where(
                 models.ExportTask.id == export_id).values(exported_at=now,
