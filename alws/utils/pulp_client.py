@@ -10,6 +10,9 @@ import aiohttp
 from alws.utils.modularity import ModuleWrapper, get_random_unique_version
 
 
+PULP_SEMAPHORE = asyncio.Semaphore(10)
+
+
 class PulpClient:
 
     def __init__(self, host: str, username: str, password: str):
@@ -326,35 +329,37 @@ class PulpClient:
     async def make_post_request(self, endpoint: str, data: Optional[dict],
                                 headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.post(full_url, json=data, headers=headers) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
+        async with PULP_SEMAPHORE:
+            async with aiohttp.ClientSession(auth=self._auth) as session:
+                async with session.post(full_url, json=data, headers=headers) as response:
+                    json = await response.json(content_type=None)
+                    response.raise_for_status()
+                    return json
 
     async def make_put_request(self, endpoint: str, data: Optional[dict],
                                headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            # TODO: data/json
-            async with session.put(full_url, data=data, headers=headers) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
+        async with PULP_SEMAPHORE:
+            async with aiohttp.ClientSession(auth=self._auth) as session:
+                async with session.put(full_url, data=data, headers=headers) as response:
+                    json = await response.json(content_type=None)
+                    response.raise_for_status()
+                    return json
 
     async def make_patch_request(self, endpoint: str, data: Optional[dict],
                                  headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            # TODO: data/json
-            async with session.patch(full_url, data=data, headers=headers) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
+        async with PULP_SEMAPHORE:
+            async with aiohttp.ClientSession(auth=self._auth) as session:
+                async with session.patch(full_url, data=data, headers=headers) as response:
+                    json = await response.json(content_type=None)
+                    response.raise_for_status()
+                    return json
 
     async def make_delete_request(self, endpoint: str):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.delete(full_url) as response:
-                json = await response.json(content_type=None)
-                return json
+        async with PULP_SEMAPHORE:
+            async with aiohttp.ClientSession(auth=self._auth) as session:
+                async with session.delete(full_url) as response:
+                    json = await response.json(content_type=None)
+                    return json
