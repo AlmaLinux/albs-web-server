@@ -40,8 +40,16 @@ class TaskPlatform(BaseModel):
 
     def add_mock_options(self, options):
         for k, v in options.items():
-            if k in ('module_enable', 'target_arch'):
+            if k == 'target_arch':
                 self.data['mock'][k] = v
+            elif k == 'module_enable':
+                if not self.data['mock'].get(k):
+                    self.data['mock'][k] = []
+                if isinstance(v, list):
+                    self.data['mock'][k].extend(v)
+                else:
+                    self.data['mock'][k].append(v)
+                self.data['mock'][k] = list(set(self.data['mock'][k]))
             elif k == 'yum_exclude':
                 old_exclude = self.data['yum'].get('exclude', '')
                 self.data['yum']['exclude'] = f'{old_exclude} {" ".join(v)}'

@@ -127,9 +127,9 @@ class ModuleWrapper:
         # xmd['mbs']['buildrequires'] section first
         xmd = self._stream.get_xmd()
         if xmd:
-            build_deps = xmd.get('mbs', {}).get('buildrequires')
-            if build_deps:
-                return build_deps
+            mbs_build_deps = xmd.get('mbs', {}).get('buildrequires')
+            if mbs_build_deps:
+                return mbs_build_deps
         # convert dependencies['buildrequires'] to the xmd-like format
         for deps in self._stream.get_dependencies():
             for name in deps.get_buildtime_modules():
