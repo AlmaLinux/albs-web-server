@@ -172,7 +172,9 @@ class BuildPlanner:
                         modularity_version['version_prefix'])
                 module.context = module.generate_new_context()
                 module.arch = arch
-                module.set_arch_list(platform.arch_list)
+                module.set_arch_list(
+                    self._request_platforms[platform.name]
+                )
                 module_pulp_href, sha256 = await pulp_client.create_module(
                     module.render())
                 db_module = models.RpmModule(

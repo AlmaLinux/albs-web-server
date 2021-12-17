@@ -165,11 +165,9 @@ class ModuleWrapper:
     def set_arch_list(self, arch_list: typing.List[str]):
         for component_name in self._stream.get_rpm_component_names():
             component = self._stream.get_rpm_component(component_name)
-            arches = component.get_arches()[:]
             component.reset_arches()
-            for arch in arches:
-                if arch in arch_list:
-                    component.add_restricted_arch(arch)
+            for arch in arch_list:
+                component.add_restricted_arch(arch)
 
     def add_rpm_artifact(self, rpm_pkg: dict):
         artifact = RpmArtifact(
