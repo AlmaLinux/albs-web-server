@@ -193,6 +193,10 @@ class ModuleWrapper:
         ]
         yield from sorted(components, key=lambda i: i[1].get_buildorder())
 
+    def set_component_ref(self, component_name, ref):
+        component = self._stream.get_rpm_component(component_name)
+        component.set_ref(ref)
+
     def iter_mock_definitions(self):
         buildopts = self._stream.get_buildopts()
         if buildopts is None:

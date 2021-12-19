@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     pulp_password: str = 'admin'
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
+    gitea_host: str = 'https://git.almalinux.org/api/v1/'
 
     package_beholder_enabled: bool = True
     beholder_host: typing.Optional[str]

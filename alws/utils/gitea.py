@@ -73,6 +73,10 @@ class GiteaClient:
         endpoint = f'repos/{repo}/branches'
         return await self._list_all_pages(endpoint)
 
+    async def get_branch(self, repo: str, branch: str) -> typing.Dict:
+        endpoint = f'repos/{repo}/branches/{branch}'
+        return await self.make_request(endpoint)
+
     async def index_repo(self, repo_name: str):
         tags = await self.list_tags(repo_name)
         branches = await self.list_branches(repo_name)

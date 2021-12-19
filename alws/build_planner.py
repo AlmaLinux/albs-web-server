@@ -1,4 +1,5 @@
 import yaml
+import logging
 import asyncio
 import typing
 import collections
@@ -14,7 +15,7 @@ from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.modularity import ModuleWrapper, calc_dist_macro
-from alws.utils.gitea import download_modules_yaml
+from alws.utils.gitea import download_modules_yaml, GiteaClient
 
 
 __all__ = ['BuildPlanner']
@@ -29,6 +30,10 @@ class BuildPlanner:
                 platforms: typing.List[build_schema.BuildCreatePlatforms]
             ):
         self._db = db
+        self._gitea_client = GiteaClient(
+            settings.gitea_host,
+            logging.getLogger(__name__)
+        )
         self._build = models.Build(user_id=user_id)
         self._task_index = 0
         self._request_platforms = {
@@ -208,7 +213,6 @@ class BuildPlanner:
             name=task.git_repo_name,
             stream=task.module_stream_from_ref()
         )
-        template = module.render()
         result = []
         # TODO: we should rethink schema for multiple platforms
         #       right now there is no option to create tasks with different
@@ -220,12 +224,21 @@ class BuildPlanner:
             ref_prefix = platform_prefix_list['non_modified']
             if await self.is_ref_modified(platform, component_name):
                 ref_prefix = platform_prefix_list['modified']
+            git_ref = f'{ref_prefix}-stream-{module.stream}'
             result.append(models.BuildTaskRef(
                 url=f'{platform_packages_git}{component_name}.git',
-                git_ref=f'{ref_prefix}-stream-{module.stream}',
+                git_ref=git_ref,
                 ref_type=BuildTaskRefType.GIT_BRANCH
             ))
-        return result, template
+            ref = await self.get_ref_commit_id(component_name, git_ref)
+            module.set_component_ref(component_name, ref)
+        return result, module.render()
+
+    async def get_ref_commit_id(self, git_name, git_branch):
+        response = await self._gitea_client.get_branch(
+            f'rpms/{git_name}', git_branch
+        )
+        return response['commit']['id']
 
     async def is_ref_modified(self, platform: models.Platform, ref: str):
         if self._module_modified_cache.get(platform.name):
