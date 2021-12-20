@@ -321,7 +321,8 @@ class PulpClient:
         return result['pulp_href']
 
     async def update_filesystem_exporter(self, fse_pulp_href: str,
-                                         fse_name: str, fse_path: str,
+                                         fse_name: str,
+                                         fse_path: str,
                                          fse_method: str='write'):
         endpoint = fse_pulp_href
         params = {
@@ -329,11 +330,26 @@ class PulpClient:
             'path': fse_path,
             'method': fse_method
         }
-        result = await self.make_put_request(endpoint, params)
-        return result
+        update_task = await self.make_put_request(endpoint, params)
+        task_result = await self.wait_for_task(update_task['task'])
+        return task_result
 
     async def delete_filesystem_exporter(self, fse_pulp_href: str):
-        result = await self.make_delete_request(fse_pulp_href)
+        delete_task = await self.make_delete_request(fse_pulp_href)
+        task_result = await self.wait_for_task(delete_task['task'])
+        return task_result
+
+    async def list_filesystem_exporters(self):
+        endpoint = 'pulp/api/v3/exporters/core/filesystem/'
+        result = await self.make_get_request(endpoint)
+        if result['count'] > 0:
+            return result['results']
+        else:
+            return []
+
+    async def get_filesystem_exporter(self, fse_pulp_href : str):
+        endpoint = fse_pulp_href
+        result = await self.make_get_request(endpoint)
         return result
 
     async def export_to_filesystem(self, fse_pulp_href: str,

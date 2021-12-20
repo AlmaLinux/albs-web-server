@@ -35,6 +35,6 @@ async def fs_export_repository(repository_ids: list,
                                db: database.Session = Depends(get_db)):
     export_task = await repo_exporter.create_pulp_exporters_to_fs(
         db, repository_ids)
-    export_pashs = await repo_exporter.execute_pulp_exporters_to_fs(
+    export_paths = await repo_exporter.execute_pulp_exporters_to_fs(
         db, export_task)
-    return export_pashs
+    return export_paths
