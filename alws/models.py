@@ -522,6 +522,7 @@ class RepoExporter(Base):
         sqlalchemy.ForeignKey('repositories.id'),
         nullable=False
     )
+    repository = relationship('Repository')
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 

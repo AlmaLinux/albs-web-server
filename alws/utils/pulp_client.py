@@ -323,7 +323,7 @@ class PulpClient:
     async def update_filesystem_exporter(self, fse_pulp_href: str,
                                          fse_name: str,
                                          fse_path: str,
-                                         fse_method: str='write'):
+                                         fse_method: str='hardlink'):
         endpoint = fse_pulp_href
         params = {
             'name': fse_name,
@@ -390,8 +390,6 @@ class PulpClient:
             async with aiohttp.ClientSession(auth=self._auth) as session:
                 async with session.post(full_url, json=data, headers=headers) as response:
                     json = await response.json(content_type=None)
-                    import pprint
-                    pprint.pprint(json)
                     response.raise_for_status()
                     return json
 
