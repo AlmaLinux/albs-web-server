@@ -17,7 +17,10 @@ class AltsClient:
                             dist_arch: str, package_name: str,
                             package_version: str, callback_href: str,
                             package_release: str = None,
-                            repositories: typing.List[dict] = None):
+                            repositories: typing.List[dict] = None,
+                            module_name: str = None,
+                            module_stream: str = None,
+                            module_version: str = None):
         if package_release:
             full_version = f'{package_version}-{package_release}'
         else:
@@ -31,9 +34,14 @@ class AltsClient:
             'package_version': full_version,
             'callback_href': callback_href,
         }
+        if module_name and module_stream and module_version:
+            payload['module_name'] = module_name
+            payload['module_stream'] = module_stream
+            payload['module_version'] = module_version
         if repositories:
             payload['repositories'] = repositories
 
+        print(f'TS payload: {payload}')
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:
             async with session.post(full_url, json=payload) as response:

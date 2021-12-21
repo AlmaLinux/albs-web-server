@@ -118,6 +118,8 @@ async def complete_test_task(db: Session, task_id: int,
                     log['name'], log['href'], task.repository.pulp_href)
             else:
                 href = log['href']
+            if not href:
+                continue
             log_record = models.TestTaskArtifact(
                 name=log['name'], href=href, test_task_id=task.id)
             logs.append(log_record)

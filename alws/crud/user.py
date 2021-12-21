@@ -10,7 +10,6 @@ from alws.utils.github import get_user_github_token, get_github_user_info
 from alws.utils.jwt_utils import generate_JWT_token
 
 
-
 async def github_login(
             db: Session,
             user: user_schema.LoginGithub

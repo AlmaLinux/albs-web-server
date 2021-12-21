@@ -38,7 +38,9 @@ class TestTaskScheduler(threading.Thread):
                     models.BuildTask.build).selectinload(
                     models.Build.linked_builds),
                 selectinload(models.TestTask.build_task).selectinload(
-                    models.BuildTask.platform)
+                    models.BuildTask.platform),
+                selectinload(models.TestTask.build_task).selectinload(
+                    models.BuildTask.rpm_module),
             ).limit(10)
         )
         tasks = tasks_query.scalars()
@@ -47,14 +49,19 @@ class TestTaskScheduler(threading.Thread):
             task.status = TestTaskStatus.STARTED
             repositories = [{'name': item.name, 'baseurl': item.url}
                             for item in task.build_task.build.repos
-                            if item.type == 'rpm']
+                            if item.type == 'rpm'
+                            and item.arch == task.env_arch]
             for build in task.build_task.build.linked_builds:
                 rpm_repos = [{'name': item.name, 'baseurl': item.url}
                              for item in build.repos
                              if item.type == 'rpm'
-                             and item.arch == task.build_task.arch]
+                             and item.arch == task.env_arch]
                 repositories.extend(rpm_repos)
             platform = task.build_task.platform
+            module_info = task.build_task.rpm_module
+            module_name = module_info.name if module_info else None
+            module_stream = module_info.stream if module_info else None
+            module_version = module_info.version if module_info else None
             try:
                 logging.debug(f'Scheduling testing for {task.package_name}-'
                               f'{task.package_version}-{task.package_release}')
@@ -63,7 +70,8 @@ class TestTaskScheduler(threading.Thread):
                     platform.test_dist_name, platform.distr_version,
                     task.env_arch, task.package_name, task.package_version,
                     callback_href, package_release=task.package_release,
-                    repositories=repositories)
+                    repositories=repositories, module_name=module_name,
+                    module_stream=module_stream, module_version=module_version)
                 updated_tasks.append(task)
                 logging.debug(f'Got response from ALTS: {response}')
             except Exception as e:

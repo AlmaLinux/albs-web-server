@@ -30,17 +30,20 @@ async def modify_platform(
             if value is not None:
                 setattr(db_platform, key, value)
         db_repos = {repo.name: repo for repo in db_platform.repos}
-        new_repos = {repo.name: repo for repo in platform.repos}
-        for repo in platform.repos:
-            if repo.name in db_repos:
-                db_repo = db_repos[repo.name]
-                for key in repo.dict().keys():
-                    setattr(db_repo, key, getattr(repo, key))
-            else:
-                db_platform.repos.append(models.Repository(**repo.dict()))
+        payload_repos = getattr(platform, 'repos', None)
+        new_repos = {}
+        if payload_repos:
+            new_repos = {repo.name: repo for repo in platform.repos}
+            for repo in platform.repos:
+                if repo.name in db_repos:
+                    db_repo = db_repos[repo.name]
+                    for key in repo.dict().keys():
+                        setattr(db_repo, key, getattr(repo, key))
+                else:
+                    db_platform.repos.append(models.Repository(**repo.dict()))
         to_remove = []
         for repo_name in db_repos:
-            if repo_name not in new_repos:
+            if new_repos and repo_name not in new_repos:
                 to_remove.append(repo_name)
         remove_query = models.Repository.name.in_(to_remove)
         await db.execute(
