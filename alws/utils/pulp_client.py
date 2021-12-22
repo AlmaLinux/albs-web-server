@@ -358,8 +358,9 @@ class PulpClient:
         params = {
             'repository_version': fse_repository_version
         }
-        result = await self.make_post_request(endpoint, params)
-        return result
+        fse_task = await self.make_post_request(endpoint, params)
+        await pulp_client.wait_for_task(fse_task['task'])
+        return fse_repository_version
 
     async def get_repo_latest_version(self, repo_href: str):
         repository_data = await self.make_get_request(repo_href)
