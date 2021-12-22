@@ -12,7 +12,7 @@ AlmaLinux Build System Web-Server (albs-web-server) is designed to control multi
 * Web-server works with `gitea_listener`, `git_cacher` and Pulp.
 
 Mentioned tools and libraries are required for ALBS Web-Server to run in the current state:
-* PostgreSQL == 13 - database
+* PostgreSQL 13 - database
 * Pulp - artifacts storage (packages, repositories, distributions, etc.)
 * Redis - storage for source repositories info and frontend info cache
 * Nginx
@@ -21,7 +21,6 @@ Mentioned tools and libraries are required for ALBS Web-Server to run in the cur
 * Python 3.9
 * FastAPI - REST API framework
 * SQLAlchemy - database ORM
-* PostgreSQL 13 - database
 * Alembic - database schema migration tool;
 
 # Config 
