@@ -21,11 +21,11 @@ async def get_releases(db: database.Session = Depends(get_db)):
 
 
 @router.post('/new/', response_model=release_schema.Release)
-async def create_new_release(builds: release_schema.ReleaseCreate,
+async def create_new_release(payload: release_schema.ReleaseCreate,
                              db: database.Session = Depends(get_db),
                              user: dict = Depends(JWTBearer())):
     release = await r_crud.create_new_release(
-        db, user['identity']['user_id'], builds)
+        db, user['identity']['user_id'], payload)
     return release
 
 

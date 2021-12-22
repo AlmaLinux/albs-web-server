@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
 
     package_beholder_enabled: bool = True
-    beholder_host: typing.Optional[str]
+    beholder_host: typing.Optional[str] = 'http://beholder-web:5000'
     beholder_token: typing.Optional[str]
 
     redis_url: str = 'redis://redis:6379'
