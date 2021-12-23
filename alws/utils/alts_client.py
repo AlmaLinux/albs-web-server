@@ -41,7 +41,6 @@ class AltsClient:
         if repositories:
             payload['repositories'] = repositories
 
-        print(f'TS payload: {payload}')
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:
             async with session.post(full_url, json=payload) as response:

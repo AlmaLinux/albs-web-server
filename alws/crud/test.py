@@ -15,23 +15,22 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
-    async with db.begin():
-        build_task_query = await db.execute(
-            select(models.BuildTask).where(
-                models.BuildTask.id == build_task_id)
-            .options(selectinload(models.BuildTask.artifacts))
-        )
-        build_task = build_task_query.scalars().first()
+    build_task_query = await db.execute(
+        select(models.BuildTask).where(
+            models.BuildTask.id == build_task_id)
+        .options(selectinload(models.BuildTask.artifacts))
+    )
+    build_task = build_task_query.scalars().first()
 
-        latest_revision_query = select(
-            func.max(models.TestTask.revision)).filter(
-            models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(latest_revision_query)
-        latest_revision = result.scalars().first()
-        if latest_revision:
-            new_revision = latest_revision + 1
-        else:
-            new_revision = 1
+    latest_revision_query = select(
+        func.max(models.TestTask.revision)).filter(
+        models.TestTask.build_task_id == build_task_id)
+    result = await db.execute(latest_revision_query)
+    latest_revision = result.scalars().first()
+    if latest_revision:
+        new_revision = latest_revision + 1
+    else:
+        new_revision = 1
 
     # Create logs repository
     repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
@@ -42,15 +41,13 @@ async def create_test_tasks(db: Session, build_task_id: int):
         name=repo_name, url=repo_url, arch=build_task.arch,
         pulp_href=repo_href, type='test_log', debug=False
     )
-    async with db.begin():
-        db.add(repository)
-        await db.commit()
+    db.add(repository)
+    await db.commit()
 
-    async with db.begin():
-        r_query = select(models.Repository).where(
-            models.Repository.name == repo_name)
-        results = await db.execute(r_query)
-        repository = results.scalars().first()
+    r_query = select(models.Repository).where(
+        models.Repository.name == repo_name)
+    results = await db.execute(r_query)
+    repository = results.scalars().first()
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -70,9 +67,8 @@ async def create_test_tasks(db: Session, build_task_id: int):
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
-    async with db.begin():
-        db.add_all(test_tasks)
-        await db.commit()
+    db.add_all(test_tasks)
+    await db.commit()
 
 
 async def restart_build_tests(db: Session, build_id: int):
