@@ -15,6 +15,7 @@ from alws.errors import (
     DistributionError,
 )
 from alws.config import settings
+from alws.constants import ExportStatus
 
 from alws.schemas import (
     build_schema, user_schema, platform_schema, build_node_schema,
@@ -45,7 +46,7 @@ async def create_pulp_exporters_to_fs(db: Session,
     async with db.begin():
         et_inserted = await db.execute(
             insert(models.ExportTask).values(
-                name=export_name, status=0)
+                name=export_name, status=ExportStatus.NEW)
         )
         export_task_pk = et_inserted.inserted_primary_key[0]
         response = await db.execute(query)
@@ -89,8 +90,8 @@ async def execute_pulp_exporters_to_fs(db: Session,
     async with db.begin():
         await db.execute(
             update(models.ExportTask).where(
-                models.ExportTask.id == export_id).values(exported_at=now,
-                                                          status=1))
+                models.ExportTask.id == export_id).values(
+                exported_at=now, status=ExportStatus.IN_PROGRESS))
         response = await db.execute(query)
         await db.commit()
     exported_paths = []
@@ -104,8 +105,8 @@ async def execute_pulp_exporters_to_fs(db: Session,
     async with db.begin():
         await db.execute(
             update(models.ExportTask).where(
-                models.ExportTask.id == export_id).values(exported_at=now,
-                                                          status=3))
+                models.ExportTask.id == export_id).values(
+                exported_at=now, status=ExportStatus.COMPLETED))
         await db.commit()
     return exported_paths
 
