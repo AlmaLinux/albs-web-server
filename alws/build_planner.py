@@ -14,6 +14,7 @@ from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
+from alws.utils.parsing import parse_git_ref
 from alws.utils.modularity import ModuleWrapper, calc_dist_macro
 from alws.utils.gitea import download_modules_yaml, GiteaClient
 
@@ -258,6 +259,8 @@ class BuildPlanner:
             ref: models.BuildTaskRef,
             mock_options: typing.Optional[dict[str, typing.Any]] = None,
             ref_platform_version: typing.Optional[str] = None):
+        parsed_dist_macro = parse_git_ref('(el[\d]+_[\d]+)', ref.git_ref)
+        dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
             arch_tasks = []
             for arch in self._request_platforms[platform.name]:
@@ -282,7 +285,10 @@ class BuildPlanner:
                         build_index,
                         platform_dist
                     )
-                    mock_options['definitions']['dist'] = dist_macro
+                    if not dist_taken_by_user:
+                        mock_options['definitions']['dist'] = dist_macro
+                if not dist_taken_by_user and parsed_dist_macro:
+                    mock_options['definitions']['dist'] = parsed_dist_macro
                 build_task = models.BuildTask(
                     arch=arch,
                     platform_id=platform.id,
