@@ -9,4 +9,4 @@ def parse_git_ref(pattern : str, git_ref : str):
     if match:
         return match.groups()[-1]
     else:
-        return None
+        return
