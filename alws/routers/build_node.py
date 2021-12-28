@@ -3,6 +3,7 @@ import itertools
 from fastapi import APIRouter, Depends, Response, status
 
 from alws import database
+from alws.config import settings
 from alws.crud import build_node, test
 from alws.dependencies import get_db, JWTBearer
 from alws.errors import AlreadyBuiltError
@@ -51,12 +52,18 @@ async def get_task(
     task = await build_node.get_available_build_task(db, request)
     if not task:
         return
+    # generate full url to builted SRPM for using less memory in database
+    builted_srpm_url = task.builted_srpm_url
+    if builted_srpm_url is not None:
+        builted_srpm_url = "{}/pulp/content/builds/{}".format(
+            settings.pulp_host, task.builted_srpm_url)
     response = {
         'id': task.id,
         'arch': task.arch,
         'ref': task.ref,
         'platform': build_node_schema.TaskPlatform.from_orm(task.platform),
         'repositories': [],
+        'builted_srpm_url': builted_srpm_url,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

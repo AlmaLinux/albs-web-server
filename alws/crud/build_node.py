@@ -2,7 +2,7 @@ import datetime
 import typing
 
 import sqlalchemy
-from sqlalchemy import delete, update
+from sqlalchemy import delete, insert, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -144,6 +144,8 @@ async def build_done(
             arch = build_task.arch
             if artifact.type == 'rpm' and artifact.arch == 'src':
                 arch = artifact.arch
+            if arch == 'src' and build_task.builted_srpm_url is not None:
+                continue
             repos = list(
                 build_repo for build_repo in build_task.build.repos
                 if build_repo.arch == arch
@@ -215,7 +217,12 @@ async def build_done(
             models.BuildTaskArtifact.type == 'rpm'))
         srpm = None
         binary_rpms = []
+        srpm_href = None
         for rpm in rpms_result.scalars().all():
+            if rpm.name.endswith('.src.rpm') and (
+                    build_task.builted_srpm_url is not None):
+                srpm_href = rpm.href
+                continue
             if rpm.name.endswith('.src.rpm'):
                 srpm = models.SourceRpm()
                 srpm.artifact = rpm
@@ -225,12 +232,92 @@ async def build_done(
                 binary_rpm.artifact = rpm
                 binary_rpm.build = build_task.build
                 binary_rpms.append(binary_rpm)
+
+        # retrieve already created instance of model SourceRpm
+        if all((srpm is None,
+                srpm_href is not None,
+                build_task.builted_srpm_url is not None)):
+            srpm_artifact_ids = await db.execute(
+                select(models.BuildTaskArtifact.id).where(
+                    models.BuildTaskArtifact.href == srpm_href,
+                ),
+            )
+            srpm_artifact_ids = list(srpm_artifact_ids.scalars().all())
+            srpm = await db.execute(
+                select(models.SourceRpm).where(
+                    models.SourceRpm.artifact_id.in_(srpm_artifact_ids),
+                ),
+            )
+            srpm = srpm.scalars().first()
     if srpm:
-        db.add(srpm)
-        await db.commit()
-        await db.refresh(srpm)
+        if build_task.builted_srpm_url is None:
+            db.add(srpm)
+            await db.commit()
+            await db.refresh(srpm)
         for binary_rpm in binary_rpms:
             binary_rpm.source_rpm = srpm
 
         db.add_all(binary_rpms)
+        await db.commit()
+
+    # TODO: wrap this in whole function
+    async with db.begin():
+        uncompleted_tasks_ids = []
+        if build_task.status in (BuildTaskStatus.COMPLETED,
+                                 BuildTaskStatus.FAILED):
+            uncompleted_tasks_ids = await db.execute(
+                select(models.BuildTask.id).where(
+                    models.BuildTask.id != build_task.id,
+                    models.BuildTask.ref_id == build_task.ref_id,
+                    models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                ),
+            )
+            uncompleted_tasks_ids = list(uncompleted_tasks_ids.scalars().all())
+
+        # if SRPM doesn't builted in first arch of project,
+        # we need to stop building project
+        if build_task.status == BuildTaskStatus.FAILED and uncompleted_tasks_ids:  # noqa
+            update_query = update(models.BuildTask).where(
+                models.BuildTask.id.in_(uncompleted_tasks_ids),
+            ).values(status=BuildTaskStatus.FAILED)
+            await db.execute(update_query)
+
+            remove_query = delete(models.BuildTaskDependency).where(
+                models.BuildTaskDependency.c.build_task_dependency.in_(
+                    uncompleted_tasks_ids),
+            )
+            await db.execute(remove_query)
+
+        # if SRPM builted we need to download them
+        # from pulp repos in next tasks
+        if all((build_task.status == BuildTaskStatus.COMPLETED,
+                uncompleted_tasks_ids,
+                not build_task.builted_srpm_url)):
+            srpm_artifact = await db.execute(
+                select(models.BuildTaskArtifact).where(
+                    models.BuildTaskArtifact.build_task_id == build_task.id,
+                    models.BuildTaskArtifact.name.like("%.src.rpm"),
+                    models.BuildTaskArtifact.type == 'rpm',
+                ),
+            )
+            srpm_artifact = srpm_artifact.scalars().first()
+
+            srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
+                build_task.platform.name,
+                build_task.build_id,
+                srpm_artifact.name[0],
+                srpm_artifact.name,
+            )
+            insert_values = [
+                {'build_task_id': task_id, 'name': srpm_artifact.name,
+                 'type': 'rpm', 'href': srpm_artifact.href}
+                for task_id in uncompleted_tasks_ids
+            ]
+
+            update_query = update(models.BuildTask).where(
+                models.BuildTask.ref_id == build_task.ref_id,
+            ).values(builted_srpm_url=srpm_url)
+            await db.execute(update_query)
+            await db.execute(insert(models.BuildTaskArtifact), insert_values)
+
         await db.commit()
