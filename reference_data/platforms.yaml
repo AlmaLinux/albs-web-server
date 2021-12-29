@@ -119,48 +119,6 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: ppc64le
-      name: centos-8-baseos
-      remote_url: http://centos.osuosl.org/8/BaseOS/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-83-baseos
-      remote_url: https://vault.centos.org/8.3.2011/BaseOS/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-8-appstream
-      remote_url: http://centos.osuosl.org/8/AppStream/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-83-appstream
-      remote_url: https://vault.centos.org/8.3.2011/AppStream/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-8-powertools
-      remote_url: http://centos.osuosl.org/8/PowerTools/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-83-powertools
-      remote_url: https://vault.centos.org/8.3.2011/PowerTools/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
-      name: centos-8-highavailability
-      remote_url: http://centos.osuosl.org/8/HighAvailability/ppc64le/os/
-      type: rpm
-      production: false
-      debug: false
-    - arch: ppc64le
       name: almalinux-8-ppc64le-devel
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
