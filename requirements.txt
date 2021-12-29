@@ -7,7 +7,7 @@ SQLAlchemy==1.4.29
 aiohttp==3.8.1
 PyJWT==2.3.0
 alembic==1.7.5
-aioredis==2.0.0
+aioredis==2.0.1
 pytest==6.2.5
 jmespath==0.10.0
 pytest==6.2.5
