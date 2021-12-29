@@ -159,6 +159,7 @@ services:
       - 8081:80
     volumes:
       - "./volumes/pulp/settings:/etc/pulp"
+      - "./volumes/pulp/exports:/srv/exports"
       - "./volumes/pulp/pulp_storage:/var/lib/pulp"
       - "./volumes/pulp/pgsql:/var/lib/pgsql"
       - "./volumes/pulp/containers:/var/lib/containers"

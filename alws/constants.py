@@ -5,7 +5,8 @@ from collections import namedtuple
 
 
 __all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
-           'BuildTaskRefType', 'SignStatus', 'RepoType', 'debuginfo_regex']
+           'BuildTaskRefType', 'SignStatus', 'RepoType', 'ExportStatus',
+           'debuginfo_regex']
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -55,6 +56,13 @@ class BuildTaskRefType(enum.IntEnum):
     @classmethod
     def to_text(cls, value: int) -> str:
         return build_ref_int_mapping[value]
+
+
+class ExportStatus(enum.IntEnum):
+    NEW = 0
+    IN_PROGRESS = 1
+    COMPLETED = 2
+    FAILED = 3
 
 
 build_ref_str_mapping: typing.Dict[str, int] = {
