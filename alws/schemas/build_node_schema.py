@@ -73,7 +73,7 @@ class Task(BaseModel):
     created_by: TaskCreatedBy
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
-    builted_srpm_url: typing.Optional[str]
+    built_srpm_url: typing.Optional[str]
 
     class Config:
         orm_mode = True

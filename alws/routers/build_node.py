@@ -53,17 +53,17 @@ async def get_task(
     if not task:
         return
     # generate full url to builted SRPM for using less memory in database
-    builted_srpm_url = task.builted_srpm_url
-    if builted_srpm_url is not None:
-        builted_srpm_url = "{}/pulp/content/builds/{}".format(
-            settings.pulp_host, task.builted_srpm_url)
+    built_srpm_url = task.built_srpm_url
+    if built_srpm_url is not None:
+        built_srpm_url = "{}/pulp/content/builds/{}".format(
+            settings.pulp_host, task.built_srpm_url)
     response = {
         'id': task.id,
         'arch': task.arch,
         'ref': task.ref,
         'platform': build_node_schema.TaskPlatform.from_orm(task.platform),
         'repositories': [],
-        'builted_srpm_url': builted_srpm_url,
+        'built_srpm_url': built_srpm_url,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

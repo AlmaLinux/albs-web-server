@@ -144,7 +144,7 @@ async def build_done(
             arch = build_task.arch
             if artifact.type == 'rpm' and artifact.arch == 'src':
                 arch = artifact.arch
-            if arch == 'src' and build_task.builted_srpm_url is not None:
+            if arch == 'src' and build_task.built_srpm_url is not None:
                 continue
             repos = list(
                 build_repo for build_repo in build_task.build.repos
@@ -220,7 +220,7 @@ async def build_done(
         srpm_href = None
         for rpm in rpms_result.scalars().all():
             if rpm.name.endswith('.src.rpm') and (
-                    build_task.builted_srpm_url is not None):
+                    build_task.built_srpm_url is not None):
                 srpm_href = rpm.href
                 continue
             if rpm.name.endswith('.src.rpm'):
@@ -236,7 +236,7 @@ async def build_done(
         # retrieve already created instance of model SourceRpm
         if all((srpm is None,
                 srpm_href is not None,
-                build_task.builted_srpm_url is not None)):
+                build_task.built_srpm_url is not None)):
             srpm_artifact_ids = await db.execute(
                 select(models.BuildTaskArtifact.id).where(
                     models.BuildTaskArtifact.href == srpm_href,
@@ -250,7 +250,7 @@ async def build_done(
             )
             srpm = srpm.scalars().first()
     if srpm:
-        if build_task.builted_srpm_url is None:
+        if build_task.built_srpm_url is None:
             db.add(srpm)
             await db.commit()
             await db.refresh(srpm)
@@ -292,7 +292,7 @@ async def build_done(
         # from pulp repos in next tasks
         if all((build_task.status == BuildTaskStatus.COMPLETED,
                 uncompleted_tasks_ids,
-                not build_task.builted_srpm_url)):
+                not build_task.built_srpm_url)):
             srpm_artifact = await db.execute(
                 select(models.BuildTaskArtifact).where(
                     models.BuildTaskArtifact.build_task_id == build_task.id,
@@ -316,7 +316,7 @@ async def build_done(
 
             update_query = update(models.BuildTask).where(
                 models.BuildTask.ref_id == build_task.ref_id,
-            ).values(builted_srpm_url=srpm_url)
+            ).values(built_srpm_url=srpm_url)
             await db.execute(update_query)
             await db.execute(insert(models.BuildTaskArtifact), insert_values)
 
