@@ -152,3 +152,23 @@ class BuildsResponse(BaseModel):
     builds: typing.List[Build]
     total_builds: typing.Optional[int]
     current_page: typing.Optional[int]
+
+
+class ModulePreiewRequest(BaseModel):
+
+    ref: BuildTaskRef
+    platform_name: str
+
+
+class ModuleRef(BaseModel):
+
+    url: str
+    git_ref: str
+    exist: bool
+    mock_options: dict
+
+
+class ModulePreview(BaseModel):
+
+    refs: typing.List[ModuleRef]
+    modules_yaml: str

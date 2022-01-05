@@ -117,19 +117,19 @@ services:
     depends_on:
       - web_server
 
-  sign_node:
-    image: sign-node:latest
-    env_file:
-      - vars.env
-    build:
-      context: ../albs-sign-node
-      dockerfile: Dockerfile
-    volumes:
-      # TODO: Hack for developement, put placeholder here instead
-      - "../albs-sign-node/node-config:/home/alt/.config"
-      - "~/.gnupg:/home/alt/.gnupg"
-    restart: on-failure
-    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_sign_node.py -v'"
+  #sign_node:
+  #  image: sign-node:latest
+  #  env_file:
+  #    - vars.env
+  #  build:
+  #    context: ../albs-sign-node
+  #    dockerfile: Dockerfile
+  #  volumes:
+  #    # TODO: Hack for developement, put placeholder here instead
+  #    - "../albs-sign-node/node-config:/home/alt/.config"
+  #    - "~/.gnupg:/home/alt/.gnupg"
+  #  restart: on-failure
+  #  command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_sign_node.py -v'"
 
   gitea_listener:
     image: albs-gitea-listener:latest

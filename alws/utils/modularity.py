@@ -7,6 +7,8 @@ import hashlib
 import datetime
 import collections
 
+import aiohttp
+import yaml
 from pydantic import BaseModel
 import gi
 gi.require_version('Modulemd', '2.0')
@@ -33,6 +35,16 @@ def calc_dist_macro(
     ]).encode('utf-8')
     dist_hash = hashlib.sha1(dist_str).hexdigest()[:8]
     return f'.module_{dist_prefix}+{build_index}+{dist_hash}'
+
+
+async def get_modified_refs_list(platform_url: str):
+    package_list = []
+    async with aiohttp.ClientSession() as session:
+        async with session.get(platform_url) as response:
+            yaml_body = await response.text()
+            response.raise_for_status()
+            package_list = yaml.safe_load(yaml_body)['modified_packages']
+            return package_list
 
 
 class RpmArtifact(BaseModel):
