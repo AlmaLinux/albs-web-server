@@ -3,8 +3,6 @@ import asyncio
 import typing
 import collections
 
-import yaml
-import aiohttp
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
@@ -15,7 +13,9 @@ from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
-from alws.utils.modularity import ModuleWrapper, calc_dist_macro, IndexWrapper
+from alws.utils.modularity import (
+    ModuleWrapper, calc_dist_macro, get_modified_refs_list, IndexWrapper
+)
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient, ModuleNotFoundError
 )
@@ -295,12 +295,7 @@ class BuildPlanner:
         if self._module_modified_cache.get(platform.name):
             return ref in self._module_modified_cache[platform.name]
         url = platform.modularity['modified_packages_url']
-        package_list = []
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                yaml_body = await response.text()
-                response.raise_for_status()
-                package_list = yaml.safe_load(yaml_body)['modified_packages']
+        package_list = await get_modified_refs_list(url)
         self._module_modified_cache[platform.name] = package_list
         return ref in self._module_modified_cache[platform.name]
 

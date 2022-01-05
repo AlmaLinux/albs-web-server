@@ -80,3 +80,10 @@ async def create_platform(
 async def get_platforms(db):
     db_platforms = await db.execute(select(models.Platform))
     return db_platforms.scalars().all()
+
+
+async def get_platform(db, name: str) -> models.Platform:
+    db_platform = await db.execute(
+        select(models.Platform).where(models.Platform.name == name)
+    )
+    return db_platform.scalars().first()
