@@ -1,5 +1,5 @@
 ---
-  name: AlmaLinux-8
+- name: AlmaLinux-8
   distr_type: rhel
   distr_version: '8'
   test_dist_name: almalinux
@@ -201,3 +201,180 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
+
+- name: AlmaLinux-9-beta
+  distr_type: rhel
+  distr_version: '9'
+  test_dist_name: almalinux
+  modularity:
+    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
+    packages_git: 'https://git.almalinux.org/rpms/'
+    git_tag_prefix:
+      modified: a9-beta
+      non_modified: c9-beta
+    versions:
+      - name: '9'
+        version_prefix: '90000'
+        dist_prefix: 'el9.0.0'
+  type: rpm
+  arch_list:
+    - x86_64
+    - aarch64
+    - ppc64le
+    - s390
+  data:
+    definitions:
+      distribution: AlmaLinux
+      packager: AlmaLinux Packaging Team <packager@almalinux.org>
+      vendor: AlmaLinux
+    mock:
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
+        make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
+        info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
+      dnf_common_opts:
+        - --setopt=deltarpm=False
+        - --allowerasing
+        - --nobest
+        - --setopt=install_weak_deps=False
+      dnf_install_command: install dnf dnf-plugins-core shadow-utils
+      package_manager: dnf
+      releasever: '9'
+      use_bootstrap_container: false
+    mock_dist: el9
+    timeout: 43200
+    yum:
+      best: false
+      module_platform_id: platform:el9
+  repositories:
+    - arch: x86_64
+      name: centos-9-baseos
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-appstream
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-crb
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-highavailability
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-resilientrtorage
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-nfv
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/NFV/x86_64/os/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: centos-9-rt
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/RT/x86_64/os/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: centos-9-baseos
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/aarch64/os/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: centos-9-appstream
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/aarch64/os/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: centos-9-crb
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/aarch64/os/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: centos-9-highavailability
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/aarch64/os/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: centos-9-resilientrtorage
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/aarch64/os/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-9-baseos
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/ppc64le/os/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-9-appstream
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/ppc64le/os/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-9-crb
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/ppc64le/os/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-9-highavailability
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/ppc64le/os/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: centos-9-resilientrtorage
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/ppc64le/os/
+      production: false
+      debug: false
+    - arch: s390x
+      name: centos-9-baseos
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/s390x/os/
+      production: false
+      debug: false
+    - arch: s390x
+      name: centos-9-appstream
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/s390x/os/
+      production: false
+      debug: false
+    - arch: s390x
+      name: centos-9-crb
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/s390x/os/
+      production: false
+      debug: false
+    - arch: s390x
+      name: centos-9-highavailability
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/s390x/os/
+      production: false
+      debug: false
+    - arch: s390x
+      name: centos-9-resilientrtorage
+      type: rpm
+      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/s390x/os/
+      production: false
+      debug: false
