@@ -201,7 +201,6 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-
 - name: AlmaLinux-9-beta
   distr_type: rhel
   distr_version: '9'
@@ -218,10 +217,11 @@
         dist_prefix: 'el9.0.0'
   type: rpm
   arch_list:
+    - i686
     - x86_64
     - aarch64
     - ppc64le
-    - s390
+    - s390x
   data:
     definitions:
       distribution: AlmaLinux

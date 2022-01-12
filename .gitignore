@@ -131,3 +131,5 @@ dmypy.json
 volumes/
 .idea
 vars.env
+reference_data/repos_for_cl9.yaml
+.gitignore
