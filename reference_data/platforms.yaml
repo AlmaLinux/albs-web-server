@@ -201,7 +201,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-- name: AlmaLinux-9-beta
+- name: AlmaLinux-9
   distr_type: rhel
   distr_version: '9'
   test_dist_name: almalinux
