@@ -173,6 +173,7 @@ class PulpClient:
         await self.wait_for_task(task['task'])
 
     async def create_rpm_publication(self, repository: str):
+        # Creates repodata for repositories in some way
         ENDPOINT = 'pulp/api/v3/publications/rpm/rpm/'
         payload = {'repository': repository}
         task = await self.make_post_request(ENDPOINT, data=payload)
@@ -359,7 +360,7 @@ class PulpClient:
             'repository_version': fse_repository_version
         }
         fse_task = await self.make_post_request(endpoint, params)
-        await pulp_client.wait_for_task(fse_task['task'])
+        await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
     async def get_repo_latest_version(self, repo_href: str):

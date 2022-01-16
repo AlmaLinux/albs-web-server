@@ -80,7 +80,8 @@ async def execute_pulp_exporters_to_fs(db: Session,
     query = select(
         models.RepoExporter.fs_exporter_href,
         models.RepoExporter.path,
-        models.Repository.pulp_href
+        models.Repository.pulp_href,
+        models.Repository.url
     ).where(
         models.RepoExporter.exported_id == export_id
     ).join(
@@ -94,13 +95,13 @@ async def execute_pulp_exporters_to_fs(db: Session,
                 exported_at=now, status=ExportStatus.IN_PROGRESS))
         response = await db.execute(query)
         await db.commit()
-    exported_paths = []
-    for fs_exporter_href, fse_path, pulp_href in response:
+    exported_data = {}
+    for fs_exporter_href, fse_path, pulp_href, repo_url in response:
         latest_version_href = await pulp_client.get_repo_latest_version(
             pulp_href)
         await pulp_client.export_to_filesystem(
             fs_exporter_href, latest_version_href)
-        exported_paths.append(fse_path)
+        exported_data[fse_path] = repo_url
         await pulp_client.delete_filesystem_exporter(fs_exporter_href)
     async with db.begin():
         await db.execute(
@@ -108,14 +109,15 @@ async def execute_pulp_exporters_to_fs(db: Session,
                 models.ExportTask.id == export_id).values(
                 exported_at=now, status=ExportStatus.COMPLETED))
         await db.commit()
-    return exported_paths
+    return exported_data
 
 
-async def create_filesystem_exporter(name : str, path: str) -> str:
+async def create_filesystem_exporter(name: str, path: str) -> str:
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     result = await pulp_client.create_filesystem_exporter(name, path)
     return result
+
 
 async def list_filesystem_exporters() -> list:
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
@@ -123,20 +125,23 @@ async def list_filesystem_exporters() -> list:
     result = await pulp_client.list_filesystem_exporters()
     return result
 
+
 async def get_filesystem_exporter(fse_pulp_href: str):
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     result = await pulp_client.get_filesystem_exporter(fse_pulp_href)
     return result
 
+
 async def update_filesystem_exporter(fse_pulp_href: str,
                                      fse_name: str,
-                                     fse_path : str):
+                                     fse_path: str):
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     result = await pulp_client.update_filesystem_exporter(
         fse_pulp_href, fse_name, fse_path)
     return result
+
 
 async def delete_filesystem_exporter(fse_pulp_href: str):
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
