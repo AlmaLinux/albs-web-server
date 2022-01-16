@@ -177,6 +177,7 @@ class PulpClient:
         await self.wait_for_task(task['task'])
 
     async def create_rpm_publication(self, repository: str):
+        # Creates repodata for repositories in some way
         ENDPOINT = 'pulp/api/v3/publications/rpm/rpm/'
         payload = {'repository': repository}
         task = await self.make_post_request(ENDPOINT, data=payload)

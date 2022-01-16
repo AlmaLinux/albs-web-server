@@ -74,6 +74,7 @@ services:
     volumes:
       - "./alws:/code/alws"
       - "./scripts:/code/scripts"
+      - "./volumes/pulp/exports:/srv/exports"
       - "./reference_data:/code/reference_data"
     command:
         bash -c 'source env/bin/activate &&
