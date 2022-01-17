@@ -310,7 +310,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/x86_64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: x86_64
@@ -318,7 +318,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/x86_64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: x86_64
@@ -326,7 +326,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/x86_64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: x86_64
@@ -334,7 +334,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/x86_64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - name: almalinux-8-baseos-debuginfo
@@ -366,7 +366,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/aarch64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: aarch64
@@ -374,7 +374,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/aarch64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: aarch64
@@ -382,7 +382,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/aarch64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: aarch64
@@ -390,7 +390,7 @@
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/aarch64/
       production: true
-      debug: false
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
 
