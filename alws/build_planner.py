@@ -197,6 +197,9 @@ class BuildPlanner:
                     devel_module.set_arch_list(
                         self._request_platforms[platform.name]
                     )
+                    mock_options['module_enable'].append(
+                        f'{devel_module.name}:{devel_module.stream}'
+                    )
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await pulp_client.create_module(
                     module_index.render(),
