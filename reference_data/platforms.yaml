@@ -313,11 +313,6 @@
       production: false
       debug: false
     - arch: aarch64
-      name: centos-9-resilientrtorage
-      type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/aarch64/os/
-      production: false
-      debug: false
     - arch: ppc64le
       name: centos-9-baseos
       type: rpm
