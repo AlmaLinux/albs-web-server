@@ -122,52 +122,53 @@ def main():
     config_path = os.path.expanduser(os.path.expandvars(args.config))
     with open(config_path, 'rt') as f:
         loader = yaml.Loader(f)
-        platform_data = loader.get_data()
-
-    if not platform_data.get('repositories'):
-        logger.error('Config does not contain a list of repositories')
-        return 1
+        platforms_data = loader.get_data()
 
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
-    repository_ids = []
-    repositories_data = platform_data.pop('repositories', [])
-
-    for repo_info in repositories_data:
-        logger.info('Creating repository from the following data: %s',
-                    str(repo_info))
-        # If repository is not marked as production, do not remove `url` field
-        repo_name = f'{repo_info["name"]}-{repo_info["arch"]}'
-        is_production = repo_info.get('production', False)
-        repo_sync_policy = repo_info.pop('repository_sync_policy', None)
-        remote_sync_policy = repo_info.pop('remote_sync_policy', None)
-        repository = sync(get_repository(
-            pulp_client, repo_info, repo_name, is_production, logger))
-        repository_ids.append(repository.id)
-
-        logger.debug('Repository instance: %s', repository)
-        if args.no_remotes:
-            logger.warning('Not creating a remote for repository %s',
-                           repository)
-            continue
-        if not is_production:
-            logger.info('Repository %s is not marked as production and '
-                        'does not need remote setup', repository)
+    for platform_data in platforms_data:
+        if not platform_data.get('repositories'):
+            logger.error('Config does not contain a list of repositories')
             continue
 
-        remote = sync(get_remote(repo_info, remote_sync_policy))
+        repository_ids = []
+        repositories_data = platform_data.pop('repositories', [])
 
-        if args.no_sync:
-            logger.info('Synchronization from remote is disabled, skipping')
-            continue
-        logger.info('Syncing %s from %s...', repository, remote)
-        sync(pulp_client.sync_rpm_repo_from_remote(
-            repository.pulp_href, remote.pulp_href, sync_policy=repo_sync_policy,
-            wait_for_result=True))
-        sync(pulp_client.create_rpm_publication(repository.pulp_href))
-        logger.info('Repository %s sync is completed', repository)
+        for repo_info in repositories_data:
+            logger.info('Creating repository from the following data: %s',
+                        str(repo_info))
+            # If repository is not marked as production, do not remove `url` field
+            repo_name = f'{repo_info["name"]}-{repo_info["arch"]}'
+            is_production = repo_info.get('production', False)
+            repo_sync_policy = repo_info.pop('repository_sync_policy', None)
+            remote_sync_policy = repo_info.pop('remote_sync_policy', None)
+            repository = sync(get_repository(
+                pulp_client, repo_info, repo_name, is_production, logger))
+            repository_ids.append(repository.id)
 
-    sync(add_repositories_to_platform(platform_data, repository_ids))
+            logger.debug('Repository instance: %s', repository)
+            if args.no_remotes:
+                logger.warning('Not creating a remote for repository %s',
+                               repository)
+                continue
+            if not is_production:
+                logger.info('Repository %s is not marked as production and '
+                            'does not need remote setup', repository)
+                continue
+
+            remote = sync(get_remote(repo_info, remote_sync_policy))
+
+            if args.no_sync:
+                logger.info('Synchronization from remote is disabled, skipping')
+                continue
+            logger.info('Syncing %s from %s...', repository, remote)
+            sync(pulp_client.sync_rpm_repo_from_remote(
+                repository.pulp_href, remote.pulp_href, sync_policy=repo_sync_policy,
+                wait_for_result=True))
+            sync(pulp_client.create_rpm_publication(repository.pulp_href))
+            logger.info('Repository %s sync is completed', repository)
+
+        sync(add_repositories_to_platform(platform_data, repository_ids))
 
 
 if __name__ == '__main__':
