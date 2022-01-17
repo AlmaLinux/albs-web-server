@@ -49,11 +49,7 @@ async def fs_export_repository(repository_ids: list,
         res = await get_urls_from_html(repo_url)
         for url in res:
             dir_rd = Path(repo_elem).parent / 'repodata'
-            print(dir_rd)
-            try:
-                os.makedirs(dir_rd, exist_ok=True)
-            except Exception as e:
-                pass
+            os.makedirs(dir_rd, exist_ok=True)
             await download_file(url, dir_rd / Path(url).name)
     return export_paths
 
