@@ -39,6 +39,14 @@ class BuildTaskRef(BaseModel):
     def ref_type_to_str(self):
         return BuildTaskRefType.to_text(self.ref_type)
 
+    def get_dev_module(self) -> 'BuildTaskRef':
+        model_copy = self.copy(deep=True)
+        model_copy.url = self.url.replace(
+            self.git_repo_name,
+            self.git_repo_name + '-devel'
+        )
+        return model_copy
+
     class Config:
         orm_mode = True
 

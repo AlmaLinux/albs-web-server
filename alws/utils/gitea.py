@@ -6,6 +6,10 @@ import logging
 import aiohttp
 
 
+class ModuleNotFoundError(Exception):
+    pass
+
+
 def modules_yaml_path_from_url(url: str, ref: str, ref_type: str) -> str:
     repo_name = urllib.parse.urlparse(url).path.split('/')[-1]
     if repo_name.endswith('.git'):
@@ -24,7 +28,12 @@ async def download_modules_yaml(url: str, ref: str, ref_type: str) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(template_path) as response:
             template = await response.text()
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except aiohttp.ClientResponseError as error:
+                if error.status == 404:
+                    raise ModuleNotFoundError()
+                raise
             return template
 
 

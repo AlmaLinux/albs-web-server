@@ -1,9 +1,9 @@
-import yaml
 import logging
 import asyncio
 import typing
 import collections
 
+import yaml
 import aiohttp
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
@@ -15,8 +15,10 @@ from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
-from alws.utils.modularity import ModuleWrapper, calc_dist_macro
-from alws.utils.gitea import download_modules_yaml, GiteaClient
+from alws.utils.modularity import ModuleWrapper, calc_dist_macro, IndexWrapper
+from alws.utils.gitea import (
+    download_modules_yaml, GiteaClient, ModuleNotFoundError
+)
 
 
 __all__ = ['BuildPlanner']
@@ -41,7 +43,7 @@ class BuildPlanner:
             platform.name: platform.arch_list for platform in platforms
         }
         self._platforms = []
-        self._modules_by_target = {}
+        self._modules_by_target = collections.defaultdict(list)
         self._module_build_index = {}
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
@@ -77,10 +79,10 @@ class BuildPlanner:
         if repo_type == 'rpm':
             repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
                 repo_name)
-            module = self._modules_by_target.get((platform.name, arch))
-            if module:
+            modules = self._modules_by_target.get((platform.name, arch), [])
+            if modules:
                 await pulp_client.modify_repository(
-                    pulp_href, add=[module.pulp_href]
+                    pulp_href, add=[module.pulp_href for module in modules]
                 )
         else:
             repo_url, pulp_href = await pulp_client.create_log_repo(
@@ -146,7 +148,7 @@ class BuildPlanner:
                 ref_type=task.ref_type
             ))
             return
-        refs, module_template = await self._get_module_refs(task)
+        refs, module_templates = await self._get_module_refs(task)
         # TODO: we should merge all of the modules before insert
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -163,7 +165,7 @@ class BuildPlanner:
                     if item['name'] == task.module_platform_version
                 )
             for arch in self._request_platforms[platform.name]:
-                module = ModuleWrapper.from_template(module_template)
+                module = ModuleWrapper.from_template(module_templates[0])
                 mock_options['module_enable'] = [
                     f'{module.name}:{module.stream}'
                 ]
@@ -181,8 +183,28 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
+                module_index = IndexWrapper()
+                module_index.add_module(module)
+                if len(module_templates) > 1:
+                    devel_module = ModuleWrapper.from_template(
+                        module_templates[1],
+                        module.name + '-devel',
+                        module.stream
+                    )
+                    devel_module.version = module.version
+                    devel_module.context = module.context
+                    devel_module.arch = module.arch
+                    devel_module.set_arch_list(
+                        self._request_platforms[platform.name]
+                    )
+                    module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await pulp_client.create_module(
-                    module.render())
+                    module_index.render(),
+                    module.name,
+                    module.stream,
+                    module.context,
+                    module.arch
+                )
                 db_module = models.RpmModule(
                     name=module.name,
                     version=str(module.version),
@@ -192,8 +214,12 @@ class BuildPlanner:
                     pulp_href=module_pulp_href,
                     sha256=sha256
                 )
-                self._modules_by_target[(platform.name, arch)] = db_module
-        self._db.add_all(list(self._modules_by_target.values()))
+                self._modules_by_target[(platform.name, arch)].append(
+                    db_module)
+        all_modules = []
+        for modules in self._modules_by_target.values():
+            all_modules.extend(modules)
+        self._db.add_all(all_modules)
         for key, value in module.iter_mock_definitions():
             mock_options['definitions'][key] = value
         for ref in refs:
@@ -209,6 +235,22 @@ class BuildPlanner:
             task.git_ref,
             BuildTaskRefType.to_text(task.ref_type)
         )
+        devel_ref = task.get_dev_module()
+        devel_template = None
+        devel_module = None
+        try:
+            devel_template = await download_modules_yaml(
+                devel_ref.url,
+                devel_ref.git_ref,
+                BuildTaskRefType.to_text(devel_ref.ref_type)
+            )
+            devel_module = ModuleWrapper.from_template(
+                devel_template,
+                name=devel_ref.git_repo_name,
+                stream=devel_ref.module_stream_from_ref()
+            )
+        except ModuleNotFoundError:
+            pass
         module = ModuleWrapper.from_template(
             template,
             name=task.git_repo_name,
@@ -233,7 +275,12 @@ class BuildPlanner:
             ))
             ref = await self.get_ref_commit_id(component_name, git_ref)
             module.set_component_ref(component_name, ref)
-        return result, module.render()
+            if devel_module:
+                devel_module.set_component_ref(component_name, ref)
+        modules = [module.render()]
+        if devel_module:
+            modules.append(devel_module.render())
+        return result, modules
 
     async def get_ref_commit_id(self, git_name, git_branch):
         response = await self._gitea_client.get_branch(
@@ -259,15 +306,17 @@ class BuildPlanner:
             ref: models.BuildTaskRef,
             mock_options: typing.Optional[dict[str, typing.Any]] = None,
             ref_platform_version: typing.Optional[str] = None):
-        parsed_dist_macro = parse_git_ref('(el[\d]+_[\d]+)', ref.git_ref)
+        parsed_dist_macro = parse_git_ref(r'(el[\d]+_[\d]+)', ref.git_ref)
         if mock_options is None:
             mock_options = {'definitions': {}}
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
             arch_tasks = []
             for arch in self._request_platforms[platform.name]:
-                module = self._modules_by_target.get((platform.name, arch))
-                if module:
+                modules = self._modules_by_target.get(
+                    (platform.name, arch), [])
+                if modules:
+                    module = modules[0]
                     build_index = self._module_build_index.get(platform.name)
                     if build_index is None:
                         platform.module_build_index += 1
@@ -297,7 +346,7 @@ class BuildPlanner:
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=module,
+                    rpm_module=modules[0],
                     mock_options=mock_options
                 )
                 task_key = (platform.name, arch)
