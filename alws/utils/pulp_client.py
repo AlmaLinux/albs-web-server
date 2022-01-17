@@ -328,7 +328,7 @@ class PulpClient:
     async def update_filesystem_exporter(self, fse_pulp_href: str,
                                          fse_name: str,
                                          fse_path: str,
-                                         fse_method: str='symlink'):
+                                         fse_method: str='hardlink'):
         endpoint = fse_pulp_href
         params = {
             'name': fse_name,
