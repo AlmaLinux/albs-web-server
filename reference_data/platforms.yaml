@@ -249,157 +249,157 @@
     - arch: x86_64
       name: centos-9-baseos
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-appstream
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-crb
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-highavailability
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-resilientrtorage
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-nfv
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/NFV/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/NFV/x86_64/os/
       production: false
       debug: false
     - arch: x86_64
       name: centos-9-rt
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/RT/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/RT/x86_64/os/
       production: false
       debug: false
     - arch: i686
       name: centos-9-baseos
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
       production: false
       debug: false
     - arch: i686
       name: centos-9-appstream
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
       production: false
       debug: false
     - arch: i686
       name: centos-9-crb
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
       production: false
       debug: false
     - arch: i686
       name: centos-9-highavailability
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
       production: false
       debug: false
     - arch: i686
       name: centos-9-resilientrtorage
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
       production: false
       debug: false
     - arch: aarch64
       name: centos-9-baseos
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/aarch64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/aarch64/os/
       production: false
       debug: false
     - arch: aarch64
       name: centos-9-appstream
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/aarch64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/aarch64/os/
       production: false
       debug: false
     - arch: aarch64
       name: centos-9-crb
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/aarch64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/aarch64/os/
       production: false
       debug: false
     - arch: aarch64
       name: centos-9-highavailability
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/aarch64/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/aarch64/os/
       production: false
       debug: false
     - arch: aarch64
     - arch: ppc64le
       name: centos-9-baseos
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/ppc64le/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/ppc64le/os/
       production: false
       debug: false
     - arch: ppc64le
       name: centos-9-appstream
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/ppc64le/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/ppc64le/os/
       production: false
       debug: false
     - arch: ppc64le
       name: centos-9-crb
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/ppc64le/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/ppc64le/os/
       production: false
       debug: false
     - arch: ppc64le
       name: centos-9-highavailability
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/ppc64le/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/ppc64le/os/
       production: false
       debug: false
     - arch: ppc64le
       name: centos-9-resilientrtorage
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/ppc64le/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/ppc64le/os/
       production: false
       debug: false
     - arch: s390x
       name: centos-9-baseos
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/BaseOS/s390x/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/s390x/os/
       production: false
       debug: false
     - arch: s390x
       name: centos-9-appstream
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/AppStream/s390x/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/s390x/os/
       production: false
       debug: false
     - arch: s390x
       name: centos-9-crb
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/CRB/s390x/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/s390x/os/
       production: false
       debug: false
     - arch: s390x
       name: centos-9-highavailability
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/HighAvailability/s390x/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/s390x/os/
       production: false
       debug: false
     - arch: s390x
       name: centos-9-resilientrtorage
       type: rpm
-      remote_url: http://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/s390x/os/
+      remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/s390x/os/
       production: false
       debug: false
