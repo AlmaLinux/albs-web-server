@@ -178,6 +178,11 @@ async def complete_sign_task(db: Session, sign_task_id: int,
     )
     sign_failed = False
 
+    sign_tasks = await db.execute(select(models.SignTask).where(
+        models.SignTask.id == sign_task_id
+    ))
+    sign_task = sign_tasks.scalars().first()
+
     if payload.packages:
         for package in payload.packages:
             # Check that package fingerprint matches the requested
@@ -195,6 +200,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             new_pkg_href = await pulp_client.create_rpm_package(
                 package.name, package.href, repo.pulp_href)
             db_package.artifact.href = new_pkg_href
+            db.package.signed_by_key = sign_task.sign_key
             modified_items.append(db_package)
             modified_items.append(db_package.artifact)
 
