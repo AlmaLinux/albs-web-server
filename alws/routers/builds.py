@@ -107,13 +107,17 @@ async def get_module_preview(
             git_ref=git_ref,
             exist=exist,
             mock_options={
-                k: v for k, v in module.iter_mock_definitions()
+                'definitions': {
+                    k: v for k, v in module.iter_mock_definitions()
+                }
             },
             ref_type=BuildTaskRefType.GIT_BRANCH
         ))
         module.set_component_ref(component_name, commit_id)
     return build_schema.ModulePreview(
         refs=result,
+        module_name=module.name,
+        module_stream=module.stream,
         modules_yaml=module.render()
     )
 
