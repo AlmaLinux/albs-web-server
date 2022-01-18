@@ -484,31 +484,31 @@
     - arch: i686
       name: centos-9-baseos
       type: rpm
-      remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
+      remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/BaseOS/
       production: false
       debug: false
     - arch: i686
       name: centos-9-appstream
       type: rpm
-      remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
+      remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/AppStream/
       production: false
       debug: false
     - arch: i686
       name: centos-9-crb
       type: rpm
-      remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
+      remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/CRB/
       production: false
       debug: false
     - arch: i686
       name: centos-9-highavailability
       type: rpm
-      remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
+      remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/HighAvailability/
       production: false
       debug: false
     - arch: i686
       name: centos-9-resilientrtorage
       type: rpm
-      remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
+      remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/ResilientStorage/
       production: false
       debug: false
     - arch: aarch64
