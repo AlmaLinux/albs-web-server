@@ -172,3 +172,5 @@ class ModulePreview(BaseModel):
 
     refs: typing.List[ModuleRef]
     modules_yaml: str
+    module_name: str
+    module_stream: str
