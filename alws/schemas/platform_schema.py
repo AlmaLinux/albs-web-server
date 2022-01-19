@@ -26,10 +26,10 @@ class PlatformCreate(BaseModel):
     type: typing.Literal['rpm', 'deb']
     distr_type: str
     distr_version: str
-    test_dist_name: str
+    test_dist_name: typing.Optional[str]
     arch_list: typing.List[str]
     repos: typing.Optional[typing.List[RepositoryCreate]]
-    data: typing.Dict[str, typing.Any]
+    data: typing.Optional[typing.Dict[str, typing.Any]]
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 

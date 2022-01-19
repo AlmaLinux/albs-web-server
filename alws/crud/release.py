@@ -14,7 +14,9 @@ from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
 
 
-async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
+async def __get_pulp_packages(
+        db: Session, build_ids: typing.List[int],
+        build_tasks: typing.List[int] = None) \
         -> typing.Tuple[typing.List[dict], typing.List[str]]:
     src_rpm_names = []
     packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
@@ -40,6 +42,9 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
             # Failsafe to not process logs
             if src_rpm.artifact.type != 'rpm':
                 continue
+            if build_tasks \
+                    and src_rpm.artifact.build_task_id not in build_tasks:
+                continue
             src_rpm_names.append(src_rpm.artifact.name)
             pkg_info = await pulp_client.get_rpm_package(
                 src_rpm.artifact.href, include_fields=packages_fields)
@@ -50,6 +55,9 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
             # Failsafe to not process logs
             if binary_rpm.artifact.type != 'rpm':
                 continue
+            if build_tasks \
+                    and binary_rpm.artifact.build_task_id not in build_tasks:
+                continue
             pkg_info = await pulp_client.get_rpm_package(
                 binary_rpm.artifact.href, include_fields=packages_fields)
             pkg_info['artifact_href'] = binary_rpm.artifact.href
@@ -59,9 +67,10 @@ async def __get_pulp_packages(db: Session, build_ids: typing.List[int]) \
 
 
 async def get_release_plan(db: Session, build_ids: typing.List[int],
-                           base_dist_name: str, base_dist_version: str,
+                           base_dist_version: str,
                            reference_dist_name: str,
-                           reference_dist_version: str) -> dict:
+                           reference_dist_version: str,
+                           build_tasks: typing.List[int] = None) -> dict:
     clean_ref_dist_name = re.search(
         r'(?P<dist_name>[a-z]+)', reference_dist_name,
         re.IGNORECASE).groupdict().get('dist_name')
@@ -70,7 +79,16 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                f'{reference_dist_version}/projects/'
     packages = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
-    pulp_packages, src_rpm_names = await __get_pulp_packages(db, build_ids)
+    pulp_packages, src_rpm_names = await __get_pulp_packages(
+        db, build_ids, build_tasks=build_tasks)
+
+    def get_pulp_based_response():
+        return {
+            'packages': [{'package': pkg, 'repositories': []}
+                         for pkg in pulp_packages],
+            'repositories': prod_repos
+        }
+
     repo_q = select(models.Repository).where(
         models.Repository.production.is_(True))
     result = await db.execute(repo_q)
@@ -88,14 +106,12 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                      for repo in prod_repos}
 
     if not settings.package_beholder_enabled:
-        return {
-            'packages': [{'package': pkg, 'repositories': []}
-                         for pkg in pulp_packages],
-            'repositories': prod_repos
-        }
+        return get_pulp_based_response()
 
     beholder_response = await BeholderClient(settings.beholder_host).post(
         endpoint, src_rpm_names)
+    if not beholder_response.get('packages'):
+        return get_pulp_based_response()
     if beholder_response.get('packages', []):
         for package in pulp_packages:
             pkg_name = package['name']
@@ -206,11 +222,16 @@ async def create_new_release(
         user = user_result.scalars().first()
         new_release = models.Release()
         new_release.build_ids = payload.builds
+        if getattr(payload, 'build_tasks', None):
+            new_release.build_task_ids = payload.build_tasks
         new_release.platform = base_platform
+        new_release.reference_platform_id = payload.reference_platform_id
         new_release.plan = await get_release_plan(
-            db, payload.builds, base_platform.name,
-            base_platform.distr_version, reference_platform.name,
-            reference_platform.distr_version
+            db, payload.builds,
+            base_platform.distr_version,
+            reference_platform.name,
+            reference_platform.distr_version,
+            build_tasks=payload.build_tasks
         )
         new_release.created_by = user
         db.add(new_release)
@@ -237,8 +258,12 @@ async def update_release(
             raise DataNotFoundError(f'Release with ID {release_id} not found')
         if payload.plan:
             release.plan = payload.plan
-        if payload.builds and payload.builds != release.build_ids:
+        build_tasks = getattr(payload, 'build_tasks', None)
+        if (payload.builds and payload.builds != release.build_ids) or \
+                (build_tasks and build_tasks != release.build_task_ids):
             release.build_ids = payload.builds
+            if build_tasks:
+                release.build_task_ids = payload.build_tasks
             platform_result = await db.execute(select(models.Platform).where(
                 models.Platform.id.in_(
                     (release.platform_id, release.reference_platform_id))))
@@ -249,9 +274,12 @@ async def update_release(
                 item for item in platforms
                 if item.id == release.reference_platform_id][0]
             release.plan = await get_release_plan(
-                db, payload.builds, base_platform.name,
-                base_platform.distr_version, reference_platform.name,
-                reference_platform.distr_version)
+                db, payload.builds,
+                base_platform.distr_version,
+                reference_platform.name,
+                reference_platform.distr_version,
+                build_tasks=payload.build_tasks
+            )
         db.add(release)
         await db.commit()
     await db.refresh(release)

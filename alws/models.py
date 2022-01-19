@@ -442,6 +442,12 @@ class Release(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_ids = sqlalchemy.Column(
         sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False)
+    build_task_ids = sqlalchemy.Column(
+        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=True)
+    reference_platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        nullable=True
+    )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('platforms.id'),
