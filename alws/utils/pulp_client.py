@@ -32,18 +32,13 @@ class PulpClient:
             name, repo_href, base_path_start=distro_path_start)
         return distro, repo_href
 
-    async def create_build_rpm_repo(self, name: str) -> str:
-        ENDPOINT = 'pulp/api/v3/repositories/rpm/rpm/'
-        payload = {'name': name, 'autopublish': True,
-                   'retain_repo_versions': 1}
-        response = await self.make_post_request(ENDPOINT, data=payload)
-
     async def create_rpm_repository(
             self, name, auto_publish: bool = False,
             create_publication: bool = False,
             base_path_start: str = 'builds') -> (str, str):
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
-        payload = {'name': name, 'autopublish': auto_publish}
+        payload = {'name': name, 'autopublish': auto_publish,
+                   'retain_repo_versions': 1}
         response = await self.make_post_request(endpoint, data=payload)
         repo_href = response['pulp_href']
         if create_publication:
@@ -359,7 +354,7 @@ class PulpClient:
             'repository_version': fse_repository_version
         }
         fse_task = await self.make_post_request(endpoint, params)
-        await pulp_client.wait_for_task(fse_task['task'])
+        await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
     async def get_repo_latest_version(self, repo_href: str):
