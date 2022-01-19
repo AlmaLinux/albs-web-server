@@ -39,6 +39,7 @@ class Platform(BaseModel):
     name: str
 
     arch_list: typing.List[str]
+    modularity: typing.Optional[typing.Dict]
 
     class Config:
         orm_mode = True
