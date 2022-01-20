@@ -54,8 +54,7 @@ async def create_pulp_exporters_to_fs(db: Session,
     for repo in response.scalars().all():
         export_path = str(Path(settings.pulp_export_path,
                                generate_repository_path(
-                                   export_task_pk, repo.name,
-                                   repo.arch, repo.debug)))
+                                   repo.name, repo.arch, repo.debug)))
         fs_exporter_href = await pulp_client.create_filesystem_exporter(
             repo.name, export_path)
         export_repos.append({
