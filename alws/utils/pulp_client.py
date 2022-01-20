@@ -1,4 +1,5 @@
 import io
+import re
 import hashlib
 import asyncio
 import typing
@@ -7,7 +8,7 @@ from typing import Optional, List
 
 import aiohttp
 
-from alws.utils.modularity import ModuleWrapper, get_random_unique_version
+from alws.utils.modularity import get_random_unique_version
 
 
 PULP_SEMAPHORE = asyncio.Semaphore(10)
@@ -80,23 +81,23 @@ class PulpClient:
             return None
         return response['results'][0]
 
-    async def create_module(self, content: str):
+    async def create_module(self, content: str, name: str, stream: str,
+                            context: str, arch: str):
         ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
         artifact_href, sha256 = await self.upload_file(content)
-        module = ModuleWrapper.from_template(content)
         payload = {
             'relative_path': 'modules.yaml',
             'artifact': artifact_href,
-            'name': module.name,
-            'stream': module.stream,
+            'name': name,
+            'stream': stream,
             # Instead of real module version, we're inserting
             # mocked one, so we can update template in the future,
             # since pulp have this global index:
             # unique_together = ("name", "stream", "version", "context",
             #                    "arch")
             'version': get_random_unique_version(),
-            'context': module.context,
-            'arch': module.arch,
+            'context': context,
+            'arch': arch,
             'artifacts': [],
             'dependencies': []
         }
@@ -146,13 +147,21 @@ class PulpClient:
             reference = await self._upload_file(content, file_sha256)
         return reference, file_sha256
 
-    async def get_repo_modules_yaml(self, url: str, sha256: str):
-        full_url = urllib.parse.urljoin(url, f'repodata/{sha256}-modules.yaml')
+    async def get_repo_modules_yaml(self, url: str):
+        repomd_url = urllib.parse.urljoin(url, 'repodata/repomd.xml')
         async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.get(full_url) as response:
-                text = await response.text()
+            async with session.get(repomd_url) as response:
+                repomd_xml = await response.text()
                 response.raise_for_status()
-                return text
+            modules_path = re.search(
+                r'repodata/[\w\d]+-modules.yaml',
+                repomd_xml
+            ).group()
+            modules_url = urllib.parse.urljoin(url, modules_path)
+            async with session.get(modules_url) as response:
+                modules_yaml = await response.text()
+                response.raise_for_status()
+                return modules_yaml
 
     async def modify_repository(self, repo_to: str, add: List[str] = None,
                                 remove: List[str] = None):
