@@ -1,8 +1,8 @@
-"""added_built_srpm_url
+"""Added built srpm url
 
-Revision ID: 9f53bc662376
-Revises: aa0a3bdf68d4
-Create Date: 2021-12-31 09:53:35.787933
+Revision ID: 2af59b3b1a4d
+Revises: 2e1d89155486
+Create Date: 2022-01-21 07:12:22.956018
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '9f53bc662376'
-down_revision = 'aa0a3bdf68d4'
+revision = '2af59b3b1a4d'
+down_revision = '2e1d89155486'
 branch_labels = None
 depends_on = None
 
