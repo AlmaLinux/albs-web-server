@@ -176,6 +176,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         settings.pulp_user,
         settings.pulp_password
     )
+    sign_failed = False
 
     if payload.packages:
         for package in payload.packages:
@@ -185,6 +186,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                               'expected fingerprint: %s', package.name,
                               package.fingerprint,
                               sign_task.sign_key.fingerprint)
+                sign_failed = True
                 continue
             db_package = next(pkg for pkg in all_rpms
                               if pkg.id == package.id)
@@ -196,7 +198,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             modified_items.append(db_package)
             modified_items.append(db_package.artifact)
 
-    if payload.success:
+    if payload.success and not sign_failed:
         sign_task.status = SignStatus.COMPLETED
         build.signed = True
     else:
