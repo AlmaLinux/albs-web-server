@@ -225,6 +225,12 @@
       type: rpm
       production: false
       debug: false
+    - arch: ppc64le
+      name: alma8-ppc64le-javapackages
+      remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/
+      type: rpm
+      production: false
+      debug: false
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -596,3 +602,64 @@
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/s390x/os/
       production: false
       debug: false
+    - arch: s390x
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/s390x/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/x86_64/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/ppc64le/
+      production: false
+      debug: false
+    - arch: i686
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/i686/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/aarch64/
+      production: false
+      debug: false
+    - arch: s390x
+      name: almalinux-9-devel-noarch
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
+      production: false
+      debug: false
+    - arch: x86_64
+      name: almalinux-9-devel-noarch
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
+      production: false
+      debug: false
+    - arch: ppc64le
+      name: almalinux-9-devel-noarch
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
+      production: false
+      debug: false
+    - arch: i686
+      name: almalinux-9-devel-noarch
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
+      production: false
+      debug: false
+    - arch: aarch64
+      name: almalinux-9-devel-noarch
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
+      production: false
+      debug: false
+
