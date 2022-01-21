@@ -360,7 +360,8 @@ class SourceRpm(Base):
     binary_rpms = relationship('BinaryRpm', back_populates='source_rpm')
     signed_by_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
+        sqlalchemy.ForeignKey('sign_keys.id',
+                              name='source_rpms_signed_by_key_id_fkey'),
         nullable=True
     )
     signed_by_key = relationship('SignKey')
@@ -390,7 +391,8 @@ class BinaryRpm(Base):
     source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
     signed_by_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
+        sqlalchemy.ForeignKey('sign_keys.id',
+                              name='binary_rpms_signed_by_key_id_fkey'),
         nullable=True
     )
     signed_by_key = relationship('SignKey')
