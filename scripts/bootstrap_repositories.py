@@ -36,6 +36,10 @@ def parse_args():
     parser.add_argument(
         '-c', '--config', type=str, required=True,
         help='Path to config file with repositories description')
+    parser.add_argument(
+        '-U', '--only_update', action='store_true', default=False,
+        required=False, help='Updates platform data in DB',
+    )
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
@@ -93,6 +97,12 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
         return remote
 
 
+async def update_platform(platform_data: dict):
+    async with database.Session() as db:
+        await pl_crud.modify_platform(
+            db, platform_schema.PlatformModify(**platform_data))
+
+
 async def add_repositories_to_platform(platform_data: dict,
                                        repositories_ids: typing.List[int]):
     platform_name = platform_data.get('name')
@@ -127,6 +137,13 @@ def main():
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
     for platform_data in platforms_data:
+        if args.only_update:
+            sync(update_platform(platform_data))
+            logger.info(
+                'Updating %s platform data is completed',
+                platform_data.get('name'),
+            )
+            continue
         if not platform_data.get('repositories'):
             logger.error('Config does not contain a list of repositories')
             continue

@@ -57,6 +57,7 @@ async def get_task(
         'ref': task.ref,
         'platform': build_node_schema.TaskPlatform.from_orm(task.platform),
         'repositories': [],
+        'is_secure_boot': task.is_secure_boot,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

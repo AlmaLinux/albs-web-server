@@ -40,6 +40,13 @@
       package_manager: dnf
       releasever: '8'
       use_bootstrap_container: false
+      macros:
+        "%pe_signing_cert": 'Cloud Linux Software, Inc'
+        "%pe_signing_token": 'profil standardowy'
+        "%_pesign": /usr/local/bin/pesign
+        "%_pesign_client": /usr/local/bin/pesign-client
+        "%with_modsign": 1
+        "%modsign_os": almalinux8
     mock_dist: el8
     timeout: 43200
     yum:

@@ -286,6 +286,8 @@ class BuildTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    is_secure_boot = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True)
     mock_options = sqlalchemy.Column(JSONB)
     ref = relationship('BuildTaskRef')
     artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
