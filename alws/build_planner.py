@@ -349,7 +349,7 @@ class BuildPlanner:
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=modules[0],
+                    rpm_module=modules[0] if modules else None,
                     mock_options=mock_options
                 )
                 task_key = (platform.name, arch)

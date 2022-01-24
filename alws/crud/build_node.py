@@ -154,9 +154,10 @@ async def build_done(
                 repo = repos[0]
                 href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
-                for module in module_index.iter_modules():
-                    rpm_package = await pulp_client.get_rpm_package(href)
-                    module.add_rpm_artifact(rpm_package)
+                if module_index:
+                    for module in module_index.iter_modules():
+                        rpm_package = await pulp_client.get_rpm_package(href)
+                        module.add_rpm_artifact(rpm_package)
             elif artifact.type == 'build_log':
                 repo = next(
                     repo for repo in repos
