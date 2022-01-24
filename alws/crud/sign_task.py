@@ -219,36 +219,40 @@ async def complete_sign_task(db: Session, sign_task_id: int,
     return sign_tasks.scalars().first()
 
 
-async def verify_signed_build(db: Session, payload: sign_schema.SignTaskCreate) \
-        -> bool:
+async def verify_signed_build(db: Session, build_id: int,
+                              platform_id: int) -> bool:
     async with db.begin():
         builds = await db.execute(select(models.Build).where(
-            models.Build.id == payload.build_id).options(
+            models.Build.id == build_id).options(
                 selectinload(models.Build.source_rpms),
                 selectinload(models.Build.binary_rpms)
         ))
         build = builds.scalars().first()
         if not build:
             raise DataNotFoundError(
-                f'Build with ID {payload.build_id} does not exist')
+                f'Build with ID {build_id} does not exist')
         if not build.signed == SignStatus.COMPLETED:
             raise ValueError(
-                f'Build with ID {payload.build_id} has not already signed')
+                f'Build with ID {build_id} has not already signed')
         if not build.source_rpms or not build.binary_rpms:
             raise ValueError(
-                f'No built packages in build with ID {payload.build_id}')
-        sign_keys = await db.execute(select(models.SignKey).where(
-            models.SignKey.id == payload.sign_key_id))
-        sign_key = sign_keys.scalars().first()
+                f'No built packages in build with ID {build_id}')
+        platform = await db.execute(select(models.Platform).where(
+            models.Platform.id == platform_id).options(
+                selectinload(models.Platform.sign_keys)))
+        if not platform:
+            raise DataNotFoundError(
+                f'platform with ID {platform_id} does not exist')
+        sign_key = platform.sign_keys.scalars().first()
         if not sign_key:
             raise DataNotFoundError(
-                f'Sign key with ID {payload.sign_key_id} does not exist')
+                f'Sign key for Platform ID {platform_id} does not exist')
         source_rpms = await db.execute(select(models.SourceRpm).where(
-            models.SourceRpm.build_id == payload.build_id).options(
+            models.SourceRpm.build_id == build_id).options(
             selectinload(models.SourceRpm.artifact)))
         source_rpms = source_rpms.scalars().all()
         binary_rpms = await db.execute(select(models.BinaryRpm).where(
-            models.BinaryRpm.build_id == payload.build_id).options(
+            models.BinaryRpm.build_id == build_id).options(
             selectinload(models.BinaryRpm.artifact)))
         binary_rpms = binary_rpms.scalars().all()
 
@@ -256,7 +260,7 @@ async def verify_signed_build(db: Session, payload: sign_schema.SignTaskCreate) 
         for p in all_rpms:
             if p.signed_by_key != sign_key:
                 raise DataNotFoundError(
-                    f'Sign key with ID {p.id} is not signed '
-                    f'by sign key {payload.sign_key_id}')
+                    f'Sign key with for pkg ID {p.id} is not matched '
+                    f'by sign key for platform ID {platform_id}')
         await db.commit()
     return True

@@ -12,6 +12,7 @@ from alws.errors import DataNotFoundError, EmptyReleasePlan, MissingRepository
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
+from alws.crud import sign_task
 
 
 async def __get_pulp_packages(
@@ -153,14 +154,21 @@ async def execute_release_plan(release_id: int, db: Session):
 
     async with db.begin():
         release_result = await db.execute(
-            select(models.Release).where(models.Release.id == release_id))
+            select(models.Release
+                   ).where(models.Release.id == release_id).options(
+                selectinload(models.Platform.platform_id)))
         release = release_result.scalars().first()
         if not release.plan.get('packages') or \
                 not release.plan.get('repositories'):
             raise EmptyReleasePlan('Cannot execute plan with empty packages '
                                    'or repositories: {packages}, {repositories}'
                                    .format_map(release.plan))
-
+        verified = True
+        for build_id in release.build_ids:
+            verified = verified and sign_task.verify_signed_build(
+                db, build_id, release.platform_id)
+        if not verified:
+            raise SignError('Cannot execute plan with wrong singing of pkg')
     for package in release.plan['packages']:
         for repository in package['repositories']:
             repo_name = repository['name']
