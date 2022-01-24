@@ -207,25 +207,26 @@ async def build_done(
         multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
         if multilib_pkgs:
             await add_multilib_packages(db, build_task, multilib_pkgs)
+    try:
+        await save_noarch_packages(db, build_task)
+    except:
+        pass
 
-    await save_noarch_packages(db, build_task)
-
-    async with db.begin():
-        rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
-            models.BuildTaskArtifact.build_task_id == build_task.id,
-            models.BuildTaskArtifact.type == 'rpm'))
-        srpm = None
-        binary_rpms = []
-        for rpm in rpms_result.scalars().all():
-            if rpm.name.endswith('.src.rpm'):
-                srpm = models.SourceRpm()
-                srpm.artifact = rpm
-                srpm.build = build_task.build
-            else:
-                binary_rpm = models.BinaryRpm()
-                binary_rpm.artifact = rpm
-                binary_rpm.build = build_task.build
-                binary_rpms.append(binary_rpm)
+    rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
+        models.BuildTaskArtifact.build_task_id == build_task.id,
+        models.BuildTaskArtifact.type == 'rpm'))
+    srpm = None
+    binary_rpms = []
+    for rpm in rpms_result.scalars().all():
+        if rpm.name.endswith('.src.rpm'):
+            srpm = models.SourceRpm()
+            srpm.artifact = rpm
+            srpm.build = build_task.build
+        else:
+            binary_rpm = models.BinaryRpm()
+            binary_rpm.artifact = rpm
+            binary_rpm.build = build_task.build
+            binary_rpms.append(binary_rpm)
     if srpm:
         db.add(srpm)
         await db.commit()
@@ -233,5 +234,5 @@ async def build_done(
         for binary_rpm in binary_rpms:
             binary_rpm.source_rpm = srpm
 
-        db.add_all(binary_rpms)
-        await db.commit()
+    db.add_all(binary_rpms)
+    await db.commit()

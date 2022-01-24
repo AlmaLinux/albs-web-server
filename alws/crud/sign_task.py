@@ -1,3 +1,4 @@
+import logging
 import typing
 import urllib.parse
 
@@ -161,6 +162,10 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             models.BinaryRpm.build_id == payload.build_id).options(
             selectinload(models.BinaryRpm.artifact)))
         binary_rpms = binary_rpms.scalars().all()
+        sign_tasks = await db.execute(select(models.SignTask).where(
+            models.SignTask.id == sign_task_id
+        ).options(selectinload(models.SignTask.sign_key)))
+        sign_task = sign_tasks.scalars().first()
 
     all_rpms = source_rpms + binary_rpms
     modified_items = []
@@ -171,9 +176,18 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         settings.pulp_user,
         settings.pulp_password
     )
+    sign_failed = False
 
     if payload.packages:
         for package in payload.packages:
+            # Check that package fingerprint matches the requested
+            if package.fingerprint != sign_task.sign_key.fingerprint:
+                logging.error('Package %s is signed with a wrong GPG key %s, '
+                              'expected fingerprint: %s', package.name,
+                              package.fingerprint,
+                              sign_task.sign_key.fingerprint)
+                sign_failed = True
+                continue
             db_package = next(pkg for pkg in all_rpms
                               if pkg.id == package.id)
             debug = is_debuginfo_rpm(package.name)
@@ -184,12 +198,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             modified_items.append(db_package)
             modified_items.append(db_package.artifact)
 
-    sign_tasks = await db.execute(select(models.SignTask).where(
-        models.SignTask.id == sign_task_id
-    ))
-    sign_task = sign_tasks.scalars().first()
-
-    if payload.success:
+    if payload.success and not sign_failed:
         sign_task.status = SignStatus.COMPLETED
         build.signed = True
     else:

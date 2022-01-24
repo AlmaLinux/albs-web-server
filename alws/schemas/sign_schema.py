@@ -67,6 +67,7 @@ class SignedRpmInfo(BaseModel):
     arch: typing.Optional[str]
     type: str
     href: str
+    fingerprint: str
 
 
 class AvailableSignTask(BaseModel):
