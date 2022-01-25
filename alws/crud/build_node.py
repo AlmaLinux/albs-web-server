@@ -1,4 +1,5 @@
 import datetime
+import logging
 import typing
 
 import sqlalchemy
@@ -137,6 +138,7 @@ async def build_done(
             )
             repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
                 module_repo.url)
+            logging.info('Saved modules template: "%s"', repo_modules_yaml)
             module_index = IndexWrapper.from_template(repo_modules_yaml)
         artifacts = []
         for artifact in request.artifacts:
@@ -165,6 +167,10 @@ async def build_done(
                 )
                 href = await pulp_client.create_file(
                     artifact.name, artifact.href, repo.pulp_href)
+            if not href:
+                logging.error("Artifact %s was not saved properly in Pulp, "
+                              "skipping", str(artifact))
+                continue
             artifacts.append(
                 models.BuildTaskArtifact(
                     build_task_id=build_task.id,
