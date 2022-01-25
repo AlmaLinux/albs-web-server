@@ -125,6 +125,13 @@ async def get_builds(
     return result.scalars().all()
 
 
+async def get_module_preview(
+                platform: models.Platform,
+                module_request: build_schema.ModulePreviewRequest
+            ) -> build_schema.ModulePreview:
+    return await build_schema.get_module_refs(module_request.ref, platform)
+
+
 async def remove_build_job(db: Session, build_id: int) -> bool:
     query_bj = select(models.Build).where(
         models.Build.id == build_id).options(
@@ -175,7 +182,7 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         # artifacts_delete
         # "Remove Artifact only if it is not associated with any Content."
         # for artifact in artifacts:
-            # await pulp_client.remove_artifact(artifact)
+        # await pulp_client.remove_artifact(artifact)
         for repo in repos:
             try:
                 await pulp_client.remove_artifact(repo, need_wait_sync=True)

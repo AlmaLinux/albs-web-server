@@ -17,7 +17,7 @@ from alws.utils.modularity import (
     ModuleWrapper, calc_dist_macro, get_modified_refs_list, IndexWrapper
 )
 from alws.utils.gitea import (
-    download_modules_yaml, GiteaClient, ModuleNotFoundError
+    download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
 
 
@@ -141,14 +141,39 @@ class BuildPlanner:
         self._build.linked_builds.append(linked_build)
 
     async def add_task(self, task: build_schema.BuildTaskRef):
-        if not task.is_module:
+        if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
             await self._add_single_ref(models.BuildTaskRef(
                 url=task.url,
                 git_ref=task.git_ref,
                 ref_type=task.ref_type
             ))
             return
-        refs, module_templates = await self._get_module_refs(task)
+
+        if isinstance(task, build_schema.BuildTaskModuleRef):
+            raw_refs = task.refs
+            _index = IndexWrapper.from_template(task.modules_yaml)
+            module = _index.get_module(task.module_name, task.module_stream)
+            devel_module = None
+            try:
+                devel_module = _index.get_module(
+                    task.module_name + '-devel', task.module_stream
+                )
+            except ModuleNotFoundError:
+                pass
+            module_templates = [module.render()]
+            if devel_module:
+                module_templates.append(devel_module.render())
+        else:
+            raw_refs, module_templates = await build_schema.get_module_refs(
+                task, self._platforms[0], raw=True
+            )
+        refs = [
+            models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=BuildTaskRefType.GIT_BRANCH
+            ) for ref in raw_refs
+        ]
         # TODO: we should merge all of the modules before insert
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -252,7 +277,7 @@ class BuildPlanner:
                 name=devel_ref.git_repo_name,
                 stream=devel_ref.module_stream_from_ref()
             )
-        except ModuleNotFoundError:
+        except ModulesYamlNotFoundError:
             pass
         module = ModuleWrapper.from_template(
             template,
