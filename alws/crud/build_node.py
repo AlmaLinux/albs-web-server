@@ -91,6 +91,11 @@ async def ping_tasks(
         await db.commit()
 
 
+async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
+    build_task = await db.execute(select(models.BuildTask).get(task_id))
+    return BuildTaskStatus.is_finished(build_task.status)
+
+
 async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
@@ -107,9 +112,6 @@ async def build_done(
             ).with_for_update()
         )
         build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_finished(build_task.status):
-            raise AlreadyBuiltError(
-                f'Build task {build_task.id} already completed')
         status = BuildTaskStatus.COMPLETED
         if request.status == 'failed':
             status = BuildTaskStatus.FAILED
