@@ -100,8 +100,8 @@
       remote_url: https://repo.almalinux.org/vault/8/extras/i686/os/
       production: true
       debug: false
-      remote_sync_policy: on_demand
       repository_sync_policy: additive
+      remote_sync_policy: on_demand
     - arch: x86_64
       name: almalinux-8-baseos
       type: rpm
@@ -215,6 +215,54 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: ppc64le
+      name: almalinux-8-baseos
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/BaseOS/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: almalinux-8-appstream
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/AppStream/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: almalinux-8-powertools
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/PowerTools/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: almalinux-8-highavailability
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/HighAvailability/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: almalinux-8-resilientstorage
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/ResilientStorage/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: almalinux-8-extras
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/extras/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
       name: almalinux-8-ppc64le-devel
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
@@ -264,6 +312,14 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: src
+      name: almalinux-8-highavailability
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: src
       name: almalinux-8-resilientstorage
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/Source/
@@ -277,7 +333,6 @@
       remote_url: https://repo.almalinux.org/almalinux/8/devel/Source/
       production: true
       debug: false
-      remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: src
       name: almalinux-8-extras
@@ -336,6 +391,30 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
     - arch: x86_64
+      name: almalinux-8-highavailability-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: x86_64
+      name: almalinux-8-resilientstorage-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: x86_64
+      name: almalinux-8-devel-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: x86_64
       name: almalinux-8-extras-debuginfo
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/x86_64/
@@ -363,6 +442,38 @@
       arch: aarch64
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-highavailability-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-resilientstorage-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-devel-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: almalinux-8-extras-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -541,7 +652,6 @@
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/aarch64/os/
       production: false
       debug: false
-    - arch: aarch64
     - arch: ppc64le
       name: centos-9-baseos
       type: rpm
