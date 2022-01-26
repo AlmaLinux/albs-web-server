@@ -165,7 +165,7 @@ class BuildPlanner:
                 module_templates.append(devel_module.render())
         else:
             raw_refs, module_templates = await build_schema.get_module_refs(
-                task, self._platforms[0], raw=True
+                task, self._platforms[0]
             )
         refs = [
             models.BuildTaskRef(
@@ -257,72 +257,11 @@ class BuildPlanner:
                 ref_platform_version=task.module_platform_version
             )
 
-    async def _get_module_refs(self, task: build_schema.BuildTaskRef):
-        template = await download_modules_yaml(
-            task.url,
-            task.git_ref,
-            BuildTaskRefType.to_text(task.ref_type)
-        )
-        devel_ref = task.get_dev_module()
-        devel_template = None
-        devel_module = None
-        try:
-            devel_template = await download_modules_yaml(
-                devel_ref.url,
-                devel_ref.git_ref,
-                BuildTaskRefType.to_text(devel_ref.ref_type)
-            )
-            devel_module = ModuleWrapper.from_template(
-                devel_template,
-                name=devel_ref.git_repo_name,
-                stream=devel_ref.module_stream_from_ref()
-            )
-        except ModulesYamlNotFoundError:
-            pass
-        module = ModuleWrapper.from_template(
-            template,
-            name=task.git_repo_name,
-            stream=task.module_stream_from_ref()
-        )
-        result = []
-        # TODO: we should rethink schema for multiple platforms
-        #       right now there is no option to create tasks with different
-        #       refs for multiple platforms
-        platform = self._platforms[0]
-        platform_prefix_list = platform.modularity['git_tag_prefix']
-        platform_packages_git = platform.modularity['packages_git']
-        for component_name, _ in module.iter_components():
-            ref_prefix = platform_prefix_list['non_modified']
-            if await self.is_ref_modified(platform, component_name):
-                ref_prefix = platform_prefix_list['modified']
-            git_ref = f'{ref_prefix}-stream-{module.stream}'
-            result.append(models.BuildTaskRef(
-                url=f'{platform_packages_git}{component_name}.git',
-                git_ref=git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH
-            ))
-            ref = await self.get_ref_commit_id(component_name, git_ref)
-            module.set_component_ref(component_name, ref)
-            if devel_module:
-                devel_module.set_component_ref(component_name, ref)
-        modules = [module.render()]
-        if devel_module:
-            modules.append(devel_module.render())
-        return result, modules
-
     async def get_ref_commit_id(self, git_name, git_branch):
         response = await self._gitea_client.get_branch(
             f'rpms/{git_name}', git_branch
         )
         return response['commit']['id']
-
-    async def is_ref_modified(self, platform: models.Platform, ref: str):
-        if self._module_modified_cache.get(platform.name):
-            return ref in self._module_modified_cache[platform.name]
-        url = platform.modularity['modified_packages_url']
-        package_list = await get_modified_refs_list(url)
-        self._module_modified_cache[platform.name] = package_list
-        return ref in self._module_modified_cache[platform.name]
 
     async def _add_single_ref(
             self,

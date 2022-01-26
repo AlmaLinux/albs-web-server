@@ -236,7 +236,7 @@ async def _get_module_ref(
     )
 
 
-async def get_module_refs(task, platform, raw=False):
+async def get_module_refs(task, platform):
     result = []
     gitea_client = GiteaClient(
         settings.gitea_host,
@@ -285,11 +285,4 @@ async def get_module_refs(task, platform, raw=False):
     modules = [module.render()]
     if devel_module:
         modules.append(devel_module.render())
-    if raw:
-        return result, modules
-    return ModulePreview(
-        refs=result,
-        module_name=module.name,
-        module_stream=module.stream,
-        modules_yaml='\n'.join(modules)
-    )
+    return result, modules

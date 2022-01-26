@@ -129,7 +129,13 @@ async def get_module_preview(
                 platform: models.Platform,
                 module_request: build_schema.ModulePreviewRequest
             ) -> build_schema.ModulePreview:
-    return await build_schema.get_module_refs(module_request.ref, platform)
+    refs, modules = await build_schema.get_module_refs(module_request.ref, platform)
+    return build_schema.ModulePreview(
+        refs=refs,
+        module_name=module_request.ref.git_repo_name,
+        module_stream=module_request.ref.module_stream_from_ref(),
+        modules_yaml='\n'.join(modules)
+    )
 
 
 async def remove_build_job(db: Session, build_id: int) -> bool:
