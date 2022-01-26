@@ -366,12 +366,6 @@ class SourceRpm(Base):
     )
     artifact = relationship('BuildTaskArtifact')
     binary_rpms = relationship('BinaryRpm', back_populates='source_rpm')
-    signed_by_key_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
-        nullable=True
-    )
-    signed_by_key = relationship('SignKey')
 
 
 class BinaryRpm(Base):
@@ -396,12 +390,6 @@ class BinaryRpm(Base):
         nullable=False
     )
     source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
-    signed_by_key_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
-        nullable=True
-    )
-    signed_by_key = relationship('SignKey')
 
 
 class User(Base):
