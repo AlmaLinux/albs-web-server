@@ -162,10 +162,6 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             models.BinaryRpm.build_id == payload.build_id).options(
             selectinload(models.BinaryRpm.artifact)))
         binary_rpms = binary_rpms.scalars().all()
-        sign_tasks = await db.execute(select(models.SignTask).where(
-            models.SignTask.id == sign_task_id
-        ).options(selectinload(models.SignTask.sign_key)))
-        sign_task = sign_tasks.scalars().first()
 
         all_rpms = source_rpms + binary_rpms
         modified_items = []
@@ -199,7 +195,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 new_pkg_href = await pulp_client.create_rpm_package(
                     package.name, package.href, repo.pulp_href)
                 db_package.artifact.href = new_pkg_href
-                db.package.signed_by_key = sign_task.sign_key
+                db_package.artifact.sign_key = sign_task.sign_key
                 modified_items.append(db_package)
                 modified_items.append(db_package.artifact)
 
