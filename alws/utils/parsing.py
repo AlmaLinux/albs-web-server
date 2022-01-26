@@ -1,7 +1,10 @@
 import re
+from tap import parser
+
+from alws.constants import TestCaseStatus
 
 
-__all__ = ['parse_git_ref']
+__all__ = ['parse_git_ref', 'parse_tap_output', 'tap_set_status']
 
 def parse_git_ref(pattern: str, git_ref: str):
     re_pattern = re.compile(pattern)
@@ -10,3 +13,77 @@ def parse_git_ref(pattern: str, git_ref: str):
         return match.groups()[-1]
     else:
         return
+
+
+def parse_tap_output(text: bytes) -> list:
+    """
+    Parses TAP test output and returns list of TAP-formatted entities.
+    Returns list of dicts with detailed status report for each test in file.
+
+    Parameters
+    ----------
+    text : bytes
+        Test output
+
+    Returns
+    -------
+    list
+
+    """
+    text = text.decode('utf8')
+    prepared_text = text.replace("\r\n", "\n")
+    tap_parser = parser.Parser()
+    try:
+        raw_data = list(tap_parser.parse_text(prepared_text))
+    except Exception:
+        return []
+    def get_diagnostic(tap_item):
+        diagnostics = []
+        index = raw_data.index(tap_item) + 1
+        while index < len(raw_data) and \
+                raw_data[index].category == "diagnostic":
+            diagnostics.append(raw_data[index].text)
+            index += 1
+        return u"\n".join(diagnostics)
+
+    tap_output = []
+    if not all([item.category == "unknown" for item in raw_data]):
+        for test_result in raw_data:
+            if test_result.category == "test":
+                test_case = {}
+                test_name = test_result.description
+                if not test_name:
+                    test_name = test_result.directive.text
+                test_case["test_name"] = test_name
+                if test_result.todo:
+                    test_case["status"] = TestCaseStatus.TODO
+                elif test_result.skip:
+                    test_case["status"] = TestCaseStatus.SKIPPED
+                elif test_result.ok:
+                    test_case["status"] = TestCaseStatus.DONE
+                else:
+                    test_case["status"] = TestCaseStatus.FAILED
+                test_case["diagnostic"] = get_diagnostic(test_result)
+                tap_output.append(test_case)
+            else:
+                continue
+    return tap_output
+
+
+def tap_set_status(tap_results):
+    """
+    Set status for test TAP logs
+
+    Parameters
+    ----------
+    tap_results : list of dicts
+        Results of testing TAP parsing
+    Returns
+    -------
+    bool
+        True if all tests have passed, False otherwise
+
+    """
+    conditions = [item["status"] == TestCaseStatus.FAILED for item in tap_results]
+    return False if any(conditions) else True
+

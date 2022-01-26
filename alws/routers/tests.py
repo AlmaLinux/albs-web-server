@@ -46,6 +46,13 @@ async def get_latest_test_results(build_task_id: int,
     return await test.get_test_tasks_by_build_task(db, build_task_id)
 
 
+@router.get('/{build_task_id}/logs',
+            response_model=typing.List[test_schema.TestLog])
+async def get_test_logs(build_task_id: int,
+                        db: database.Session = Depends(get_db)):
+    return await test.get_test_logs(build_task_id, db)
+
+
 @router.get('/{build_task_id}/{revision}',
             response_model=typing.List[test_schema.TestTask])
 async def get_latest_test_results(build_task_id: int, revision: int,
