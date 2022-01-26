@@ -1,12 +1,10 @@
 import itertools
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
-from syncer import sync
 
 from alws import database
 from alws.crud import build_node, test
 from alws.dependencies import get_db, JWTBearer
-from alws.errors import AlreadyBuiltError
 from alws.schemas import build_node_schema
 
 
@@ -17,11 +15,11 @@ router = APIRouter(
 )
 
 
-def build_done_task(build_done_: build_node_schema.BuildDone,
-                    db: database.Session):
-    sync(build_node.build_done(db, build_done_))
+async def build_done_task(build_done_: build_node_schema.BuildDone,
+                          db: database.Session):
+    await build_node.build_done(db, build_done_)
     if build_done_.status == 'done':
-        sync(test.create_test_tasks(db, build_done_.task_id))
+        await test.create_test_tasks(db, build_done_.task_id)
 
 
 @router.post('/ping')
@@ -47,7 +45,7 @@ async def build_done(
     if task_already_finished:
         response.status_code = status.HTTP_409_CONFLICT
         return {'ok': False}
-    background_tasks.add(build_done_task, build_done_, db)
+    background_tasks.add_task(build_done_task, build_done_, db)
     return {'ok': True}
 
 

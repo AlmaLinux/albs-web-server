@@ -100,6 +100,8 @@ async def add_distributions_after_rebuild(
                 else:
                     await pulp_client.modify_repository(
                         remove=value, repo_to=key)
+        for repo in modify.keys():
+            await pulp_client.create_rpm_publication(repo)
 
 
 async def prepare_repo_modify_dict(db_build: models.Build,
@@ -184,3 +186,4 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
             await pulp_client.modify_repository(add=value, repo_to=key)
         else:
             await pulp_client.modify_repository(remove=value, repo_to=key)
+        await pulp_client.create_rpm_publication(key)
