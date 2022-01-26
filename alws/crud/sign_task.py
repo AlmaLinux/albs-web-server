@@ -162,57 +162,58 @@ async def complete_sign_task(db: Session, sign_task_id: int,
             models.BinaryRpm.build_id == payload.build_id).options(
             selectinload(models.BinaryRpm.artifact)))
         binary_rpms = binary_rpms.scalars().all()
+
+        all_rpms = source_rpms + binary_rpms
+        modified_items = []
+        repo_mapping = await __get_build_repos(
+            db, payload.build_id, build=build)
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        sign_failed = False
         sign_tasks = await db.execute(select(models.SignTask).where(
             models.SignTask.id == sign_task_id
         ).options(selectinload(models.SignTask.sign_key)))
         sign_task = sign_tasks.scalars().first()
 
-    all_rpms = source_rpms + binary_rpms
-    modified_items = []
-    repo_mapping = await __get_build_repos(
-        db, payload.build_id, build=build)
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password
-    )
-    sign_failed = False
+        if payload.packages:
+            for package in payload.packages:
+                # Check that package fingerprint matches the requested
+                if package.fingerprint != sign_task.sign_key.fingerprint:
+                    logging.error('Package %s is signed with a wrong GPG key %s, '
+                                  'expected fingerprint: %s', package.name,
+                                  package.fingerprint,
+                                  sign_task.sign_key.fingerprint)
+                    sign_failed = True
+                    continue
+                db_package = next(pkg for pkg in all_rpms
+                                  if pkg.id == package.id)
+                debug = is_debuginfo_rpm(package.name)
+                repo = repo_mapping.get((package.arch, debug))
+                new_pkg_href = await pulp_client.create_rpm_package(
+                    package.name, package.href, repo.pulp_href)
+                db_package.artifact.href = new_pkg_href
+                db_package.artifact.sign_key = sign_task.sign_key
+                modified_items.append(db_package)
+                modified_items.append(db_package.artifact)
 
-    if payload.packages:
-        for package in payload.packages:
-            # Check that package fingerprint matches the requested
-            if package.fingerprint != sign_task.sign_key.fingerprint:
-                logging.error('Package %s is signed with a wrong GPG key %s, '
-                              'expected fingerprint: %s', package.name,
-                              package.fingerprint,
-                              sign_task.sign_key.fingerprint)
-                sign_failed = True
-                continue
-            db_package = next(pkg for pkg in all_rpms
-                              if pkg.id == package.id)
-            debug = is_debuginfo_rpm(package.name)
-            repo = repo_mapping.get((package.arch, debug))
-            new_pkg_href = await pulp_client.create_rpm_package(
-                package.name, package.href, repo.pulp_href)
-            db_package.artifact.href = new_pkg_href
-            modified_items.append(db_package)
-            modified_items.append(db_package.artifact)
+        if payload.success and not sign_failed:
+            sign_task.status = SignStatus.COMPLETED
+            build.signed = True
+        else:
+            sign_task.status = SignStatus.FAILED
+            build.signed = False
+        sign_task.log_href = payload.log_href
+        sign_task.error_message = payload.error_message
 
-    if payload.success and not sign_failed:
-        sign_task.status = SignStatus.COMPLETED
-        build.signed = True
-    else:
-        sign_task.status = SignStatus.FAILED
-        build.signed = False
-    sign_task.log_href = payload.log_href
-    sign_task.error_message = payload.error_message
-
-    db.add(sign_task)
-    db.add(build)
-    if modified_items:
-        db.add_all(modified_items)
-    await db.commit()
-    sign_tasks = await db.execute(select(models.SignTask).where(
-        models.SignTask.id == sign_task_id).options(
-        selectinload(models.SignTask.sign_key)))
+        db.add(sign_task)
+        db.add(build)
+        if modified_items:
+            db.add_all(modified_items)
+        sign_tasks = await db.execute(select(models.SignTask).where(
+            models.SignTask.id == sign_task_id).options(
+            selectinload(models.SignTask.sign_key)))
+        await db.commit()
     return sign_tasks.scalars().first()
