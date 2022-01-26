@@ -123,6 +123,51 @@ class ModuleWrapper:
         hashes = '{0}:{1}'.format(build_context, runtime_context)
         return hashlib.sha1(hashes.encode('utf-8')).hexdigest()[:8]
 
+    def add_module_dependencies_from_mock_defs(self, mock_modules: list = None):
+        old_deps = Modulemd.Dependencies()
+        new_deps = Modulemd.Dependencies()
+        modules = []
+        if mock_modules:
+            for module in mock_modules:
+                module_name, module_stream = module.split(':')
+                modules.append((module_name, module_stream))
+        if self._stream.get_dependencies():
+            old_deps = self._stream.get_dependencies()[0]
+
+        # Override build time modules if needed
+        added_build_deps = []
+        for old_dep in old_deps.get_buildtime_modules():
+            streams = old_deps.get_buildtime_streams(old_dep)
+            if modules:
+                for module in modules:
+                    if old_dep == module[0] and not streams:
+                        new_deps.add_buildtime_stream(module[0], module[1])
+                        added_build_deps.append(old_dep)
+
+        for old_dep in old_deps.get_buildtime_modules():
+            streams = old_deps.get_buildtime_streams(old_dep)
+            if old_dep not in added_build_deps:
+                for stream in streams:
+                    new_deps.add_buildtime_stream(old_dep, stream)
+
+        # Override runtime modules if needed
+        added_runtime_deps = []
+        for old_dep in old_deps.get_runtime_modules():
+            streams = old_deps.get_runtime_streams(old_dep)
+            for module in modules:
+                if old_dep == module[0] and not streams:
+                    new_deps.add_runtime_stream(module[0], module[1])
+                    added_runtime_deps.append(old_dep)
+
+        for old_dep in old_deps.get_runtime_modules():
+            streams = old_deps.get_runtime_streams(old_dep)
+            if old_dep not in added_runtime_deps:
+                for stream in streams:
+                    new_deps.add_runtime_stream(old_dep, stream)
+
+        self._stream.clear_dependencies()
+        self._stream.add_dependencies(new_deps)
+
     def get_build_deps(self) -> dict:
         build_deps = {}
         # try to extract a detailed requirements list from the

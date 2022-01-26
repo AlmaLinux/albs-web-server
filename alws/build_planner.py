@@ -156,7 +156,12 @@ class BuildPlanner:
             settings.pulp_password
         )
         module = None
-        mock_options = {'definitions': {}}
+        if self._build.mock_options:
+            mock_options = self._build.mock_options.copy()
+            if not mock_options.get('definitions'):
+                mock_options['definitions'] = {}
+        else:
+            mock_options = {'definitions': {}}
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
             if task.module_platform_version:
@@ -164,8 +169,10 @@ class BuildPlanner:
                     item for item in platform.modularity['versions']
                     if item['name'] == task.module_platform_version
                 )
-            for arch in self._request_platforms[platform.name]:
+            for arch in self._request_platforms[platform.name]
                 module = ModuleWrapper.from_template(module_templates[0])
+                module.add_module_dependencies_from_mock_defs(
+                    mock_modules=mock_options.get('module_enable', []))
                 mock_options['module_enable'] = [
                     f'{module.name}:{module.stream}'
                 ]
