@@ -83,33 +83,35 @@ class RpmArtifact(BaseModel):
         )
         result = re.search(regex, artifact)
         if not result:
-            return None
+            return
         return RpmArtifact(**result.groupdict())
+
+    @staticmethod
+    def from_pulp_model(rpm_pkg: dict) -> 'RpmArtifact':
+        return RpmArtifact(
+            name=rpm_pkg['name'],
+            epoch=int(rpm_pkg['epoch']),
+            version=rpm_pkg['version'],
+            release=rpm_pkg['release'],
+            arch=rpm_pkg['arch']
+        )
 
 
 class ModuleWrapper:
 
-    def __init__(self, index, module, stream):
-        self._index = index
-        self._module = module
+    def __init__(self, stream):
         self._stream = stream
 
     @classmethod
     def from_template(cls, template: str, name=None, stream=None):
-        index = Modulemd.ModuleIndex.new()
-        ret, _ = index.update_from_string(template, strict=True)
-        if not ret:
-            if not all([name, stream]):
-                raise ValueError('can not parse modules.yaml template')
-            stream = Modulemd.ModuleStreamV2.read_string(
+        if all([name, stream]):
+            md_stream = Modulemd.ModuleStreamV2.read_string(
                 template, True, name, stream)
-            if not stream:
-                raise ValueError('can not parse modules.yaml template')
-            index.add_module_stream(stream)
-        name = index.get_module_names()[0]
-        module = index.get_module(name)
-        stream = module.get_all_streams()[0]
-        return ModuleWrapper(index, module, stream)
+        else:
+            md_stream = Modulemd.ModuleStreamV2.read_string(template, True)
+        if not md_stream:
+            raise ValueError('can not parse modules.yaml template')
+        return ModuleWrapper(md_stream)
 
     def generate_new_version(self, platform_prefix: str) -> int:
         return int(platform_prefix + datetime.datetime.utcnow().strftime(
@@ -215,14 +217,11 @@ class ModuleWrapper:
                 component.add_restricted_arch(arch)
 
     def add_rpm_artifact(self, rpm_pkg: dict):
-        artifact = RpmArtifact(
-            name=rpm_pkg['name'],
-            epoch=int(rpm_pkg['epoch']),
-            version=rpm_pkg['version'],
-            release=rpm_pkg['release'],
-            arch=rpm_pkg['arch']
-        ).as_artifact()
-        if not self.is_artifact_filtered(artifact):
+        artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
+        if self.is_artifact_filtered(artifact):
+            if self.name.endswith('-devel'):
+                self._stream.add_rpm_artifact(artifact)
+        elif not self.name.endswith('-devel'):
             self._stream.add_rpm_artifact(artifact)
 
     def is_artifact_filtered(self, artifact: str) -> bool:
@@ -268,7 +267,9 @@ class ModuleWrapper:
                     yield module, stream
 
     def render(self) -> str:
-        return self._index.dump_to_string()
+        index = IndexWrapper()
+        index.add_module(self)
+        return index.render()
 
     @property
     def name(self) -> str:
@@ -301,3 +302,41 @@ class ModuleWrapper:
     @arch.setter
     def arch(self, arch: str):
         self._stream.set_arch(arch)
+
+
+class IndexWrapper:
+
+    def __init__(self, index=None):
+        if index is None:
+            index = Modulemd.ModuleIndex.new()
+        self._index = index
+
+    @staticmethod
+    def from_template(template: str):
+        index = Modulemd.ModuleIndex.new()
+        ret, _ = index.update_from_string(template, strict=True)
+        if not ret:
+            raise ValueError('can not parse modules.yaml template')
+        return IndexWrapper(index)
+
+    def get_module(self, name: str, stream: str) -> ModuleWrapper:
+        module = self._index.get_module(name)
+        for module_stream in module.get_all_streams():
+            if module_stream.get_stream_name() == stream:
+                return ModuleWrapper(module_stream)
+        raise ModuleNotFoundError(f'Index doesn\'t contain {name}:{stream}')
+
+    def add_module(self, module: ModuleWrapper):
+        self._index.add_module_stream(module._stream)
+
+    def iter_modules(self):
+        for module_name in self._index.get_module_names():
+            module = self._index.get_module(module_name)
+            for stream in module.get_all_streams():
+                yield ModuleWrapper(stream)
+
+    def render(self) -> str:
+        return self._index.dump_to_string()
+
+    def copy(self):
+        return self.from_template(self.render())

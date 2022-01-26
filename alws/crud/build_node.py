@@ -11,7 +11,7 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.errors import AlreadyBuiltError
 from alws.schemas import build_node_schema
-from alws.utils.modularity import ModuleWrapper
+from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import add_multilib_packages, get_multilib_packages
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
@@ -126,7 +126,7 @@ async def build_done(
             settings.pulp_user,
             settings.pulp_password
         )
-        build_module = None
+        module_index = None
         module_repo = None
         if build_task.rpm_module:
             module_repo = next(
@@ -136,8 +136,8 @@ async def build_done(
                 and build_repo.type == 'rpm'
             )
             repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
-                module_repo.url, build_task.rpm_module.sha256)
-            build_module = ModuleWrapper.from_template(repo_modules_yaml)
+                module_repo.url)
+            module_index = IndexWrapper.from_template(repo_modules_yaml)
         artifacts = []
         for artifact in request.artifacts:
             href = None
@@ -154,9 +154,10 @@ async def build_done(
                 repo = repos[0]
                 href = await pulp_client.create_rpm_package(
                     artifact.name, artifact.href, repo.pulp_href)
-                if build_module:
-                    rpm_package = await pulp_client.get_rpm_package(href)
-                    build_module.add_rpm_artifact(rpm_package)
+                if module_index:
+                    for module in module_index.iter_modules():
+                        rpm_package = await pulp_client.get_rpm_package(href)
+                        module.add_rpm_artifact(rpm_package)
             elif artifact.type == 'build_log':
                 repo = next(
                     repo for repo in repos
@@ -172,9 +173,14 @@ async def build_done(
                     href=href
                 )
             )
-        if build_module:
+        if build_task.rpm_module:
             module_pulp_href, sha256 = await pulp_client.create_module(
-                build_module.render())
+                module_index.render(),
+                build_task.rpm_module.name,
+                build_task.rpm_module.stream,
+                build_task.rpm_module.context,
+                build_task.rpm_module.arch
+            )
             await pulp_client.modify_repository(
                 module_repo.pulp_href,
                 add=[module_pulp_href],
@@ -201,25 +207,26 @@ async def build_done(
         multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
         if multilib_pkgs:
             await add_multilib_packages(db, build_task, multilib_pkgs)
+    try:
+        await save_noarch_packages(db, build_task)
+    except:
+        pass
 
-    await save_noarch_packages(db, build_task)
-
-    async with db.begin():
-        rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
-            models.BuildTaskArtifact.build_task_id == build_task.id,
-            models.BuildTaskArtifact.type == 'rpm'))
-        srpm = None
-        binary_rpms = []
-        for rpm in rpms_result.scalars().all():
-            if rpm.name.endswith('.src.rpm'):
-                srpm = models.SourceRpm()
-                srpm.artifact = rpm
-                srpm.build = build_task.build
-            else:
-                binary_rpm = models.BinaryRpm()
-                binary_rpm.artifact = rpm
-                binary_rpm.build = build_task.build
-                binary_rpms.append(binary_rpm)
+    rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
+        models.BuildTaskArtifact.build_task_id == build_task.id,
+        models.BuildTaskArtifact.type == 'rpm'))
+    srpm = None
+    binary_rpms = []
+    for rpm in rpms_result.scalars().all():
+        if rpm.name.endswith('.src.rpm'):
+            srpm = models.SourceRpm()
+            srpm.artifact = rpm
+            srpm.build = build_task.build
+        else:
+            binary_rpm = models.BinaryRpm()
+            binary_rpm.artifact = rpm
+            binary_rpm.build = build_task.build
+            binary_rpms.append(binary_rpm)
     if srpm:
         db.add(srpm)
         await db.commit()
@@ -227,5 +234,5 @@ async def build_done(
         for binary_rpm in binary_rpms:
             binary_rpm.source_rpm = srpm
 
-        db.add_all(binary_rpms)
-        await db.commit()
+    db.add_all(binary_rpms)
+    await db.commit()
