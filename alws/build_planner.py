@@ -30,7 +30,8 @@ class BuildPlanner:
                 self,
                 db: Session,
                 user_id: int,
-                platforms: typing.List[build_schema.BuildCreatePlatforms]
+                platforms: typing.List[build_schema.BuildCreatePlatforms],
+                is_secure_boot: bool,
             ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -47,6 +48,7 @@ class BuildPlanner:
         self._module_build_index = {}
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
+        self._is_secure_boot = is_secure_boot
 
     async def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
@@ -316,6 +318,7 @@ class BuildPlanner:
                     index=self._task_index,
                     ref=ref,
                     rpm_module=modules[0] if modules else None,
+                    is_secure_boot=self._is_secure_boot,
                     mock_options=mock_options
                 )
                 task_key = (platform.name, arch)

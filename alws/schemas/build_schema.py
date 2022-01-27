@@ -81,6 +81,7 @@ class BuildCreate(BaseModel):
     tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    is_secure_boot: bool
 
 
 class BuildPlatform(BaseModel):
@@ -115,6 +116,7 @@ class BuildTask(BaseModel):
     platform: BuildPlatform
     ref: BuildTaskRef
     artifacts: typing.List[BuildTaskArtifact]
+    is_secure_boot: typing.Optional[bool]
 
     class Config:
         orm_mode = True

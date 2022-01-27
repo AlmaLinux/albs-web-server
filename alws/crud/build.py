@@ -21,7 +21,8 @@ async def create_build(
             user_id: int
         ) -> models.Build:
     async with db.begin():
-        planner = BuildPlanner(db, user_id, build.platforms)
+        planner = BuildPlanner(
+            db, user_id, build.platforms, build.is_secure_boot)
         await planner.load_platforms()
         if build.mock_options:
             planner.add_mock_options(build.mock_options)
