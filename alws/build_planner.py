@@ -169,7 +169,7 @@ class BuildPlanner:
                     item for item in platform.modularity['versions']
                     if item['name'] == task.module_platform_version
                 )
-            for arch in self._request_platforms[platform.name]
+            for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_templates[0])
                 module.add_module_dependencies_from_mock_defs(
                     mock_modules=mock_options.get('module_enable', []))
