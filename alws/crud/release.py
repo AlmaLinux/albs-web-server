@@ -154,9 +154,9 @@ async def execute_release_plan(release_id: int, db: Session):
 
     async with db.begin():
         release_result = await db.execute(
-            select(models.Release
-                   ).where(models.Release.id == release_id).options(
-                selectinload(models.Platform.platform_id)))
+            select(models.Release).where(
+                models.Release.id == release_id).options(
+                    selectinload(models.Platform.platform_id)))
         release = release_result.scalars().first()
         if not release.plan.get('packages') or \
                 not release.plan.get('repositories'):
@@ -165,7 +165,7 @@ async def execute_release_plan(release_id: int, db: Session):
                                    .format_map(release.plan))
         for build_id in release.build_ids:
             try:
-                verified = sign_task.verify_signed_build(
+                verified = await sign_task.verify_signed_build(
                     db, build_id, release.platform_id)
             except (DataNotFoundError, ValueError) as e:
                 msg = f'The build {build_id} was not verified, because\n{e}'

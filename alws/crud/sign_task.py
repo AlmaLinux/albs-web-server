@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
-from alws.errors import BuildAlreadySignedError, DataNotFoundError
+from alws.errors import BuildAlreadySignedError, DataNotFoundError, SignError
 from alws.schemas import sign_schema
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
@@ -259,7 +259,7 @@ async def verify_signed_build(db: Session, build_id: int,
         all_rpms = source_rpms + binary_rpms
         for p in all_rpms:
             if p.signed_by_key != sign_key:
-                raise DataNotFoundError(
+                raise SignError(
                     f'Sign key with for pkg ID {p.id} is not matched '
                     f'by sign key for platform ID {platform_id}')
         await db.commit()
