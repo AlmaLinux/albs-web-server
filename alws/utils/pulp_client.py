@@ -376,7 +376,7 @@ class PulpClient:
     async def wait_for_task(self, task_href: str):
         task = await self.make_get_request(task_href)
         while task['state'] not in ('failed', 'completed'):
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(1)
             task = await self.make_get_request(task_href)
         return task
 
