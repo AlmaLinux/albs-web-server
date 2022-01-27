@@ -1,10 +1,18 @@
+import asyncio
 import typing
+import logging
 import datetime
 import urllib.parse
 
+import aiohttp.client_exceptions
 from pydantic import BaseModel, validator, Field, conlist
 
+from alws.config import settings
 from alws.constants import BuildTaskRefType
+from alws.utils.gitea import (
+    download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
+)
+from alws.utils.modularity import ModuleWrapper, get_modified_refs_list
 
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
@@ -51,6 +59,16 @@ class BuildTaskRef(BaseModel):
         orm_mode = True
 
 
+class BuildTaskModuleRef(BaseModel):
+
+    module_name: str
+    module_stream: str
+    module_platform_version: str
+    module_version: typing.Optional[str] = None
+    modules_yaml: str
+    refs: typing.List[BuildTaskRef]
+
+
 class BuildCreatePlatforms(BaseModel):
 
     name: str
@@ -60,7 +78,7 @@ class BuildCreatePlatforms(BaseModel):
 class BuildCreate(BaseModel):
 
     platforms: conlist(BuildCreatePlatforms, min_items=1)
-    tasks: conlist(BuildTaskRef, min_items=1)
+    tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
     linked_builds: typing.Optional[typing.List[int]]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
 
@@ -160,3 +178,111 @@ class BuildsResponse(BaseModel):
     builds: typing.List[Build]
     total_builds: typing.Optional[int]
     current_page: typing.Optional[int]
+
+
+class ModulePreviewRequest(BaseModel):
+
+    ref: BuildTaskRef
+    platform_name: str
+
+
+class ModuleRef(BaseModel):
+
+    url: str
+    git_ref: str
+    exist: bool
+    mock_options: dict
+
+
+class ModulePreview(BaseModel):
+
+    refs: typing.List[ModuleRef]
+    modules_yaml: str
+    module_name: str
+    module_stream: str
+
+
+async def _get_module_ref(
+            component_name, modified_list, platform_prefix_list,
+            module, gitea_client, devel_module, platform_packages_git
+        ):
+    ref_prefix = platform_prefix_list['non_modified']
+    if component_name in modified_list:
+        ref_prefix = platform_prefix_list['modified']
+    git_ref = f'{ref_prefix}-stream-{module.stream}'
+    exist = True
+    commit_id = ''
+    try:
+        response = await gitea_client.get_branch(
+            f'rpms/{component_name}', git_ref
+        )
+        commit_id = response['commit']['id']
+    except aiohttp.client_exceptions.ClientResponseError as e:
+        if e.status == 404:
+            exist = False
+    module.set_component_ref(component_name, commit_id)
+    if devel_module:
+        devel_module.set_component_ref(component_name, commit_id)
+    return ModuleRef(
+        url=f'{platform_packages_git}{component_name}.git',
+        git_ref=git_ref,
+        exist=exist,
+        mock_options={
+            'definitions': {
+                k: v for k, v in module.iter_mock_definitions()
+            }
+        },
+        ref_type=BuildTaskRefType.GIT_BRANCH
+    )
+
+
+async def get_module_refs(task, platform):
+    result = []
+    gitea_client = GiteaClient(
+        settings.gitea_host,
+        logging.getLogger(__name__)
+    )
+    modified_list = await get_modified_refs_list(
+        platform.modularity['modified_packages_url']
+    )
+    template = await download_modules_yaml(
+        task.url,
+        task.git_ref,
+        BuildTaskRefType.to_text(task.ref_type)
+    )
+    devel_ref = task.get_dev_module()
+    devel_template = None
+    devel_module = None
+    try:
+        devel_template = await download_modules_yaml(
+            devel_ref.url,
+            devel_ref.git_ref,
+            BuildTaskRefType.to_text(devel_ref.ref_type)
+        )
+        devel_module = ModuleWrapper.from_template(
+            devel_template,
+            name=devel_ref.git_repo_name,
+            stream=devel_ref.module_stream_from_ref()
+        )
+    except ModulesYamlNotFoundError:
+        pass
+    module = ModuleWrapper.from_template(
+        template,
+        name=task.git_repo_name,
+        stream=task.module_stream_from_ref()
+    )
+    platform_prefix_list = platform.modularity['git_tag_prefix']
+    platform_packages_git = platform.modularity['packages_git']
+    component_tasks = []
+    for component_name, _ in module.iter_components():
+        component_tasks.append(
+            _get_module_ref(
+                component_name, modified_list, platform_prefix_list,
+                module, gitea_client, devel_module, platform_packages_git
+            )
+        )
+    result = await asyncio.gather(*component_tasks)
+    modules = [module.render()]
+    if devel_module:
+        modules.append(devel_module.render())
+    return result, modules

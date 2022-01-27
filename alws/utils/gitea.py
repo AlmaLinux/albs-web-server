@@ -6,7 +6,7 @@ import logging
 import aiohttp
 
 
-class ModuleNotFoundError(Exception):
+class ModulesYamlNotFoundError(Exception):
     pass
 
 
@@ -32,7 +32,7 @@ async def download_modules_yaml(url: str, ref: str, ref_type: str) -> str:
                 response.raise_for_status()
             except aiohttp.ClientResponseError as error:
                 if error.status == 404:
-                    raise ModuleNotFoundError()
+                    raise ModulesYamlNotFoundError()
                 raise
             return template
 
