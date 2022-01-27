@@ -1,4 +1,5 @@
 import datetime
+import logging
 import typing
 
 import sqlalchemy
@@ -9,7 +10,6 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
-from alws.errors import AlreadyBuiltError
 from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import add_multilib_packages, get_multilib_packages
@@ -90,110 +90,121 @@ async def ping_tasks(
         await db.commit()
 
 
+async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
+    async with db.begin():
+        build_tasks = await db.execute(select(models.BuildTask).where(
+            models.BuildTask.id == task_id))
+        build_task = build_tasks.scalars().first()
+    return BuildTaskStatus.is_finished(build_task.status)
+
+
+async def __process_build_task_artifacts(
+        db: Session, task_id: int, task_artifacts: list):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    build_tasks = await db.execute(
+        select(models.BuildTask).where(
+            models.BuildTask.id == task_id).options(
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos
+            ),
+            selectinload(models.BuildTask.rpm_module)
+        ).with_for_update()
+    )
+    build_task = build_tasks.scalars().first()
+    module_index = None
+    module_repo = None
+    artifacts = []
+    str_task_id = str(task_id)
+    if build_task.rpm_module:
+        module_repo = next(
+            build_repo for build_repo in build_task.build.repos
+            if build_repo.arch == build_task.arch
+            and not build_repo.debug
+            and build_repo.type == 'rpm'
+        )
+        repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
+            module_repo.url)
+        module_index = IndexWrapper.from_template(repo_modules_yaml)
+    for artifact in task_artifacts:
+        href = None
+        arch = build_task.arch
+        if artifact.type == 'rpm' and artifact.arch == 'src':
+            arch = artifact.arch
+        repos = list(
+            build_repo for build_repo in build_task.build.repos
+            if build_repo.arch == arch
+            and build_repo.type == artifact.type
+            and build_repo.debug == artifact.is_debuginfo
+        )
+        if artifact.type == 'rpm':
+            repo = repos[0]
+            href = await pulp_client.create_rpm_package(
+                artifact.name, artifact.href, repo.pulp_href)
+            if module_index:
+                for module in module_index.iter_modules():
+                    rpm_package = await pulp_client.get_rpm_package(href)
+                    module.add_rpm_artifact(rpm_package)
+        elif artifact.type == 'build_log':
+            repo = next(
+                repo for repo in repos
+                if repo.name.endswith(str_task_id)
+            )
+            href = await pulp_client.create_file(
+                artifact.name, artifact.href, repo.pulp_href)
+        if not href:
+            logging.error("Artifact %s was not saved properly in Pulp, "
+                          "skipping", str(artifact))
+            continue
+        artifacts.append(
+            models.BuildTaskArtifact(
+                build_task_id=build_task.id,
+                name=artifact.name,
+                type=artifact.type,
+                href=href
+            )
+        )
+    if build_task.rpm_module:
+        module_pulp_href, sha256 = await pulp_client.create_module(
+            module_index.render(),
+            build_task.rpm_module.name,
+            build_task.rpm_module.stream,
+            build_task.rpm_module.context,
+            build_task.rpm_module.arch
+        )
+        await pulp_client.modify_repository(
+            module_repo.pulp_href,
+            add=[module_pulp_href],
+            remove=[build_task.rpm_module.pulp_href]
+        )
+        build_task.rpm_module.sha256 = sha256
+        build_task.rpm_module.pulp_href = module_pulp_href
+
+    db.add_all(artifacts)
+    db.add(build_task)
+    await db.commit()
+    await db.refresh(build_task)
+    return build_task
+
+
 async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
-    async with db.begin():
-        query = models.BuildTask.id == request.task_id
-        build_task = await db.execute(
-            select(models.BuildTask).where(query).options(
-                selectinload(models.BuildTask.platform),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.repos
-                ),
-                selectinload(models.BuildTask.rpm_module)
-            ).with_for_update()
-        )
-        build_task = build_task.scalars().first()
-        if BuildTaskStatus.is_finished(build_task.status):
-            raise AlreadyBuiltError(
-                f'Build task {build_task.id} already completed')
-        status = BuildTaskStatus.COMPLETED
-        if request.status == 'failed':
-            status = BuildTaskStatus.FAILED
-        elif request.status == 'excluded':
-            status = BuildTaskStatus.EXCLUDED
-        build_task.status = status
-        remove_query = (
-            models.BuildTaskDependency.c.build_task_dependency == request.task_id
-        )
-        await db.execute(
-            delete(models.BuildTaskDependency).where(remove_query)
-        )
-        pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
-        )
-        module_index = None
-        module_repo = None
-        if build_task.rpm_module:
-            module_repo = next(
-                build_repo for build_repo in build_task.build.repos
-                if build_repo.arch == build_task.arch
-                and not build_repo.debug
-                and build_repo.type == 'rpm'
-            )
-            repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
-                module_repo.url)
-            module_index = IndexWrapper.from_template(repo_modules_yaml)
-        artifacts = []
-        for artifact in request.artifacts:
-            href = None
-            arch = build_task.arch
-            if artifact.type == 'rpm' and artifact.arch == 'src':
-                arch = artifact.arch
-            repos = list(
-                build_repo for build_repo in build_task.build.repos
-                if build_repo.arch == arch
-                and build_repo.type == artifact.type
-                and build_repo.debug == artifact.is_debuginfo
-            )
-            if artifact.type == 'rpm':
-                repo = repos[0]
-                href = await pulp_client.create_rpm_package(
-                    artifact.name, artifact.href, repo.pulp_href)
-                if module_index:
-                    for module in module_index.iter_modules():
-                        rpm_package = await pulp_client.get_rpm_package(href)
-                        module.add_rpm_artifact(rpm_package)
-            elif artifact.type == 'build_log':
-                repo = next(
-                    repo for repo in repos
-                    if repo.name.endswith(str(request.task_id))
-                )
-                href = await pulp_client.create_file(
-                    artifact.name, artifact.href, repo.pulp_href)
-            artifacts.append(
-                models.BuildTaskArtifact(
-                    build_task_id=build_task.id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    href=href
-                )
-            )
-        if build_task.rpm_module:
-            module_pulp_href, sha256 = await pulp_client.create_module(
-                module_index.render(),
-                build_task.rpm_module.name,
-                build_task.rpm_module.stream,
-                build_task.rpm_module.context,
-                build_task.rpm_module.arch
-            )
-            await pulp_client.modify_repository(
-                module_repo.pulp_href,
-                add=[module_pulp_href],
-                remove=[build_task.rpm_module.pulp_href]
-            )
-            build_task.rpm_module.sha256 = sha256
-            build_task.rpm_module.pulp_href = module_pulp_href
-        db.add_all(artifacts)
-        db.add(build_task)
-        await db.commit()
+
+    build_task = await __process_build_task_artifacts(
+        db, request.task_id, request.artifacts)
+    status = BuildTaskStatus.COMPLETED
+    if request.status == 'failed':
+        status = BuildTaskStatus.FAILED
+    elif request.status == 'excluded':
+        status = BuildTaskStatus.EXCLUDED
 
     multilib_conditions = (
-        build_task.arch == 'x86_64',
+        build_task.arch in ('x86_64', 'i686'),
         status == BuildTaskStatus.COMPLETED,
         bool(settings.beholder_host),
         # TODO: Beholder doesn't have authorization right now
@@ -207,10 +218,18 @@ async def build_done(
         multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
         if multilib_pkgs:
             await add_multilib_packages(db, build_task, multilib_pkgs)
-    try:
-        await save_noarch_packages(db, build_task)
-    except:
-        pass
+    await save_noarch_packages(db, build_task)
+
+    await db.execute(
+        update(models.BuildTask).where(
+            models.BuildTask.id == request.task_id).values(status=status)
+    )
+
+    await db.execute(
+        delete(models.BuildTaskDependency).where(
+            models.BuildTaskDependency.c.build_task_dependency == request.task_id
+        )
+    )
 
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
