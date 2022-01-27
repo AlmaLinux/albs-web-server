@@ -1,12 +1,11 @@
 import itertools
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
 
 from alws import database
 from alws.config import settings
 from alws.crud import build_node, test
 from alws.dependencies import get_db, JWTBearer
-from alws.errors import AlreadyBuiltError
 from alws.schemas import build_node_schema
 
 
@@ -17,30 +16,37 @@ router = APIRouter(
 )
 
 
+async def build_done_task(build_done_: build_node_schema.BuildDone,
+                          db: database.Session):
+    await build_node.build_done(db, build_done_)
+    if build_done_.status == 'done':
+        await test.create_test_tasks(db, build_done_.task_id)
+
+
 @router.post('/ping')
 async def ping(
             node_status: build_node_schema.Ping,
             db: database.Session = Depends(get_db)
         ):
     if not node_status.active_tasks:
-        return
+        return {}
     await build_node.ping_tasks(db, node_status.active_tasks)
+    return {}
 
 
 @router.post('/build_done')
 async def build_done(
             build_done_: build_node_schema.BuildDone,
             response: Response,
-            db: database.Session = Depends(get_db)
+            background_tasks: BackgroundTasks,
+            db: database.Session = Depends(get_db),
         ):
-    try:
-        await build_node.build_done(db, build_done_)
-    except AlreadyBuiltError:
+    task_already_finished = await build_node.check_build_task_is_finished(
+        db, build_done_.task_id)
+    if task_already_finished:
         response.status_code = status.HTTP_409_CONFLICT
-    # need add some logic after discussing with team
-    # await crud.add_distributions_after_rebuild(db, build_done)
-    if build_done_.status == 'done':
-        await test.create_test_tasks(db, build_done_.task_id)
+        return {'ok': False}
+    background_tasks.add_task(build_done_task, build_done_, db)
     return {'ok': True}
 
 
@@ -64,6 +70,7 @@ async def get_task(
         'platform': build_node_schema.TaskPlatform.from_orm(task.platform),
         'repositories': [],
         'built_srpm_url': built_srpm_url,
+        'is_secure_boot': task.is_secure_boot,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

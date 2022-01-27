@@ -9,7 +9,11 @@ from fastapi import (
 )
 
 from alws import database
-from alws.crud import build as build_crud, build_node
+from alws.crud import (
+    build as build_crud,
+    build_node,
+    platform as platform_crud
+)
 from alws.dependencies import get_db, JWTBearer
 from alws.errors import DataNotFoundError
 from alws.schemas import build_schema
@@ -46,6 +50,18 @@ async def get_builds_per_page(
         page_number=pageNumber,
         search_params=search_params,
     )
+
+
+@router.post('/get_module_preview/',
+             response_model=build_schema.ModulePreview)
+async def get_module_preview(
+    module_request: build_schema.ModulePreviewRequest,
+    db: database.Session = Depends(get_db)
+):
+    platform = await platform_crud.get_platform(
+        db, module_request.platform_name
+    )
+    return await build_crud.get_module_preview(platform, module_request)
 
 
 @router.get('/{build_id}/', response_model=build_schema.Build)

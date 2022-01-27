@@ -3,8 +3,6 @@ import asyncio
 import typing
 import collections
 
-import yaml
-import aiohttp
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
@@ -15,9 +13,11 @@ from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
-from alws.utils.modularity import ModuleWrapper, calc_dist_macro, IndexWrapper
+from alws.utils.modularity import (
+    ModuleWrapper, calc_dist_macro, get_modified_refs_list, IndexWrapper
+)
 from alws.utils.gitea import (
-    download_modules_yaml, GiteaClient, ModuleNotFoundError
+    download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
 
 
@@ -30,7 +30,8 @@ class BuildPlanner:
                 self,
                 db: Session,
                 user_id: int,
-                platforms: typing.List[build_schema.BuildCreatePlatforms]
+                platforms: typing.List[build_schema.BuildCreatePlatforms],
+                is_secure_boot: bool,
             ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -47,6 +48,7 @@ class BuildPlanner:
         self._module_build_index = {}
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
+        self._is_secure_boot = is_secure_boot
 
     async def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
@@ -141,14 +143,39 @@ class BuildPlanner:
         self._build.linked_builds.append(linked_build)
 
     async def add_task(self, task: build_schema.BuildTaskRef):
-        if not task.is_module:
+        if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
             await self._add_single_ref(models.BuildTaskRef(
                 url=task.url,
                 git_ref=task.git_ref,
                 ref_type=task.ref_type
             ))
             return
-        refs, module_templates = await self._get_module_refs(task)
+
+        if isinstance(task, build_schema.BuildTaskModuleRef):
+            raw_refs = task.refs
+            _index = IndexWrapper.from_template(task.modules_yaml)
+            module = _index.get_module(task.module_name, task.module_stream)
+            devel_module = None
+            try:
+                devel_module = _index.get_module(
+                    task.module_name + '-devel', task.module_stream
+                )
+            except ModuleNotFoundError:
+                pass
+            module_templates = [module.render()]
+            if devel_module:
+                module_templates.append(devel_module.render())
+        else:
+            raw_refs, module_templates = await build_schema.get_module_refs(
+                task, self._platforms[0]
+            )
+        refs = [
+            models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=BuildTaskRefType.GIT_BRANCH
+            ) for ref in raw_refs
+        ]
         # TODO: we should merge all of the modules before insert
         pulp_client = PulpClient(
             settings.pulp_host,
@@ -156,7 +183,12 @@ class BuildPlanner:
             settings.pulp_password
         )
         module = None
-        mock_options = {'definitions': {}}
+        if self._build.mock_options:
+            mock_options = self._build.mock_options.copy()
+            if not mock_options.get('definitions'):
+                mock_options['definitions'] = {}
+        else:
+            mock_options = {'definitions': {}}
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
             if task.module_platform_version:
@@ -166,6 +198,8 @@ class BuildPlanner:
                 )
             for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_templates[0])
+                module.add_module_dependencies_from_mock_defs(
+                    mock_modules=mock_options.get('module_enable', []))
                 mock_options['module_enable'] = [
                     f'{module.name}:{module.stream}'
                 ]
@@ -232,77 +266,11 @@ class BuildPlanner:
                 ref_platform_version=task.module_platform_version
             )
 
-    async def _get_module_refs(self, task: build_schema.BuildTaskRef):
-        template = await download_modules_yaml(
-            task.url,
-            task.git_ref,
-            BuildTaskRefType.to_text(task.ref_type)
-        )
-        devel_ref = task.get_dev_module()
-        devel_template = None
-        devel_module = None
-        try:
-            devel_template = await download_modules_yaml(
-                devel_ref.url,
-                devel_ref.git_ref,
-                BuildTaskRefType.to_text(devel_ref.ref_type)
-            )
-            devel_module = ModuleWrapper.from_template(
-                devel_template,
-                name=devel_ref.git_repo_name,
-                stream=devel_ref.module_stream_from_ref()
-            )
-        except ModuleNotFoundError:
-            pass
-        module = ModuleWrapper.from_template(
-            template,
-            name=task.git_repo_name,
-            stream=task.module_stream_from_ref()
-        )
-        result = []
-        # TODO: we should rethink schema for multiple platforms
-        #       right now there is no option to create tasks with different
-        #       refs for multiple platforms
-        platform = self._platforms[0]
-        platform_prefix_list = platform.modularity['git_tag_prefix']
-        platform_packages_git = platform.modularity['packages_git']
-        for component_name, _ in module.iter_components():
-            ref_prefix = platform_prefix_list['non_modified']
-            if await self.is_ref_modified(platform, component_name):
-                ref_prefix = platform_prefix_list['modified']
-            git_ref = f'{ref_prefix}-stream-{module.stream}'
-            result.append(models.BuildTaskRef(
-                url=f'{platform_packages_git}{component_name}.git',
-                git_ref=git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH
-            ))
-            ref = await self.get_ref_commit_id(component_name, git_ref)
-            module.set_component_ref(component_name, ref)
-            if devel_module:
-                devel_module.set_component_ref(component_name, ref)
-        modules = [module.render()]
-        if devel_module:
-            modules.append(devel_module.render())
-        return result, modules
-
     async def get_ref_commit_id(self, git_name, git_branch):
         response = await self._gitea_client.get_branch(
             f'rpms/{git_name}', git_branch
         )
         return response['commit']['id']
-
-    async def is_ref_modified(self, platform: models.Platform, ref: str):
-        if self._module_modified_cache.get(platform.name):
-            return ref in self._module_modified_cache[platform.name]
-        url = platform.modularity['modified_packages_url']
-        package_list = []
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                yaml_body = await response.text()
-                response.raise_for_status()
-                package_list = yaml.safe_load(yaml_body)['modified_packages']
-        self._module_modified_cache[platform.name] = package_list
-        return ref in self._module_modified_cache[platform.name]
 
     async def _add_single_ref(
             self,
@@ -353,7 +321,8 @@ class BuildPlanner:
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=modules[0],
+                    rpm_module=modules[0] if modules else None,
+                    is_secure_boot=self._is_secure_boot,
                     mock_options=mock_options
                 )
                 task_key = (platform.name, arch)

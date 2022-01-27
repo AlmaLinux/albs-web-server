@@ -52,73 +52,72 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
         settings.pulp_user,
         settings.pulp_password,
     )
-    async with db.begin():
-        build_tasks = await db.execute(query)
-        build_tasks = build_tasks.scalars().all()
-        if not all(
-                BuildTaskStatus.is_finished(task.status)
-                for task in build_tasks):
-            return
+    build_tasks = await db.execute(query)
+    build_tasks = build_tasks.scalars().all()
+    if not all(
+            BuildTaskStatus.is_finished(task.status)
+            for task in build_tasks):
+        return
 
-        build_task_ids = [task.id for task in build_tasks]
-        noarch_packages, debug_noarch_packages = await get_noarch_packages(
-            db, build_task_ids)
-        if not any((noarch_packages, debug_noarch_packages)):
-            return
+    build_task_ids = [task.id for task in build_tasks]
+    noarch_packages, debug_noarch_packages = await get_noarch_packages(
+        db, build_task_ids)
+    if not any((noarch_packages, debug_noarch_packages)):
+        return
 
-        repos_to_update = {}
-        new_noarch_artifacts = []
-        hrefs_to_add = list(noarch_packages.values())
-        debug_hrefs_to_add = list(debug_noarch_packages.values())
+    repos_to_update = {}
+    new_noarch_artifacts = []
+    hrefs_to_add = list(noarch_packages.values())
+    debug_hrefs_to_add = list(debug_noarch_packages.values())
 
-        for task in build_tasks:
-            if task.status in (BuildTaskStatus.FAILED,
-                               BuildTaskStatus.EXCLUDED):
-                continue
-            noarch = copy.deepcopy(noarch_packages)
-            debug_noarch = copy.deepcopy(debug_noarch_packages)
-            hrefs_to_delete = []
-            debug_hrefs_to_delete = []
+    for task in build_tasks:
+        if task.status in (BuildTaskStatus.FAILED,
+                           BuildTaskStatus.EXCLUDED):
+            continue
+        noarch = copy.deepcopy(noarch_packages)
+        debug_noarch = copy.deepcopy(debug_noarch_packages)
+        hrefs_to_delete = []
+        debug_hrefs_to_delete = []
 
-            # replace hrefs for existing artifacts in database
-            # and create new artifacts if they doesn't exist
-            for artifact in task.artifacts:
-                if artifact.name in noarch:
-                    hrefs_to_delete.append(artifact.href)
-                    artifact.href = noarch.pop(artifact.name)
-                if artifact.name in debug_noarch:
-                    debug_hrefs_to_delete.append(artifact.href)
-                    artifact.href = debug_noarch.pop(artifact.name)
+        # replace hrefs for existing artifacts in database
+        # and create new artifacts if they doesn't exist
+        for artifact in task.artifacts:
+            if artifact.name in noarch:
+                hrefs_to_delete.append(artifact.href)
+                artifact.href = noarch.pop(artifact.name)
+            if artifact.name in debug_noarch:
+                debug_hrefs_to_delete.append(artifact.href)
+                artifact.href = debug_noarch.pop(artifact.name)
 
-            artifacts_to_create = {**noarch, **debug_noarch}
-            for name, href in artifacts_to_create.items():
-                new_noarch_artifacts.append(
-                    models.BuildTaskArtifact(
-                        build_task_id=task.id,
-                        name=name,
-                        type='rpm',
-                        href=href,
-                    )
+        artifacts_to_create = {**noarch, **debug_noarch}
+        for name, href in artifacts_to_create.items():
+            new_noarch_artifacts.append(
+                models.BuildTaskArtifact(
+                    build_task_id=task.id,
+                    name=name,
+                    type='rpm',
+                    href=href,
                 )
+            )
 
-            for repo in build_task.build.repos:
-                if (repo.arch == 'src' or repo.type != 'rpm'
-                        or repo.arch != task.arch):
-                    continue
-                repo_href = repo.pulp_href
-                add_content = hrefs_to_add
-                remove_content = hrefs_to_delete
-                if repo.debug:
-                    add_content = debug_hrefs_to_add
-                    remove_content = debug_hrefs_to_delete
-                repos_to_update[repo_href] = {
-                    'add': add_content,
-                    'remove': remove_content,
-                }
+        for repo in build_task.build.repos:
+            if (repo.arch == 'src' or repo.type != 'rpm'
+                    or repo.arch != task.arch):
+                continue
+            repo_href = repo.pulp_href
+            add_content = hrefs_to_add
+            remove_content = hrefs_to_delete
+            if repo.debug:
+                add_content = debug_hrefs_to_add
+                remove_content = debug_hrefs_to_delete
+            repos_to_update[repo_href] = {
+                'add': add_content,
+                'remove': remove_content,
+            }
 
-        db.add_all(build_tasks)
-        db.add_all(new_noarch_artifacts)
-        await db.commit()
+    db.add_all(build_tasks)
+    db.add_all(new_noarch_artifacts)
+    await db.commit()
 
     for repo_href, content_dict in repos_to_update.items():
         await pulp_client.modify_repository(

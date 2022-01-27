@@ -1,3 +1,4 @@
+import logging
 import typing
 import urllib.parse
 
@@ -44,6 +45,11 @@ class AltsClient:
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:
             async with session.post(full_url, json=payload) as response:
-                resp_json = await response.json()
+                try:
+                    resp_json = await response.json()
+                except Exception as e:
+                    logging.error(
+                        'Cannot decode response from test system: %s', str(e)
+                    )
                 response.raise_for_status()
                 return resp_json

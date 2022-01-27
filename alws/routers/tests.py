@@ -1,6 +1,6 @@
 import typing
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from alws import database
 from alws.crud import test
@@ -18,8 +18,10 @@ router = APIRouter(
 @router.post('/{test_task_id}/result/')
 async def update_test_task_result(test_task_id: int,
                                   result: test_schema.TestTaskResult,
+                                  background_tasks: BackgroundTasks,
                                   db: database.Session = Depends(get_db)):
-    await test.complete_test_task(db, test_task_id, result)
+    background_tasks.add_task(
+        test.complete_test_task, db, test_task_id, result)
     return {'ok': True}
 
 

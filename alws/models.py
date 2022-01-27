@@ -104,6 +104,7 @@ class Platform(Base):
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     data = sqlalchemy.Column(JSONB, nullable=False)
     repos = relationship('Repository', secondary=PlatformRepo)
+    sign_keys = relationship('SignKey', back_populates='platform')
 
 
 class Distribution(Base):
@@ -286,6 +287,8 @@ class BuildTask(Base):
     status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    is_secure_boot = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True)
     mock_options = sqlalchemy.Column(JSONB)
     ref = relationship('BuildTaskRef')
     artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
@@ -340,6 +343,13 @@ class BuildTaskArtifact(Base):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     build_task = relationship('BuildTask', back_populates='artifacts')
+    sign_key_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('sign_keys.id',
+                              name='build_artifacts_sign_key_id_fkey'),
+        nullable=True)
+    sign_key = relationship('SignKey',
+                            back_populates='build_task_artifacts')
 
 
 class SourceRpm(Base):
@@ -479,6 +489,14 @@ class SignKey(Base):
     public_url = sqlalchemy.Column(sqlalchemy.Text)
     inserted = sqlalchemy.Column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow())
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id',
+                              name='sign_keys_platform_id_fkey'),
+        nullable=True)
+    platform = relationship('Platform', back_populates='sign_keys')
+    build_task_artifacts = relationship('BuildTaskArtifact',
+                                        back_populates='sign_key')
 
 
 class SignTask(Base):
