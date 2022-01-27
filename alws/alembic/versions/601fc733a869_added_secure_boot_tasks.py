@@ -1,7 +1,7 @@
 """Added secure boot tasks
 
 Revision ID: 601fc733a869
-Revises: 2e1d89155486
+Revises: 936845bf5a4f
 Create Date: 2022-01-23 10:05:11.343144
 
 """

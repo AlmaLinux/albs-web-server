@@ -1,7 +1,7 @@
 """Added built srpm url
 
 Revision ID: 2af59b3b1a4d
-Revises: 2e1d89155486
+Revises: 601fc733a869
 Create Date: 2022-01-21 07:12:22.956018
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '2af59b3b1a4d'
-down_revision = '2e1d89155486'
+down_revision = '601fc733a869'
 branch_labels = None
 depends_on = None
 
