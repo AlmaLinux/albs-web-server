@@ -231,19 +231,23 @@ async def verify_signed_build(db: Session, build_id: int,
         if not build:
             raise DataNotFoundError(
                 f'Build with ID {build_id} does not exist')
-        if not build.signed == SignStatus.COMPLETED:
+        if not build.signed:
             raise ValueError(
                 f'Build with ID {build_id} has not already signed')
         if not build.source_rpms or not build.binary_rpms:
             raise ValueError(
                 f'No built packages in build with ID {build_id}')
-        platform = await db.execute(select(models.Platform).where(
+        platforms = await db.execute(select(models.Platform).where(
             models.Platform.id == platform_id).options(
                 selectinload(models.Platform.sign_keys)))
+        platform = platforms.scalars().first()
         if not platform:
             raise DataNotFoundError(
                 f'platform with ID {platform_id} does not exist')
-        sign_key = platform.sign_keys.scalars().first()
+        if not platform.sign_keys:
+            raise DataNotFoundError(
+                f'platform with ID {platform_id} connects with no keys')
+        sign_key = platform.sign_keys[0]
         if not sign_key:
             raise DataNotFoundError(
                 f'Sign key for Platform ID {platform_id} does not exist')
@@ -258,7 +262,7 @@ async def verify_signed_build(db: Session, build_id: int,
 
         all_rpms = source_rpms + binary_rpms
         for p in all_rpms:
-            if p.signed_by_key != sign_key:
+            if p.artifact.sign_key != sign_key:
                 raise SignError(
                     f'Sign key with for pkg ID {p.id} is not matched '
                     f'by sign key for platform ID {platform_id}')
