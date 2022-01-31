@@ -232,7 +232,7 @@ async def verify_signed_build(db: Session, build_id: int,
             raise DataNotFoundError(
                 f'Build with ID {build_id} does not exist')
         if not build.signed:
-            raise ValueError(
+            raise SignError(
                 f'Build with ID {build_id} has not already signed')
         if not build.source_rpms or not build.binary_rpms:
             raise ValueError(

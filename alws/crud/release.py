@@ -168,7 +168,7 @@ async def execute_release_plan(release_id: int, db: Session):
         try:
             verified = await sign_task.verify_signed_build(
                 db, build_id, release.platform.id)
-        except (DataNotFoundError, ValueError) as e:
+        except (DataNotFoundError, ValueError, SignError) as e:
             msg = f'The build {build_id} was not verified, because\n{e}'
             raise SignError(msg)
         if not verified:
