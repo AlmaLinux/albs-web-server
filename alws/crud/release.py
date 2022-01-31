@@ -200,7 +200,8 @@ async def execute_release_plan(release_id: int, db: Session):
 
 async def get_releases(db: Session) -> typing.List[models.Release]:
     release_result = await db.execute(select(models.Release).options(
-        selectinload(models.Release.created_by)))
+        selectinload(models.Release.created_by),
+        selectinload(models.Release.platform)))
     return release_result.scalars().all()
 
 
