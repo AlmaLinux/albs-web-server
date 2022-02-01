@@ -326,13 +326,20 @@ class IndexWrapper:
     @staticmethod
     def from_template(template: str):
         index = Modulemd.ModuleIndex.new()
-        ret, _ = index.update_from_string(template, strict=True)
+        ret, error = index.update_from_string(template, strict=True)
         if not ret:
-            raise ValueError('can not parse modules.yaml template')
+            raise ValueError(
+                f'Can not parse modules.yaml template, '
+                f'error: {error[0].get_error()}'
+            )
         return IndexWrapper(index)
 
     def get_module(self, name: str, stream: str) -> ModuleWrapper:
         module = self._index.get_module(name)
+        if not module:
+            raise ModuleNotFoundError(
+                f'Index doesn\'t contain {name}:{stream}'
+            )
         for module_stream in module.get_all_streams():
             if module_stream.get_stream_name() == stream:
                 return ModuleWrapper(module_stream)

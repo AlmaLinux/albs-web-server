@@ -1,7 +1,7 @@
 import typing
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class SignKey(BaseModel):
@@ -87,3 +87,16 @@ class SignTaskComplete(BaseModel):
 
 class SignTaskCompleteResponse(BaseModel):
     success: bool
+
+
+class SyncSignTaskRequest(BaseModel):
+    content: str
+    pgp_keyid: str
+
+
+class SyncSignTaskResponse(BaseModel):
+    asc_content: str
+
+
+class SyncSignTaskError(BaseModel):
+    error: str
