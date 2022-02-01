@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - "/home/avoid/tmpfs/volumes/postgresql/data:/var/lib/postgresql/data"
+      - "./volumes/postgresql/data:/var/lib/postgresql/data"
 
   rabbitmq:
     image: rabbitmq:3.8-management
@@ -158,11 +158,11 @@ services:
     ports:
       - 8081:80
     volumes:
-      - "/home/avoid/tmpfs/volumes/pulp/settings:/etc/pulp"
-      - "/home/avoid/tmpfs/volumes/pulp/exports:/srv/exports"
-      - "/home/avoid/tmpfs/volumes/pulp/pulp_storage:/var/lib/pulp"
-      - "/home/avoid/tmpfs/volumes/pulp/pgsql:/var/lib/pgsql"
-      - "/home/avoid/tmpfs/volumes/pulp/containers:/var/lib/containers"
+      - "./volumes/pulp/settings:/etc/pulp"
+      - "./volumes/pulp/exports:/srv/exports"
+      - "./volumes/pulp/pulp_storage:/var/lib/pulp"
+      - "./volumes/pulp/pgsql:/var/lib/pgsql"
+      - "./volumes/pulp/containers:/var/lib/containers"
     devices:
       - "/dev/fuse"
     restart: on-failure
