@@ -71,7 +71,7 @@ class Task(BaseModel):
     ref: TaskRef
     platform: TaskPlatform
     created_by: TaskCreatedBy
-    is_secure_boot: bool
+    is_secure_boot: typing.Optional[bool] = False
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     built_srpm_url: typing.Optional[str]
