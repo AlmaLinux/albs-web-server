@@ -3,6 +3,7 @@ import typing
 from pydantic import BaseModel, Field
 
 from alws.schemas.user_schema import User
+from alws.schemas.platform_schema import Platform
 
 
 __all__ = [
@@ -21,6 +22,7 @@ class Release(BaseModel):
         Field(default_factory=list)
     plan: typing.Optional[typing.Dict[str, typing.Any]]
     created_by: User
+    platform: Platform
 
     class Config:
         orm_mode = True
