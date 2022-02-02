@@ -4,6 +4,8 @@ import urllib.parse
 
 import aiohttp
 
+from alws.constants import REQUEST_TIMEOUT
+
 
 class BeholderClient:
     def __init__(self, host: str, token: str = None):
@@ -13,6 +15,7 @@ class BeholderClient:
             self._headers.update({
                 'Authorization': f'Bearer {token}',
             })
+        self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)
@@ -25,7 +28,8 @@ class BeholderClient:
         full_url = self._get_url(endpoint)
         async with aiohttp.ClientSession(headers=req_headers,
                                          raise_for_status=True) as session:
-            async with session.get(full_url, params=params) as response:
+            async with session.get(full_url, params=params,
+                                   timeout=self.__timeout) as response:
                 data = await response.read()
                 json_data = json.loads(data)
                 return json_data
@@ -34,7 +38,8 @@ class BeholderClient:
         async with aiohttp.ClientSession(headers=self._headers,
                                          raise_for_status=True) as session:
             async with session.post(
-                    self._get_url(endpoint), json=data) as response:
+                    self._get_url(endpoint), json=data,
+                    timeout=self.__timeout) as response:
                 data = await response.read()
                 json_data = json.loads(data)
                 return json_data
