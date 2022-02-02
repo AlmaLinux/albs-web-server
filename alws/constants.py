@@ -6,7 +6,10 @@ from collections import namedtuple
 
 __all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
            'BuildTaskRefType', 'SignStatus', 'RepoType', 'ExportStatus',
-           'debuginfo_regex']
+           'debuginfo_regex', 'REQUEST_TIMEOUT']
+
+
+REQUEST_TIMEOUT = 60  # 1 minute
 
 
 class BuildTaskStatus(enum.IntEnum):
