@@ -43,22 +43,18 @@ def upgrade():
             sign_key_id = sign_task.sign_key.id
             modified.setdefault(sign_key_id, [])
             build_task_q = select(
-                models.BuildTaskArtifact.name,
-                models.BuildTaskArtifact.id,
-                models.BuildTaskArtifact.sign_key_id,
-                models.BuildTask.build_id
+                models.BuildTaskArtifact.id
             ).join(
                 models.BuildTask,
                 models.BuildTask.id == models.BuildTaskArtifact.build_task_id
-            ).where(
-                models.BuildTask.build_id == sign_task.build.id
             ).filter(and_(
+                models.BuildTask.build_id == sign_task.build.id,
                 models.BuildTaskArtifact.type == 'rpm',
                 models.BuildTaskArtifact.sign_key == None
             ))
             res = db.execute(build_task_q)
-            for _, artifact_id, _, _ in res:
-                modified[sign_key_id].append(artifact_id)
+            for artifact_id in res:
+                modified[sign_key_id].append(artifact_id[0])
         for sk, baids in modified.items():
             sign_key = db.execute(select(models.SignKey).where(
                 models.SignKey.id == sk)).scalars().first()
