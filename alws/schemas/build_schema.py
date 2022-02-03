@@ -106,6 +106,22 @@ class BuildTaskArtifact(BaseModel):
         orm_mode = True
 
 
+class BuildTaskTestTask(BaseModel):
+
+    status: int
+
+    class Config:
+        orm_mode = True
+
+
+class BuildSignTask(BaseModel):
+
+    status: int
+
+    class Config:
+        orm_mode = True
+
+
 class BuildTask(BaseModel):
 
     id: int
@@ -117,6 +133,7 @@ class BuildTask(BaseModel):
     ref: BuildTaskRef
     artifacts: typing.List[BuildTaskArtifact]
     is_secure_boot: typing.Optional[bool]
+    test_tasks: typing.List[BuildTaskTestTask]
 
     class Config:
         orm_mode = True
@@ -164,6 +181,7 @@ class Build(BaseModel):
     created_at: datetime.datetime
     tasks: typing.List[BuildTask]
     user: BuildUser
+    sign_tasks: typing.List[BuildSignTask]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
 

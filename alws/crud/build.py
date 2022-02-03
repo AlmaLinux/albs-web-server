@@ -63,7 +63,10 @@ async def get_builds(
         selectinload(models.Build.user),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.artifacts),
-        selectinload(models.Build.linked_builds)
+        selectinload(models.Build.linked_builds),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.test_tasks),
+        selectinload(models.Build.sign_tasks)
     ).distinct(models.Build.id)
 
     pulp_params = {

@@ -215,6 +215,7 @@ class Build(Base):
         default=datetime.datetime.utcnow
     )
     tasks = relationship('BuildTask', back_populates='build')
+    sign_tasks = relationship('SignTask', back_populates='build')
     repos = relationship('Repository', secondary=BuildRepo)
     user = relationship('User')
     linked_builds = relationship(
