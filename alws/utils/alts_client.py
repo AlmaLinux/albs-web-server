@@ -5,6 +5,9 @@ import urllib.parse
 import aiohttp
 
 
+from alws.constants import REQUEST_TIMEOUT
+
+
 __all__ = ['AltsClient']
 
 
@@ -12,6 +15,7 @@ class AltsClient:
     def __init__(self, base_url: str, token: str):
         self._base_url = base_url
         self._headers = {'authorization': f'Bearer {token}'}
+        self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     async def schedule_task(self, dist_name: str,
                             dist_version: typing.Union[int, str],
@@ -44,9 +48,10 @@ class AltsClient:
 
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:
-            async with session.post(full_url, json=payload) as response:
+            async with session.post(full_url, json=payload,
+                                    timeout=self.__timeout) as response:
                 try:
-                    resp_json = await response.json()
+                    resp_json = await response.json(content=None)
                 except Exception as e:
                     logging.error(
                         'Cannot decode response from test system: %s', str(e)

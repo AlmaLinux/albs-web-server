@@ -8,6 +8,7 @@ from typing import Optional, List
 
 import aiohttp
 
+from alws.constants import REQUEST_TIMEOUT
 from alws.utils.modularity import get_random_unique_version
 
 
@@ -21,6 +22,7 @@ class PulpClient:
         self._username = username
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
+        self._timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
@@ -383,7 +385,8 @@ class PulpClient:
     async def make_get_request(self, endpoint: str, params: dict = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.get(full_url, params=params) as response:
+            async with session.get(full_url, params=params,
+                                   timeout=self._timeout) as response:
                 json = await response.json(content_type=None)
                 response.raise_for_status()
                 return json
@@ -393,7 +396,9 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.post(full_url, json=data, headers=headers) as response:
+                async with session.post(
+                        full_url, json=data, headers=headers,
+                        timeout=self._timeout) as response:
                     json = await response.json(content_type=None)
                     response.raise_for_status()
                     return json
@@ -403,7 +408,9 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.put(full_url, data=data, headers=headers) as response:
+                async with session.put(
+                        full_url, data=data, headers=headers,
+                        timeout=self._timeout) as response:
                     json = await response.json(content_type=None)
                     response.raise_for_status()
                     return json
@@ -413,7 +420,9 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.patch(full_url, data=data, headers=headers) as response:
+                async with session.patch(
+                        full_url, data=data, headers=headers,
+                        timeout=self._timeout) as response:
                     json = await response.json(content_type=None)
                     response.raise_for_status()
                     return json
@@ -422,6 +431,7 @@ class PulpClient:
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.delete(full_url) as response:
+                async with session.delete(
+                        full_url, timeout=self._timeout) as response:
                     json = await response.json(content_type=None)
                     return json
