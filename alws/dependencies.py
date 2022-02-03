@@ -1,6 +1,8 @@
+import asyncio
+
+import aioredis
 from fastapi import Request, HTTPException, status
 from fastapi.security import HTTPBearer
-import aioredis
 
 from alws import database
 from alws.config import settings
@@ -10,9 +12,18 @@ from alws.utils.jwt_utils import decode_JWT_token
 __all__ = ['get_db', 'JWTBearer']
 
 
+# Usually PostgreSQL supports up to 100 concurrent connections,
+# so making semaphore a bit less to not hit that limit
+DB_SEMAPHORE = asyncio.Semaphore(90)
+
+
 async def get_db() -> database.Session:
-    async with database.Session() as session:
-        yield session
+    async with DB_SEMAPHORE:
+        async with database.Session() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
 
 
 async def get_redis() -> aioredis.Redis:
