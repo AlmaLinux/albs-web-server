@@ -74,6 +74,7 @@ class Task(BaseModel):
     is_secure_boot: typing.Optional[bool] = False
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
+    built_srpm_url: typing.Optional[str]
 
     class Config:
         orm_mode = True

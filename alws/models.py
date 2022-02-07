@@ -303,6 +303,7 @@ class BuildTask(Base):
     )
     test_tasks = relationship('TestTask', back_populates='build_task')
     rpm_module = relationship('RpmModule')
+    built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
 
 
 class BuildTaskRef(Base):
