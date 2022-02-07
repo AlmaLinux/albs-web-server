@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import ReleaseStatus, RepoType
-from alws.errors import DataNotFoundError, EmptyReleasePlan, MissingRepository
+from alws.errors import (DataNotFoundError, EmptyReleasePlan,
+                         MissingRepository, SignError)
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
+from alws.crud import sign_task
 
 
 async def __get_pulp_packages(
@@ -153,14 +155,25 @@ async def execute_release_plan(release_id: int, db: Session):
 
     async with db.begin():
         release_result = await db.execute(
-            select(models.Release).where(models.Release.id == release_id))
+            select(models.Release).where(
+                models.Release.id == release_id).options(
+                    selectinload(models.Release.platform)))
         release = release_result.scalars().first()
         if not release.plan.get('packages') or \
                 not release.plan.get('repositories'):
             raise EmptyReleasePlan('Cannot execute plan with empty packages '
                                    'or repositories: {packages}, {repositories}'
                                    .format_map(release.plan))
-
+    for build_id in release.build_ids:
+        try:
+            verified = await sign_task.verify_signed_build(
+                db, build_id, release.platform.id)
+        except (DataNotFoundError, ValueError, SignError) as e:
+            msg = f'The build {build_id} was not verified, because\n{e}'
+            raise SignError(msg)
+        if not verified:
+            msg = f'Cannot execute plan with wrong singing of {build_id}'
+            raise SignError(msg)
     for package in release.plan['packages']:
         for repository in package['repositories']:
             repo_name = repository['name']
@@ -312,7 +325,7 @@ async def commit_release(db: Session, release_id: int) -> (models.Release, str):
         await db.commit()
     try:
         await execute_release_plan(release_id, db)
-    except (EmptyReleasePlan, MissingRepository) as e:
+    except (EmptyReleasePlan, MissingRepository, SignError) as e:
         message = f'Cannot commit release: {str(e)}'
         release.status = ReleaseStatus.FAILED
     else:
