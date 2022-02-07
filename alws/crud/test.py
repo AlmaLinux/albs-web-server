@@ -175,25 +175,21 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
 
     """
     async with db.begin():
-        test_tasks_query = select(models.TestTask).where(
+        repo_id_query = select(models.TestTask.repository_id).where(
             models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(test_tasks_query)
-        test_tasks = result.scalars().all()
-        repo_id = test_tasks[0].repository_id
+        result = await db.execute(repo_id_query)
+        repo_id = result.scalars().first()
         repo_url_query = select(models.Repository.url).where(
             models.Repository.id == repo_id)
         result = await db.execute(repo_url_query)
         repo_url = result.scalars().first()
 
-        test_tasks_ids = [test.id for test in test_tasks]
-
-        test_names_query = select(models.TestTaskArtifact).where(
-                    models.TestTaskArtifact.test_task_id.in_(test_tasks_ids)
-                )
+        test_names_query = select(models.TestTaskArtifact).join(
+            models.TestTask, models.TestTaskArtifact.test_task_id == 
+            models.TestTask.id).where(
+                models.TestTask.build_task_id == build_task_id)
         result = await db.execute(test_names_query)
-
         test_artifacts = result.scalars().all()
-
     test_names = defaultdict(list)
     for artifact in test_artifacts:
         if artifact.name.startswith('tests_'):

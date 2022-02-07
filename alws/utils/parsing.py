@@ -30,7 +30,10 @@ def parse_tap_output(text: bytes) -> list:
     list
 
     """
-    text = text.decode('utf8')
+    try:
+        text = text.decode('utf8')
+    except UnicodeDecodeError:
+        text = text.decode('utf8', 'replace')
     prepared_text = text.replace("\r\n", "\n")
     tap_parser = parser.Parser()
     try:
@@ -47,7 +50,7 @@ def parse_tap_output(text: bytes) -> list:
         return u"\n".join(diagnostics)
 
     tap_output = []
-    if not all([item.category == "unknown" for item in raw_data]):
+    if any([item.category != "unknown" for item in raw_data]):
         for test_result in raw_data:
             if test_result.category == "test":
                 test_case = {}
