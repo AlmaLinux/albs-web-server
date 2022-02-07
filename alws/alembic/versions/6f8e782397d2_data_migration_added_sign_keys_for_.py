@@ -18,7 +18,7 @@ from alws.config import settings
 
 # revision identifiers, used by Alembic.
 revision = '6f8e782397d2'
-down_revision = '936845bf5a4f'
+down_revision = '2af59b3b1a4d'
 branch_labels = None
 depends_on = None
 
