@@ -283,12 +283,13 @@ async def build_done(
         multilib_pkgs = await get_multilib_packages(db, build_task, src_rpm)
         if multilib_pkgs:
             await add_multilib_packages(db, build_task, multilib_pkgs)
-    await save_noarch_packages(db, build_task)
 
     await db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
+
+    await save_noarch_packages(db, build_task)
 
     await db.execute(
         delete(models.BuildTaskDependency).where(

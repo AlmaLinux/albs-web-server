@@ -76,46 +76,45 @@ async def add_multilib_packages(
         settings.pulp_user,
         settings.pulp_password,
     )
-    async with db.begin():
-        subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
-            models.BuildTask.build_id == build_task.build_id,
-            models.BuildTask.index == build_task.index,
-            models.BuildTask.arch == 'i686',
-        )).scalar_subquery()
-        query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
-            models.BuildTaskArtifact.build_task_id == subquery,
-            models.BuildTaskArtifact.type == 'rpm',
-            models.BuildTaskArtifact.name.not_like('%src.rpm%'),
-        ))
-        db_artifacts = await db.execute(query)
-        db_artifacts = db_artifacts.scalars().all()
+    subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
+        models.BuildTask.build_id == build_task.build_id,
+        models.BuildTask.index == build_task.index,
+        models.BuildTask.arch == 'i686',
+    )).scalar_subquery()
+    query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
+        models.BuildTaskArtifact.build_task_id == subquery,
+        models.BuildTaskArtifact.type == 'rpm',
+        models.BuildTaskArtifact.name.not_like('%src.rpm%'),
+    ))
+    db_artifacts = await db.execute(query)
+    db_artifacts = db_artifacts.scalars().all()
 
-        artifacts = []
-        pkg_hrefs = []
-        debug_pkg_hrefs = []
+    artifacts = []
+    pkg_hrefs = []
+    debug_pkg_hrefs = []
 
-        for artifact in db_artifacts:
-            for pkg_name, pkg_version in multilib_packages.items():
-                if artifact.name.startswith(pkg_name):
-                    rpm_pkg = await pulp_client.get_rpm_package(
-                        package_href=artifact.href,
-                        include_fields=['name', 'version'],
-                    )
-                    if rpm_pkg.get('version', '') == pkg_version:
-                        artifacts.append(
-                            models.BuildTaskArtifact(
-                                build_task_id=build_task.id,
-                                name=artifact.name,
-                                type=artifact.type,
-                                href=artifact.href,
-                            )
+    for artifact in db_artifacts:
+        for pkg_name, pkg_version in multilib_packages.items():
+            if artifact.name.startswith(pkg_name):
+                rpm_pkg = await pulp_client.get_rpm_package(
+                    package_href=artifact.href,
+                    include_fields=['name', 'version'],
+                )
+                if rpm_pkg.get('version', '') == pkg_version:
+                    artifacts.append(
+                        models.BuildTaskArtifact(
+                            build_task_id=build_task.id,
+                            name=artifact.name,
+                            type=artifact.type,
+                            href=artifact.href,
                         )
-                        if re.search(r'-debug(info|source)$', rpm_pkg['name']):
-                            debug_pkg_hrefs.append(artifact.href)
-                        else:
-                            pkg_hrefs.append(artifact.href)
-        db.add_all(artifacts)
-        await db.commit()
+                    )
+                    if re.search(r'-debug(info|source)$', rpm_pkg['name']):
+                        debug_pkg_hrefs.append(artifact.href)
+                    else:
+                        pkg_hrefs.append(artifact.href)
+    db.add_all(artifacts)
+    await db.commit()
 
     for repo in build_task.build.repos:
         if repo.arch != 'x86_64' and repo.type != 'rpm':
