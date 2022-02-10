@@ -103,11 +103,14 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          built_srpm_url: str = None, module_index=None):
     rpms = []
     for artifact in task_artifacts:
-        if task_arch == 'src' and built_srpm_url is not None:
+        arch = task_arch
+        if artifact.arch == 'src':
+            arch = artifact.arch
+        if arch == 'src' and built_srpm_url is not None:
             continue
         repo = next(
             build_repo for build_repo in repositories
-            if build_repo.arch == task_arch
+            if build_repo.arch == arch
             and build_repo.type == artifact.type
             and build_repo.debug == artifact.is_debuginfo
         )
