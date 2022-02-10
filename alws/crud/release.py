@@ -99,7 +99,8 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'id': repo.id,
             'name': repo.name,
             'arch': repo.arch,
-            'debug': repo.debug
+            'debug': repo.debug,
+            'url': repo.url
         }
         for repo in result.scalars().all()
     ]
