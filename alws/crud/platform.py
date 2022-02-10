@@ -1,4 +1,6 @@
-from sqlalchemy import delete
+import typing
+
+from sqlalchemy import and_, delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,29 +9,38 @@ from alws.errors import DataNotFoundError
 from alws.schemas import platform_schema
 
 
-
 async def modify_platform(
             db: Session,
             platform: platform_schema.PlatformModify
-        ) -> models.Platform:
+        ) -> typing.Union[models.Platform, models.ReferencePlatform]:
     query = models.Platform.name == platform.name
     async with db.begin():
-        db_platform = await db.execute(
-            select(models.Platform).where(query).options(
-                selectinload(models.Platform.repos)
-            ).with_for_update()
-        )
+        if platform.is_reference:
+            query = and_(
+                models.ReferencePlatform.name == platform.name,
+                models.ReferencePlatform.distr_version == platform.distr_version)
+            db_platform = await db.execute(
+                select(models.Platform).where(query))
+        else:
+            db_platform = await db.execute(
+                select(models.Platform).where(query).options(
+                    selectinload(models.Platform.repos)
+                ).with_for_update()
+            )
         db_platform = db_platform.scalars().first()
         if not db_platform:
             raise DataNotFoundError(
                 f'Platform with name: "{platform.name}" does not exists'
             )
-        for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data', 'modularity'):
+        platform_fields = ('type', 'distr_type', 'distr_version', 'arch_list',
+                           'data', 'modularity', 'reference_platform')
+        for key in platform_fields:
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
-        db_repos = {repo.name: repo for repo in db_platform.repos}
+        db_repos = {}
+        if not platform.is_reference:
+            db_repos = {repo.name: repo for repo in db_platform.repos}
         payload_repos = getattr(platform, 'repos', None)
         new_repos = {}
         if payload_repos:
@@ -57,17 +68,26 @@ async def modify_platform(
 async def create_platform(
             db: Session,
             platform: platform_schema.PlatformCreate
-        ) -> models.Platform:
-    db_platform = models.Platform(
-        name=platform.name,
-        type=platform.type,
-        distr_type=platform.distr_type,
-        distr_version=platform.distr_version,
-        test_dist_name=platform.test_dist_name,
-        data=platform.data,
-        arch_list=platform.arch_list,
-        modularity=platform.modularity
-    )
+        ) -> typing.Union[models.Platform, models.ReferencePlatform]:
+    if platform.is_reference:
+        db_platform = models.ReferencePlatform(
+            name=platform.name,
+            type=platform.type,
+            distr_type=platform.distr_type,
+            distr_version=platform.distr_version,
+            arch_list=platform.arch_list,
+        )
+    else:
+        db_platform = models.Platform(
+            name=platform.name,
+            type=platform.type,
+            distr_type=platform.distr_type,
+            distr_version=platform.distr_version,
+            test_dist_name=platform.test_dist_name,
+            data=platform.data,
+            arch_list=platform.arch_list,
+            modularity=platform.modularity
+        )
     if platform.repos:
         for repo in platform.repos:
             db_platform.repos.append(models.Repository(**repo.dict()))
@@ -77,13 +97,26 @@ async def create_platform(
     return db_platform
 
 
-async def get_platforms(db):
-    db_platforms = await db.execute(select(models.Platform))
+async def get_platforms(
+            db: Session,
+            is_reference: bool = False,
+        ) -> typing.List[typing.Union[models.Platform,
+                                      models.ReferencePlatform]]:
+    query = select(models.Platform)
+    if is_reference:
+        query = select(models.ReferencePlatform)
+    db_platforms = await db.execute(query)
     return db_platforms.scalars().all()
 
 
-async def get_platform(db, name: str) -> models.Platform:
-    db_platform = await db.execute(
-        select(models.Platform).where(models.Platform.name == name)
-    )
+async def get_platform(
+            db: Session,
+            name: str,
+            is_reference: bool = False,
+        ) -> typing.Union[models.Platform, models.ReferencePlatform]:
+    query = select(models.Platform).where(models.Platform.name == name)
+    if is_reference:
+        query = select(models.ReferencePlatform).where(
+            models.ReferencePlatform.name == name)
+    db_platform = await db.execute(query)
     return db_platform.scalars().first()

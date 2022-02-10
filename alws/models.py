@@ -101,10 +101,29 @@ class Platform(Base):
         unique=True,
         index=True
     )
+    reference_platform = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(length=20), nullable=True)
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     data = sqlalchemy.Column(JSONB, nullable=False)
     repos = relationship('Repository', secondary=PlatformRepo)
     sign_keys = relationship('SignKey', back_populates='platform')
+
+
+class ReferencePlatform(Base):
+
+    __tablename__ = 'reference_platforms'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    distr_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    distr_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    arch_list = sqlalchemy.Column(JSONB, nullable=False)
+    name = sqlalchemy.Column(
+        sqlalchemy.Text,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
 
 
 class Distribution(Base):

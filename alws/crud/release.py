@@ -85,9 +85,15 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         db, build_ids, build_tasks=build_tasks)
 
     def get_pulp_based_response():
+        plan_packages = []
+        for pkg in pulp_packages:
+            full_name = pkg['full_name']
+            if full_name in added_packages:
+                continue
+            plan_packages.append({'package': pkg, 'repositories': []})
+            added_packages.append(full_name)
         return {
-            'packages': [{'package': pkg, 'repositories': []}
-                         for pkg in pulp_packages],
+            'packages': plan_packages,
             'repositories': prod_repos
         }
 
@@ -107,6 +113,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
                      for repo in prod_repos}
 
+    added_packages = []
     if not settings.package_beholder_enabled:
         return get_pulp_based_response()
 
@@ -119,6 +126,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             pkg_name = package['name']
             pkg_version = package['version']
             pkg_arch = package['arch']
+            full_name = package['full_name']
+            if full_name in added_packages:
+                continue
             query = f'packages[].packages[?name==\'{pkg_name}\' ' \
                     f'&& version==\'{pkg_version}\' ' \
                     f'&& arch==\'{pkg_arch}\'][]'
@@ -144,6 +154,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 pkg_info['repositories'] = [
                     repos_mapping.get(item) for item in release_repositories]
             packages.append(pkg_info)
+            added_packages.append(full_name)
     return {
         'packages': packages,
         'repositories': prod_repos
@@ -206,6 +217,8 @@ async def execute_release_plan(release_id: int, db: Session):
                     f'or doesn\'t have pulp_href field')
             result = await pulp_client.modify_repository(
                 repo.pulp_href, add=packages)
+            # after modify repos we need to publish repo content
+            await pulp_client.create_rpm_publication(repo.pulp_href)
             repo_status[repository_name][arch] = result
 
     return repo_status

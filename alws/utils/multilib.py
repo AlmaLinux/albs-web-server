@@ -24,6 +24,15 @@ async def get_multilib_packages(
         build_task: models.BuildTask,
         src_rpm: str,
 ) -> dict:
+
+    async def call_beholder(endpoint: str) -> dict:
+        pkg_info = {}
+        try:
+            pkg_info = await beholder_client.get(endpoint)
+        except Exception as exc:
+            logging.exception("Cannot get multilib packages: %s", exc)
+        return pkg_info
+
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
@@ -43,11 +52,13 @@ async def get_multilib_packages(
         host=settings.beholder_host,
         token=settings.beholder_token,
     )
-    try:
-        pkg_info = await beholder_client.get(endpoint)
-    except Exception as exc:
-        logging.exception("Cannot get multilib packages: %s", exc)
-        return result
+
+    pkg_info = await call_beholder(endpoint)
+    if not pkg_info:
+        ref_platform = build_task.platform.reference_platform[:-1]
+        url = f'api/v1/distros/{ref_platform}/{distr_ver}/project/{src_rpm}'
+        pkg_info = await call_beholder(url)
+
     multilib_packages = jmespath.search(
         "packages[?arch=='i686'].{name: name, version: version, "
         "repos: repositories}",

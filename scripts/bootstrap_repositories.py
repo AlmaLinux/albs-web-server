@@ -40,6 +40,10 @@ def parse_args():
         '-U', '--only_update', action='store_true', default=False,
         required=False, help='Updates platform data in DB',
     )
+    parser.add_argument(
+        '-B', '--is_reference', action='store_true', default=False,
+        required=False, help='Loads reference platforms in DB',
+    )
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
@@ -108,7 +112,8 @@ async def add_repositories_to_platform(platform_data: dict,
     platform_name = platform_data.get('name')
     platform_instance = None
     async with database.Session() as db:
-        for platform in await pl_crud.get_platforms(db):
+        for platform in await pl_crud.get_platforms(
+                db, is_reference=platform_data['is_reference']):
             if platform.name == platform_name:
                 platform_instance = platform
                 break
@@ -137,6 +142,7 @@ def main():
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
     for platform_data in platforms_data:
+        platform_data['is_reference'] = args.is_reference
         if args.only_update:
             sync(update_platform(platform_data))
             logger.info(
@@ -145,8 +151,7 @@ def main():
             )
             continue
         if not platform_data.get('repositories'):
-            logger.error('Config does not contain a list of repositories')
-            continue
+            logger.info('Config does not contain a list of repositories')
 
         repository_ids = []
         repositories_data = platform_data.pop('repositories', [])
