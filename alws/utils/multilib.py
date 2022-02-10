@@ -11,6 +11,7 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
+from alws.utils.rpm_utils import split_filename
 
 
 __all__ = [
@@ -94,25 +95,28 @@ async def add_multilib_packages(
     debug_pkg_hrefs = []
 
     for artifact in db_artifacts:
+        artifact_name = split_filename(artifact.name)[0]
         for pkg_name, pkg_version in multilib_packages.items():
-            if artifact.name.startswith(pkg_name):
+            if artifact_name == pkg_name:
+                href = artifact.href
                 rpm_pkg = await pulp_client.get_rpm_package(
-                    package_href=artifact.href,
+                    package_href=href,
                     include_fields=['name', 'version'],
                 )
-                if rpm_pkg.get('version', '') == pkg_version:
+                if rpm_pkg.get('version', '') == pkg_version and (
+                        href not in pkg_hrefs or href not in debug_pkg_hrefs):
                     artifacts.append(
                         models.BuildTaskArtifact(
                             build_task_id=build_task.id,
                             name=artifact.name,
                             type=artifact.type,
-                            href=artifact.href,
+                            href=href,
                         )
                     )
                     if re.search(r'-debug(info|source)$', rpm_pkg['name']):
-                        debug_pkg_hrefs.append(artifact.href)
+                        debug_pkg_hrefs.append(href)
                     else:
-                        pkg_hrefs.append(artifact.href)
+                        pkg_hrefs.append(href)
     db.add_all(artifacts)
     await db.commit()
 
