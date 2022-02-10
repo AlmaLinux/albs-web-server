@@ -98,9 +98,9 @@ async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
     return BuildTaskStatus.is_finished(build_task.status)
 
 
-def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
-                   task_artifacts: list, repositories: list,
-                   built_srpm_url: str = None, module_index=None):
+async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
+                         task_artifacts: list, repositories: list,
+                         built_srpm_url: str = None, module_index=None):
     rpms = []
     for artifact in task_artifacts:
         if task_arch == 'src' and built_srpm_url is not None:
@@ -134,8 +134,8 @@ def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
     return rpms
 
 
-def __process_logs(pulp_client: PulpClient, task_id: int,
-                   task_artifacts: list, repositories: list):
+async def __process_logs(pulp_client: PulpClient, task_id: int,
+                         task_artifacts: list, repositories: list):
     logs = []
     str_task_id = str(task_id)
     for artifact in task_artifacts:
@@ -204,7 +204,7 @@ async def __process_build_task_artifacts(
                         if repo.type == 'build_log']
     db_entities = []
     db_entities.extend(
-        __process_rpms(
+        await __process_rpms(
             pulp_client, build_task.id, build_task.arch,
             rpm_artifacts, rpm_repositories,
             built_srpm_url=build_task.built_srpm_url,
@@ -212,8 +212,8 @@ async def __process_build_task_artifacts(
         )
     )
     db_entities.extend(
-        __process_logs(pulp_client, build_task.id, log_artifacts,
-                       log_repositories)
+        await __process_logs(pulp_client, build_task.id, log_artifacts,
+                             log_repositories)
     )
     if build_task.rpm_module and module_index:
         module_pulp_href, sha256 = await pulp_client.create_module(
@@ -352,12 +352,10 @@ async def build_done(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
     srpm = None
-    srpm_href = None
     binary_rpms = []
     for rpm in rpms_result.scalars().all():
         if rpm.name.endswith('.src.rpm') and (
                 build_task.built_srpm_url is not None):
-            srpm_href = rpm.href
             continue
         if rpm.name.endswith('.src.rpm'):
             srpm = models.SourceRpm()
@@ -370,19 +368,10 @@ async def build_done(
             binary_rpms.append(binary_rpm)
 
     # retrieve already created instance of model SourceRpm
-    if srpm is None and srpm_href is not None:
-        srpm_artifact_ids = await db.execute(
-            select(models.BuildTaskArtifact.id).where(
-                models.BuildTaskArtifact.href == srpm_href,
-            ),
-        )
-        srpm_artifact_ids = list(srpm_artifact_ids.scalars().all())
-        srpm = await db.execute(
-            select(models.SourceRpm).where(
-                models.SourceRpm.artifact_id.in_(srpm_artifact_ids),
-            ),
-        )
-        srpm = srpm.scalars().first()
+    if not srpm:
+        srpms = await db.execute(select(models.SourceRpm).where(
+            models.SourceRpm.build_id == build_task.build_id))
+        srpm = srpms.scalars().first()
     if srpm:
         if build_task.built_srpm_url is None:
             db.add(srpm)
