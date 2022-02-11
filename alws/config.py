@@ -28,5 +28,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
+    rabbitmq_default_user: str = 'test-system'
+    rabbitmq_default_pass: str = 'test-system'
+    rabbitmq_default_host: str = 'rabbitmq'
+    rabbitmq_default_vhost: str = 'test_system'
+
 
 settings = Settings()

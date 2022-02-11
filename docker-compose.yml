@@ -86,6 +86,27 @@ services:
       - db
       - pulp
 
+  task_queue:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+      - "./scripts:/code/scripts"
+      - "./reference_data:/code/reference_data"
+    command: bash -c 'source env/bin/activate &&
+                      /wait_for_it.sh rabbitmq:5672 &&
+                      dramatiq --threads 1 alws.dramatiq.build'
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
+      - web_server
+      - rabbitmq
+
   frontend:
     image: albs-frontend:latest
     env_file:
