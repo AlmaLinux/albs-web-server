@@ -1,9 +1,12 @@
 ---
-  name: CentOSStream
-  distr_type: rhel
-  distr_version: '8'
-  type: rpm
-  arch_list:
-    - x86_64
-    - aarch64
-    - ppc64le
+  - name: CentOSStream
+    distr_type: rhel
+    distr_version: '8'
+    modularity:
+      versions:
+        -
+    type: rpm
+    arch_list:
+      - x86_64
+      - aarch64
+      - ppc64le

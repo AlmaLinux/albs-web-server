@@ -7,6 +7,7 @@ import urllib.parse
 from typing import Optional, List
 
 import aiohttp
+from aiohttp_retry import RetryClient, ExponentialRetry
 
 from alws.constants import REQUEST_TIMEOUT
 from alws.utils.modularity import get_random_unique_version
@@ -383,9 +384,16 @@ class PulpClient:
             task = await self.make_get_request(task_href)
         return task
 
+    async def __get_client(self):
+        retry = ExponentialRetry(attempts=5)
+        client = RetryClient(raise_for_status=True, retry_options=retry,
+                             auth=self._auth)
+        return client
+
     async def make_get_request(self, endpoint: str, params: dict = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
+        session = await self.__get_client()
+        async with session:
             async with session.get(full_url, params=params,
                                    timeout=self._timeout) as response:
                 json = await response.json(content_type=None)
@@ -396,7 +404,8 @@ class PulpClient:
                                 headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
+            session = await self.__get_client()
+            async with session:
                 async with session.post(
                         full_url, json=data, headers=headers,
                         timeout=self._timeout) as response:
@@ -408,7 +417,8 @@ class PulpClient:
                                headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
+            session = await self.__get_client()
+            async with session:
                 async with session.put(
                         full_url, data=data, headers=headers,
                         timeout=self._timeout) as response:
@@ -420,7 +430,8 @@ class PulpClient:
                                  headers: Optional[dict] = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
+            session = await self.__get_client()
+            async with session:
                 async with session.patch(
                         full_url, data=data, headers=headers,
                         timeout=self._timeout) as response:
@@ -431,7 +442,8 @@ class PulpClient:
     async def make_delete_request(self, endpoint: str):
         full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
+            session = await self.__get_client()
+            async with session:
                 async with session.delete(
                         full_url, timeout=self._timeout) as response:
                     json = await response.json(content_type=None)
