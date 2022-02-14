@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.utils.exporter import fs_export_repository
+from repomd_signer import repomd_signer
 
 
 def parse_args():
@@ -67,6 +68,7 @@ def main():
         modules_yaml = repodata / 'modules.yaml'
         if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
+        repomd_signer(repodata)
 
 
 if __name__ == '__main__':
