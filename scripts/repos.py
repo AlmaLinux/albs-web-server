@@ -3,8 +3,9 @@ import sys
 import typing
 import argparse
 import logging
-from syncer import sync
 
+from syncer import sync
+from pathlib import Path
 from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -14,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws import database
 from alws import models
-from alws.routers.repositories import fs_export_repository
+from alws.utils.exporter import fs_export_repository
 
 
 def parse_args():
@@ -41,8 +42,8 @@ async def export_repos_from_pulp(builds_ids: typing.List[int]):
                     models.Repository.production == True
                 ))
             result_ids = result.scalars().all()
-            repo_ids.append(result_ids)
-        return await fs_export_repository(db=db, repository_ids=repo_ids)
+            repo_ids.extend(result_ids)
+    return await fs_export_repository(db=db, repository_ids=repo_ids)
 
 
 def main():
@@ -59,11 +60,12 @@ def main():
     
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
-    for path in exported_paths:
-        repo_path = path.rstrip('/Packages')
-        repodata = os.path.join(repo_path, 'repodata')
-        modules_yaml = os.path.join(repodata, 'modules.yaml')
-        if os.path.exists(modules_yaml):
+    for exp_path in exported_paths:
+        path = Path(exp_path)
+        repo_path = path.parent
+        repodata = repo_path / 'repodata'
+        modules_yaml = repodata / 'modules.yaml'
+        if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
 
 
