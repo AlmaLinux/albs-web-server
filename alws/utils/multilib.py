@@ -55,9 +55,13 @@ async def get_multilib_packages(
 
     pkg_info = await call_beholder(endpoint)
     if not pkg_info:
-        ref_platform = build_task.platform.reference_platform[:-1]
-        url = f'api/v1/distros/{ref_platform}/{distr_ver}/project/{src_rpm}'
-        pkg_info = await call_beholder(url)
+        for ref_platform in build_task.platform.reference_platforms:
+            ref_name = ref_platform.name[:-1]
+            ref_ver = ref_platform.distr_version
+            url = f'api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}'
+            pkg_info = await call_beholder(url)
+            if pkg_info:
+                break
 
     multilib_packages = jmespath.search(
         "packages[?arch=='i686'].{name: name, version: version, "
