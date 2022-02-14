@@ -15,7 +15,7 @@ class PlatformModify(BaseModel):
     distr_type: typing.Optional[str] = None
     distr_version: typing.Optional[str] = None
     arch_list: typing.Optional[typing.List[str]] = None
-    reference_platform: typing.Optional[str] = None
+    reference_platforms: typing.Optional[typing.List[str]] = []
     repos: typing.Optional[typing.List[RepositoryCreate]] = None
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
