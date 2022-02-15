@@ -335,15 +335,16 @@ async def build_done(
                 await add_multilib_packages(db, build_task, multilib_pkgs)
         except Exception as e:
             logging.error('Cannot process multilib packages: %s', str(e))
-    try:
-        await save_noarch_packages(db, build_task)
-    except Exception as e:
-        logging.error('Cannot process noarch packages: %s', str(e))
 
     await db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
+
+    try:
+        await save_noarch_packages(db, build_task)
+    except Exception as e:
+        logging.error('Cannot process noarch packages: %s', str(e))
 
     await db.execute(
         delete(models.BuildTaskDependency).where(
