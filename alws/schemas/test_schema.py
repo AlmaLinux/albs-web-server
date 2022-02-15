@@ -22,3 +22,10 @@ class TestTask(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class TestLog(BaseModel):
+    log: str
+    success: bool
+    logs_format: str
+    tap_results: typing.List[dict]
