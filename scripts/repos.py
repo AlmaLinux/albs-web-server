@@ -25,31 +25,30 @@ def parse_args():
         description='Packages exporter script. Exports repositories from Pulp'
                     'and transfer them to production host'
     )
-    parser.add_argument('platform_name', type=str, nargs='+')
+    parser.add_argument('platform_names', type=str, nargs='+')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
 
 
 async def export_repos_from_pulp(platform_names: typing.List[str]):
+    repo_ids = []
+    platforms_dict = {}
     async with database.Session() as db:
-        repo_ids = []
-        for platform_name in platform_names:
-            result = await db.execute(select(models.Platform.id).filter(
-                models.Platform.name.ilike(f'%{platform_name}%')
+        db_platforms = await db.execute(
+            select(models.Platform).where(
+                models.Platform.name.in_(platform_names)).options(
+                    selectinload(models.Platform.repos))
+        )
+        db_platforms = db_platforms.scalars().all()
+        for db_platform in db_platforms:
+            platforms_dict[db_platform.name] = db_platform.id
+            repo_ids.extend((
+                repo.id for repo in db_platform.repos
+                if repo.production is True
             ))
-            platform_id = result.scalars().first()
-            result = await db.execute(select(models.PlatformRepo.c.repository_id).where(
-                models.PlatformRepo.c.platform_id == platform_id
-            ))
-            all_repo_ids = result.scalars().all()
-            result = await db.execute(select(models.Repository.id).where(
-                models.Repository.id.in_(all_repo_ids)
-            ).where(
-                models.Repository.production == True
-            ))
-            repo_ids.extend(result.scalars().all())
-    return await fs_export_repository(db=db, repository_ids=repo_ids)
+    return (await fs_export_repository(db=db, repository_ids=set(repo_ids)),
+            platforms_dict)
 
 
 def main():
@@ -59,11 +58,14 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-    platform_name = args.platform_name
-    exported_paths = sync(export_repos_from_pulp(platform_name))
-    logger.info('args=%s, platform_name=%s, exp_paths=%s',
-                args, args.platform_name, exported_paths)
-    
+
+    logger.info('Start exporting packages for following platforms:\n%s',
+                args.platform_names)
+    exported_paths, platforms_dict = sync(export_repos_from_pulp(
+        args.platform_names))
+    logger.info('All repositories exported in following paths:\n%s',
+                '\n'.join((str(path) for path in exported_paths)))
+
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
     for exp_path in exported_paths:
@@ -73,7 +75,12 @@ def main():
         modules_yaml = repodata / 'modules.yaml'
         if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
-        repomd_signer(repodata)
+        try:
+            repomd_signer(repodata, platforms_dict)
+        except Exception as exc:
+            logger.exception('Cannot to sign repomd.xml:')
+        else:
+            logger.info('repomd.xml in %s is signed', str(repodata))
 
 
 if __name__ == '__main__':
