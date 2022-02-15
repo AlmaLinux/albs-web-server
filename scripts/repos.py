@@ -25,25 +25,30 @@ def parse_args():
         description='Packages exporter script. Exports repositories from Pulp'
                     'and transfer them to production host'
     )
-    parser.add_argument('builds_ids', type=int, nargs='+')
+    parser.add_argument('platform_name', type=str, nargs='+')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
 
 
-async def export_repos_from_pulp(builds_ids: typing.List[int]):
+async def export_repos_from_pulp(platform_names: typing.List[str]):
     async with database.Session() as db:
         repo_ids = []
-        for build_id in builds_ids:
-            result = await db.execute(select(models.Repository.id).join(
-                models.BuildRepo, models.Repository.id ==
-                models.BuildRepo.c.repository_id).where(
-                    models.BuildRepo.c.build_id == build_id
-                ).where(
-                    models.Repository.production == True
-                ))
-            result_ids = result.scalars().all()
-            repo_ids.extend(result_ids)
+        for platform_name in platform_names:
+            result = await db.execute(select(models.Platform.id).filter(
+                models.Platform.name.ilike(f'%{platform_name}%')
+            ))
+            platform_id = result.scalars().first()
+            result = await db.execute(select(models.PlatformRepo.c.repository_id).where(
+                models.PlatformRepo.c.platform_id == platform_id
+            ))
+            all_repo_ids = result.scalars().all()
+            result = await db.execute(select(models.Repository.id).where(
+                models.Repository.id.in_(all_repo_ids)
+            ).where(
+                models.Repository.production == True
+            ))
+            repo_ids.extend(result.scalars().all())
     return await fs_export_repository(db=db, repository_ids=repo_ids)
 
 
@@ -54,10 +59,10 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-    builds_ids = args.builds_ids
-    exported_paths = sync(export_repos_from_pulp(builds_ids))
-    logger.info('args=%s, builds_ids=%s, exp_paths=%s',
-                args, args.builds_ids, exported_paths)
+    platform_name = args.platform_name
+    exported_paths = sync(export_repos_from_pulp(platform_name))
+    logger.info('args=%s, platform_name=%s, exp_paths=%s',
+                args, args.platform_name, exported_paths)
     
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
