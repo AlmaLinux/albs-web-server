@@ -51,7 +51,15 @@ async def create_pulp_exporters_to_fs(db: Session,
         export_task_pk = et_inserted.inserted_primary_key[0]
         response = await db.execute(query)
         await db.commit()
+    async with db.begin():
+        created_repo_exporters = await db.execute(
+            select(models.RepoExporter.repository_id).where(
+                models.RepoExporter.repository_id.in_(repo_list)),
+        )
+    created_repo_exporters = created_repo_exporters.scalars().all()
     for repo in response.scalars().all():
+        if repo.id in created_repo_exporters:
+            continue
         export_path = str(Path(settings.pulp_export_path,
                                generate_repository_path(
                                    repo.name, repo.arch, repo.debug)))
