@@ -108,7 +108,8 @@ async def add_repositories_to_platform(platform_data: dict,
     platform_name = platform_data.get('name')
     platform_instance = None
     async with database.Session() as db:
-        for platform in await pl_crud.get_platforms(db):
+        for platform in await pl_crud.get_platforms(
+                db, is_reference=platform_data.get('is_reference', False)):
             if platform.name == platform_name:
                 platform_instance = platform
                 break
@@ -145,8 +146,7 @@ def main():
             )
             continue
         if not platform_data.get('repositories'):
-            logger.error('Config does not contain a list of repositories')
-            continue
+            logger.info('Config does not contain a list of repositories')
 
         repository_ids = []
         repositories_data = platform_data.pop('repositories', [])

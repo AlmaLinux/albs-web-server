@@ -3,6 +3,8 @@
   distr_type: rhel
   distr_version: '8'
   test_dist_name: almalinux
+  reference_platforms:
+    - 'CentOSStream8'
   modularity:
     modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
     packages_git: 'https://git.almalinux.org/rpms/'
@@ -543,6 +545,8 @@
   distr_type: rhel
   distr_version: '9'
   test_dist_name: almalinux
+  reference_platforms:
+    - 'CentOSStream9'
   modularity:
     modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
     packages_git: 'https://git.almalinux.org/rpms/'

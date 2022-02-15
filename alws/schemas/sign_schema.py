@@ -11,6 +11,7 @@ class SignKey(BaseModel):
     keyid: str
     public_url: str
     inserted: datetime
+    platform_id: typing.Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -22,6 +23,7 @@ class SignKeyCreate(BaseModel):
     keyid: str
     fingerprint: str
     public_url: str
+    platform_id: typing.Optional[int] = None
 
 
 class SignKeyUpdate(BaseModel):

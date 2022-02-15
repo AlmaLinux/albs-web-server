@@ -175,7 +175,8 @@ async def __process_build_task_artifacts(
     build_tasks = await db.execute(
         select(models.BuildTask).where(
             models.BuildTask.id == task_id).options(
-            selectinload(models.BuildTask.platform),
+            selectinload(models.BuildTask.platform).selectinload(
+                models.Platform.reference_platforms),
             selectinload(models.BuildTask.build).selectinload(
                 models.Build.repos
             ),

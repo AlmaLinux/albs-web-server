@@ -1,12 +1,29 @@
 ---
-  - name: CentOSStream
-    distr_type: rhel
-    distr_version: '8'
-    modularity:
+- name: CentOSStream8
+  distr_type: rhel
+  distr_version: '8'
+  test_dist_name: CentOSStream8
+  modularity:
       versions:
-        -
-    type: rpm
-    arch_list:
-      - x86_64
-      - aarch64
-      - ppc64le
+  data: {}
+  is_reference: true
+  type: rpm
+  arch_list:
+    - x86_64
+    - aarch64
+    - ppc64le
+
+- name: CentOSStream9
+  distr_type: rhel
+  distr_version: '9'
+  test_dist_name: CentOSStream9
+  modularity:
+      versions:
+  data: {}
+  is_reference: true
+  type: rpm
+  arch_list:
+    - x86_64
+    - aarch64
+    - ppc64le
+    - s390x

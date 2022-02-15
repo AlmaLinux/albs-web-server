@@ -15,9 +15,11 @@ class PlatformModify(BaseModel):
     distr_type: typing.Optional[str] = None
     distr_version: typing.Optional[str] = None
     arch_list: typing.Optional[typing.List[str]] = None
+    reference_platforms: typing.Optional[typing.List[str]] = []
     repos: typing.Optional[typing.List[RepositoryCreate]] = None
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
+    is_reference: typing.Optional[bool] = False
 
 
 class PlatformCreate(BaseModel):
@@ -31,6 +33,7 @@ class PlatformCreate(BaseModel):
     repos: typing.Optional[typing.List[RepositoryCreate]]
     data: typing.Optional[typing.Dict[str, typing.Any]]
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
+    is_reference: typing.Optional[bool] = False
 
 
 class Platform(BaseModel):
