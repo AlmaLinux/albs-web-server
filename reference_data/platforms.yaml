@@ -43,6 +43,10 @@
       releasever: '8'
       use_bootstrap_container: false
       macros:
+        "%__pesign_cert": "%pe_signing_cert"
+        "%__pesign_client_cert": "%pe_signing_cert"
+        "%__pesign_client_token": "%pe_signing_token"
+        "%__pesign_token": "-t %pe_signing_token"
         "%pe_signing_cert": "'Cloud Linux Software, Inc'"
         "%pe_signing_token": "'profil standardowy'"
         "%_pesign": "/usr/local/bin/pesign"

@@ -3,6 +3,8 @@
   distr_type: rhel
   distr_version: '8'
   test_dist_name: CentOSStream8
+  modularity:
+      versions:
   data: {}
   is_reference: true
   type: rpm
@@ -15,6 +17,8 @@
   distr_type: rhel
   distr_version: '9'
   test_dist_name: CentOSStream9
+  modularity:
+      versions:
   data: {}
   is_reference: true
   type: rpm
@@ -22,3 +26,4 @@
     - x86_64
     - aarch64
     - ppc64le
+    - s390x

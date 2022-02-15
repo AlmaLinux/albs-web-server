@@ -1,3 +1,7 @@
+import re
+from collections import defaultdict
+from io import BytesIO
+from typing import BinaryIO
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
@@ -7,6 +11,8 @@ from alws.config import settings
 from alws.constants import TestTaskStatus
 from alws.schemas import test_schema
 from alws.utils.pulp_client import PulpClient
+from alws.utils.file_utils import download_file
+from alws.utils.parsing import parse_tap_output, tap_set_status
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
@@ -141,3 +147,68 @@ async def get_test_tasks_by_build_task(
             query = query.filter(models.TestTask.revision == revision)
         result = await db.execute(query)
         return result.scalars().all()
+
+
+def get_logs_format(logs: bytes) -> str:
+    logs_format = 'text'
+    if re.search(rb'^Exit code: \d\nStdout:\n\n1\.\.\d',
+                 logs, flags=re.IGNORECASE):
+        logs_format = 'tap'
+    return logs_format
+
+
+async def get_test_logs(build_task_id: int, db: Session) -> list:
+    """
+    Parses test logs and determine test format.
+    Returns dict of lists for each build's test with detailed status report.
+
+    Parameters
+    ----------
+    build_task_id : int
+        Id of the build, which tests info is interested
+    db: Session
+        db connection
+
+    Returns
+    -------
+    list
+
+    """
+    async with db.begin():
+        repo_id_query = select(models.TestTask.repository_id).where(
+            models.TestTask.build_task_id == build_task_id)
+        result = await db.execute(repo_id_query)
+        repo_id = result.scalars().first()
+        repo_url_query = select(models.Repository.url).where(
+            models.Repository.id == repo_id)
+        result = await db.execute(repo_url_query)
+        repo_url = result.scalars().first()
+
+        test_names_query = select(models.TestTaskArtifact).join(
+            models.TestTask, models.TestTaskArtifact.test_task_id == 
+            models.TestTask.id).where(
+                models.TestTask.build_task_id == build_task_id)
+        result = await db.execute(test_names_query)
+        test_artifacts = result.scalars().all()
+    test_names = defaultdict(list)
+    for artifact in test_artifacts:
+        if artifact.name.startswith('tests_'):
+            test_names[artifact.test_task_id].append(artifact.name)
+
+    test_results = []
+    for test_task_test_names in test_names.values():
+        for test_name in test_task_test_names:
+            log = BytesIO()
+            log_href = repo_url + test_name
+            await download_file(log_href, log)
+            tap_results = parse_tap_output(log.getvalue())
+            tap_status = tap_set_status(tap_results)
+            logs_format = get_logs_format(log.getvalue())
+            test_tap = {
+                'log': log.getvalue(),
+                'success': tap_status,
+                'logs_format': logs_format,
+                'tap_results': tap_results
+            }
+            test_results.append(test_tap)
+    return test_results

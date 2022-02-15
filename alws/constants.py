@@ -32,6 +32,13 @@ class TestTaskStatus(enum.IntEnum):
     FAILED = 4
 
 
+class TestCaseStatus(enum.IntEnum):
+    FAILED = 1
+    DONE = 2
+    TODO = 3
+    SKIPPED = 4
+
+
 class ReleaseStatus(enum.IntEnum):
     SCHEDULED = 1
     IN_PROGRESS = 2
