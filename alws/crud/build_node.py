@@ -286,7 +286,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
             build_task.platform.name,
             build_task.build_id,
-            srpm_artifact.name[0],
+            srpm_artifact.name[0].lower(),
             srpm_artifact.name,
         )
         insert_values = [
