@@ -26,12 +26,14 @@ def parse_args():
                     'and transfer them to production host'
     )
     parser.add_argument('platform_names', type=str, nargs='+')
+    parser.add_argument('-a', '--arches', type=str, nargs='+', required=False)
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
 
 
-async def export_repos_from_pulp(platform_names: typing.List[str]):
+async def export_repos_from_pulp(platform_names: typing.List[str],
+                                 arches: typing.List[str] = []):
     repo_ids = []
     platforms_dict = {}
     async with database.Session() as db:
@@ -40,11 +42,16 @@ async def export_repos_from_pulp(platform_names: typing.List[str]):
                 models.Platform.name.in_(platform_names)).options(
                     selectinload(models.Platform.repos))
         )
-        db_platforms = db_platforms.scalars().all()
-        for db_platform in db_platforms:
-            platforms_dict[db_platform.id] = []
-            for repo in db_platform.repos:
-                if repo.production is True:
+    db_platforms = db_platforms.scalars().all()
+    for db_platform in db_platforms:
+        platforms_dict[db_platform.id] = []
+        for repo in db_platform.repos:
+            if repo.production is True:
+                if arches:
+                    if repo.arch in arches:
+                        platforms_dict[db_platform.id].append(repo.name)
+                        repo_ids.append(repo.id)
+                else:
                     platforms_dict[db_platform.id].append(repo.name)
                     repo_ids.append(repo.id)
     return (await fs_export_repository(db=db, repository_ids=set(repo_ids)),
@@ -62,7 +69,7 @@ def main():
     logger.info('Start exporting packages for following platforms:\n%s',
                 args.platform_names)
     exported_paths, platforms_dict = sync(export_repos_from_pulp(
-        args.platform_names))
+        args.platform_names, args.arches))
     logger.info('All repositories exported in following paths:\n%s',
                 '\n'.join((str(path) for path in exported_paths)))
 
@@ -75,6 +82,7 @@ def main():
         repo_path = path.parent
         repodata = repo_path / 'repodata'
         modules_yaml = repodata / 'modules.yaml'
+        createrepo_c(repo_path)
         if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
         key_id = None
