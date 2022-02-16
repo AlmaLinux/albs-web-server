@@ -16,6 +16,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws import database
 from alws import models
+from alws.config import settings
+from alws.utils.pulp_client import PulpClient
 from alws.utils.exporter import fs_export_repository
 from repomd_signer import get_sign_keys_from_db, repomd_signer
 
@@ -76,6 +78,20 @@ async def export_repos_from_release_plan(release_id: int):
             db_release.platform_id)
 
 
+async def delete_existing_exporters_from_pulp():
+    deleted_exporters = []
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    existing_exporters = await pulp_client.list_filesystem_exporters()
+    for exporter in existing_exporters:
+        await pulp_client.delete_filesystem_exporter(exporter['pulp_href'])
+        deleted_exporters.append(exporter['name'])
+    return deleted_exporters
+
+
 def main():
     args = parse_args()
     logger = logging.getLogger('packages-exporter')
@@ -87,6 +103,11 @@ def main():
     platforms_dict = {}
     key_id_by_platform = None
     exported_paths = []
+
+    deleted_exporters = sync(delete_existing_exporters_from_pulp())
+    if deleted_exporters:
+        logger.info('Following exporters, has been deleted from pulp:\n%s',
+                    '\n'.join(str(i) for i in deleted_exporters))
 
     db_sign_keys = sync(get_sign_keys_from_db())
 
