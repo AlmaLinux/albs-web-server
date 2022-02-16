@@ -3,6 +3,7 @@ import sys
 import typing
 import argparse
 import logging
+import jmespath
 
 from syncer import sync
 from pathlib import Path
@@ -25,17 +26,22 @@ def parse_args():
         description='Packages exporter script. Exports repositories from Pulp'
                     'and transfer them to production host'
     )
-    parser.add_argument('platform_names', type=str, nargs='+')
-    parser.add_argument('-a', '--arches', type=str, nargs='+', required=False)
+    parser.add_argument('-names', '--platform_names',
+                        type=str, nargs='+', required=False,
+                        help='List of platform names to export')
+    parser.add_argument('-a', '--arches', type=str, nargs='+',
+                        required=False, help='List of arches to export')
+    parser.add_argument('-id', '--release_id', type=int,
+                        required=False, help='Extract repos by release_id')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         required=False, help='Enable verbose output')
     return parser.parse_args()
 
 
 async def export_repos_from_pulp(platform_names: typing.List[str],
-                                 arches: typing.List[str] = []):
+                                 platforms_dict: dict,
+                                 arches: typing.List[str] = None):
     repo_ids = []
-    platforms_dict = {}
     async with database.Session() as db:
         db_platforms = await db.execute(
             select(models.Platform).where(
@@ -47,15 +53,27 @@ async def export_repos_from_pulp(platform_names: typing.List[str],
         platforms_dict[db_platform.id] = []
         for repo in db_platform.repos:
             if repo.production is True:
-                if arches:
+                if arches is not None:
                     if repo.arch in arches:
                         platforms_dict[db_platform.id].append(repo.name)
                         repo_ids.append(repo.id)
                 else:
                     platforms_dict[db_platform.id].append(repo.name)
                     repo_ids.append(repo.id)
+    return await fs_export_repository(db=db, repository_ids=set(repo_ids))
+
+
+async def export_repos_from_release_plan(release_id: int):
+    repo_ids = []
+    async with database.Session() as db:
+        db_release = await db.execute(
+            select(models.Release).where(models.Release.id == release_id))
+    db_release = db_release.scalars().first()
+
+    repo_ids = jmespath.search('packages[].repositories[].id',
+                               db_release.plan)
     return (await fs_export_repository(db=db, repository_ids=set(repo_ids)),
-            platforms_dict)
+            db_release.platform_id)
 
 
 def main():
@@ -66,14 +84,31 @@ def main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logger.info('Start exporting packages for following platforms:\n%s',
-                args.platform_names)
-    exported_paths, platforms_dict = sync(export_repos_from_pulp(
-        args.platform_names, args.arches))
-    logger.info('All repositories exported in following paths:\n%s',
-                '\n'.join((str(path) for path in exported_paths)))
+    platforms_dict = {}
+    key_id_by_platform = None
+    exported_paths = []
 
     db_sign_keys = sync(get_sign_keys_from_db())
+
+    if args.release_id:
+        release_id = args.release_id
+        logger.info('Start exporting packages from release id=%s',
+                    release_id)
+        exported_paths, platform_id = sync(
+            export_repos_from_release_plan(release_id))
+        key_id_by_platform = next((
+            sign_key.keyid for sign_key in db_sign_keys
+            if sign_key.platform_id == platform_id
+        ), None)
+
+    if args.platform_names:
+        logger.info('Start exporting packages for following platforms:\n%s',
+                    args.platform_names)
+        exported_paths = sync(export_repos_from_pulp(
+            args.platform_names, platforms_dict, args.arches))
+
+    logger.info('All repositories exported in following paths:\n%s',
+                '\n'.join((str(path) for path in exported_paths)))
 
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
@@ -85,7 +120,7 @@ def main():
         createrepo_c(repo_path)
         if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
-        key_id = None
+        key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
             for repo_name in platform_repos:
                 if repo_name in str(exp_path):
