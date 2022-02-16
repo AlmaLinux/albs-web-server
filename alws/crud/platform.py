@@ -37,9 +37,6 @@ async def modify_platform(
         if payload_repos:
             new_repos = {repo.name: repo for repo in platform.repos}
             for repo in platform.repos:
-                if repo.remote_url:
-                    remote_url = repo.remote_url.split('/')[3:]
-                    repo.remote_url = '/'.join(remote_url)
                 if repo.name in db_repos:
                     db_repo = db_repos[repo.name]
                     for key in repo.dict().keys():
