@@ -29,7 +29,6 @@ class RepositoryCreate(BaseModel):
     debug: bool
     production: bool = False
     pulp_href: typing.Optional[str]
-    remote_url: typing.Optional[str]
 
 
 class RepositorySearch(BaseModel):

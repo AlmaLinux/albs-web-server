@@ -10,7 +10,6 @@ from alws import models
 from alws.config import settings
 from alws.constants import ExportStatus
 from alws.utils.pulp_client import PulpClient
-from alws.utils.repository import generate_repository_path
 
 
 async def create_pulp_exporters_to_fs(db: Session,
@@ -30,9 +29,8 @@ async def create_pulp_exporters_to_fs(db: Session,
         response = await db.execute(query)
         await db.commit()
     for repo in response.scalars().all():
-        export_path = str(Path(settings.pulp_export_path,
-                               generate_repository_path(
-                                   repo.name, repo.arch, repo.debug)))
+        export_path = str(Path(
+            settings.pulp_export_path, repo.export_path, 'Packages'))
         fs_exporter_href = await pulp_client.create_filesystem_exporter(
             f'{repo.name}-{repo.arch}', export_path)
         export_repos.append({
