@@ -22,26 +22,9 @@ async def get_sign_keys_from_db():
         return await get_sign_keys(session)
 
 
-def repomd_signer(export_path, platforms_dict):
+def repomd_signer(export_path, key_id):
     xml = etree.parse(os.path.join(export_path, 'repomd.xml'))
     xml_string = str(etree.tostring(xml.getroot()))
-    sign_keys = sync(get_sign_keys_from_db())
-    key_id = None
-    # TODO: need to refactor this
-    if 'almalinux-8' in str(export_path):
-        platform_id = platforms_dict.get('AlmaLinux-8', 0)
-        key_id = next((
-            sign_key.keyid for sign_key in sign_keys
-            if sign_key.platform_id == platform_id
-        ), None)
-    elif 'almalinux-9' in str(export_path):
-        platform_id = platforms_dict.get('AlmaLinux-9', 0)
-        key_id = next((
-            sign_key.keyid for sign_key in sign_keys
-            if sign_key.platform_id == platform_id
-        ), None)
-    if key_id is None:
-        raise Exception
     sign_data = {
         "content": xml_string,
         "pgp_keyid": key_id,

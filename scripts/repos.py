@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.utils.exporter import fs_export_repository
-from repomd_signer import repomd_signer
+from repomd_signer import get_sign_keys_from_db, repomd_signer
 
 
 def parse_args():
@@ -42,11 +42,12 @@ async def export_repos_from_pulp(platform_names: typing.List[str]):
         )
         db_platforms = db_platforms.scalars().all()
         for db_platform in db_platforms:
-            platforms_dict[db_platform.name] = db_platform.id
-            repo_ids.extend((
-                repo.id for repo in db_platform.repos
-                if repo.production is True
-            ))
+            platforms_dict[db_platform.id] = []
+            for repo in db_platform.repos:
+                if repo.production is True:
+                    platforms_dict[db_platform.id].append(repo.name)
+                    repo_ids.append(repo.id)
+    repo_ids = [8, 9]
     return (await fs_export_repository(db=db, repository_ids=set(repo_ids)),
             platforms_dict)
 
@@ -66,6 +67,8 @@ def main():
     logger.info('All repositories exported in following paths:\n%s',
                 '\n'.join((str(path) for path in exported_paths)))
 
+    db_sign_keys = sync(get_sign_keys_from_db())
+
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
     for exp_path in exported_paths:
@@ -75,12 +78,21 @@ def main():
         modules_yaml = repodata / 'modules.yaml'
         if modules_yaml.exists():
             modifyrepo_c(modules_yaml, repodata)
-        try:
-            repomd_signer(repodata, platforms_dict)
-        except Exception as exc:
-            logger.exception('Cannot to sign repomd.xml:')
-        else:
-            logger.info('repomd.xml in %s is signed', str(repodata))
+        key_id = None
+        for platform_id, platform_repos in platforms_dict.items():
+            for repo_name in platform_repos:
+                if repo_name in str(exp_path):
+                    key_id = next((
+                        sign_key.keyid for sign_key in db_sign_keys
+                        if sign_key.platform_id == platform_id
+                    ), None)
+                    break
+        if key_id is None:
+            logger.info('Cannot sign repomd.xml in %s, missing GPG key',
+                        str(exp_path))
+            continue
+        repomd_signer(repodata, key_id)
+        logger.info('repomd.xml in %s is signed', str(repodata))
 
 
 if __name__ == '__main__':
