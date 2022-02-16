@@ -47,7 +47,6 @@ async def export_repos_from_pulp(platform_names: typing.List[str]):
                 if repo.production is True:
                     platforms_dict[db_platform.id].append(repo.name)
                     repo_ids.append(repo.id)
-    repo_ids = [8, 9]
     return (await fs_export_repository(db=db, repository_ids=set(repo_ids)),
             platforms_dict)
 
