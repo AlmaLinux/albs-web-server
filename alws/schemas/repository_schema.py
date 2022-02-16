@@ -21,6 +21,17 @@ class Repository(BaseModel):
         orm_mode = True
 
 
+class RepositoryModify(BaseModel):
+    name: typing.Optional[str] = None
+    arch: typing.Optional[str] = None
+    url: typing.Optional[str] = None
+    type: typing.Optional[str] = None
+    debug: typing.Optional[str] = None
+    production: typing.Optional[bool] = False
+    pulp_href: typing.Optional[str] = None
+    remote_url: typing.Optional[str] = None
+
+
 class RepositoryCreate(BaseModel):
     name: str
     arch: str
@@ -29,6 +40,7 @@ class RepositoryCreate(BaseModel):
     debug: bool
     production: bool = False
     pulp_href: typing.Optional[str]
+    remote_url: typing.Optional[str]
 
 
 class RepositorySearch(BaseModel):

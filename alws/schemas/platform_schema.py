@@ -2,7 +2,7 @@ import typing
 
 from pydantic import BaseModel
 
-from alws.schemas.repository_schema import RepositoryCreate
+from alws.schemas.repository_schema import RepositoryCreate, RepositoryModify
 
 
 __all__ = ['PlatformCreate', 'Platform']
@@ -16,7 +16,7 @@ class PlatformModify(BaseModel):
     distr_version: typing.Optional[str] = None
     arch_list: typing.Optional[typing.List[str]] = None
     reference_platforms: typing.Optional[typing.List[str]] = []
-    repos: typing.Optional[typing.List[RepositoryCreate]] = None
+    repos: typing.Optional[typing.List[RepositoryModify]] = None
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_reference: typing.Optional[bool] = False

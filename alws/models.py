@@ -173,6 +173,8 @@ class Repository(CustomRepoRepr):
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
+    remote_url = sqlalchemy.Column(sqlalchemy.Text, default=False,
+                                   nullable=True)
 
 
 class RepositoryRemote(CustomRepoRepr):

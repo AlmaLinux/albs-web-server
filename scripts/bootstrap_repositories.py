@@ -139,10 +139,10 @@ def main():
 
     for platform_data in platforms_data:
         if args.only_update:
-            sync(update_platform(platform_data))
+            sync(update_platform(platforms_data))
             logger.info(
                 'Updating %s platform data is completed',
-                platform_data.get('name'),
+                platforms_data.get('name'),
             )
             continue
         if not platform_data.get('repositories'):
