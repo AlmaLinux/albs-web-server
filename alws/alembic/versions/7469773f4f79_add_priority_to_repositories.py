@@ -1,8 +1,8 @@
 """add priority to repositories
 
-Revision ID: d8dd099dc849
-Revises: 6f8e782397d2
-Create Date: 2022-02-09 14:45:37.608420
+Revision ID: 7469773f4f79
+Revises: 3da2d1e48185
+Create Date: 2022-02-17 09:36:28.521829
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'd8dd099dc849'
-down_revision = '6f8e782397d2'
+revision = '7469773f4f79'
+down_revision = '3da2d1e48185'
 branch_labels = None
 depends_on = None
 
