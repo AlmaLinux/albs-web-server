@@ -57,10 +57,10 @@ async def export_repos_from_pulp(platform_names: typing.List[str],
             if repo.production is True:
                 if arches is not None:
                     if repo.arch in arches:
-                        platforms_dict[db_platform.id].append(repo.name)
+                        platforms_dict[db_platform.id].append(repo.export_path)
                         repo_ids.append(repo.id)
                 else:
-                    platforms_dict[db_platform.id].append(repo.name)
+                    platforms_dict[db_platform.id].append(repo.export_path)
                     repo_ids.append(repo.id)
     return await fs_export_repository(db=db, repository_ids=set(repo_ids))
 
@@ -143,8 +143,8 @@ def main():
             modifyrepo_c(modules_yaml, repodata)
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
-            for repo_name in platform_repos:
-                if repo_name in str(exp_path):
+            for repo_export_path in platform_repos:
+                if repo_export_path in str(exp_path):
                     key_id = next((
                         sign_key.keyid for sign_key in db_sign_keys
                         if sign_key.platform_id == platform_id
