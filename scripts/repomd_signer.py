@@ -1,20 +1,28 @@
 import os
-import aioredis
+import json
+import urllib.parse
+import aiohttp
 
 from lxml import etree
 from syncer import sync
 
 from alws import database
 from alws.config import settings
-from alws.schemas import sign_schema
-from alws.routers.sign_task import create_small_sign_task
 from alws.routers.sign_key import get_sign_keys
 
 
+HEADERS = {'Authorization': f'Bearer {settings.sign_server_token}'}
+
+
 async def sign_repomd_xml(data):
-    client = aioredis.from_url(settings.redis_url)
-    return await create_small_sign_task(
-        sign_schema.SyncSignTaskRequest(**data), client)
+    endpoint = 'sign-tasks/sync_sign_task/'
+    url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
+    async with aiohttp.ClientSession(headers=HEADERS,
+                                     raise_for_status=True) as session:
+        async with session.post(url, json=data) as response:
+            json_data = await response.read()
+            json_data = json.loads(json_data)
+            return json_data
 
 
 async def get_sign_keys_from_db():

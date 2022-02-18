@@ -28,5 +28,8 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
+    sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
+    sign_server_token: typing.Optional[str]
+
 
 settings = Settings()
