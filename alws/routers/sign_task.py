@@ -5,9 +5,8 @@ import typing
 import aioredis
 from fastapi import APIRouter, Depends, Query, WebSocket
 
-from alws import database
 from alws.crud import sign_task
-from alws.dependencies import get_db, get_redis, JWTBearer
+from alws.dependencies import get_redis, JWTBearer, get_sync_db
 from alws.schemas import sign_schema
 
 
@@ -19,36 +18,35 @@ router = APIRouter(
 
 
 @router.get('/', response_model=typing.List[sign_schema.SignTask])
-async def get_sign_tasks(build_id: int = None,
-                         db: database.Session = Depends(get_db)):
-    return await sign_task.get_sign_tasks(db, build_id=build_id)
+async def get_sign_tasks(build_id: int = None):
+    with get_sync_db() as db:
+        return await sign_task.get_sign_tasks(db, build_id=build_id)
 
 
 @router.post('/', response_model=sign_schema.SignTask)
-async def create_sign_task(payload: sign_schema.SignTaskCreate,
-                           db: database.Session = Depends(get_db)):
-    return await sign_task.create_sign_task(db, payload)
+async def create_sign_task(payload: sign_schema.SignTaskCreate):
+    with get_sync_db() as db:
+        return await sign_task.create_sign_task(db, payload)
 
 
 @router.post('/get_sign_task/',
              response_model=typing.Union[dict, sign_schema.AvailableSignTask])
-async def get_available_sign_task(
-        payload: sign_schema.SignTaskGet,
-        db: database.Session = Depends(get_db)):
-    result = await sign_task.get_available_sign_task(db, payload.key_ids)
-    if any([not result.get(item) for item in
-            ['build_id', 'id', 'keyid', 'packages']]):
-        return {}
-    return result
+async def get_available_sign_task(payload: sign_schema.SignTaskGet):
+    with get_sync_db() as db:
+        result = await sign_task.get_available_sign_task(db, payload.key_ids)
+        if any([not result.get(item) for item in
+                ['build_id', 'id', 'keyid', 'packages']]):
+            return {}
+        return result
 
 
 @router.post('/{sign_task_id}/complete/',
              response_model=sign_schema.SignTaskCompleteResponse)
 async def complete_sign_task(
-        sign_task_id: int, payload: sign_schema.SignTaskComplete,
-        db: database.Session = Depends(get_db)):
-    await sign_task.complete_sign_task(db, sign_task_id, payload)
-    return {'success': True}
+        sign_task_id: int, payload: sign_schema.SignTaskComplete):
+    with get_sync_db() as db:
+        await sign_task.complete_sign_task(db, sign_task_id, payload)
+        return {'success': True}
 
 
 @router.post('/sync_sign_task/',

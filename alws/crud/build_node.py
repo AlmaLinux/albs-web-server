@@ -20,40 +20,38 @@ from alws.utils.pulp_client import PulpClient
 async def get_available_build_task(
             db: Session,
             request: build_node_schema.RequestTask
-        ) -> models.BuildTask:
-    async with db.begin():
-        # TODO: here should be config value
-        ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        query = ~models.BuildTask.dependencies.any()
-        db_task = await db.execute(
-            select(models.BuildTask).where(query).with_for_update().filter(
-                    sqlalchemy.and_(
-                        models.BuildTask.status < BuildTaskStatus.COMPLETED,
-                        models.BuildTask.arch.in_(request.supported_arches),
-                        sqlalchemy.or_(
-                            models.BuildTask.ts < ts_expired,
-                            models.BuildTask.ts.__eq__(None)
-                        )
+        ) -> typing.Optional[models.BuildTask]:
+    # TODO: here should be config value
+    ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
+    query = ~models.BuildTask.dependencies.any()
+    db_task = db.execute(
+        select(models.BuildTask).where(query).with_for_update().filter(
+                sqlalchemy.and_(
+                    models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                    models.BuildTask.arch.in_(request.supported_arches),
+                    sqlalchemy.or_(
+                        models.BuildTask.ts < ts_expired,
+                        models.BuildTask.ts.__eq__(None)
                     )
-                ).options(
-                selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.repos),
-                selectinload(models.BuildTask.platform).selectinload(
-                    models.Platform.repos),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.linked_builds).selectinload(
-                    models.Build.repos)
-            ).order_by(models.BuildTask.id)
-        )
-        db_task = db_task.scalars().first()
-        if not db_task:
-            return
-        db_task.ts = datetime.datetime.now()
-        db_task.status = BuildTaskStatus.STARTED
-        await db.commit()
+                )
+            ).options(
+            selectinload(models.BuildTask.ref),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos),
+            selectinload(models.BuildTask.platform).selectinload(
+                models.Platform.repos),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.user),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.linked_builds).selectinload(
+                models.Build.repos)
+        ).order_by(models.BuildTask.id)
+    )
+    db_task = db_task.scalars().first()
+    if not db_task:
+        return
+    db_task.ts = datetime.datetime.now()
+    db_task.status = BuildTaskStatus.STARTED
     return db_task
 
 
@@ -68,15 +66,14 @@ async def update_failed_build_items(db: Session, build_id: int):
             models.BuildTask.build_id == build_id,
             models.BuildTask.status == BuildTaskStatus.FAILED)
     ).order_by(models.BuildTask.index, models.BuildTask.id)
-    async with db.begin():
-        last_task = None
-        failed_tasks = await db.execute(query)
-        for task in failed_tasks.scalars():
-            task.status = BuildTaskStatus.IDLE
-            if last_task is not None:
-                await db.run_sync(add_build_task_dependencies, task, last_task)
-            last_task = task
-        await db.commit()
+    last_task = None
+    failed_tasks = db.execute(query)
+    for task in failed_tasks.scalars():
+        task.status = BuildTaskStatus.IDLE
+        if last_task is not None:
+            db.run_sync(add_build_task_dependencies, task, last_task)
+        last_task = task
+    db.flush()
 
 
 async def ping_tasks(
@@ -85,16 +82,14 @@ async def ping_tasks(
         ):
     query = models.BuildTask.id.in_(task_list)
     now = datetime.datetime.now()
-    async with db.begin():
-        await db.execute(update(models.BuildTask).where(query).values(ts=now))
-        await db.commit()
+    db.execute(update(models.BuildTask).where(query).values(ts=now))
+    db.flush()
 
 
 async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
-    async with db.begin():
-        build_tasks = await db.execute(select(models.BuildTask).where(
-            models.BuildTask.id == task_id))
-        build_task = build_tasks.scalars().first()
+    build_tasks = db.execute(select(models.BuildTask).where(
+        models.BuildTask.id == task_id))
+    build_task = build_tasks.scalars().first()
     return BuildTaskStatus.is_finished(build_task.status)
 
 
@@ -172,7 +167,7 @@ async def __process_build_task_artifacts(
         settings.pulp_user,
         settings.pulp_password
     )
-    build_tasks = await db.execute(
+    build_tasks = db.execute(
         select(models.BuildTask).where(
             models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform).selectinload(
@@ -237,8 +232,8 @@ async def __process_build_task_artifacts(
 
     db.add_all(db_entities)
     db.add(build_task)
-    await db.commit()
-    await db.refresh(build_task)
+    db.flush()
+    db.refresh(build_task)
     return build_task
 
 
@@ -246,7 +241,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
     uncompleted_tasks_ids = []
     if build_task.status in (BuildTaskStatus.COMPLETED,
                              BuildTaskStatus.FAILED):
-        uncompleted_tasks_ids = await db.execute(
+        uncompleted_tasks_ids = db.execute(
             select(models.BuildTask.id).where(
                 models.BuildTask.id != build_task.id,
                 models.BuildTask.ref_id == build_task.ref_id,
@@ -261,20 +256,20 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         update_query = update(models.BuildTask).where(
             models.BuildTask.id.in_(uncompleted_tasks_ids),
         ).values(status=BuildTaskStatus.FAILED)
-        await db.execute(update_query)
+        db.execute(update_query)
 
         remove_query = delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency.in_(
                 uncompleted_tasks_ids),
         )
-        await db.execute(remove_query)
+        db.execute(remove_query)
 
     # if SRPM builted we need to download them
     # from pulp repos in next tasks
     if all((build_task.status == BuildTaskStatus.COMPLETED,
             uncompleted_tasks_ids,
             build_task.built_srpm_url is None)):
-        srpm_artifact = await db.execute(
+        srpm_artifact = db.execute(
             select(models.BuildTaskArtifact).where(
                 models.BuildTaskArtifact.build_task_id == build_task.id,
                 models.BuildTaskArtifact.name.like("%.src.rpm"),
@@ -298,10 +293,10 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         update_query = update(models.BuildTask).where(
             models.BuildTask.ref_id == build_task.ref_id,
         ).values(built_srpm_url=srpm_url)
-        await db.execute(update_query)
-        await db.execute(insert(models.BuildTaskArtifact), insert_values)
+        db.execute(update_query)
+        db.execute(insert(models.BuildTaskArtifact), insert_values)
 
-    await db.commit()
+    db.flush()
 
 
 async def build_done(
@@ -337,7 +332,7 @@ async def build_done(
         except Exception as e:
             logging.error('Cannot process multilib packages: %s', str(e))
 
-    await db.execute(
+    db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
@@ -347,13 +342,13 @@ async def build_done(
     except Exception as e:
         logging.error('Cannot process noarch packages: %s', str(e))
 
-    await db.execute(
+    db.execute(
         delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency == request.task_id
         )
     )
 
-    rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
+    rpms_result = db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
     srpm = None
@@ -374,18 +369,18 @@ async def build_done(
 
     # retrieve already created instance of model SourceRpm
     if not srpm:
-        srpms = await db.execute(select(models.SourceRpm).where(
+        srpms = db.execute(select(models.SourceRpm).where(
             models.SourceRpm.build_id == build_task.build_id))
         srpm = srpms.scalars().first()
     if srpm:
         if build_task.built_srpm_url is None:
             db.add(srpm)
-            await db.commit()
-            await db.refresh(srpm)
+            db.flush()
+            db.refresh(srpm)
         for binary_rpm in binary_rpms:
             binary_rpm.source_rpm = srpm
 
     db.add_all(binary_rpms)
-    await db.commit()
+    db.flush()
 
     await __update_built_srpm_url(db, build_task)

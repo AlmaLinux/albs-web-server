@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import contextmanager
 
 import aioredis
 from fastapi import Request, HTTPException, status
@@ -9,7 +10,7 @@ from alws.config import settings
 from alws.utils.jwt_utils import decode_JWT_token
 
 
-__all__ = ['get_db', 'JWTBearer']
+__all__ = ['get_db', 'get_sync_db', 'JWTBearer']
 
 
 # Usually PostgreSQL supports up to 100 concurrent connections,
@@ -24,6 +25,22 @@ async def get_db() -> database.Session:
                 yield session
             finally:
                 await session.close()
+
+
+@contextmanager
+def get_sync_db() -> database.SyncSession:
+    """
+    Provide a transactional scope around a series of operations
+    """
+    with database.SyncSession() as session:
+        try:
+            yield session
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
 
 async def get_redis() -> aioredis.Redis:

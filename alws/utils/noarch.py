@@ -26,7 +26,7 @@ async def get_noarch_packages(
         models.BuildTaskArtifact.type == 'rpm',
         models.BuildTaskArtifact.name.like('%.noarch.%'),
     ))
-    db_artifacts = await db.execute(query)
+    db_artifacts = db.execute(query)
     db_artifacts = db_artifacts.scalars().all()
     noarch_packages = {}
     debug_noarch_packages = {}
@@ -52,7 +52,7 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
         settings.pulp_user,
         settings.pulp_password,
     )
-    build_tasks = await db.execute(query)
+    build_tasks = db.execute(query)
     build_tasks = build_tasks.scalars().all()
     if not all(
             BuildTaskStatus.is_finished(task.status)
@@ -117,7 +117,7 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
 
     db.add_all(build_tasks)
     db.add_all(new_noarch_artifacts)
-    await db.commit()
+    db.flush()
 
     for repo_href, content_dict in repos_to_update.items():
         await pulp_client.modify_repository(

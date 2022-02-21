@@ -43,14 +43,13 @@ async def create_pulp_exporters_to_fs(db: Session,
     export_repos = []
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    async with db.begin():
-        et_inserted = await db.execute(
-            insert(models.ExportTask).values(
-                name=export_name, status=ExportStatus.NEW)
-        )
-        export_task_pk = et_inserted.inserted_primary_key[0]
-        response = await db.execute(query)
-        await db.commit()
+    et_inserted = db.execute(
+        insert(models.ExportTask).values(
+            name=export_name, status=ExportStatus.NEW)
+    )
+    export_task_pk = et_inserted.inserted_primary_key[0]
+    response = db.execute(query)
+    db.flush()
     for repo in response.scalars().all():
         export_path = str(Path(settings.pulp_export_path,
                                generate_repository_path(
@@ -64,10 +63,9 @@ async def create_pulp_exporters_to_fs(db: Session,
             'fs_exporter_href': fs_exporter_href
         })
     if export_repos:
-        async with db.begin():
-            await db.execute(
-                insert(models.RepoExporter), export_repos)
-            await db.commit()
+        db.execute(
+            insert(models.RepoExporter), export_repos)
+        db.flush()
     return export_task_pk
 
 
@@ -87,13 +85,12 @@ async def execute_pulp_exporters_to_fs(db: Session,
         models.Repository
     ).filter(
         models.RepoExporter.repository_id == models.Repository.id)
-    async with db.begin():
-        await db.execute(
-            update(models.ExportTask).where(
-                models.ExportTask.id == export_id).values(
-                exported_at=now, status=ExportStatus.IN_PROGRESS))
-        response = await db.execute(query)
-        await db.commit()
+    db.execute(
+        update(models.ExportTask).where(
+            models.ExportTask.id == export_id).values(
+            exported_at=now, status=ExportStatus.IN_PROGRESS))
+    response = db.execute(query)
+    db.flush()
     exported_data = {}
     for fs_exporter_href, fse_path, pulp_href, repo_url in response:
         latest_version_href = await pulp_client.get_repo_latest_version(
@@ -102,12 +99,11 @@ async def execute_pulp_exporters_to_fs(db: Session,
             fs_exporter_href, latest_version_href)
         exported_data[fse_path] = repo_url
         await pulp_client.delete_filesystem_exporter(fs_exporter_href)
-    async with db.begin():
-        await db.execute(
-            update(models.ExportTask).where(
-                models.ExportTask.id == export_id).values(
-                exported_at=now, status=ExportStatus.COMPLETED))
-        await db.commit()
+    db.execute(
+        update(models.ExportTask).where(
+            models.ExportTask.id == export_id).values(
+            exported_at=now, status=ExportStatus.COMPLETED))
+    db.flush()
     return exported_data
 
 
