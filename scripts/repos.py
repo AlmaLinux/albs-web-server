@@ -137,10 +137,8 @@ def main():
         path = Path(exp_path)
         repo_path = path.parent
         repodata = repo_path / 'repodata'
-        modules_yaml = repodata / 'modules.yaml'
-        createrepo_c(repo_path)
-        if modules_yaml.exists():
-            modifyrepo_c(modules_yaml, repodata)
+        result = createrepo_c.run(args=['--update', '--keep-all-metadata', repo_path])
+        logger.info(result)
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
             for repo_export_path in platform_repos:
