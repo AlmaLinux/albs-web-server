@@ -314,7 +314,7 @@ class BuildPlanner:
                     if not dist_taken_by_user:
                         mock_options['definitions']['dist'] = dist_macro
                 if not dist_taken_by_user and parsed_dist_macro:
-                    mock_options['definitions']['dist'] = parsed_dist_macro
+                    mock_options['definitions']['dist'] = f'.{parsed_dist_macro}'
                 build_task = models.BuildTask(
                     arch=arch,
                     platform_id=platform.id,
