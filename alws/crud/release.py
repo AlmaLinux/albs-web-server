@@ -1,3 +1,4 @@
+import asyncio
 import re
 import typing
 
@@ -81,47 +82,78 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                f'{reference_dist_version}/projects/'
     packages = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     pulp_packages, src_rpm_names = await __get_pulp_packages(
         db, build_ids, build_tasks=build_tasks)
 
-    def get_pulp_based_response():
+    async def check_package_presence_in_repo(pulp_package: dict,
+                                             repo_version: str):
+        params = {
+            'name': pulp_package['name'],
+            'epoch': pulp_package['epoch'],
+            'version': pulp_package['version'],
+            'release': pulp_package['release'],
+            'arch': pulp_package['arch'],
+            'repository_version': repo_version,
+        }
+        packages = await pulp_client.get_rpm_packages(params)
+        if packages:
+            return True
+        return False
+
+    async def get_pulp_based_response():
         plan_packages = []
+        existing_packages = []
         for pkg in pulp_packages:
+            tasks = [
+                check_package_presence_in_repo(pkg, repo_href)
+                for repo_href in latest_prod_repo_versions
+            ]
             full_name = pkg['full_name']
             if full_name in added_packages:
                 continue
+            result = await asyncio.gather(*tasks)
+            if any(result):
+                existing_packages.append(full_name)
             plan_packages.append({'package': pkg, 'repositories': []})
             added_packages.append(full_name)
         return {
             'packages': plan_packages,
-            'repositories': prod_repos
+            'repositories': prod_repos,
+            'existing_packages': existing_packages,
         }
 
     repo_q = select(models.Repository).where(
         models.Repository.production.is_(True))
     result = await db.execute(repo_q)
-    prod_repos = [
-        {
+    prod_repos = []
+    tasks = []
+    for repo in result.scalars().all():
+        prod_repos.append({
             'id': repo.id,
             'name': repo.name,
             'arch': repo.arch,
             'debug': repo.debug,
-            'url': repo.url
-        }
-        for repo in result.scalars().all()
-    ]
+            'url': repo.url,
+        })
+        tasks.append(pulp_client.get_repo_latest_version(repo.pulp_href))
+    latest_prod_repo_versions = await asyncio.gather(*tasks)
 
     repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
                      for repo in prod_repos}
 
     added_packages = []
     if not settings.package_beholder_enabled:
-        return get_pulp_based_response()
+        return await get_pulp_based_response()
 
     beholder_response = await BeholderClient(settings.beholder_host).post(
         endpoint, src_rpm_names)
     if not beholder_response.get('packages'):
-        return get_pulp_based_response()
+        return await get_pulp_based_response()
     if beholder_response.get('packages', []):
         for package in pulp_packages:
             pkg_name = package['name']
