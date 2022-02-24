@@ -90,19 +90,21 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     pulp_packages, src_rpm_names = await __get_pulp_packages(
         db, build_ids, build_tasks=build_tasks)
 
-    async def check_package_presence_in_repo(pulp_package: dict,
-                                             repo_version: str):
+    async def check_package_presence_in_repo(pulp_pkg: dict,
+                                             repo_href: str):
         params = {
-            'name': pulp_package['name'],
-            'epoch': pulp_package['epoch'],
-            'version': pulp_package['version'],
-            'release': pulp_package['release'],
-            'arch': pulp_package['arch'],
-            'repository_version': repo_version,
+            'name': pulp_pkg['name'],
+            'epoch': pulp_pkg['epoch'],
+            'version': pulp_pkg['version'],
+            'release': pulp_pkg['release'],
+            'arch': pulp_pkg['arch'],
+            'repository_version': repo_href,
         }
         packages = await pulp_client.get_rpm_packages(params)
         if packages:
-            return pulp_package['full_name']
+            return {
+                latest_prod_repo_versions[repo_href]: pulp_pkg['full_name']
+            }
 
     async def get_pulp_based_response():
         plan_packages = []
@@ -138,8 +140,13 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'debug': repo.debug,
             'url': repo.url,
         })
-        tasks.append(pulp_client.get_repo_latest_version(repo.pulp_href))
-    latest_prod_repo_versions = await asyncio.gather(*tasks)
+        tasks.append(pulp_client.get_repo_latest_version(
+            repo.pulp_href,
+            for_releases=True,
+        ))
+    latest_prod_repo_versions = {}
+    for repo_href, repo_name in await asyncio.gather(*tasks):
+        latest_prod_repo_versions[repo_href] = repo_name
 
     repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
                      for repo in prod_repos}
