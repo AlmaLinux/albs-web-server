@@ -102,29 +102,27 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         }
         packages = await pulp_client.get_rpm_packages(params)
         if packages:
-            return True
-        return False
+            return pulp_package['full_name']
 
     async def get_pulp_based_response():
         plan_packages = []
-        existing_packages = []
+        tasks = []
         for pkg in pulp_packages:
-            tasks = [
-                check_package_presence_in_repo(pkg, repo_href)
-                for repo_href in latest_prod_repo_versions
-            ]
             full_name = pkg['full_name']
             if full_name in added_packages:
                 continue
-            result = await asyncio.gather(*tasks)
-            if any(result):
-                existing_packages.append(full_name)
+            if pkg['arch'] == 'noarch':
+                tasks.extend((
+                    check_package_presence_in_repo(pkg, repo_href)
+                    for repo_href in latest_prod_repo_versions
+                ))
             plan_packages.append({'package': pkg, 'repositories': []})
             added_packages.append(full_name)
+        existing_packages = await asyncio.gather(*tasks)
         return {
             'packages': plan_packages,
             'repositories': prod_repos,
-            'existing_packages': existing_packages,
+            'existing_packages': list(filter(None, existing_packages)),
         }
 
     repo_q = select(models.Repository).where(
@@ -155,6 +153,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     if not beholder_response.get('packages'):
         return await get_pulp_based_response()
     if beholder_response.get('packages', []):
+        tasks = []
         for package in pulp_packages:
             pkg_name = package['name']
             pkg_version = package['version']
@@ -162,6 +161,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             full_name = package['full_name']
             if full_name in added_packages:
                 continue
+            if package['arch'] == 'noarch':
+                tasks.extend((
+                    check_package_presence_in_repo(package, repo_href)
+                    for repo_href in latest_prod_repo_versions
+                ))
             query = f'packages[].packages[?name==\'{pkg_name}\' ' \
                     f'&& version==\'{pkg_version}\' ' \
                     f'&& arch==\'{pkg_arch}\'][]'
@@ -188,9 +192,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     repos_mapping.get(item) for item in release_repositories]
             packages.append(pkg_info)
             added_packages.append(full_name)
+        existing_packages = await asyncio.gather(*tasks)
     return {
         'packages': packages,
-        'repositories': prod_repos
+        'repositories': prod_repos,
+        'existing_packages': list(filter(None, existing_packages)),
     }
 
 

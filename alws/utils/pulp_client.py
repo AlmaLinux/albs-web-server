@@ -392,13 +392,14 @@ class PulpClient:
 
     async def make_get_request(self, endpoint: str, params: dict = None):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        session = await self.__get_client()
-        async with session:
-            async with session.get(full_url, params=params,
-                                   timeout=self._timeout) as response:
-                json = await response.json(content_type=None)
-                response.raise_for_status()
-                return json
+        async with PULP_SEMAPHORE:
+            session = await self.__get_client()
+            async with session:
+                async with session.get(full_url, params=params,
+                                       timeout=self._timeout) as response:
+                    json = await response.json(content_type=None)
+                    response.raise_for_status()
+                    return json
 
     async def make_post_request(self, endpoint: str, data: Optional[dict],
                                 headers: Optional[dict] = None):
