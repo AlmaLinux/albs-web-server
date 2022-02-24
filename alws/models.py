@@ -174,6 +174,8 @@ class Repository(CustomRepoRepr):
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
     export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
+                                 nullable=False)
 
 
 class RepositoryRemote(CustomRepoRepr):
