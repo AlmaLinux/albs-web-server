@@ -317,7 +317,7 @@ class PulpClient:
         return task
 
     async def create_filesystem_exporter(self, fse_name: str, fse_path: str,
-                                         fse_method: str='write'):
+                                         fse_method: str = 'hardlink'):
         endpoint = 'pulp/api/v3/exporters/core/filesystem/'
 
         params = {
@@ -331,7 +331,7 @@ class PulpClient:
     async def update_filesystem_exporter(self, fse_pulp_href: str,
                                          fse_name: str,
                                          fse_path: str,
-                                         fse_method: str='hardlink'):
+                                         fse_method: str = 'hardlink'):
         endpoint = fse_pulp_href
         params = {
             'name': fse_name,

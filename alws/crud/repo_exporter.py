@@ -1,38 +1,15 @@
 import datetime
-import logging
 import typing
 from pathlib import Path
 
-import sqlalchemy
 from sqlalchemy import update, delete, insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 
 from alws import models
-from alws.errors import (
-    AlreadyBuiltError,
-    DataNotFoundError,
-    DistributionError,
-)
 from alws.config import settings
 from alws.constants import ExportStatus
-
-from alws.schemas import (
-    build_schema, user_schema, platform_schema, build_node_schema,
-    distro_schema, test_schema, release_schema, remote_schema,
-    repository_schema,
-)
-from alws.utils.distro_utils import create_empty_repo
-from alws.utils.modularity import ModuleWrapper
-from alws.utils.github import get_user_github_token, get_github_user_info
-from alws.utils.jwt_utils import generate_JWT_token
-from alws.utils.multilib import (
-    add_multilib_packages,
-    get_multilib_packages,
-)
-from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
-from alws.utils.repository import generate_repository_path
 
 
 async def create_pulp_exporters_to_fs(db: Session,
@@ -52,11 +29,10 @@ async def create_pulp_exporters_to_fs(db: Session,
         response = await db.execute(query)
         await db.commit()
     for repo in response.scalars().all():
-        export_path = str(Path(settings.pulp_export_path,
-                               generate_repository_path(
-                                   repo.name, repo.arch, repo.debug)))
+        export_path = str(Path(
+            settings.pulp_export_path, repo.export_path, 'Packages'))
         fs_exporter_href = await pulp_client.create_filesystem_exporter(
-            repo.name, export_path)
+            f'{repo.name}-{repo.arch}', export_path)
         export_repos.append({
             'path': export_path,
             'exported_id': export_task_pk,
@@ -107,6 +83,10 @@ async def execute_pulp_exporters_to_fs(db: Session,
             update(models.ExportTask).where(
                 models.ExportTask.id == export_id).values(
                 exported_at=now, status=ExportStatus.COMPLETED))
+        await db.execute(
+            delete(models.RepoExporter).where(
+                models.RepoExporter.exported_id == export_id)
+        )
         await db.commit()
     return exported_data
 
