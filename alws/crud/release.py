@@ -1,6 +1,7 @@
 import asyncio
 import re
 import typing
+from collections import defaultdict
 
 import jmespath
 from sqlalchemy.future import select
@@ -91,20 +92,20 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         db, build_ids, build_tasks=build_tasks)
 
     async def check_package_presence_in_repo(pulp_pkg: dict,
-                                             repo_href: str):
+                                             repo_ver_href: str):
         params = {
             'name': pulp_pkg['name'],
             'epoch': pulp_pkg['epoch'],
             'version': pulp_pkg['version'],
             'release': pulp_pkg['release'],
             'arch': pulp_pkg['arch'],
-            'repository_version': repo_href,
+            'repository_version': repo_ver_href,
         }
         packages = await pulp_client.get_rpm_packages(params)
         if packages:
-            return {
-                latest_prod_repo_versions[repo_href]: pulp_pkg['full_name']
-            }
+            repo_href = re.sub(r'versions\/\d+\/$', '', repo_ver_href)
+            existing_packages[pulp_pkg['full_name']].append(
+                repo_ids_by_href.get(repo_href, 0))
 
     async def get_pulp_based_response():
         plan_packages = []
@@ -120,11 +121,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 ))
             plan_packages.append({'package': pkg, 'repositories': []})
             added_packages.append(full_name)
-        existing_packages = await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
         return {
             'packages': plan_packages,
             'repositories': prod_repos,
-            'existing_packages': list(filter(None, existing_packages)),
+            'existing_packages': existing_packages,
         }
 
     repo_q = select(models.Repository).where(
@@ -132,6 +133,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     result = await db.execute(repo_q)
     prod_repos = []
     tasks = []
+    repo_ids_by_href = {}
     for repo in result.scalars().all():
         prod_repos.append({
             'id': repo.id,
@@ -140,18 +142,15 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'debug': repo.debug,
             'url': repo.url,
         })
-        tasks.append(pulp_client.get_repo_latest_version(
-            repo.pulp_href,
-            for_releases=True,
-        ))
-    latest_prod_repo_versions = {}
-    for repo_href, repo_name in await asyncio.gather(*tasks):
-        latest_prod_repo_versions[repo_href] = repo_name
+        tasks.append(pulp_client.get_repo_latest_version(repo.pulp_href))
+        repo_ids_by_href[repo.pulp_href] = repo.id
+    latest_prod_repo_versions = await asyncio.gather(*tasks)
 
     repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
                      for repo in prod_repos}
 
     added_packages = []
+    existing_packages = defaultdict(list)
     if not settings.package_beholder_enabled:
         return await get_pulp_based_response()
 
@@ -199,11 +198,24 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     repos_mapping.get(item) for item in release_repositories]
             packages.append(pkg_info)
             added_packages.append(full_name)
-        existing_packages = await asyncio.gather(*tasks)
+
+        await asyncio.gather(*tasks)
+        # if noarch package already in repo with same NEVRA,
+        # we should exclude this repo when generate release plan
+        for pkg_info in packages:
+            package = pkg_info['package']
+            if package['arch'] != 'noarch':
+                continue
+            repos_ids = existing_packages.get(package['full_name'], [])
+            new_repos = [
+                repo for repo in pkg_info['repositories']
+                if repo['id'] not in repos_ids
+            ]
+            pkg_info['repositories'] = new_repos
     return {
         'packages': packages,
         'repositories': prod_repos,
-        'existing_packages': list(filter(None, existing_packages)),
+        'existing_packages': existing_packages,
     }
 
 
