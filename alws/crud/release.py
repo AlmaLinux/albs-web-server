@@ -19,7 +19,7 @@ from alws.crud import sign_task
 async def __get_pulp_packages(
         db: Session, build_ids: typing.List[int],
         build_tasks: typing.List[int] = None) \
-        -> typing.Tuple[typing.List[dict], typing.List[str]]:
+        -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
     src_rpm_names = []
     packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
     pulp_packages = []
@@ -36,9 +36,13 @@ async def __get_pulp_packages(
             models.SourceRpm.artifact),
         selectinload(
             models.Build.binary_rpms).selectinload(
-            models.BinaryRpm.artifact)
+            models.BinaryRpm.artifact),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.rpm_module
+        )
     )
     build_result = await db.execute(builds_q)
+    modules_to_release = {}
     for build in build_result.scalars().all():
         for src_rpm in build.source_rpms:
             # Failsafe to not process logs
@@ -65,7 +69,25 @@ async def __get_pulp_packages(
             pkg_info['artifact_href'] = binary_rpm.artifact.href
             pkg_info['full_name'] = binary_rpm.artifact.name
             pulp_packages.append(pkg_info)
-    return pulp_packages, src_rpm_names
+        for task in build.tasks:
+            if task.rpm_module and task.id in build_tasks:
+                key = (
+                    task.rpm_module.name,
+                    task.rpm_module.stream,
+                    task.rpm_module.version,
+                    task.rpm_module.arch
+                )
+                if key in modules_to_release:
+                    continue
+                modules_to_release[key] = {
+                    'build_id': build.id,
+                    'name': task.rpm_module.name,
+                    'stream': task.rpm_module.stream,
+                    'version': task.rpm_module.version,
+                    'arch': task.rpm_module.arch,
+                    'artifact_href': task.rpm_module.pulp_href,
+                }
+    return pulp_packages, src_rpm_names, list(modules_to_release.values())
 
 
 async def get_release_plan(db: Session, build_ids: typing.List[int],
@@ -73,15 +95,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                            reference_dist_name: str,
                            reference_dist_version: str,
                            build_tasks: typing.List[int] = None) -> dict:
-    clean_ref_dist_name = re.search(
-        r'(?P<dist_name>[a-z]+)', reference_dist_name,
-        re.IGNORECASE).groupdict().get('dist_name')
-    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
-    endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
-               f'{reference_dist_version}/projects/'
     packages = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
-    pulp_packages, src_rpm_names = await __get_pulp_packages(
+    pulp_packages, src_rpm_names, pulp_rpm_modules = await __get_pulp_packages(
         db, build_ids, build_tasks=build_tasks)
 
     def get_pulp_based_response():
@@ -94,7 +110,14 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             added_packages.append(full_name)
         return {
             'packages': plan_packages,
-            'repositories': prod_repos
+            'repositories': prod_repos,
+            'modules': [
+                {
+                    'module': module,
+                    'repositories': []
+                }
+                for module in pulp_rpm_modules
+            ]
         }
 
     repo_q = select(models.Repository).where(
@@ -111,15 +134,23 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         for repo in result.scalars().all()
     ]
 
-    repos_mapping = {RepoType(repo['name'], repo['arch'], repo['debug']): repo
-                     for repo in prod_repos}
+    repos_mapping = {
+        RepoType(repo['name'], repo['arch'], repo['debug']): repo
+        for repo in prod_repos
+    }
 
     added_packages = []
     if not settings.package_beholder_enabled:
         return get_pulp_based_response()
 
-    beholder_response = await BeholderClient(settings.beholder_host).post(
-        endpoint, src_rpm_names)
+    clean_ref_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', reference_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
+    endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
+               f'{reference_dist_version}/projects/'
+    beholder = BeholderClient(settings.beholder_host)
+    beholder_response = await beholder.post(endpoint, src_rpm_names)
     if not beholder_response.get('packages'):
         return get_pulp_based_response()
     if beholder_response.get('packages', []):
@@ -153,11 +184,33 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                         release_repo_name, repo['arch'], debug)
                     release_repositories.add(release_repo)
                 pkg_info['repositories'] = [
-                    repos_mapping.get(item) for item in release_repositories]
+                    repos_mapping.get(item) for item in release_repositories
+                ]
             packages.append(pkg_info)
             added_packages.append(full_name)
+    rpm_modules = []
+    for module in pulp_rpm_modules:
+        endpoint = (
+            f'/api/v1/distros/{clean_ref_dist_name}/'
+            f'{reference_dist_version}/projects/{module["name"]}/'
+            f'{module["stream"]}/{module["arch"]}/'
+        )
+        module_response = await beholder.get(endpoint)
+        module_repo = module_response['repostitory']
+        repo_name = repo_name_regex.search(
+            module_repo['name']).groupdict()['name']
+        release_repo_name = (f'{clean_ref_dist_name_lower}'
+                             f'-{base_dist_version}-{repo_name}')
+        module_info = {
+            'module': module,
+            'repositories': [
+                RepoType(release_repo_name, module_repo['arch'], False)
+            ]
+        }
+        rpm_modules.append(module_info)
     return {
         'packages': packages,
+        'modules': rpm_modules,
         'repositories': prod_repos
     }
 
@@ -196,6 +249,17 @@ async def execute_release_plan(release_id: int, db: Session):
                 packages_to_repo_layout[repo_name][repo_arch] = []
             packages_to_repo_layout[repo_name][repo_arch].append(
                 package['package']['artifact_href'])
+
+    for module in release.plan.get('modules', []):
+        for repository in module['repositories']:
+            repo_name = repository['name']
+            repo_arch = repository['arch']
+            if repo_name not in packages_to_repo_layout:
+                packages_to_repo_layout[repo_name] = {}
+            if repo_arch not in packages_to_repo_layout[repo_name]:
+                packages_to_repo_layout[repo_name][repo_arch] = []
+            packages_to_repo_layout[repo_name][repo_arch].append(
+                module['module']['artifact_href'])
 
     pulp_client = PulpClient(
         settings.pulp_host,
