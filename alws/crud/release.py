@@ -14,6 +14,7 @@ from alws.errors import (DataNotFoundError, EmptyReleasePlan,
                          MissingRepository, SignError)
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
+from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
 from alws.crud import sign_task
 
@@ -115,9 +116,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             if full_name in added_packages:
                 continue
             if pkg['arch'] == 'noarch':
+                pkg_is_debug = is_debuginfo_rpm(pkg['name'])
                 tasks.extend((
                     check_package_presence_in_repo(pkg, repo_href)
-                    for repo_href in latest_prod_repo_versions
+                    for repo_href, repo_is_debug in latest_prod_repo_versions
+                    if repo_is_debug is pkg_is_debug
                 ))
             plan_packages.append({'package': pkg, 'repositories': []})
             added_packages.append(full_name)
@@ -142,7 +145,8 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'debug': repo.debug,
             'url': repo.url,
         })
-        tasks.append(pulp_client.get_repo_latest_version(repo.pulp_href))
+        tasks.append(pulp_client.get_repo_latest_version(
+            repo.pulp_href, for_releases=True))
         repo_ids_by_href[repo.pulp_href] = repo.id
     latest_prod_repo_versions = await asyncio.gather(*tasks)
 
@@ -168,9 +172,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             if full_name in added_packages:
                 continue
             if package['arch'] == 'noarch':
+                pkg_is_debug = is_debuginfo_rpm(pkg_name)
                 tasks.extend((
                     check_package_presence_in_repo(package, repo_href)
-                    for repo_href in latest_prod_repo_versions
+                    for repo_href, repo_is_debug in latest_prod_repo_versions
+                    if repo_is_debug is pkg_is_debug
                 ))
             query = f'packages[].packages[?name==\'{pkg_name}\' ' \
                     f'&& version==\'{pkg_version}\' ' \
