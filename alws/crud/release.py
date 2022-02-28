@@ -14,6 +14,7 @@ from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
 from alws.crud import sign_task
+from alws.utils.modularity import IndexWrapper
 
 
 async def __get_pulp_packages(
@@ -39,7 +40,8 @@ async def __get_pulp_packages(
             models.BinaryRpm.artifact),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.rpm_module
-        )
+        ),
+        selectinload(models.Build.repos)
     )
     build_result = await db.execute(builds_q)
     modules_to_release = {}
@@ -79,14 +81,24 @@ async def __get_pulp_packages(
                 )
                 if key in modules_to_release:
                     continue
-                modules_to_release[key] = {
-                    'build_id': build.id,
-                    'name': task.rpm_module.name,
-                    'stream': task.rpm_module.stream,
-                    'version': task.rpm_module.version,
-                    'arch': task.rpm_module.arch,
-                    'artifact_href': task.rpm_module.pulp_href,
-                }
+                module_repo = next(
+                    build_repo for build_repo in task.build.repos
+                    if build_repo.arch == task.arch
+                    and not build_repo.debug
+                    and build_repo.type == 'rpm'
+                )
+                repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
+                    module_repo.url)
+                module_index = IndexWrapper.from_template(repo_modules_yaml)
+                for module in module_index.iter_modules():
+                    modules_to_release[key] = {
+                        'build_id': build.id,
+                        'name': module.name,
+                        'stream': module.stream,
+                        'version': module.version,
+                        'arch': module.arch,
+                        'template': module.render()
+                    }
     return pulp_packages, src_rpm_names, list(modules_to_release.values())
 
 
@@ -250,6 +262,11 @@ async def execute_release_plan(release_id: int, db: Session):
             packages_to_repo_layout[repo_name][repo_arch].append(
                 package['package']['artifact_href'])
 
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     for module in release.plan.get('modules', []):
         for repository in module['repositories']:
             repo_name = repository['name']
@@ -258,8 +275,15 @@ async def execute_release_plan(release_id: int, db: Session):
                 packages_to_repo_layout[repo_name] = {}
             if repo_arch not in packages_to_repo_layout[repo_name]:
                 packages_to_repo_layout[repo_name][repo_arch] = []
+            module_pulp_href, _ = await pulp_client.create_module(
+                module['template'],
+                module['name'],
+                module['stream'],
+                module['context'],
+                module['arch']
+            )
             packages_to_repo_layout[repo_name][repo_arch].append(
-                module['module']['artifact_href'])
+                module_pulp_href)
 
     pulp_client = PulpClient(
         settings.pulp_host,
