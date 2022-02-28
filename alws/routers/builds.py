@@ -26,15 +26,17 @@ router = APIRouter(
 )
 
 
-@router.post('/', response_model=build_schema.Build)
+@router.post('/', response_model=build_schema.BuildCreateResponse)
 async def create_build(
             build: build_schema.BuildCreate,
             user: dict = Depends(JWTBearer()),
         ):
     with get_sync_db() as db:
-        db_build = await build_crud.create_build(
-            db, build, user['identity']['user_id'])
-        return db_build
+        return await build_crud.create_build(
+            db,
+            build,
+            user['identity']['user_id']
+        )
 
 
 @router.get('/', response_model=typing.Union[

@@ -20,6 +20,19 @@ async def get_repositories(db: Session, repository_id: int = None
     return result.scalars().all()
 
 
+async def get_repositories_by_platform_name(
+        db: Session, platform_name: str) -> typing.List[models.Repository]:
+    result = await db.execute(
+        select(models.Platform).where(
+            models.Platform.name == platform_name).options(
+                selectinload(models.Platform.repos))
+    )
+    result = result.scalars().first()
+    if result is None:
+        return []
+    return result.repos
+
+
 async def create_repositories(
         db: Session,
         payload: typing.List[repository_schema.RepositoryCreate]
@@ -101,14 +114,17 @@ async def update_repository(
         db: Session, repository_id: int,
         payload: repository_schema.RepositoryUpdate
 ) -> models.Repository:
-    repository = db.execute(select(
-        models.Repository).get(repository_id))
-    for field, value in payload.dict():
-        setattr(repository, field, value)
-    db.add(repository)
-    db.flush()
-    db.refresh(repository)
-    return repository
+    db_repo = db.execute(
+        select(models.Repository).where(
+            models.Repository.id == repository_id)
+    )
+    db_repo = db_repo.scalars().first()
+    for field, value in payload.dict().items():
+        setattr(db_repo, field, value)
+        db.add(db_repo)
+        db.flush()
+    db.refresh(db_repo)
+    return db_repo
 
 
 async def delete_repository(db: Session, repository_id: int):

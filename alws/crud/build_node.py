@@ -303,7 +303,6 @@ async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
-
     build_task = await __process_build_task_artifacts(
         db, request.task_id, request.artifacts)
     status = BuildTaskStatus.COMPLETED

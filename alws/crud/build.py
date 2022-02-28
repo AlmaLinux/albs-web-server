@@ -13,6 +13,7 @@ from alws.config import settings
 from alws.errors import DataNotFoundError
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
+from alws.dramatiq import start_build
 
 
 async def create_build(
@@ -20,26 +21,15 @@ async def create_build(
             build: build_schema.BuildCreate,
             user_id: int
         ) -> models.Build:
-    planner = BuildPlanner(
-        db, user_id, build.platforms, build.is_secure_boot)
-    await planner.load_platforms()
-    if build.mock_options:
-        planner.add_mock_options(build.mock_options)
-    for task in build.tasks:
-        await planner.add_task(task)
-    if build.linked_builds:
-        for linked_id in build.linked_builds:
-            linked_build = await get_builds(db, linked_id)
-            if linked_build:
-                await planner.add_linked_builds(linked_build)
-    db_build = planner.create_build()
+    db_build = models.Build(
+        user_id=user_id,
+        mock_options=build.mock_options
+    )
     db.add(db_build)
     db.flush()
     db.refresh(db_build)
-    await planner.init_build_repos()
-    db.flush()
-    # TODO: this is ugly hack for now
-    return await get_builds(db, db_build.id)
+    start_build.send(db_build.id, build.dict())
+    return db_build
 
 
 async def get_builds(
@@ -47,7 +37,7 @@ async def get_builds(
             build_id: typing.Optional[int] = None,
             page_number: typing.Optional[int] = None,
             search_params: build_schema.BuildSearch = None,
-        ) -> typing.Union[typing.List[models.Build], dict]:
+        ) -> typing.Union[models.Build, typing.List[models.Build], dict]:
     query = select(models.Build).join(
         models.Build.tasks,
     ).join(

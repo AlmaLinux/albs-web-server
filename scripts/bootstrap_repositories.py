@@ -103,6 +103,18 @@ async def update_platform(platform_data: dict):
             db, platform_schema.PlatformModify(**platform_data))
 
 
+async def update_repository(repo_id: int, repo_data: dict):
+    async with database.Session() as db:
+        await repo_crud.update_repository(
+            db, repo_id, repository_schema.RepositoryUpdate(**repo_data))
+
+
+async def get_repositories_for_update(platform_name: str):
+    async with database.Session() as db:
+        return await repo_crud.get_repositories_by_platform_name(
+            db, platform_name)
+
+
 async def add_repositories_to_platform(platform_data: dict,
                                        repositories_ids: typing.List[int]):
     platform_name = platform_data.get('name')
@@ -140,9 +152,33 @@ def main():
     for platform_data in platforms_data:
         if args.only_update:
             sync(update_platform(platform_data))
+            platform_name = platform_data.get('name')
             logger.info(
                 'Updating %s platform data is completed',
-                platform_data.get('name'),
+                platform_name,
+            )
+            db_repos = sync(get_repositories_for_update(platform_name))
+            repos_to_update = {}
+            for repo in platform_data.get('repositories', []):
+                for db_repo in db_repos:
+                    conditions = (
+                        db_repo.name == repo['name'],
+                        db_repo.arch == repo['arch'],
+                        db_repo.type == repo['type'],
+                        db_repo.debug == repo['debug'],
+                    )
+                    if all(conditions):
+                        repos_to_update[db_repo.id] = repo
+                        break
+            logger.info(
+                'Start updating repository data for platform: %s',
+                platform_name,
+            )
+            for repo_id, repo_data in repos_to_update.items():
+                sync(update_repository(repo_id, repo_data))
+            logger.info(
+                'Updating repository data for platform %s is completed',
+                platform_name,
             )
             continue
         if not platform_data.get('repositories'):

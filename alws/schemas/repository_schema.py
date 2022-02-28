@@ -42,12 +42,8 @@ class RepositorySearch(BaseModel):
 
 
 class RepositoryUpdate(BaseModel):
-    name: typing.Optional[str]
-    arch: typing.Optional[str]
-    url: typing.Optional[str]
-    type: typing.Optional[str]
-    debug: typing.Optional[bool]
     production: typing.Optional[bool]
+    export_path: typing.Optional[str]
 
 
 class RepositorySync(BaseModel):
