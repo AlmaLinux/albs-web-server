@@ -33,5 +33,8 @@ class Settings(BaseSettings):
     rabbitmq_default_host: str = 'rabbitmq'
     rabbitmq_default_vhost: str = 'test_system'
 
+    sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
+    sign_server_token: typing.Optional[str]
+
 
 settings = Settings()

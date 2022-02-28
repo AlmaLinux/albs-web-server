@@ -1,11 +1,12 @@
-from sqlalchemy import delete
+import typing
+
+from sqlalchemy import and_, delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.errors import DataNotFoundError
 from alws.schemas import platform_schema
-
 
 
 async def modify_platform(
@@ -16,7 +17,8 @@ async def modify_platform(
     async with db.begin():
         db_platform = await db.execute(
             select(models.Platform).where(query).options(
-                selectinload(models.Platform.repos)
+                selectinload(models.Platform.repos),
+                selectinload(models.Platform.reference_platforms),
             ).with_for_update()
         )
         db_platform = db_platform.scalars().first()
@@ -25,7 +27,7 @@ async def modify_platform(
                 f'Platform with name: "{platform.name}" does not exists'
             )
         for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data', 'modularity'):
+                    'data', 'modularity', 'is_reference'):
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
@@ -41,11 +43,29 @@ async def modify_platform(
                         setattr(db_repo, key, getattr(repo, key))
                 else:
                     db_platform.repos.append(models.Repository(**repo.dict()))
-        to_remove = []
+
+        ref_platform_ids_to_remove = [
+            ref_platform.id
+            for ref_platform in db_platform.reference_platforms
+            if ref_platform.name not in platform.reference_platforms
+        ]
+        ref_platforms = await db.execute(
+            select(models.Platform).where(
+                models.Platform.name.in_(platform.reference_platforms)))
+        for ref_platform in ref_platforms.scalars().all():
+            db_platform.reference_platforms.append(ref_platform)
+
+        await db.execute(delete(models.ReferencePlatforms).where(and_(
+            models.ReferencePlatforms.c.platform_id == db_platform.id,
+            models.ReferencePlatforms.c.refefence_platform_id.in_(
+                ref_platform_ids_to_remove),
+        )))
+
+        repos_to_remove = []
         for repo_name in db_repos:
             if new_repos and repo_name not in new_repos:
-                to_remove.append(repo_name)
-        remove_query = models.Repository.name.in_(to_remove)
+                repos_to_remove.append(repo_name)
+        remove_query = models.Repository.name.in_(repos_to_remove)
         await db.execute(
             delete(models.BuildTaskDependency).where(remove_query)
         )
@@ -66,6 +86,7 @@ async def create_platform(
         test_dist_name=platform.test_dist_name,
         data=platform.data,
         arch_list=platform.arch_list,
+        is_reference=platform.is_reference,
         modularity=platform.modularity
     )
     if platform.repos:
@@ -77,12 +98,16 @@ async def create_platform(
     return db_platform
 
 
-async def get_platforms(db):
-    db_platforms = await db.execute(select(models.Platform))
+async def get_platforms(
+            db: Session,
+            is_reference: bool = False,
+        ) -> typing.List[models.Platform]:
+    condition = models.Platform.is_reference.is_(is_reference)
+    db_platforms = await db.execute(select(models.Platform).where(condition))
     return db_platforms.scalars().all()
 
 
-async def get_platform(db, name: str) -> models.Platform:
+async def get_platform(db: Session, name: str) -> models.Platform:
     db_platform = await db.execute(
         select(models.Platform).where(models.Platform.name == name)
     )

@@ -84,6 +84,24 @@ DistributionBuilds = sqlalchemy.Table(
 )
 
 
+ReferencePlatforms = sqlalchemy.Table(
+    'reference_platforms',
+    Base.metadata,
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        'refefence_platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        primary_key=True,
+    ),
+)
+
+
 class Platform(Base):
 
     __tablename__ = 'platforms'
@@ -103,6 +121,14 @@ class Platform(Base):
     )
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     data = sqlalchemy.Column(JSONB, nullable=False)
+    is_reference = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True)
+    reference_platforms = relationship(
+        'Platform',
+        secondary=ReferencePlatforms,
+        primaryjoin=(ReferencePlatforms.c.platform_id == id),
+        secondaryjoin=(ReferencePlatforms.c.refefence_platform_id == id),
+    )
     repos = relationship('Repository', secondary=PlatformRepo)
     sign_keys = relationship('SignKey', back_populates='platform')
 
@@ -147,6 +173,9 @@ class Repository(CustomRepoRepr):
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
+    export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
+                                 nullable=False)
 
 
 class RepositoryRemote(CustomRepoRepr):

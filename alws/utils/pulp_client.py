@@ -4,11 +4,10 @@ import hashlib
 import asyncio
 import typing
 import urllib.parse
-from typing import Optional, List
+from typing import List
 
 import aiohttp
 
-from alws.constants import REQUEST_TIMEOUT
 from alws.utils.modularity import get_random_unique_version
 
 
@@ -22,13 +21,12 @@ class PulpClient:
         self._username = username
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
-        self._timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
-        response = await self.make_post_request(ENDPOINT, data=payload)
+        response = await self.request('POST', ENDPOINT, json=payload)
         repo_href = response['pulp_href']
         await self.create_file_publication(repo_href)
         distro = await self.create_file_distro(
@@ -42,7 +40,7 @@ class PulpClient:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         payload = {'name': name, 'autopublish': auto_publish,
                    'retain_repo_versions': 1}
-        response = await self.make_post_request(endpoint, data=payload)
+        response = await self.request('POST', endpoint, json=payload)
         repo_href = response['pulp_href']
         if create_publication:
             await self.create_rpm_publication(repo_href)
@@ -57,7 +55,7 @@ class PulpClient:
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         params = {'name': name}
-        response = await self.make_get_request(endpoint, params=params)
+        response = await self.request('GET', endpoint, params=params)
         if response['count'] == 0:
             return None
         return response['results'][0]
@@ -65,7 +63,7 @@ class PulpClient:
     async def get_rpm_distro(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/distributions/rpm/rpm/'
         params = {'name__contains': name}
-        response = await self.make_get_request(endpoint, params=params)
+        response = await self.request('GET', endpoint, params=params)
         if response['count'] == 0:
             return None
         return response['results'][0]
@@ -73,7 +71,7 @@ class PulpClient:
     async def get_rpm_remote(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/remotes/rpm/rpm/'
         params = {'name__contains': name}
-        response = await self.make_get_request(endpoint, params=params)
+        response = await self.request('GET', endpoint, params=params)
         if response['count'] == 0:
             return None
         return response['results'][0]
@@ -98,7 +96,7 @@ class PulpClient:
             'artifacts': [],
             'dependencies': []
         }
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0], sha256
 
@@ -107,13 +105,13 @@ class PulpClient:
         payload = {
             'sha256': sha256
         }
-        response = await self.make_get_request(ENDPOINT, params=payload)
+        response = await self.request('GET', ENDPOINT, params=payload)
         if response['count']:
             return response['results'][0]['pulp_href']
 
     async def _upload_file(self, content, sha256):
-        response = await self.make_post_request(
-            'pulp/api/v3/uploads/', {'size': len(content)}
+        response = await self.request(
+            'POST', 'pulp/api/v3/uploads/', json={'size': len(content)}
         )
         upload_href = response['pulp_href']
         payload = {
@@ -122,11 +120,11 @@ class PulpClient:
         headers = {
             'Content-Range': f'bytes 0-{len(content) - 1}/{len(content)}'
         }
-        await self.make_put_request(
-            upload_href, data=payload, headers=headers
+        await self.request(
+            'PUT', upload_href, data=payload, headers=headers
         )
-        task = await self.make_post_request(
-            f'{upload_href}commit/', data={'sha256': sha256}
+        task = await self.request(
+            'POST', f'{upload_href}commit/', json={'sha256': sha256}
         )
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0]
@@ -168,21 +166,21 @@ class PulpClient:
             payload['add_content_units'] = add
         if remove:
             payload['remove_content_units'] = remove
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         response = await self.wait_for_task(task['task'])
         return response
 
     async def create_file_publication(self, repository: str):
         ENDPOINT = 'pulp/api/v3/publications/file/file/'
         payload = {'repository': repository}
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         await self.wait_for_task(task['task'])
 
     async def create_rpm_publication(self, repository: str):
         # Creates repodata for repositories in some way
         ENDPOINT = 'pulp/api/v3/publications/rpm/rpm/'
         payload = {'repository': repository}
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         await self.wait_for_task(task['task'])
 
     async def create_file(
@@ -197,7 +195,7 @@ class PulpClient:
             'artifact': artifact_href,
             'repository': repo
         }
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         hrefs = [item for item in task_result['created_resources']
                  if 'file/files' in item]
@@ -215,7 +213,7 @@ class PulpClient:
             'artifact': artifact_href,
             'repository': repo
         }
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         hrefs = [item for item in task_result['created_resources']
                  if 'rpm/packages' in item]
@@ -223,7 +221,7 @@ class PulpClient:
 
     async def get_rpm_packages(self, params: dict = None) -> list:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
-        response = await self.make_get_request(ENDPOINT, params=params)
+        response = await self.request('GET', ENDPOINT, params=params)
         if response['count'] == 0:
             return []
         return list(response['results'])
@@ -236,7 +234,7 @@ class PulpClient:
             'name': f'{name}-distro',
             'base_path': f'{base_path_start}/{name}'
         }
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
@@ -249,7 +247,7 @@ class PulpClient:
             'name': f'{name}-distro',
             'base_path': f'{base_path_start}/{name}'
         }
-        task = await self.make_post_request(ENDPOINT, data=payload)
+        task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
@@ -262,11 +260,11 @@ class PulpClient:
             params['fields'] = include_fields
         if exclude_fields:
             params['exclude_fields'] = exclude_fields
-        return await self.make_get_request(package_href, params=params)
+        return await self.request('GET', package_href, params=params)
 
     async def remove_artifact(self, artifact_href: str,
                               need_wait_sync: bool=False):
-        await self.make_delete_request(artifact_href)
+        await self.request('DELETE', artifact_href)
         if need_wait_sync:
             remove_task = await self.get_distro(artifact_href)
             return remove_task
@@ -282,7 +280,7 @@ class PulpClient:
             'url': remote_url,
             'policy': remote_policy
         }
-        result = await self.make_post_request(ENDPOINT, payload)
+        result = await self.request('POST', ENDPOINT, json=payload)
         return result['pulp_href']
 
     async def update_rpm_remote(self, remote_href, remote_url: str,
@@ -291,7 +289,7 @@ class PulpClient:
             'url': remote_url,
             'policy': remote_policy
         }
-        await self.make_patch_request(remote_href, payload)
+        await self.request('PATCH', remote_href, data=payload)
         return remote_href
 
     async def sync_rpm_repo_from_remote(self, repo_href: str, remote_href: str,
@@ -309,14 +307,14 @@ class PulpClient:
             'remote': remote_href,
             'mirror': mirror
         }
-        task = await self.make_post_request(endpoint, payload)
+        task = await self.request('POST', endpoint, json=payload)
         if wait_for_result:
             result = await self.wait_for_task(task['task'])
             return result
         return task
 
     async def create_filesystem_exporter(self, fse_name: str, fse_path: str,
-                                         fse_method: str='write'):
+                                         fse_method: str = 'hardlink'):
         endpoint = 'pulp/api/v3/exporters/core/filesystem/'
 
         params = {
@@ -324,40 +322,39 @@ class PulpClient:
             'path': fse_path,
             'method': fse_method
         }
-        result = await self.make_post_request(endpoint, params)
+        result = await self.request('POST', endpoint, json=params)
         return result['pulp_href']
 
     async def update_filesystem_exporter(self, fse_pulp_href: str,
                                          fse_name: str,
                                          fse_path: str,
-                                         fse_method: str='hardlink'):
+                                         fse_method: str = 'hardlink'):
         endpoint = fse_pulp_href
         params = {
             'name': fse_name,
             'path': fse_path,
             'method': fse_method
         }
-        update_task = await self.make_put_request(endpoint, params)
+        update_task = await self.request('PUT', endpoint, data=params)
         task_result = await self.wait_for_task(update_task['task'])
         return task_result
 
     async def delete_filesystem_exporter(self, fse_pulp_href: str):
-        delete_task = await self.make_delete_request(fse_pulp_href)
+        delete_task = await self.request('DELETE', fse_pulp_href)
         task_result = await self.wait_for_task(delete_task['task'])
         return task_result
 
     async def list_filesystem_exporters(self):
         endpoint = 'pulp/api/v3/exporters/core/filesystem/'
-        result = await self.make_get_request(endpoint)
+        result = await self.request('GET', endpoint)
         if result['count'] > 0:
             return result['results']
         else:
             return []
 
-    async def get_filesystem_exporter(self, fse_pulp_href : str):
+    async def get_filesystem_exporter(self, fse_pulp_href: str):
         endpoint = fse_pulp_href
-        result = await self.make_get_request(endpoint)
-        return result
+        return await self.request('GET', endpoint)
 
     async def export_to_filesystem(self, fse_pulp_href: str,
                                    fse_repository_version: str):
@@ -365,74 +362,39 @@ class PulpClient:
         params = {
             'repository_version': fse_repository_version
         }
-        fse_task = await self.make_post_request(endpoint, params)
+        fse_task = await self.request('POST', endpoint, json=params)
         await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
     async def get_repo_latest_version(self, repo_href: str):
-        repository_data = await self.make_get_request(repo_href)
+        repository_data = await self.request('GET', repo_href)
         return repository_data.get('latest_version_href')
 
     async def get_distro(self, distro_href: str):
-        return await self.make_get_request(distro_href)
+        return await self.request('GET', distro_href)
 
     async def wait_for_task(self, task_href: str):
-        task = await self.make_get_request(task_href)
+        task = await self.request('GET', task_href)
         while task['state'] not in ('failed', 'completed'):
             await asyncio.sleep(1)
-            task = await self.make_get_request(task_href)
+            task = await self.request('GET', task_href)
         return task
 
-    async def make_get_request(self, endpoint: str, params: dict = None):
+    async def request(
+        self, method: str, endpoint: str, params: dict = None,
+        json: dict = None, data: dict = None, headers: dict = None
+    ):
         full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.get(full_url, params=params,
-                                   timeout=self._timeout) as response:
-                json = await response.json(content_type=None)
+        async with PULP_SEMAPHORE:
+            async with aiohttp.request(
+                method,
+                full_url,
+                params=params,
+                json=json,
+                data=data,
+                headers=headers,
+                auth=self._auth
+            ) as response:
+                response_json = await response.json()
                 response.raise_for_status()
-                return json
-
-    async def make_post_request(self, endpoint: str, data: Optional[dict],
-                                headers: Optional[dict] = None):
-        full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.post(
-                        full_url, json=data, headers=headers,
-                        timeout=self._timeout) as response:
-                    json = await response.json(content_type=None)
-                    response.raise_for_status()
-                    return json
-
-    async def make_put_request(self, endpoint: str, data: Optional[dict],
-                               headers: Optional[dict] = None):
-        full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.put(
-                        full_url, data=data, headers=headers,
-                        timeout=self._timeout) as response:
-                    json = await response.json(content_type=None)
-                    response.raise_for_status()
-                    return json
-
-    async def make_patch_request(self, endpoint: str, data: Optional[dict],
-                                 headers: Optional[dict] = None):
-        full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.patch(
-                        full_url, data=data, headers=headers,
-                        timeout=self._timeout) as response:
-                    json = await response.json(content_type=None)
-                    response.raise_for_status()
-                    return json
-
-    async def make_delete_request(self, endpoint: str):
-        full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with PULP_SEMAPHORE:
-            async with aiohttp.ClientSession(auth=self._auth) as session:
-                async with session.delete(
-                        full_url, timeout=self._timeout) as response:
-                    json = await response.json(content_type=None)
-                    return json
+                return response_json

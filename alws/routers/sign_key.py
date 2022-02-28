@@ -26,7 +26,7 @@ async def create_sign_key(payload: sign_schema.SignKeyCreate,
     return await sign_key.create_sign_key(db, payload)
 
 
-@router.put('/{sign_key_id/', response_model=sign_schema.SignKey)
+@router.put('/{sign_key_id}/', response_model=sign_schema.SignKey)
 async def modify_sign_key(sign_key_id: int, payload: sign_schema.SignKeyUpdate,
                           db: database.Session = Depends(get_db)):
     return await sign_key.update_sign_key(db, sign_key_id, payload)
