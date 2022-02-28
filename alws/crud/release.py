@@ -108,6 +108,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                            reference_dist_version: str,
                            build_tasks: typing.List[int] = None) -> dict:
     packages = []
+    rpm_modules = []
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
     pulp_packages, src_rpm_names, pulp_rpm_modules = await __get_pulp_packages(
         db, build_ids, build_tasks=build_tasks)
@@ -156,7 +157,6 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
     beholder = BeholderClient(settings.beholder_host)
-    rpm_modules = []
     for module in pulp_rpm_modules:
         endpoint = (
             f'/api/v1/distros/{clean_ref_dist_name}/'
@@ -164,7 +164,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             f'{module["stream"]}/{module["arch"]}/'
         )
         module_response = await beholder.get(endpoint)
-        module_repo = module_response['repostitory']
+        module_repo = module_response['repository']
         repo_name = repo_name_regex.search(
             module_repo['name']).groupdict()['name']
         release_repo_name = (f'{clean_ref_dist_name_lower}'
