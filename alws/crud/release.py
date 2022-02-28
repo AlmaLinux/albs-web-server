@@ -123,13 +123,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         return {
             'packages': plan_packages,
             'repositories': prod_repos,
-            'modules': [
-                {
-                    'module': module,
-                    'repositories': []
-                }
-                for module in pulp_rpm_modules
-            ]
+            'modules': rpm_modules,
         }
 
     repo_q = select(models.Repository).where(
@@ -162,6 +156,26 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
     beholder = BeholderClient(settings.beholder_host)
+    rpm_modules = []
+    for module in pulp_rpm_modules:
+        endpoint = (
+            f'/api/v1/distros/{clean_ref_dist_name}/'
+            f'{reference_dist_version}/module/{module["name"]}/'
+            f'{module["stream"]}/{module["arch"]}/'
+        )
+        module_response = await beholder.get(endpoint)
+        module_repo = module_response['repostitory']
+        repo_name = repo_name_regex.search(
+            module_repo['name']).groupdict()['name']
+        release_repo_name = (f'{clean_ref_dist_name_lower}'
+                             f'-{base_dist_version}-{repo_name}')
+        module_info = {
+            'module': module,
+            'repositories': [
+                RepoType(release_repo_name, module_repo['arch'], False)
+            ]
+        }
+        rpm_modules.append(module_info)
     beholder_response = await beholder.post(endpoint, src_rpm_names)
     if not beholder_response.get('packages'):
         return get_pulp_based_response()
@@ -200,26 +214,6 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 ]
             packages.append(pkg_info)
             added_packages.append(full_name)
-    rpm_modules = []
-    for module in pulp_rpm_modules:
-        endpoint = (
-            f'/api/v1/distros/{clean_ref_dist_name}/'
-            f'{reference_dist_version}/projects/{module["name"]}/'
-            f'{module["stream"]}/{module["arch"]}/'
-        )
-        module_response = await beholder.get(endpoint)
-        module_repo = module_response['repostitory']
-        repo_name = repo_name_regex.search(
-            module_repo['name']).groupdict()['name']
-        release_repo_name = (f'{clean_ref_dist_name_lower}'
-                             f'-{base_dist_version}-{repo_name}')
-        module_info = {
-            'module': module,
-            'repositories': [
-                RepoType(release_repo_name, module_repo['arch'], False)
-            ]
-        }
-        rpm_modules.append(module_info)
     return {
         'packages': packages,
         'modules': rpm_modules,
