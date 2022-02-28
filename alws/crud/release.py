@@ -154,8 +154,6 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         r'(?P<dist_name>[a-z]+)', reference_dist_name,
         re.IGNORECASE).groupdict().get('dist_name')
     clean_ref_dist_name_lower = clean_ref_dist_name.lower()
-    endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
-               f'{reference_dist_version}/projects/'
     beholder = BeholderClient(settings.beholder_host)
     for module in pulp_rpm_modules:
         endpoint = (
@@ -176,6 +174,8 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             ]
         }
         rpm_modules.append(module_info)
+    endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
+               f'{reference_dist_version}/projects/'
     beholder_response = await beholder.post(endpoint, src_rpm_names)
     if not beholder_response.get('packages'):
         return get_pulp_based_response()
