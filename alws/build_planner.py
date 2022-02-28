@@ -29,7 +29,7 @@ class BuildPlanner:
     def __init__(
                 self,
                 db: Session,
-                user_id: int,
+                build: models.Build,
                 platforms: typing.List[build_schema.BuildCreatePlatforms],
                 is_secure_boot: bool,
             ):
@@ -38,7 +38,12 @@ class BuildPlanner:
             settings.gitea_host,
             logging.getLogger(__name__)
         )
-        self._build = models.Build(user_id=user_id)
+        self._pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password
+        )
+        self._build = build
         self._task_index = 0
         self._request_platforms = {
             platform.name: platform.arch_list for platform in platforms
@@ -52,7 +57,7 @@ class BuildPlanner:
 
     async def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
-        self._platforms = await self._db.execute(select(models.Platform).where(
+        self._platforms = self._db.execute(select(models.Platform).where(
             models.Platform.name.in_(platform_names)))
         self._platforms = self._platforms.scalars().all()
         if len(self._platforms) != len(platform_names):
@@ -66,7 +71,6 @@ class BuildPlanner:
 
     async def create_build_repo(
                 self,
-                pulp_client: PulpClient,
                 platform: models.Platform,
                 arch: str,
                 repo_type: str,
@@ -79,15 +83,15 @@ class BuildPlanner:
             f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}{suffix}'
         )
         if repo_type == 'rpm':
-            repo_url, pulp_href = await pulp_client.create_build_rpm_repo(
+            repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
                 repo_name)
             modules = self._modules_by_target.get((platform.name, arch), [])
             if modules:
-                await pulp_client.modify_repository(
+                await self._pulp_client.modify_repository(
                     pulp_href, add=[module.pulp_href for module in modules]
                 )
         else:
-            repo_url, pulp_href = await pulp_client.create_log_repo(
+            repo_url, pulp_href = await self._pulp_client.create_log_repo(
                 repo_name)
         repo = models.Repository(
             name=repo_name,
@@ -97,25 +101,13 @@ class BuildPlanner:
             type=repo_type,
             debug=is_debug
         )
-        await self._db.run_sync(self.sync_append_build_repo, repo)
-
-    def sync_append_build_repo(self, db: Session, repo: models.BuildRepo):
         self._build.repos.append(repo)
 
-    def sync_get_build_tasks(self, db: Session):
-        return self._build.tasks
-
     async def init_build_repos(self):
-        pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
-        )
         tasks = []
         for platform in self._platforms:
             for arch in ['src'] + self._request_platforms[platform.name]:
                 tasks.append(self.create_build_repo(
-                    pulp_client,
                     platform,
                     arch,
                     'rpm'
@@ -123,15 +115,13 @@ class BuildPlanner:
                 if arch == 'src':
                     continue
                 tasks.append(self.create_build_repo(
-                    pulp_client,
                     platform,
                     arch,
                     'rpm',
                     is_debug=True
                 ))
-        for task in await self._db.run_sync(self.sync_get_build_tasks):
+        for task in self._build.tasks:
             tasks.append(self.create_build_repo(
-                pulp_client,
                 task.platform,
                 task.arch,
                 'build_log',
@@ -176,12 +166,6 @@ class BuildPlanner:
                 ref_type=BuildTaskRefType.GIT_BRANCH
             ) for ref in raw_refs
         ]
-        # TODO: we should merge all of the modules before insert
-        pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
-        )
         module = None
         if self._build.mock_options:
             mock_options = self._build.mock_options.copy()
@@ -235,7 +219,7 @@ class BuildPlanner:
                         f'{devel_module.name}:{devel_module.stream}'
                     )
                     module_index.add_module(devel_module)
-                module_pulp_href, sha256 = await pulp_client.create_module(
+                module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
                     module.name,
                     module.stream,
@@ -319,13 +303,13 @@ class BuildPlanner:
                     mock_options['definitions']['dist'] = f'.{parsed_dist_macro}'
                 build_task = models.BuildTask(
                     arch=arch,
-                    platform_id=platform.id,
+                    platform=platform,
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
                     rpm_module=modules[0] if modules else None,
                     is_secure_boot=self._is_secure_boot,
-                    mock_options=mock_options
+                    mock_options=mock_options,
                 )
                 task_key = (platform.name, arch)
                 self._tasks_cache[task_key].append(build_task)
@@ -337,9 +321,6 @@ class BuildPlanner:
                 arch_tasks.append(build_task)
                 self._build.tasks.append(build_task)
         self._task_index += 1
-
-    def add_mock_options(self, mock_options: dict):
-        self._build.mock_options = mock_options
 
     def create_build(self):
         return self._build
