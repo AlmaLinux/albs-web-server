@@ -79,9 +79,9 @@ class BuildCreate(BaseModel):
 
     platforms: conlist(BuildCreatePlatforms, min_items=1)
     tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
-    linked_builds: typing.Optional[typing.List[int]]
+    linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
-    is_secure_boot: typing.Optional[bool] = False
+    is_secure_boot: bool = False
 
 
 class BuildPlatform(BaseModel):
@@ -170,6 +170,16 @@ class BuildUser(BaseModel):
     id: int
     username: str
     email: str
+
+    class Config:
+        orm_mode = True
+
+
+class BuildCreateResponse(BaseModel):
+
+    id: int
+    created_at: datetime.datetime
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
 
     class Config:
         orm_mode = True

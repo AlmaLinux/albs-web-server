@@ -1,10 +1,11 @@
 import itertools
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
 from alws import database
+from alws import dramatiq
 from alws.config import settings
-from alws.crud import build_node, test
+from alws.crud import build_node
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import build_node_schema
 
@@ -14,13 +15,6 @@ router = APIRouter(
     tags=['builds'],
     dependencies=[Depends(JWTBearer())]
 )
-
-
-async def build_done_task(build_done_: build_node_schema.BuildDone,
-                          db: database.Session):
-    await build_node.build_done(db, build_done_)
-    if build_done_.status == 'done':
-        await test.create_test_tasks(db, build_done_.task_id)
 
 
 @router.post('/ping')
@@ -38,7 +32,6 @@ async def ping(
 async def build_done(
             build_done_: build_node_schema.BuildDone,
             response: Response,
-            background_tasks: BackgroundTasks,
             db: database.Session = Depends(get_db),
         ):
     task_already_finished = await build_node.check_build_task_is_finished(
@@ -46,7 +39,7 @@ async def build_done(
     if task_already_finished:
         response.status_code = status.HTTP_409_CONFLICT
         return {'ok': False}
-    background_tasks.add_task(build_done_task, build_done_, db)
+    dramatiq.build_done.send(build_done_.dict())
     return {'ok': True}
 
 

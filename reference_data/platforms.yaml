@@ -68,7 +68,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-appstream
       type: rpm
@@ -78,7 +78,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-powertools
       type: rpm
@@ -88,7 +88,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-highavailability
       type: rpm
@@ -98,7 +98,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-resilientstorage
       type: rpm
@@ -108,7 +108,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-devel
       type: rpm
@@ -118,7 +118,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-8-extras
       type: rpm
@@ -128,7 +128,7 @@
       debug: false
       repository_sync_policy: additive
       remote_sync_policy: on_demand
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-baseos
       type: rpm
@@ -138,7 +138,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-appstream
       type: rpm
@@ -148,7 +148,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-powertools
       type: rpm
@@ -158,7 +158,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-highavailability
       type: rpm
@@ -168,7 +168,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-resilientstorage
       type: rpm
@@ -178,7 +178,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-devel
       type: rpm
@@ -188,7 +188,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-extras
       type: rpm
@@ -198,7 +198,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-baseos
       type: rpm
@@ -208,7 +208,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-appstream
       type: rpm
@@ -218,7 +218,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-powertools
       type: rpm
@@ -228,7 +228,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-highavailability
       type: rpm
@@ -238,7 +238,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-resilientstorage
       type: rpm
@@ -248,7 +248,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-devel
       type: rpm
@@ -258,7 +258,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-extras
       type: rpm
@@ -268,7 +268,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-baseos
       type: rpm
@@ -278,7 +278,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-appstream
       type: rpm
@@ -288,7 +288,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-powertools
       type: rpm
@@ -298,7 +298,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-highavailability
       type: rpm
@@ -308,7 +308,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-resilientstorage
       type: rpm
@@ -318,7 +318,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-extras
       type: rpm
@@ -328,27 +328,27 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-ppc64le-devel
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: alma8-distribution-ppc64le
       remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-AlmaLinux-8-ppc64le-dr/
       type: rpm
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: alma8-ppc64le-javapackages
       remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/
       type: rpm
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -358,7 +358,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-appstream
       arch: src
       type: rpm
@@ -368,7 +368,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-powertools
       arch: src
       type: rpm
@@ -378,7 +378,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: src
       name: almalinux-8-highavailability
       type: rpm
@@ -388,7 +388,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: src
       name: almalinux-8-highavailability
       type: rpm
@@ -398,7 +398,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: src
       name: almalinux-8-resilientstorage
       type: rpm
@@ -408,7 +408,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: src
       name: almalinux-8-devel
       type: rpm
@@ -418,7 +418,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: src
       name: almalinux-8-extras
       type: rpm
@@ -428,7 +428,7 @@
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-baseos-debuginfo
       arch: x86_64
       type: rpm
@@ -438,7 +438,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-appstream-debuginfo
       arch: x86_64
       type: rpm
@@ -448,7 +448,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-powertools-debuginfo
       arch: x86_64
       type: rpm
@@ -458,7 +458,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -468,7 +468,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -478,7 +478,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -488,7 +488,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -498,7 +498,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -508,7 +508,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -518,7 +518,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -528,7 +528,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-baseos-debuginfo
       arch: aarch64
       type: rpm
@@ -538,7 +538,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-appstream-debuginfo
       arch: aarch64
       type: rpm
@@ -548,7 +548,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-powertools-debuginfo
       arch: aarch64
       type: rpm
@@ -558,7 +558,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -568,7 +568,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -578,7 +578,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -588,7 +588,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -598,7 +598,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-baseos-debuginfo
       arch: ppc64le
       type: rpm
@@ -608,7 +608,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-appstream-debuginfo
       arch: ppc64le
       type: rpm
@@ -618,7 +618,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - name: almalinux-8-powertools-debuginfo
       arch: ppc64le
       type: rpm
@@ -628,7 +628,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -638,7 +638,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -648,7 +648,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -658,7 +658,7 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
-      priotiry: 10
+      priority: 10
 
 - name: AlmaLinux-9
   distr_type: rhel
@@ -720,250 +720,250 @@
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-appstream
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-crb
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-highavailability
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-resilientrtorage
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-nfv
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/NFV/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: centos-9-rt
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/RT/x86_64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: centos-9-baseos
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/BaseOS/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: centos-9-appstream
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/AppStream/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: centos-9-crb
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/CRB/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: centos-9-highavailability
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/HighAvailability/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: centos-9-resilientrtorage
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/centos/i686/ResilientStorage/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: centos-9-baseos
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/aarch64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: centos-9-appstream
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/aarch64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: centos-9-crb
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/aarch64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: centos-9-highavailability
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/aarch64/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: centos-9-baseos
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/ppc64le/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: centos-9-appstream
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/ppc64le/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: centos-9-crb
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/ppc64le/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: centos-9-highavailability
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/ppc64le/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: centos-9-resilientrtorage
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/ppc64le/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: centos-9-baseos
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/BaseOS/s390x/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: centos-9-appstream
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/AppStream/s390x/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: centos-9-crb
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/CRB/s390x/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: centos-9-highavailability
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/HighAvailability/s390x/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: centos-9-resilientrtorage
       type: rpm
       remote_url: https://mirror.facebook.net/centos-stream/9-stream/ResilientStorage/s390x/os/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: almalinux-9-devel
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/s390x/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-9-devel
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/x86_64/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-9-devel
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/ppc64le/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-9-devel
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/i686/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-9-devel
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/aarch64/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: s390x
       name: almalinux-9-devel-noarch
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: x86_64
       name: almalinux-9-devel-noarch
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: ppc64le
       name: almalinux-9-devel-noarch
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: i686
       name: almalinux-9-devel-noarch
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
     - arch: aarch64
       name: almalinux-9-devel-noarch
       type: rpm
       remote_url: https://repo.almalinux.org/development/almalinux/9/devel/noarch/
       production: false
       debug: false
-      priotiry: 10
+      priority: 10
 
