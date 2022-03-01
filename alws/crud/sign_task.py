@@ -18,7 +18,7 @@ from alws.utils.pulp_client import PulpClient
 async def __get_build_repos(
         db: Session, build_id: int, build: models.Build = None) -> dict:
     if not build:
-        builds = await db.execute(select(models.Build).where(
+        builds = db.execute(select(models.Build).where(
             models.Build.id == build_id).options(
             selectinload(models.Build.repos)
         ))
@@ -39,50 +39,49 @@ async def get_sign_tasks(db: Session, build_id: int = None) \
     if build_id:
         query = query.where(models.SignTask.build_id == build_id)
     query = query.options(selectinload(models.SignTask.sign_key))
-    result = await db.execute(query)
+    result = db.execute(query)
     return result.scalars().all()
 
 
 async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate) \
         -> models.SignTask:
-    async with db.begin():
-        builds = await db.execute(select(models.Build).where(
-            models.Build.id == payload.build_id).options(
-                selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms)
-        ))
-        build = builds.scalars().first()
-        if not build:
-            raise DataNotFoundError(
-                f'Build with ID {payload.build_id} does not exist')
-        if build.signed:
-            raise BuildAlreadySignedError(
-                f'Build with ID {payload.build_id} is already signed')
-        if not build.source_rpms or not build.binary_rpms:
-            raise ValueError(
-                f'No built packages in build with ID {payload.build_id}')
-        sign_keys = await db.execute(select(models.SignKey).where(
-            models.SignKey.id == payload.sign_key_id))
-        sign_key = sign_keys.scalars().first()
+    builds = db.execute(select(models.Build).where(
+        models.Build.id == payload.build_id).options(
+            selectinload(models.Build.source_rpms),
+            selectinload(models.Build.binary_rpms)
+    ))
+    build = builds.scalars().first()
+    if not build:
+        raise DataNotFoundError(
+            f'Build with ID {payload.build_id} does not exist')
+    if build.signed:
+        raise BuildAlreadySignedError(
+            f'Build with ID {payload.build_id} is already signed')
+    if not build.source_rpms or not build.binary_rpms:
+        raise ValueError(
+            f'No built packages in build with ID {payload.build_id}')
+    sign_keys = db.execute(select(models.SignKey).where(
+        models.SignKey.id == payload.sign_key_id))
+    sign_key = sign_keys.scalars().first()
 
-        if not sign_key:
-            raise DataNotFoundError(
-                f'Sign key with ID {payload.sign_key_id} does not exist')
-        sign_task = models.SignTask(
-            status=SignStatus.IDLE, build_id=payload.build_id,
-            sign_key_id=payload.sign_key_id
-        )
-        db.add(sign_task)
-        await db.commit()
-    await db.refresh(sign_task)
-    sign_tasks = await db.execute(select(models.SignTask).where(
+    if not sign_key:
+        raise DataNotFoundError(
+            f'Sign key with ID {payload.sign_key_id} does not exist')
+    sign_task = models.SignTask(
+        status=SignStatus.IDLE, build_id=payload.build_id,
+        sign_key_id=payload.sign_key_id
+    )
+    db.add(sign_task)
+    db.flush()
+    db.refresh(sign_task)
+    sign_tasks = db.execute(select(models.SignTask).where(
         models.SignTask.id == sign_task.id).options(
         selectinload(models.SignTask.sign_key)))
     return sign_tasks.scalars().first()
 
 
 async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
-    sign_tasks = await db.execute(select(models.SignTask).join(
+    sign_tasks = db.execute(select(models.SignTask).join(
         models.SignTask.sign_key).where(
             models.SignTask.status == SignStatus.IDLE,
             models.SignKey.keyid.in_(key_ids)
@@ -94,16 +93,16 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
 
     sign_task.status = SignStatus.IN_PROGRESS
     db.add(sign_task)
-    await db.commit()
+    db.flush()
 
-    build_src_rpms = await db.execute(select(models.SourceRpm).where(
+    build_src_rpms = db.execute(select(models.SourceRpm).where(
         models.SourceRpm.build_id == sign_task.build_id).options(
         selectinload(models.SourceRpm.artifact))
     )
     build_src_rpms = build_src_rpms.scalars().all()
     if not build_src_rpms:
         return {}
-    build_binary_rpms = await db.execute(select(models.BinaryRpm).where(
+    build_binary_rpms = db.execute(select(models.BinaryRpm).where(
         models.BinaryRpm.build_id == sign_task.build_id).options(
         selectinload(models.BinaryRpm.artifact).selectinload(
             models.BuildTaskArtifact.build_task)
@@ -150,122 +149,120 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
 async def complete_sign_task(db: Session, sign_task_id: int,
                              payload: sign_schema.SignTaskComplete) \
         -> models.SignTask:
-    async with db.begin():
-        builds = await db.execute(select(models.Build).where(
-            models.Build.id == payload.build_id).options(
-            selectinload(models.Build.repos)))
-        build = builds.scalars().first()
-        source_rpms = await db.execute(select(models.SourceRpm).where(
-            models.SourceRpm.build_id == payload.build_id).options(
-            selectinload(models.SourceRpm.artifact)))
-        source_rpms = source_rpms.scalars().all()
-        binary_rpms = await db.execute(select(models.BinaryRpm).where(
-            models.BinaryRpm.build_id == payload.build_id).options(
-            selectinload(models.BinaryRpm.artifact)))
-        binary_rpms = binary_rpms.scalars().all()
+    builds = db.execute(select(models.Build).where(
+        models.Build.id == payload.build_id).options(
+        selectinload(models.Build.repos)))
+    build = builds.scalars().first()
+    source_rpms = db.execute(select(models.SourceRpm).where(
+        models.SourceRpm.build_id == payload.build_id).options(
+        selectinload(models.SourceRpm.artifact)))
+    source_rpms = source_rpms.scalars().all()
+    binary_rpms = db.execute(select(models.BinaryRpm).where(
+        models.BinaryRpm.build_id == payload.build_id).options(
+        selectinload(models.BinaryRpm.artifact)))
+    binary_rpms = binary_rpms.scalars().all()
 
-        all_rpms = source_rpms + binary_rpms
-        modified_items = []
-        repo_mapping = await __get_build_repos(
-            db, payload.build_id, build=build)
-        pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
-        )
-        sign_failed = False
-        sign_tasks = await db.execute(select(models.SignTask).where(
-            models.SignTask.id == sign_task_id
-        ).options(selectinload(models.SignTask.sign_key)))
-        sign_task = sign_tasks.scalars().first()
+    all_rpms = source_rpms + binary_rpms
+    modified_items = []
+    repo_mapping = await __get_build_repos(
+        db, payload.build_id, build=build)
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    sign_failed = False
+    sign_tasks = db.execute(select(models.SignTask).where(
+        models.SignTask.id == sign_task_id
+    ).options(selectinload(models.SignTask.sign_key)))
+    sign_task = sign_tasks.scalars().first()
 
-        if payload.packages:
-            for package in payload.packages:
-                # Check that package fingerprint matches the requested
-                if package.fingerprint != sign_task.sign_key.fingerprint:
-                    logging.error('Package %s is signed with a wrong GPG key %s, '
-                                  'expected fingerprint: %s', package.name,
-                                  package.fingerprint,
-                                  sign_task.sign_key.fingerprint)
-                    sign_failed = True
-                    continue
-                db_package = next(pkg for pkg in all_rpms
-                                  if pkg.id == package.id)
-                debug = is_debuginfo_rpm(package.name)
-                repo = repo_mapping.get((package.arch, debug))
-                new_pkg_href = await pulp_client.create_rpm_package(
-                    package.name, package.href, repo.pulp_href)
-                db_package.artifact.href = new_pkg_href
-                db_package.artifact.sign_key = sign_task.sign_key
-                modified_items.append(db_package)
-                modified_items.append(db_package.artifact)
+    if payload.packages:
+        for package in payload.packages:
+            # Check that package fingerprint matches the requested
+            if package.fingerprint != sign_task.sign_key.fingerprint:
+                logging.error('Package %s is signed with a wrong GPG key %s, '
+                              'expected fingerprint: %s', package.name,
+                              package.fingerprint,
+                              sign_task.sign_key.fingerprint)
+                sign_failed = True
+                continue
+            db_package = next(pkg for pkg in all_rpms
+                              if pkg.id == package.id)
+            debug = is_debuginfo_rpm(package.name)
+            repo = repo_mapping.get((package.arch, debug))
+            new_pkg_href = await pulp_client.create_rpm_package(
+                package.name, package.href, repo.pulp_href)
+            db_package.artifact.href = new_pkg_href
+            db_package.artifact.sign_key = sign_task.sign_key
+            modified_items.append(db_package)
+            modified_items.append(db_package.artifact)
 
-        if payload.success and not sign_failed:
-            sign_task.status = SignStatus.COMPLETED
-            build.signed = True
-        else:
-            sign_task.status = SignStatus.FAILED
-            build.signed = False
-        sign_task.log_href = payload.log_href
-        sign_task.error_message = payload.error_message
+    if payload.success and not sign_failed:
+        sign_task.status = SignStatus.COMPLETED
+        build.signed = True
+    else:
+        sign_task.status = SignStatus.FAILED
+        build.signed = False
+    sign_task.log_href = payload.log_href
+    sign_task.error_message = payload.error_message
 
-        db.add(sign_task)
-        db.add(build)
-        if modified_items:
-            db.add_all(modified_items)
-        sign_tasks = await db.execute(select(models.SignTask).where(
-            models.SignTask.id == sign_task_id).options(
-            selectinload(models.SignTask.sign_key)))
-        await db.commit()
+    db.add(sign_task)
+    db.add(build)
+    if modified_items:
+        db.add_all(modified_items)
+    sign_tasks = db.execute(select(models.SignTask).where(
+        models.SignTask.id == sign_task_id).options(
+        selectinload(models.SignTask.sign_key)))
+    db.flush()
     return sign_tasks.scalars().first()
 
 
 async def verify_signed_build(db: Session, build_id: int,
                               platform_id: int) -> bool:
-    async with db.begin():
-        builds = await db.execute(select(models.Build).where(
-            models.Build.id == build_id).options(
-                selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms)
-        ))
-        build = builds.scalars().first()
-        if not build:
-            raise DataNotFoundError(
-                f'Build with ID {build_id} does not exist')
-        if not build.signed:
-            raise SignError(
-                f'Build with ID {build_id} has not already signed')
-        if not build.source_rpms or not build.binary_rpms:
-            raise ValueError(
-                f'No built packages in build with ID {build_id}')
-        platforms = await db.execute(select(models.Platform).where(
-            models.Platform.id == platform_id).options(
-                selectinload(models.Platform.sign_keys)))
-        platform = platforms.scalars().first()
-        if not platform:
-            raise DataNotFoundError(
-                f'platform with ID {platform_id} does not exist')
-        if not platform.sign_keys:
-            raise DataNotFoundError(
-                f'platform with ID {platform_id} connects with no keys')
-        sign_key = platform.sign_keys[0]
-        if not sign_key:
-            raise DataNotFoundError(
-                f'Sign key for Platform ID {platform_id} does not exist')
-        source_rpms = await db.execute(select(models.SourceRpm).where(
-            models.SourceRpm.build_id == build_id).options(
-            selectinload(models.SourceRpm.artifact)))
-        source_rpms = source_rpms.scalars().all()
-        binary_rpms = await db.execute(select(models.BinaryRpm).where(
-            models.BinaryRpm.build_id == build_id).options(
-            selectinload(models.BinaryRpm.artifact)))
-        binary_rpms = binary_rpms.scalars().all()
+    builds = db.execute(select(models.Build).where(
+        models.Build.id == build_id).options(
+            selectinload(models.Build.source_rpms),
+            selectinload(models.Build.binary_rpms)
+    ))
+    build = builds.scalars().first()
+    if not build:
+        raise DataNotFoundError(
+            f'Build with ID {build_id} does not exist')
+    if not build.signed:
+        raise SignError(
+            f'Build with ID {build_id} has not already signed')
+    if not build.source_rpms or not build.binary_rpms:
+        raise ValueError(
+            f'No built packages in build with ID {build_id}')
+    platforms = db.execute(select(models.Platform).where(
+        models.Platform.id == platform_id).options(
+            selectinload(models.Platform.sign_keys)))
+    platform = platforms.scalars().first()
+    if not platform:
+        raise DataNotFoundError(
+            f'platform with ID {platform_id} does not exist')
+    if not platform.sign_keys:
+        raise DataNotFoundError(
+            f'platform with ID {platform_id} connects with no keys')
+    sign_key = platform.sign_keys[0]
+    if not sign_key:
+        raise DataNotFoundError(
+            f'Sign key for Platform ID {platform_id} does not exist')
+    source_rpms = db.execute(select(models.SourceRpm).where(
+        models.SourceRpm.build_id == build_id).options(
+        selectinload(models.SourceRpm.artifact)))
+    source_rpms = source_rpms.scalars().all()
+    binary_rpms = db.execute(select(models.BinaryRpm).where(
+        models.BinaryRpm.build_id == build_id).options(
+        selectinload(models.BinaryRpm.artifact)))
+    binary_rpms = binary_rpms.scalars().all()
 
-        all_rpms = source_rpms + binary_rpms
-        for p in all_rpms:
-            if p.artifact.sign_key != sign_key:
-                raise SignError(
-                    f'Sign key with for pkg ID {p.id} is not matched '
-                    f'by sign key for platform ID {platform_id}')
-        await db.commit()
+    all_rpms = source_rpms + binary_rpms
+    for p in all_rpms:
+        if p.artifact.sign_key != sign_key:
+            raise SignError(
+                f'Sign key with for pkg ID {p.id} is not matched '
+                f'by sign key for platform ID {platform_id}')
+    db.flush()
     return True

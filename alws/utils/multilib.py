@@ -54,7 +54,7 @@ async def get_multilib_packages(
         models.BuildTask.index == build_task.index,
         models.BuildTask.status == BuildTaskStatus.COMPLETED,
     ))
-    db_build_tasks = await db.execute(query)
+    db_build_tasks = db.execute(query)
     task_arches = [task.arch for task in db_build_tasks.scalars().all()]
     result = {}
     multilib_packages = {}
@@ -110,7 +110,7 @@ async def add_multilib_packages(
         models.BuildTaskArtifact.type == 'rpm',
         models.BuildTaskArtifact.name.not_like('%src.rpm%'),
     ))
-    db_artifacts = await db.execute(query)
+    db_artifacts = db.execute(query)
     db_artifacts = db_artifacts.scalars().all()
 
     artifacts = []
@@ -142,7 +142,7 @@ async def add_multilib_packages(
                 else:
                     pkg_hrefs.append(href)
     db.add_all(artifacts)
-    await db.commit()
+    db.flush()
 
     for repo in build_task.build.repos:
         if repo.arch != 'x86_64' and repo.type != 'rpm':

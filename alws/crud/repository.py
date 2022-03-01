@@ -16,7 +16,7 @@ async def get_repositories(db: Session, repository_id: int = None
     repo_q = select(models.Repository)
     if repository_id:
         repo_q = repo_q.where(models.Repository.id == repository_id)
-    result = await db.execute(repo_q)
+    result = db.execute(repo_q)
     return result.scalars().all()
 
 
@@ -49,27 +49,26 @@ async def create_repositories(
     ]
     query = sqlalchemy.or_(*query_list).with_for_update()
     repos_mapping = {}
-    async with db.begin():
-        repos_result = await db.execute(query)
-        for repo in repos_result.scalars().all():
-            repo_key = f'{repo.name}-{repo.arch}-{repo.debug}'
-            repos_mapping[repo_key] = repo
+    repos_result = db.execute(query)
+    for repo in repos_result.scalars().all():
+        repo_key = f'{repo.name}-{repo.arch}-{repo.debug}'
+        repos_mapping[repo_key] = repo
 
-        for repo_item in payload:
-            repo_item_dict = repo_item.dict()
-            repo_key = f'{repo_item.name}-{repo_item.arch}-{repo_item.debug}'
-            if repo_key not in repos_mapping:
-                repos_mapping[repo_key] = models.Repository(**repo_item_dict)
-            else:
-                repo = repos_mapping[repo_key]
-                for field, value in repo_item_dict.items():
-                    setattr(repo, field, value)
+    for repo_item in payload:
+        repo_item_dict = repo_item.dict()
+        repo_key = f'{repo_item.name}-{repo_item.arch}-{repo_item.debug}'
+        if repo_key not in repos_mapping:
+            repos_mapping[repo_key] = models.Repository(**repo_item_dict)
+        else:
+            repo = repos_mapping[repo_key]
+            for field, value in repo_item_dict.items():
+                setattr(repo, field, value)
 
-        db.add_all(repos_mapping.values())
-        await db.commit()
+    db.add_all(repos_mapping.values())
+    db.flush()
 
     for repo in repos_mapping.values():
-        await db.refresh(repo)
+        db.refresh(repo)
 
     return list(repos_mapping.values())
 
@@ -83,15 +82,14 @@ async def create_repository(
         models.Repository.type == payload.type,
         models.Repository.debug == payload.debug,
     )
-    async with db.begin():
-        result = await db.execute(query)
-        if result.scalars().first():
-            raise ValueError('Repository already exists')
+    result = db.execute(query)
+    if result.scalars().first():
+        raise ValueError('Repository already exists')
 
-        repository = models.Repository(**payload.dict())
-        db.add(repository)
-        await db.commit()
-    await db.refresh(repository)
+    repository = models.Repository(**payload.dict())
+    db.add(repository)
+    db.flush()
+    db.refresh(repository)
     return repository
 
 
@@ -108,45 +106,42 @@ async def search_repository(
             query = query.where(models.Repository.type == value)
         elif key == 'debug':
             query = query.where(models.Repository.debug == value)
-    async with db.begin():
-        result = await db.execute(query)
-        return result.scalars().first()
+    result = db.execute(query)
+    return result.scalars().first()
 
 
 async def update_repository(
         db: Session, repository_id: int,
         payload: repository_schema.RepositoryUpdate
 ) -> models.Repository:
-    async with db.begin():
-        db_repo = await db.execute(
-            select(models.Repository).where(
-                models.Repository.id == repository_id)
-        )
-        db_repo = db_repo.scalars().first()
-        for field, value in payload.dict().items():
-            setattr(db_repo, field, value)
+    db_repo = db.execute(
+        select(models.Repository).where(
+            models.Repository.id == repository_id)
+    )
+    db_repo = db_repo.scalars().first()
+    for field, value in payload.dict().items():
+        setattr(db_repo, field, value)
         db.add(db_repo)
-        await db.commit()
-    await db.refresh(db_repo)
+        db.flush()
+    db.refresh(db_repo)
     return db_repo
 
 
 async def delete_repository(db: Session, repository_id: int):
-    async with db.begin():
-        await db.execute(delete(models.Repository).where(
-            models.Repository.id == repository_id))
-        await db.commit()
+    db.execute(delete(models.Repository).where(
+        models.Repository.id == repository_id))
+    db.flush()
 
 
 async def add_to_platform(db: Session, platform_id: int,
                           repository_ids: typing.List[int]) -> models.Platform:
-    platform_result = await db.execute(select(models.Platform).where(
+    platform_result = db.execute(select(models.Platform).where(
         models.Platform.id == platform_id).options(
         selectinload(models.Platform.repos)).with_for_update())
     platform = platform_result.scalars().first()
     if not platform:
         raise ValueError(f'Platform with id {platform_id} is missing')
-    repositories_result = await db.execute(select(models.Repository).where(
+    repositories_result = db.execute(select(models.Repository).where(
         models.Repository.id.in_(repository_ids)))
     repositories = repositories_result.scalars().all()
 
@@ -155,9 +150,9 @@ async def add_to_platform(db: Session, platform_id: int,
     platform.repos = new_repos_list
     db.add(platform)
     db.add_all(new_repos_list)
-    await db.commit()
+    db.flush()
 
-    platform_result = await db.execute(select(models.Platform).where(
+    platform_result = db.execute(select(models.Platform).where(
         models.Platform.id == platform_id).options(
         selectinload(models.Platform.repos)
     ))
@@ -168,13 +163,13 @@ async def remove_from_platform(
         db: Session, platform_id: int,
         repository_ids: typing.List[int]
 ) -> models.Platform:
-    await db.execute(delete(models.PlatformRepo).where(
+    db.execute(delete(models.PlatformRepo).where(
         models.PlatformRepo.c.platform_id == platform_id,
         models.PlatformRepo.c.repository_id.in_(repository_ids)
     ))
-    await db.commit()
+    db.flush()
 
-    platform_result = await db.execute(select(models.Platform).where(
+    platform_result = db.execute(select(models.Platform).where(
         models.Platform.id == platform_id).options(
         selectinload(models.Platform.repos)
     ))
@@ -194,7 +189,7 @@ async def create_repository_remote(
         settings.pulp_user,
         settings.pulp_password
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     remote = result.scalars().first()
     if remote:
         return remote
@@ -213,8 +208,8 @@ async def create_repository_remote(
         pulp_href=remote_href,
     )
     db.add(remote)
-    await db.commit()
-    await db.refresh(remote)
+    db.flush()
+    db.refresh(remote)
     return remote
 
 
@@ -222,22 +217,20 @@ async def update_repository_remote(
         db: Session, remote_id: int,
         payload: remote_schema.RemoteUpdate
 ) -> models.RepositoryRemote:
-    async with db.begin():
-        remote = select(models.RepositoryRemote).get(remote_id)
-        for key, value in payload.dict().items():
-            setattr(remote, key, value)
-        db.add(remote)
-        await db.commit()
-    await db.refresh(remote)
+    remote = select(models.RepositoryRemote).get(remote_id)
+    for key, value in payload.dict().items():
+        setattr(remote, key, value)
+    db.add(remote)
+    db.flush()
+    db.refresh(remote)
     return remote
 
 
-async def sync_repo_from_remote(db: Session, repository_id: int,
+async def sync_repo_from_remote(repository_id: int,
                                 payload: repository_schema.RepositorySync,
                                 wait_for_result: bool = False):
-    async with db.begin():
-        repository = select(models.Repository).get(repository_id)
-        remote = select(models.RepositoryRemote).get(payload.remote_id)
+    repository = select(models.Repository).get(repository_id)
+    remote = select(models.RepositoryRemote).get(payload.remote_id)
 
     pulp_client = PulpClient(
         settings.pulp_host,

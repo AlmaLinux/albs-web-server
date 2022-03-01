@@ -2,12 +2,9 @@ import typing
 
 from fastapi import APIRouter, Depends
 
-from alws import database
-from alws.crud import repository
 from alws.crud import repo_exporter
 from alws.schemas.exporter_schema import FileSystemExporter
-from alws.dependencies import get_db, JWTBearer
-
+from alws.dependencies import JWTBearer
 
 
 router = APIRouter(
@@ -22,10 +19,12 @@ async def create_fs_exporter(name: str, path: str) -> str:
     pulp_href = await repo_exporter.create_filesystem_exporter(name, path)
     return pulp_href
 
+
 @router.get('/', response_model=typing.List[FileSystemExporter])
 async def list_fs_exporters():
     exporter_list = await repo_exporter.list_filesystem_exporters()
     return exporter_list
+
 
 @router.get('/{fse_pulp_href}/',
             response_model=typing.List[FileSystemExporter])
