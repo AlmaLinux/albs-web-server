@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, Any
 
 import dramatiq
@@ -9,7 +8,7 @@ from alws.crud import build_node as build_node_crud, test
 from alws.build_planner import BuildPlanner
 from alws.schemas import build_schema, build_node_schema
 from alws.database import SyncSession
-from alws.dependencies import get_db
+from alws.dependencies import get_sync_db
 from alws.dramatiq import event_loop
 
 
@@ -45,7 +44,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 
 async def _build_done(request: build_node_schema.BuildDone):
-    async for db in get_db():
+    with get_sync_db() as db:
         await build_node_crud.build_done(db, request)
         if request.status == 'done':
             await test.create_test_tasks(db, request.task_id)

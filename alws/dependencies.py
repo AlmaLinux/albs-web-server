@@ -36,7 +36,7 @@ def get_sync_db() -> database.SyncSession:
         try:
             yield session
             session.commit()
-        except:
+        except Exception:
             session.rollback()
             raise
         finally:

@@ -2,10 +2,9 @@ import itertools
 
 from fastapi import APIRouter, Depends, Response, status
 
-from alws import database
 from alws import dramatiq
 from alws.config import settings
-from alws.crud import build_node, test
+from alws.crud import build_node
 from alws.dependencies import get_sync_db, JWTBearer
 from alws.schemas import build_node_schema
 
@@ -30,6 +29,7 @@ async def ping(node_status: build_node_schema.Ping):
 async def build_done(
             build_done_: build_node_schema.BuildDone,
             response: Response,
+        ):
     with get_sync_db() as db:
         task_already_finished = await build_node.check_build_task_is_finished(
             db, build_done_.task_id)

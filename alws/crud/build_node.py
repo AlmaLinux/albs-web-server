@@ -371,13 +371,12 @@ async def build_done(
         srpms = db.execute(select(models.SourceRpm).where(
             models.SourceRpm.build_id == build_task.build_id))
         srpm = srpms.scalars().first()
-    if srpm:
-        if build_task.built_srpm_url is None:
-            db.add(srpm)
-            db.flush()
-            db.refresh(srpm)
-        for binary_rpm in binary_rpms:
-            binary_rpm.source_rpm = srpm
+    if build_task.built_srpm_url is None:
+        db.add(srpm)
+        db.flush()
+        db.refresh(srpm)
+    for binary_rpm in binary_rpms:
+        binary_rpm.source_rpm = srpm
 
     db.add_all(binary_rpms)
     db.flush()
