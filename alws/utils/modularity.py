@@ -242,6 +242,9 @@ class ModuleWrapper:
                 return True
         return False
 
+    def get_rpm_artifacts(self) -> typing.List[str]:
+        return self._stream.get_rpm_artifacts()
+
     def iter_components(self):
         components = [
             (component_name, self._stream.get_rpm_component(component_name))

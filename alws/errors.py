@@ -2,6 +2,10 @@ class BuildError(Exception):
     pass
 
 
+class EmptyBuildError(Exception):
+    pass
+
+
 class SignError(Exception):
     pass
 
