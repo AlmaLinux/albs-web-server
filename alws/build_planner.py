@@ -192,26 +192,25 @@ class BuildPlanner:
                     f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
                     f'/module/{module.name}/{module.stream}/{arch}/'
                 )
-                beholder_response = None
                 pkgs_to_add = []
                 if not self._skip_module_checking:
                     try:
                         beholder_response = await beholder_client.get(endpoint)
                     except Exception:
                         logging.error('Cannot get module info')
-                if beholder_response is not None:
+                        continue
                     beholder_components = {
                         item['ref']: item['name']
                         for item in beholder_response.get('components', [])
                     }
                     for ref_id, component_name in beholder_components.items():
-                        git_ref_id = None
                         try:
                             git_ref_id = await self.get_ref_commit_id(
                                 component_name, module.stream)
                         except Exception:
                             logging.exception('Cannot get git_ref_commit_id:')
-                        if git_ref_id is not None and git_ref_id == ref_id:
+                            continue
+                        if git_ref_id == ref_id:
                             for artifact in beholder_response['artifacts']:
                                 srpm_name = artifact['sourcerpm']['name']
                                 if srpm_name != component_name:
