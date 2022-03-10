@@ -134,10 +134,16 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     clean_base_dist_name = re.search(
         r'(?P<dist_name>[a-z]+)', base_dist_name,
         re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_base_dist_name:
+        raise ValueError(f'Base distribution name is malformed: '
+                         f'{base_dist_name}')
     clean_base_dist_name_lower = clean_base_dist_name.lower()
     clean_ref_dist_name = re.search(
         r'(?P<dist_name>[a-z]+)', reference_dist_name,
         re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_ref_dist_name:
+        raise ValueError(f'Reference distribution name is malformed: '
+                         f'{reference_dist_name}')
     clean_ref_dist_name_lower = clean_ref_dist_name.lower()
     beholder = BeholderClient(settings.beholder_host)
 
