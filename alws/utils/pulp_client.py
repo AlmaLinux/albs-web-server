@@ -206,7 +206,7 @@ class PulpClient:
                 package_name: str,
                 artifact_href: str,
                 repo: str
-            ) -> typing.Union[str, None]:
+            ) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
         payload = {
             'relative_path': package_name,
