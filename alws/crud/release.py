@@ -106,6 +106,7 @@ async def __get_pulp_packages(
 
 
 async def get_release_plan(db: Session, build_ids: typing.List[int],
+                           base_dist_name: str,
                            base_dist_version: str,
                            reference_dist_name: str,
                            reference_dist_version: str,
@@ -200,6 +201,25 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'modules': rpm_modules,
         }
 
+    if not settings.package_beholder_enabled:
+        return get_pulp_based_response()
+
+    clean_base_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', base_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_base_dist_name:
+        raise ValueError(f'Base distribution name is malformed: '
+                         f'{base_dist_name}')
+    clean_base_dist_name_lower = clean_base_dist_name.lower()
+    clean_ref_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', reference_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_ref_dist_name:
+        raise ValueError(f'Reference distribution name is malformed: '
+                         f'{reference_dist_name}')
+    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
+    beholder = BeholderClient(settings.beholder_host)
+
     repo_q = select(models.Repository).where(
         models.Repository.production.is_(True))
     result = await db.execute(repo_q)
@@ -233,30 +253,39 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     if not settings.package_beholder_enabled:
         return await get_pulp_based_response()
 
-    clean_ref_dist_name = re.search(
-        r'(?P<dist_name>[a-z]+)', reference_dist_name,
-        re.IGNORECASE).groupdict().get('dist_name')
-    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
-    beholder = BeholderClient(settings.beholder_host)
     for module in pulp_rpm_modules:
         endpoint = (
             f'/api/v1/distros/{clean_ref_dist_name}/'
             f'{reference_dist_version}/module/{module["name"]}/'
             f'{module["stream"]}/{module["arch"]}/'
         )
-        module_response = await beholder.get(endpoint)
-        module_repo = module_response['repository']
-        repo_name = repo_name_regex.search(
-            module_repo['name']).groupdict()['name']
-        release_repo_name = (f'{clean_ref_dist_name_lower}'
-                             f'-{base_dist_version}-{repo_name}')
-        module_info = {
-            'module': module,
-            'repositories': [
-                RepoType(release_repo_name, module_repo['arch'], False)
-            ]
-        }
-        rpm_modules.append(module_info)
+        success = True
+        module_response = None
+        try:
+            module_response = await beholder.get(endpoint)
+        except Exception:
+            endpoint = (
+                f'/api/v1/distros/{base_dist_name}/'
+                f'{reference_dist_version}/module/{module["name"]}/'
+                f'{module["stream"]}/{module["arch"]}/'
+            )
+            try:
+                module_response = await beholder.get(endpoint)
+            except Exception:
+                success = False
+        if success and module_response:
+            module_repo = module_response['repository']
+            repo_name = repo_name_regex.search(
+                module_repo['name']).groupdict()['name']
+            release_repo_name = (f'{clean_base_dist_name_lower}'
+                                 f'-{base_dist_version}-{repo_name}')
+            module_info = {
+                'module': module,
+                'repositories': [
+                    RepoType(release_repo_name, module_repo['arch'], False)
+                ]
+            }
+            rpm_modules.append(module_info)
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
     beholder_response = await beholder.post(endpoint, src_rpm_names)
@@ -438,6 +467,7 @@ async def create_new_release(
         new_release.reference_platform_id = payload.reference_platform_id
         new_release.plan = await get_release_plan(
             db, payload.builds,
+            base_platform.name,
             base_platform.distr_version,
             reference_platform.name,
             reference_platform.distr_version,
