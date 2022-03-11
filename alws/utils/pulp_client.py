@@ -366,8 +366,12 @@ class PulpClient:
         await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
-    async def get_repo_latest_version(self, repo_href: str):
+    async def get_repo_latest_version(self, repo_href: str,
+                                      for_releases: bool = False):
         repository_data = await self.request('GET', repo_href)
+        if for_releases:
+            return (repository_data.get('latest_version_href'),
+                    '-debug-' in repository_data['name'])
         return repository_data.get('latest_version_href')
 
     async def get_distro(self, distro_href: str):

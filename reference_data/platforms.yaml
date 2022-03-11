@@ -602,8 +602,8 @@
     - name: almalinux-8-baseos-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/BaseOS/debug/ppc64le/
-      export_path: almalinux/8.5-beta/BaseOS/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/ppc64le/
+      export_path: almalinux/8/BaseOS/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -612,8 +612,8 @@
     - name: almalinux-8-appstream-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/AppStream/debug/ppc64le/
-      export_path: almalinux/8.5-beta/AppStream/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/ppc64le/
+      export_path: almalinux/8/AppStream/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -622,8 +622,8 @@
     - name: almalinux-8-powertools-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/PowerTools/debug/ppc64le/
-      export_path: almalinux/8.5-beta/PowerTools/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/ppc64le/
+      export_path: almalinux/8/PowerTools/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -632,8 +632,8 @@
     - arch: ppc64le
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/HighAvailability/debug/ppc64le/
-      export_path: almalinux/8.5-beta/HighAvailability/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/ppc64le/
+      export_path: almalinux/8/HighAvailability/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -642,8 +642,8 @@
     - arch: ppc64le
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/ResilientStorage/debug/ppc64le/
-      export_path: almalinux/8.5-beta/ResilientStorage/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/ppc64le/
+      export_path: almalinux/8/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -652,8 +652,8 @@
     - arch: ppc64le
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8.5-beta/extras/debug/ppc64le/
-      export_path: almalinux/8.5-beta/extras/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/ppc64le/
+      export_path: almalinux/8/extras/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand

@@ -89,3 +89,5 @@ build_ref_int_mapping: typing.Dict[int, str] = {
 debuginfo_regex = re.compile(r'debug(info|source)')
 
 RepoType = namedtuple('RepoType', ('name', 'arch', 'debug'))
+PackageNevra = namedtuple('PackageNevra',
+                          ('name', 'epoch', 'version', 'release', 'arch'))
