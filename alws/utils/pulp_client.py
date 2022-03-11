@@ -216,7 +216,7 @@ class PulpClient:
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         # Success case
-        if task_result['state'] == 'success':
+        if task_result['state'] == 'completed':
             hrefs = [item for item in task_result['created_resources']
                      if 'rpm/packages' in item]
             return hrefs[0] if hrefs else None
