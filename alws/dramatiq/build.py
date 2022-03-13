@@ -31,7 +31,6 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 build,
                 platforms=build_request.platforms,
                 is_secure_boot=build_request.is_secure_boot,
-                skip_module_checking=build_request.skip_module_checking,
             )
             await planner.load_platforms()
             for task in build_request.tasks:

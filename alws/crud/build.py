@@ -122,12 +122,18 @@ async def get_module_preview(
                 platform: models.Platform,
                 module_request: build_schema.ModulePreviewRequest
             ) -> build_schema.ModulePreview:
-    refs, modules = await build_schema.get_module_refs(module_request.ref, platform)
+    refs, modules, excluded_components = await build_schema.get_module_refs(
+        task=module_request.ref,
+        platform=platform,
+        platform_arches=module_request.platform_arches,
+        skip_module_checking=module_request.skip_module_checking,
+    )
     return build_schema.ModulePreview(
         refs=refs,
         module_name=module_request.ref.git_repo_name,
         module_stream=module_request.ref.module_stream_from_ref(),
-        modules_yaml='\n'.join(modules)
+        modules_yaml='\n'.join(modules),
+        excluded_components=excluded_components,
     )
 
 

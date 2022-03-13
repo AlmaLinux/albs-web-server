@@ -2,6 +2,7 @@ import asyncio
 import typing
 import logging
 import datetime
+import re
 import urllib.parse
 
 import aiohttp.client_exceptions
@@ -9,6 +10,8 @@ from pydantic import BaseModel, validator, Field, conlist
 
 from alws.config import settings
 from alws.constants import BuildTaskRefType
+from alws import models
+from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
@@ -82,7 +85,6 @@ class BuildCreate(BaseModel):
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     is_secure_boot: bool = False
-    skip_module_checking: bool = False
 
 
 class BuildPlatform(BaseModel):
@@ -215,6 +217,8 @@ class ModulePreviewRequest(BaseModel):
 
     ref: BuildTaskRef
     platform_name: str
+    platform_arches: typing.List[str] = []
+    skip_module_checking: bool = False
 
 
 class ModuleRef(BaseModel):
@@ -228,6 +232,7 @@ class ModuleRef(BaseModel):
 class ModulePreview(BaseModel):
 
     refs: typing.List[ModuleRef]
+    excluded_components: typing.List[typing.Dict[str, str]] = []
     modules_yaml: str
     module_name: str
     module_stream: str
@@ -267,12 +272,54 @@ async def _get_module_ref(
     )
 
 
-async def get_module_refs(task, platform):
+async def get_module_refs(
+    task: BuildTaskRef,
+    platform: models.Platform,
+    platform_arches: list[str],
+    skip_module_checking: bool = False,
+) -> tuple[list[ModuleRef], list[str], list[dict[str, str]]]:
+    async def check_module_updates(endpoint: str) -> None:
+        try:
+            beholder_response = await beholder_client.get(endpoint)
+        except Exception:
+            logging.error('Cannot get module info')
+            return
+        beholder_components = {
+            item['ref']: item['name']
+            for item in beholder_response.get('components', [])
+        }
+        for ref_id, component_name in beholder_components.items():
+            try:
+                git_branch = await gitea_client.get_branch(
+                    f'rpms/{component_name}', task.git_ref)
+                git_ref_id = git_branch['commit']['id']
+            except Exception:
+                logging.exception('Cannot get git_ref_commit_id:')
+                continue
+            if git_ref_id == ref_id:
+                for artifact in beholder_response['artifacts']:
+                    srpm_name = artifact['sourcerpm']['name']
+                    if srpm_name != component_name:
+                        continue
+                    components_to_exclude.append(srpm_name)
+                    pkgs_to_add.extend(artifact['packages'])
+
     result = []
     gitea_client = GiteaClient(
         settings.gitea_host,
         logging.getLogger(__name__)
     )
+
+    beholder_client = BeholderClient(
+        host=settings.beholder_host,
+        token=settings.beholder_token,
+    )
+    components_to_exclude = []
+    pkgs_to_add = []
+    clean_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
+    ).groupdict().get('dist_name', '')
+    distr_ver = platform.distr_version
     modified_list = await get_modified_refs_list(
         platform.modularity['modified_packages_url']
     )
@@ -302,10 +349,24 @@ async def get_module_refs(task, platform):
         name=task.git_repo_name,
         stream=task.module_stream_from_ref()
     )
+    checking_tasks = []
+    if not skip_module_checking:
+        for arch in platform_arches:
+            endpoint = (
+                f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
+                f'/module/{module.name}/{module.stream}/{arch}/'
+            )
+            checking_tasks.append(check_module_updates(endpoint))
+    await asyncio.gather(*checking_tasks)
+
+    for pkg_dict in pkgs_to_add:
+        module.add_rpm_artifact(pkg_dict)
     platform_prefix_list = platform.modularity['git_tag_prefix']
     platform_packages_git = platform.modularity['packages_git']
     component_tasks = []
     for component_name, _ in module.iter_components():
+        if component_name in components_to_exclude:
+            continue
         component_tasks.append(
             _get_module_ref(
                 component_name, modified_list, platform_prefix_list,
@@ -316,4 +377,8 @@ async def get_module_refs(task, platform):
     modules = [module.render()]
     if devel_module:
         modules.append(devel_module.render())
-    return result, modules
+    components_to_exclude = [
+        {'url': component_name, 'git_ref': task.git_ref}
+        for component_name in set(components_to_exclude)
+    ]
+    return result, modules, components_to_exclude

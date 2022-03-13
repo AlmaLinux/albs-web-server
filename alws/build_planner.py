@@ -2,17 +2,15 @@ import logging
 import asyncio
 import typing
 import collections
-import re
 
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 
 from alws import models
-from alws.errors import DataNotFoundError, EmptyBuildError
+from alws.errors import DataNotFoundError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
-from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
 from alws.utils.modularity import (
@@ -34,7 +32,6 @@ class BuildPlanner:
                 build: models.Build,
                 platforms: typing.List[build_schema.BuildCreatePlatforms],
                 is_secure_boot: bool,
-                skip_module_checking: bool,
             ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -57,7 +54,6 @@ class BuildPlanner:
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
         self._is_secure_boot = is_secure_boot
-        self._skip_module_checking = skip_module_checking
 
     async def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
@@ -163,6 +159,13 @@ class BuildPlanner:
             raw_refs, module_templates = await build_schema.get_module_refs(
                 task, self._platforms[0]
             )
+        refs = [
+            models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=BuildTaskRefType.GIT_BRANCH
+            ) for ref in raw_refs
+        ]
         module = None
         if self._build.mock_options:
             mock_options = self._build.mock_options.copy()
@@ -170,17 +173,8 @@ class BuildPlanner:
                 mock_options['definitions'] = {}
         else:
             mock_options = {'definitions': {}}
-        beholder_client = BeholderClient(
-            host=settings.beholder_host,
-            token=settings.beholder_token,
-        )
-        modules_to_exclude = []
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
-            clean_dist_name = re.search(
-                r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
-            ).groupdict().get('dist_name', '')
-            distr_ver = platform.distr_version
             if task.module_platform_version:
                 modularity_version = next(
                     item for item in platform.modularity['versions']
@@ -188,38 +182,6 @@ class BuildPlanner:
                 )
             for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_templates[0])
-                endpoint = (
-                    f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                    f'/module/{module.name}/{module.stream}/{arch}/'
-                )
-                pkgs_to_add = []
-                if not self._skip_module_checking:
-                    try:
-                        beholder_response = await beholder_client.get(endpoint)
-                    except Exception:
-                        logging.error('Cannot get module info')
-                        continue
-                    beholder_components = {
-                        item['ref']: item['name']
-                        for item in beholder_response.get('components', [])
-                    }
-                    for ref_id, component_name in beholder_components.items():
-                        try:
-                            git_ref_id = await self.get_ref_commit_id(
-                                component_name, module.stream)
-                        except Exception:
-                            logging.exception('Cannot get git_ref_commit_id:')
-                            continue
-                        if git_ref_id == ref_id:
-                            for artifact in beholder_response['artifacts']:
-                                srpm_name = artifact['sourcerpm']['name']
-                                if srpm_name != component_name:
-                                    continue
-                                modules_to_exclude.append(srpm_name)
-                                pkgs_to_add.extend(artifact['packages'])
-                for pkg_dict in pkgs_to_add:
-                    module.add_rpm_artifact(pkg_dict)
-
                 module.add_module_dependencies_from_mock_defs(
                     mock_modules=mock_options.get('module_enable', []))
                 mock_options['module_enable'] = [
@@ -281,19 +243,6 @@ class BuildPlanner:
         self._db.add_all(all_modules)
         for key, value in module.iter_mock_definitions():
             mock_options['definitions'][key] = value
-        modules_to_exclude = set(modules_to_exclude)
-        refs = [
-            models.BuildTaskRef(
-                url=ref.url,
-                git_ref=ref.git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH
-            ) for ref in raw_refs
-            if not any((
-                module_name in ref.url for module_name in modules_to_exclude
-            ))
-        ]
-        if not refs:
-            raise EmptyBuildError
         for ref in refs:
             await self._add_single_ref(
                 ref,
