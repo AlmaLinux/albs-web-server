@@ -1,3 +1,5 @@
+import asyncio
+
 import importlib
 import threading
 
@@ -22,7 +24,7 @@ graceful_terminate_event = threading.Event()
 async def startup():
     global scheduler, terminate_event, graceful_terminate_event
     scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
-    scheduler.start()
+    asyncio.create_task(scheduler.run())
 
 
 @app.on_event('shutdown')

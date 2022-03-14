@@ -269,7 +269,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         )
         await db.execute(remove_query)
 
-    # if SRPM builted we need to download them
+    # if SRPM built we need to download them
     # from pulp repos in next tasks
     if all((build_task.status == BuildTaskStatus.COMPLETED,
             uncompleted_tasks_ids,

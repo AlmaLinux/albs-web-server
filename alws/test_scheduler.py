@@ -2,10 +2,10 @@ import logging
 import random
 import threading
 import traceback
+import asyncio
 
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from syncer import sync
 
 from alws import models
 from alws.config import settings
@@ -87,14 +87,14 @@ class TestTaskScheduler(threading.Thread):
                 session.commit()
             session.close()
 
-    def run(self) -> None:
+    async def run(self) -> None:
         self._term_event.wait(10)
         while not self._term_event.is_set() and \
                 not self._graceful_event.is_set():
             try:
-                sync(self._schedule_tasks_for_execution)
+                await self._schedule_tasks_for_execution()
             except Exception as e:
                 logging.error(f'Error during scheduler loop: {e}')
                 logging.error(f'Traceback: {traceback.format_exc()}')
             finally:
-                self._term_event.wait(random.randint(5, 10))
+                await asyncio.sleep(random.randint(5, 10))

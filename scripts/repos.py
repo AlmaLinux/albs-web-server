@@ -8,6 +8,7 @@ import jmespath
 from syncer import sync
 from pathlib import Path
 from plumbum import local
+import sqlalchemy
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -31,6 +32,9 @@ def parse_args():
     parser.add_argument('-names', '--platform_names',
                         type=str, nargs='+', required=False,
                         help='List of platform names to export')
+    parser.add_argument('-repos', '--repo_ids',
+                        type=int, nargs='+', required=False,
+                        help='List of repo ids to export')
     parser.add_argument('-a', '--arches', type=str, nargs='+',
                         required=False, help='List of arches to export')
     parser.add_argument('-id', '--release_id', type=int,
@@ -40,29 +44,39 @@ def parse_args():
     return parser.parse_args()
 
 
-async def export_repos_from_pulp(platform_names: typing.List[str],
-                                 platforms_dict: dict,
+async def export_repos_from_pulp(platforms_dict: dict,
+                                 platform_names: typing.List[str] = None,
+                                 repo_ids: typing.List[int] = None,
                                  arches: typing.List[str] = None):
-    repo_ids = []
-    async with database.Session() as db:
-        db_platforms = await db.execute(
-            select(models.Platform).where(
-                models.Platform.name.in_(platform_names)).options(
-                    selectinload(models.Platform.repos))
+
+    where_conditions = models.Platform.is_reference.is_(False)
+    if platform_names is not None:
+        where_conditions = sqlalchemy.and_(
+            models.Platform.name.in_(platform_names),
+            models.Platform.is_reference.is_(False),
         )
+    query = select(models.Platform).where(
+        where_conditions).options(selectinload(models.Platform.repos))
+    async with database.Session() as db:
+        db_platforms = await db.execute(query)
     db_platforms = db_platforms.scalars().all()
+
+    repo_ids_to_export = []
     for db_platform in db_platforms:
         platforms_dict[db_platform.id] = []
         for repo in db_platform.repos:
+            if repo_ids is not None and repo.id not in repo_ids:
+                continue
             if repo.production is True:
                 if arches is not None:
                     if repo.arch in arches:
                         platforms_dict[db_platform.id].append(repo.export_path)
-                        repo_ids.append(repo.id)
+                        repo_ids_to_export.append(repo.id)
                 else:
                     platforms_dict[db_platform.id].append(repo.export_path)
-                    repo_ids.append(repo.id)
-    return await fs_export_repository(db=db, repository_ids=set(repo_ids))
+                    repo_ids_to_export.append(repo.id)
+    return await fs_export_repository(db=db,
+                                      repository_ids=set(repo_ids_to_export))
 
 
 async def export_repos_from_release_plan(release_id: int):
@@ -122,11 +136,25 @@ def main():
             if sign_key.platform_id == platform_id
         ), None)
 
-    if args.platform_names:
-        logger.info('Start exporting packages for following platforms:\n%s',
-                    args.platform_names)
+    if args.platform_names or args.repo_ids:
+        platform_names = args.platform_names
+        repo_ids = args.repo_ids
+        msg, msg_values = (
+            'Start exporting packages for following platforms:\n%s',
+            platform_names,
+        )
+        if repo_ids:
+            msg, msg_values = (
+                'Start exporting packages for following repositories:\n%s',
+                repo_ids,
+            )
+        logger.info(msg, msg_values)
         exported_paths = sync(export_repos_from_pulp(
-            args.platform_names, platforms_dict, args.arches))
+            platform_names=platform_names,
+            platforms_dict=platforms_dict,
+            arches=args.arches,
+            repo_ids=repo_ids,
+        ))
 
     logger.info('All repositories exported in following paths:\n%s',
                 '\n'.join((str(path) for path in exported_paths)))
@@ -137,7 +165,9 @@ def main():
         path = Path(exp_path)
         repo_path = path.parent
         repodata = repo_path / 'repodata'
-        result = createrepo_c.run(args=['--update', '--keep-all-metadata', repo_path])
+        result = createrepo_c.run(
+            args=['--update', '--keep-all-metadata', repo_path],
+        )
         logger.info(result)
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():

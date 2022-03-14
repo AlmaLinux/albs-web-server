@@ -99,6 +99,7 @@ async def __get_pulp_packages(
                         'name': module.name,
                         'stream': module.stream,
                         'version': module.version,
+                        'context': module.context,
                         'arch': module.arch,
                         'template': module.render()
                     }
@@ -106,6 +107,7 @@ async def __get_pulp_packages(
 
 
 async def get_release_plan(db: Session, build_ids: typing.List[int],
+                           base_dist_name: str,
                            base_dist_version: str,
                            reference_dist_name: str,
                            reference_dist_version: str,
@@ -200,6 +202,25 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'modules': rpm_modules,
         }
 
+    if not settings.package_beholder_enabled:
+        return await get_pulp_based_response()
+
+    clean_base_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', base_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_base_dist_name:
+        raise ValueError(f'Base distribution name is malformed: '
+                         f'{base_dist_name}')
+    clean_base_dist_name_lower = clean_base_dist_name.lower()
+    clean_ref_dist_name = re.search(
+        r'(?P<dist_name>[a-z]+)', reference_dist_name,
+        re.IGNORECASE).groupdict().get('dist_name')
+    if not clean_ref_dist_name:
+        raise ValueError(f'Reference distribution name is malformed: '
+                         f'{reference_dist_name}')
+    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
+    beholder = BeholderClient(settings.beholder_host)
+
     repo_q = select(models.Repository).where(
         models.Repository.production.is_(True))
     result = await db.execute(repo_q)
@@ -230,31 +251,41 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         defaultdict(list), defaultdict(list), defaultdict(list)
     )
 
-    if not settings.package_beholder_enabled:
-        return await get_pulp_based_response()
-
-    clean_ref_dist_name = re.search(
-        r'(?P<dist_name>[a-z]+)', reference_dist_name,
-        re.IGNORECASE).groupdict().get('dist_name')
-    clean_ref_dist_name_lower = clean_ref_dist_name.lower()
-    beholder = BeholderClient(settings.beholder_host)
     for module in pulp_rpm_modules:
         endpoint = (
             f'/api/v1/distros/{clean_ref_dist_name}/'
             f'{reference_dist_version}/module/{module["name"]}/'
             f'{module["stream"]}/{module["arch"]}/'
         )
-        module_response = await beholder.get(endpoint)
+        success = True
+        module_response = None
+        try:
+            module_response = await beholder.get(endpoint)
+        except Exception:
+            endpoint = (
+                f'/api/v1/distros/{base_dist_name}/'
+                f'{reference_dist_version}/module/{module["name"]}/'
+                f'{module["stream"]}/{module["arch"]}/'
+            )
+            try:
+                module_response = await beholder.get(endpoint)
+            except Exception:
+                success = False
+        if not success or not module_response:
+            continue
         module_repo = module_response['repository']
         repo_name = repo_name_regex.search(
             module_repo['name']).groupdict()['name']
-        release_repo_name = (f'{clean_ref_dist_name_lower}'
-                             f'-{base_dist_version}-{repo_name}')
+        release_repo_name = (
+            f'{clean_base_dist_name_lower}-{base_dist_version}-{repo_name}'
+        )
         module_info = {
             'module': module,
-            'repositories': [
-                RepoType(release_repo_name, module_repo['arch'], False)
-            ]
+            'repositories': [{
+                'name': release_repo_name,
+                'arch': module_repo['arch'],
+                'debug': False
+            }]
         }
         rpm_modules.append(module_info)
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
@@ -262,6 +293,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     beholder_response = await beholder.post(endpoint, src_rpm_names)
     if not beholder_response.get('packages'):
         return await get_pulp_based_response()
+
     if beholder_response.get('packages', []):
         for package in pulp_packages:
             pkg_name = package['name']
@@ -335,6 +367,7 @@ async def execute_release_plan(release_id: int, db: Session):
             raise EmptyReleasePlan('Cannot execute plan with empty packages '
                                    'or repositories: {packages}, {repositories}'
                                    .format_map(release.plan))
+
     for build_id in release.build_ids:
         try:
             verified = await sign_task.verify_signed_build(
@@ -369,21 +402,17 @@ async def execute_release_plan(release_id: int, db: Session):
                 packages_to_repo_layout[repo_name] = {}
             if repo_arch not in packages_to_repo_layout[repo_name]:
                 packages_to_repo_layout[repo_name][repo_arch] = []
+            module_info = module['module']
             module_pulp_href, _ = await pulp_client.create_module(
-                module['template'],
-                module['name'],
-                module['stream'],
-                module['context'],
-                module['arch']
+                module_info['template'],
+                module_info['name'],
+                module_info['stream'],
+                module_info['context'],
+                module_info['arch']
             )
             packages_to_repo_layout[repo_name][repo_arch].append(
                 module_pulp_href)
 
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password
-    )
     repo_status = {}
 
     for repository_name, arches in packages_to_repo_layout.items():
@@ -391,7 +420,8 @@ async def execute_release_plan(release_id: int, db: Session):
         for arch, packages in arches.items():
             repo_q = select(models.Repository).where(
                 models.Repository.name == repository_name,
-                models.Repository.arch == arch)
+                models.Repository.arch == arch
+            )
             repo_result = await db.execute(repo_q)
             repo = repo_result.scalars().first()
             if not repo:
@@ -438,6 +468,7 @@ async def create_new_release(
         new_release.reference_platform_id = payload.reference_platform_id
         new_release.plan = await get_release_plan(
             db, payload.builds,
+            base_platform.name,
             base_platform.distr_version,
             reference_platform.name,
             reference_platform.distr_version,

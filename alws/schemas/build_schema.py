@@ -82,6 +82,7 @@ class BuildCreate(BaseModel):
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     is_secure_boot: bool = False
+    skip_module_checking: bool = False
 
 
 class BuildPlatform(BaseModel):

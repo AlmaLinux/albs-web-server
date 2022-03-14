@@ -206,7 +206,7 @@ class PulpClient:
                 package_name: str,
                 artifact_href: str,
                 repo: str
-            ) -> str:
+            ) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
         payload = {
             'relative_path': package_name,
@@ -215,9 +215,20 @@ class PulpClient:
         }
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
-        hrefs = [item for item in task_result['created_resources']
-                 if 'rpm/packages' in item]
-        return hrefs[0] if hrefs else None
+        # Success case
+        if task_result['state'] == 'completed':
+            hrefs = [item for item in task_result['created_resources']
+                     if 'rpm/packages' in item]
+            return hrefs[0] if hrefs else None
+        # This situation might happen if upload to pulp and conversion
+        # into the RPM package happened, but sign task was not marked
+        # for success. This way no new resources will be created,
+        # but the task response will contain reference to already
+        # existing resource
+        if task_result['state'] == 'failed':
+            if task_result.get('reserved_resources_record'):
+                return task_result['reserved_resources_record'][0]
+        return None
 
     async def get_rpm_packages(self, params: dict = None) -> list:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'

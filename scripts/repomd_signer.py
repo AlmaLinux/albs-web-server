@@ -3,7 +3,6 @@ import json
 import urllib.parse
 import aiohttp
 
-from lxml import etree
 from syncer import sync
 
 from alws import database
@@ -31,10 +30,10 @@ async def get_sign_keys_from_db():
 
 
 def repomd_signer(export_path, key_id):
-    xml = etree.parse(os.path.join(export_path, 'repomd.xml'))
-    xml_string = str(etree.tostring(xml.getroot()))
+    with open(os.path.join(export_path, 'repomd.xml'), 'rt') as f:
+        file_content = f.read()
     sign_data = {
-        "content": xml_string,
+        "content": file_content,
         "pgp_keyid": key_id,
     }
     result = sync(sign_repomd_xml(sign_data))
