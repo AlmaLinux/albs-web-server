@@ -28,7 +28,7 @@ async def __get_build_repos(
 
 
 def __get_package_url(base_url: str, package_name: str) -> str:
-    pkg_first_letter = package_name[0]
+    pkg_first_letter = package_name[0].lower()
     return urllib.parse.urljoin(
         base_url, f'Packages/{pkg_first_letter}/{package_name}')
 
