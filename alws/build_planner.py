@@ -15,7 +15,7 @@ from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
-from alws.utils.parsing import parse_git_ref
+from alws.utils.parsing import get_clean_distr_name, parse_git_ref
 from alws.utils.modularity import (
     ModuleWrapper, calc_dist_macro, IndexWrapper
 )
@@ -78,7 +78,7 @@ class BuildPlanner:
             raise DataNotFoundError(
                 f'platforms: {missing_platforms} cannot be found in database'
             )
-    
+
     def load_platform_flavors(self, flavors):
         db_flavors = self._db.execute(
             select(models.PlatformFlavour).where(
@@ -197,9 +197,7 @@ class BuildPlanner:
             for flavour in self._platform_flavors:
                 if flavour.modularity and flavour.modularity.get('versions'):
                     modularity_version = flavour.modularity['versions'][-1]
-            clean_dist_name = re.search(
-                r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
-            ).groupdict().get('dist_name', '')
+            clean_dist_name = get_clean_distr_name(platform.name)
             distr_ver = platform.distr_version
             if task.module_platform_version:
                 flavour_versions = [

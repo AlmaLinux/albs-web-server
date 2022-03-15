@@ -436,10 +436,11 @@ async def build_done(
     )
     if all(multilib_conditions):
         try:
-            multilib_pkgs = await get_multilib_packages(
+            multilib_pkgs, module_artifacts = await get_multilib_packages(
                 db, build_task, src_rpm)
             if multilib_pkgs:
-                await add_multilib_packages(db, build_task, multilib_pkgs)
+                await add_multilib_packages(db, build_task,
+                                            multilib_pkgs, module_artifacts)
         except Exception as e:
             logging.exception('Cannot process multilib packages: %s', str(e))
             raise MultilibProcessingError('Cannot process multilib packages')
