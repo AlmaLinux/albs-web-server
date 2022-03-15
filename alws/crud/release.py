@@ -301,9 +301,10 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
     beholder_response = await beholder.post(endpoint, src_rpm_names)
-    for pkg in beholder_response.get('packages', []):
-        key = (pkg['name'], pkg['version'], pkg['arch'])
-        beholder_cache[key] = package
+    for pkg_list in beholder_response.get('packages', {}):
+        for pkg in pkg_list['packages']:
+            key = (pkg['name'], pkg['version'], pkg['arch'])
+            beholder_cache[key] = pkg
     if not beholder_cache:
         return await get_pulp_based_response()
     for package in pulp_packages:
