@@ -254,12 +254,16 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
     )
 
     for module in pulp_rpm_modules:
+        module_arch_list = [module['arch']]
+        if module['arch'] == 'ppc64le':
+            module_arch_list.append('aarch64')
         endpoints = [
             f'/api/v1/distros/{dist_name}/'
             f'{reference_dist_version}/module/{module["name"]}/'
-            f'{module["stream"]}/{module["arch"]}/'
+            f'{module["stream"]}/{module_arch}/'
 
             for dist_name in [clean_ref_dist_name, base_dist_name]
+            for module_arch in module_arch_list
         ]
         module_response = None
         for endpoint in endpoints:
@@ -273,6 +277,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             for pkg in _packages['packages']:
                 key = (pkg['name'], pkg['version'], pkg['arch'])
                 beholder_cache[key] = pkg
+                if pkg['arch'] == 'aarch64':
+                    second_key = (
+                        pkg['name'], pkg['version'], 'ppc64le'
+                    )
+                    beholder_cache[second_key] = pkg
         module_repo = module_response['repository']
         repo_name = repo_name_regex.search(
             module_repo['name']).groupdict()['name']
