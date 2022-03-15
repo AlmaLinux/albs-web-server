@@ -14,7 +14,6 @@ from plumbum import local
 import sqlalchemy
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-# from syncer import sync
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
