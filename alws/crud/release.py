@@ -305,6 +305,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         for pkg in pkg_list['packages']:
             key = (pkg['name'], pkg['version'], pkg['arch'])
             beholder_cache[key] = pkg
+            if pkg['arch'] == 'aarch64':
+                second_key = (pkg['name'], pkg['version'], 'ppc64le')
+                beholder_cache[key] = pkg
     if not beholder_cache:
         return await get_pulp_based_response()
     for package in pulp_packages:
