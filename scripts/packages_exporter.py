@@ -21,8 +21,6 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.config import settings
-from alws.routers.sign_key import get_sign_keys
-from alws.utils.exporter import fs_export_repository
 from alws.utils.pulp_client import PulpClient
 
 
@@ -50,20 +48,31 @@ def parse_args():
     return parser.parse_args()
 
 
-async def sign_repomd_xml(data):
-    endpoint = 'sign-tasks/sync_sign_task/'
-    url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
+async def make_request(method: str, endpoint: str,
+                       params: dict = None, data: dict = None):
+    full_url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
     async with aiohttp.ClientSession(headers=HEADERS,
                                      raise_for_status=True) as session:
-        async with session.post(url, json=data) as response:
+        async with session.request(method, full_url,
+                                   json=data, params=params) as response:
             json_data = await response.read()
             json_data = json.loads(json_data)
             return json_data
 
 
-async def get_sign_keys_from_db():
-    async with database.Session() as session:
-        return await get_sign_keys(session)
+async def sign_repomd_xml(data):
+    endpoint = 'sign-tasks/sync_sign_task/'
+    return await make_request('POST', endpoint, data=data)
+
+
+async def get_sign_keys():
+    endpoint = 'sign-keys/'
+    return await make_request('GET', endpoint)
+
+
+async def export_repositories(repo_ids: list):
+    endpoint = 'repositories/exports/'
+    return await make_request('POST', endpoint, data=repo_ids)
 
 
 async def repomd_signer(export_path, key_id):
@@ -75,10 +84,11 @@ async def repomd_signer(export_path, key_id):
     }
     result = await sign_repomd_xml(sign_data)
     result_data = result.get('asc_content')
+    if result_data is None:
+        return result['error']
     repodata_path = os.path.join(export_path, 'repomd.xml.asc')
-    if result_data is not None:
-        with open(repodata_path, 'w') as file:
-            file.writelines(result_data)
+    with open(repodata_path, 'w') as file:
+        file.writelines(result_data)
 
 
 async def copy_noarch_packages_from_x86_64_repo(
@@ -149,7 +159,6 @@ async def prepare_and_execute_async_tasks(source_repo_dict: dict,
     await asyncio.gather(*tasks)
 
 
-
 async def export_repos_from_pulp(platforms_dict: dict,
                                  platform_names: typing.List[str] = None,
                                  repo_ids: typing.List[int] = None,
@@ -188,8 +197,7 @@ async def export_repos_from_pulp(platforms_dict: dict,
                     platforms_dict[db_platform.id].append(repo.export_path)
                     repo_ids_to_export.append(repo.id)
     await prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
-    exported_paths = await fs_export_repository(
-        db=db, repository_ids=set(repo_ids_to_export))
+    exported_paths = await export_repositories(list(set(repo_ids_to_export)))
     return exported_paths
 
 
@@ -202,7 +210,7 @@ async def export_repos_from_release_plan(release_id: int):
 
     repo_ids = jmespath.search('packages[].repositories[].id',
                                db_release.plan)
-    repo_ids = set(repo_ids)
+    repo_ids = list(set(repo_ids))
     async with database.Session() as db:
         db_repos = await db.execute(
             select(models.Repository).where(sqlalchemy.and_(
@@ -218,7 +226,7 @@ async def export_repos_from_release_plan(release_id: int):
         if db_repo.arch == 'ppc64le':
             repos_ppc64le[db_repo.name] = db_repo.pulp_href
     await prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
-    exported_paths = await fs_export_repository(db=db, repository_ids=repo_ids)
+    exported_paths = await export_repositories(repo_ids)
     return exported_paths, db_release.platform_id
 
 
@@ -253,7 +261,7 @@ async def main():
         logger.info('Following exporters, has been deleted from pulp:\n%s',
                     '\n'.join(str(i) for i in deleted_exporters))
 
-    db_sign_keys = await get_sign_keys_from_db()
+    db_sign_keys = await get_sign_keys()
     if args.release_id:
         release_id = args.release_id
         logger.info('Start exporting packages from release id=%s',
@@ -261,8 +269,8 @@ async def main():
         exported_paths, platform_id = await export_repos_from_release_plan(
             release_id)
         key_id_by_platform = next((
-            sign_key.keyid for sign_key in db_sign_keys
-            if sign_key.platform_id == platform_id
+            sign_key['keyid'] for sign_key in db_sign_keys
+            if sign_key['platform_id'] == platform_id
         ), None)
 
     if args.platform_names or args.repo_ids:
@@ -290,9 +298,11 @@ async def main():
     createrepo_c = local['createrepo_c']
     modifyrepo_c = local['modifyrepo_c']
     for exp_path in exported_paths:
+        string_exp_path = str(exp_path)
         path = Path(exp_path)
         repo_path = path.parent
         repodata = repo_path / 'repodata'
+        string_repodata_path = str(repodata)
         result = createrepo_c.run(
             args=['--update', '--keep-all-metadata', repo_path],
         )
@@ -300,18 +310,22 @@ async def main():
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
             for repo_export_path in platform_repos:
-                if repo_export_path in str(exp_path):
+                if repo_export_path in string_exp_path:
                     key_id = next((
-                        sign_key.keyid for sign_key in db_sign_keys
-                        if sign_key.platform_id == platform_id
+                        sign_key['keyid'] for sign_key in db_sign_keys
+                        if sign_key['platform_id'] == platform_id
                     ), None)
                     break
         if key_id is None:
             logger.info('Cannot sign repomd.xml in %s, missing GPG key',
-                        str(exp_path))
+                        string_exp_path)
             continue
-        await repomd_signer(repodata, key_id)
-        logger.info('repomd.xml in %s is signed', str(repodata))
+        error = await repomd_signer(repodata, key_id)
+        logger_args = ['repomd.xml in %s is signed', string_repodata_path]
+        if error:
+            logger_args = ['repomd.xml in %s is failed to sign:\n%s',
+                           string_repodata_path, error]
+        logger.info(*logger_args)
 
 
 if __name__ == '__main__':
