@@ -1,9 +1,10 @@
 import asyncio
+from dataclasses import replace
 import re
+import copy
 import typing
 from collections import defaultdict
 
-import jmespath
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -194,7 +195,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             if pkg['arch'] == 'noarch':
                 prepare_data_for_executing_async_tasks(pkg, full_name)
             plan_packages.append({'package': pkg, 'repositories': []})
-            added_packages.append(full_name)
+            added_packages.add(full_name)
         await prepare_and_execute_async_tasks()
 
         return {
@@ -248,7 +249,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         for repo in prod_repos
     }
 
-    added_packages = []
+    added_packages = set()
     pkgs_nevra, debug_pkgs_nevra, existing_packages = (
         defaultdict(list), defaultdict(list), defaultdict(list)
     )
@@ -281,7 +282,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                     second_key = (
                         pkg['name'], pkg['version'], 'ppc64le'
                     )
-                    beholder_cache[second_key] = pkg
+                    replaced_pkg = copy.deepcopy(pkg)
+                    for repo in replaced_pkg['repositories']:
+                        if repo['arch'] == 'aarch64':
+                            repo['arch'] = 'ppc64le'
+                    beholder_cache[second_key] = replaced_pkg
         module_repo = module_response['repository']
         repo_name = repo_name_regex.search(
             module_repo['name']).groupdict()['name']
@@ -307,7 +312,11 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             beholder_cache[key] = pkg
             if pkg['arch'] == 'aarch64':
                 second_key = (pkg['name'], pkg['version'], 'ppc64le')
-                beholder_cache[second_key] = pkg
+                replaced_pkg = copy.deepcopy(pkg)
+                for repo in replaced_pkg['repositories']:
+                    if repo['arch'] == 'aarch64':
+                        repo['arch'] = 'ppc64le'
+                beholder_cache[second_key] = replaced_pkg
     if not beholder_cache:
         return await get_pulp_based_response()
     for package in pulp_packages:
@@ -320,18 +329,22 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         if pkg_arch == 'noarch':
             prepare_data_for_executing_async_tasks(package, full_name)
         key = (pkg_name, pkg_version, pkg_arch)
-        predicted_package = beholder_cache.get(key)
+        predicted_package = beholder_cache.get(key, [])
         pkg_info = {'package': package, 'repositories': []}
+        release_repositories = set()
+        repositories = []
         if not predicted_package:
             continue
         repositories = predicted_package['repositories']
-        release_repositories = set()
         for repo in repositories:
             ref_repo_name = repo['name']
             repo_name = (repo_name_regex.search(ref_repo_name)
                             .groupdict()['name'])
-            release_repo_name = (f'{clean_ref_dist_name_lower}'
-                                    f'-{base_dist_version}-{repo_name}')
+            release_repo_name = '-'.join([
+                clean_ref_dist_name_lower,
+                base_dist_version,
+                repo_name
+            ])
             debug = ref_repo_name.endswith('debuginfo')
             if repo['arch'] == 'src':
                 debug = False
@@ -341,8 +354,23 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         pkg_info['repositories'] = [
             repos_mapping.get(item) for item in release_repositories
         ]
+        added_packages.add(full_name)
         packages.append(pkg_info)
-        added_packages.append(full_name)
+    
+    #for package in pulp_packages:
+    #    if package['full_name'] in added_packages:
+    #        continue
+    #    added_packages.add(package['full_name'])
+    #    release_repositories.add(RepoType(
+    #        '-'.join([
+    #            clean_ref_dist_name_lower,
+    #            base_dist_version,
+    #            'devel'
+    #        ]),
+    #        # TODO: arch (what if package is noarch) ????
+    #        'x86_64',
+    #        False
+    #    ))
 
     # if noarch package already in repo with same NEVRA,
     # we should exclude this repo when generate release plan
@@ -352,6 +380,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         if package['arch'] != 'noarch':
             continue
         repos_ids = existing_packages.get(package['full_name'], [])
+        # TODO: also add here check for build arches
         new_repos = [
             repo for repo in pkg_info['repositories']
             if repo['id'] not in repos_ids

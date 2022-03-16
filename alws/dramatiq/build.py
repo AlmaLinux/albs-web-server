@@ -47,10 +47,9 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 async def _build_done(request: build_node_schema.BuildDone):
     async for db in get_db():
-        async with db.begin():
-            await build_node_crud.build_done(db, request)
-            if request.status == 'done':
-                await test.create_test_tasks(db, request.task_id)
+        await build_node_crud.build_done(db, request)
+        if request.status == 'done':
+            await test.create_test_tasks(db, request.task_id)
 
 
 @dramatiq.actor(
