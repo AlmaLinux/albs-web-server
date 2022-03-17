@@ -40,8 +40,11 @@ def parse_args():
                         required=False, help='List of arches to export')
     parser.add_argument('-id', '--release_id', type=int,
                         required=False, help='Extract repos by release_id')
-    parser.add_argument('-v', '--verbose', action='store_true', default=False,
-                        required=False, help='Enable verbose output')
+    parser.add_argument(
+        '-copy', '--copy_noarch_packages', action='store_true',
+        default=False, required=False,
+        help='Copy noarch packages from x86_64 repos into ppc64le',
+    )
     return parser.parse_args()
 
 
@@ -49,16 +52,13 @@ class Exporter:
     def __init__(
         self,
         pulp_client,
-        verbose=None,
+        copy_noarch_packages,
     ):
+        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('packages-exporter')
-        if verbose:
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.INFO)
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
-        self.modifyrepo_c = local['modifyrepo_c']
+        self.copy_noarch_packages = copy_noarch_packages
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
@@ -114,7 +114,7 @@ class Exporter:
     async def retrieve_all_packages_from_pulp(
         self,
         latest_repo_version: str
-    ) -> list:
+    ) -> list[dict]:
         endpoint = 'pulp/api/v3/content/rpm/packages/'
         params = {
             'arch': 'noarch',
@@ -196,6 +196,9 @@ class Exporter:
         destination_repo_dict: dict,
     ) -> None:
         tasks = []
+        if not self.copy_noarch_packages:
+            self.logger.info('Skip copying noarch packages')
+            return
         for repo_name, repo_href in source_repo_dict.items():
             dest_repo_name = repo_name.replace('x86_64', 'ppc64le')
             dest_repo_href = destination_repo_dict.get(dest_repo_name)
@@ -206,15 +209,16 @@ class Exporter:
                     destination_repo_name=dest_repo_name,
                     destination_repo_href=dest_repo_href,
                 ))
-        self.logger.info('Start checking noarch packages in repos')
+        self.logger.info('Start checking and copying noarch packages in repos')
         await asyncio.gather(*tasks)
 
-    async def export_repos_from_pulp(self,
-                                     platforms_dict: dict,
-                                     platform_names: typing.List[str] = None,
-                                     repo_ids: typing.List[int] = None,
-                                     arches: typing.List[str] = None):
-
+    async def export_repos_from_pulp(
+        self,
+        platform_names: typing.List[str] = None,
+        repo_ids: typing.List[int] = None,
+        arches: typing.List[str] = None
+    ) -> (list[str], dict):
+        platforms_dict = {}
         msg, msg_values = (
             'Start exporting packages for following platforms:\n%s',
             platform_names,
@@ -267,9 +271,10 @@ class Exporter:
             list(set(repo_ids_to_export)))
         self.logger.info('All repositories exported in following paths:\n%s',
                          '\n'.join((str(path) for path in exported_paths)))
-        return exported_paths
+        return exported_paths, platforms_dict
 
-    async def export_repos_from_release(self, release_id: int):
+    async def export_repos_from_release(self,
+                                        release_id: int) -> (list[str], int):
         self.logger.info('Start exporting packages from release id=%s',
                          release_id)
         repo_ids = []
@@ -335,7 +340,7 @@ async def main():
     )
     exporter = Exporter(
         pulp_client=pulp_client,
-        verbose=args.verbose,
+        copy_noarch_packages=args.copy_noarch_packages,
     )
 
     await exporter.delete_existing_exporters_from_pulp()
@@ -353,9 +358,8 @@ async def main():
     if args.platform_names or args.repo_ids:
         platform_names = args.platform_names
         repo_ids = args.repo_ids
-        exported_paths = await exporter.export_repos_from_pulp(
+        exported_paths, platforms_dict = await exporter.export_repos_from_pulp(
             platform_names=platform_names,
-            platforms_dict=platforms_dict,
             arches=args.arches,
             repo_ids=repo_ids,
         )
