@@ -72,7 +72,8 @@ class BuildTaskModuleRef(BaseModel):
 class BuildCreatePlatforms(BaseModel):
 
     name: str
-    arch_list: typing.List[str]
+    arch_list: typing.List[typing.Literal['x86_64', 'i686', 'aarch64', 'ppc64le',
+                                          's390x']]
 
 
 class BuildCreate(BaseModel):
