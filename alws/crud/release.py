@@ -114,6 +114,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                            build_tasks: typing.List[int] = None) -> dict:
     packages = []
     rpm_modules = []
+    packages_from_repos = {}
     repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -132,21 +133,20 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'release__in': ','.join(pkgs_nevra['release']),
             'arch': 'noarch',
             'repository_version': repo_ver_href,
-            'fields': 'name,epoch,version,release,arch',
+            'fields': 'pulp_href,name,epoch,version,release,arch',
         }
-        packages = await pulp_client.get_rpm_packages(params)
-        if packages:
+        pulp_packages_by_params = await pulp_client.get_rpm_packages(params)
+        if pulp_packages_by_params:
             repo_href = re.sub(r'versions\/\d+\/$', '', repo_ver_href)
-            pkg_fullnames = [
-                pkgs_mapping.get(PackageNevra(
+            for pkg in pulp_packages_by_params:
+                full_name = pkgs_mapping.get(PackageNevra(
                     pkg['name'], pkg['epoch'], pkg['version'],
                     pkg['release'], pkg['arch']
                 ))
-                for pkg in packages
-            ]
-            for fullname in filter(None, pkg_fullnames):
-                existing_packages[fullname].append(
-                    repo_ids_by_href.get(repo_href, 0))
+                if full_name is not None:
+                    existing_packages[full_name].append(
+                        (pkg['pulp_href'], repo_ids_by_href.get(repo_href))
+                    )
 
     async def prepare_and_execute_async_tasks() -> None:
         tasks = []
@@ -162,6 +162,22 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 if repo_is_debug is value
             ))
         await asyncio.gather(*tasks)
+        if not tasks:
+            return
+        # if noarch packages was founded in pulp prod repos with same NEVRA,
+        # we should take them instead of build packages
+        for pkg_info in packages:
+            pkg = pkg_info['package']
+            full_name = pkg['full_name']
+            existing_packages_data = next((
+                data for data in existing_packages.get(full_name, ())
+                if None not in data
+            ), None)
+            if existing_packages_data is None:
+                continue
+            pkg_href, repo_id = existing_packages_data
+            pkg['artifact_href'] = pkg_href
+            packages_from_repos[full_name] = repo_id
 
     def prepare_data_for_executing_async_tasks(package: dict,
                                                full_name: str) -> None:
@@ -184,26 +200,22 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             pkgs_nevra['release'].append(pkg_release)
 
     async def get_pulp_based_response():
-        plan_packages = []
         for pkg in pulp_packages:
             full_name = pkg['full_name']
             if full_name in added_packages:
                 continue
             if pkg['arch'] == 'noarch':
                 prepare_data_for_executing_async_tasks(pkg, full_name)
-            plan_packages.append({'package': pkg, 'repositories': []})
+            packages.append({'package': pkg, 'repositories': []})
             added_packages.append(full_name)
         await prepare_and_execute_async_tasks()
 
         return {
-            'packages': plan_packages,
+            'packages': packages,
             'repositories': prod_repos,
-            'existing_packages': existing_packages,
+            'packages_from_repos': packages_from_repos,
             'modules': rpm_modules,
         }
-
-    if not settings.package_beholder_enabled:
-        return await get_pulp_based_response()
 
     clean_base_dist_name = re.search(
         r'(?P<dist_name>[a-z]+)', base_dist_name,
@@ -251,6 +263,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         defaultdict(list), defaultdict(list), defaultdict(list)
     )
 
+    if not settings.package_beholder_enabled:
+        return await get_pulp_based_response()
+
     for module in pulp_rpm_modules:
         endpoint = (
             f'/api/v1/distros/{clean_ref_dist_name}/'
@@ -290,7 +305,10 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         rpm_modules.append(module_info)
     endpoint = f'/api/v1/distros/{clean_ref_dist_name}/' \
                f'{reference_dist_version}/projects/'
-    beholder_response = await beholder.post(endpoint, src_rpm_names)
+    try:
+        beholder_response = await beholder.post(endpoint, src_rpm_names)
+    except Exception:
+        beholder_response = {}
     if not beholder_response.get('packages'):
         return await get_pulp_based_response()
 
@@ -331,23 +349,10 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 ]
             packages.append(pkg_info)
             added_packages.append(full_name)
-
-        # if noarch package already in repo with same NEVRA,
-        # we should exclude this repo when generate release plan
         await prepare_and_execute_async_tasks()
-        for pkg_info in packages:
-            package = pkg_info['package']
-            if package['arch'] != 'noarch':
-                continue
-            repos_ids = existing_packages.get(package['full_name'], [])
-            new_repos = [
-                repo for repo in pkg_info['repositories']
-                if repo['id'] not in repos_ids
-            ]
-            pkg_info['repositories'] = new_repos
     return {
         'packages': packages,
-        'existing_packages': existing_packages,
+        'packages_from_repos': packages_from_repos,
         'modules': rpm_modules,
         'repositories': prod_repos
     }
