@@ -9,7 +9,7 @@ aiofiles==0.8.0
 aioredis==2.0.1
 PyJWT==2.3.0
 alembic==1.7.7
-pytest==6.2.5
+pytest==7.1.1
 jmespath==0.10.0
 PyYAML==5.4.1
 lxml==4.8.0
