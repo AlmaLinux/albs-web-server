@@ -1,6 +1,4 @@
 import asyncio
-from dataclasses import replace
-from email.mime import base
 import re
 import copy
 import typing
@@ -23,9 +21,9 @@ from alws.utils.modularity import IndexWrapper
 
 
 async def __get_pulp_packages(
-        db: Session, build_ids: typing.List[int],
-        build_tasks: typing.List[int] = None) \
-        -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
+    db: Session, build_ids: typing.List[int],
+    build_tasks: typing.List[int] = None,
+) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
     src_rpm_names = []
     packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
     pulp_packages = []
@@ -174,9 +172,9 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 for repo_href, repo_is_debug in latest_prod_repo_versions
                 if repo_is_debug is value
             ))
-        await asyncio.gather(*tasks)
         if not tasks:
             return
+        await asyncio.gather(*tasks)
         # if noarch packages was founded in pulp prod repos with same NEVRA,
         # we should take them instead of build packages
         for pkg_info in packages:
@@ -228,7 +226,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
                 pkg['task_arch'],
                 False
             )]
-            plan_packages.append({
+            packages.append({
                 'package': pkg,
                 'repositories': [release_repo]
             })
@@ -413,25 +411,12 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             False
         )]
         pkg_info = {
-            'package': package, 
+            'package': package,
             'repositories': [release_repo]
         }
         packages.append(pkg_info)
 
-    # if noarch package already in repo with same NEVRA,
-    # we should exclude this repo when generate release plan
     await prepare_and_execute_async_tasks()
-    for pkg_info in packages:
-        package = pkg_info['package']
-        if package['arch'] != 'noarch':
-            continue
-        repos_ids = existing_packages.get(package['full_name'], [])
-        # TODO: also add here check for build arches
-        new_repos = [
-            repo for repo in pkg_info['repositories']
-            if repo['id'] not in repos_ids
-        ]
-        pkg_info['repositories'] = new_repos
     return {
         'packages': packages,
         'packages_from_repos': packages_from_repos,
