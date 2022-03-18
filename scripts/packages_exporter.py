@@ -14,6 +14,7 @@ from plumbum import local
 import sqlalchemy
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from syncer import sync
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -114,7 +115,7 @@ class Exporter:
     async def retrieve_all_packages_from_pulp(
         self,
         latest_repo_version: str
-    ) -> list[dict]:
+    ) -> typing.List[typing.Dict[str, str]]:
         endpoint = 'pulp/api/v3/content/rpm/packages/'
         params = {
             'arch': 'noarch',
@@ -217,7 +218,7 @@ class Exporter:
         platform_names: typing.List[str] = None,
         repo_ids: typing.List[int] = None,
         arches: typing.List[str] = None
-    ) -> (list[str], dict):
+    ) -> typing.Tuple[typing.List[str], typing.Dict[int, str]]:
         platforms_dict = {}
         msg, msg_values = (
             'Start exporting packages for following platforms:\n%s',
@@ -273,8 +274,10 @@ class Exporter:
                          '\n'.join((str(path) for path in exported_paths)))
         return exported_paths, platforms_dict
 
-    async def export_repos_from_release(self,
-                                        release_id: int) -> (list[str], int):
+    async def export_repos_from_release(
+        self,
+        release_id: int,
+    ) -> typing.Tuple[typing.List[str], int]:
         self.logger.info('Start exporting packages from release id=%s',
                          release_id)
         repo_ids = []
@@ -327,7 +330,7 @@ class Exporter:
         self.logger.info(stdout)
 
 
-async def main():
+def main():
     args = parse_args()
 
     platforms_dict = {}
@@ -343,13 +346,13 @@ async def main():
         copy_noarch_packages=args.copy_noarch_packages,
     )
 
-    await exporter.delete_existing_exporters_from_pulp()
+    sync(exporter.delete_existing_exporters_from_pulp())
 
-    db_sign_keys = await exporter.get_sign_keys()
+    db_sign_keys = sync(exporter.get_sign_keys())
     if args.release_id:
         release_id = args.release_id
-        exported_paths, platform_id = await exporter.export_repos_from_release(
-            release_id)
+        exported_paths, platform_id = sync(exporter.export_repos_from_release(
+            release_id))
         key_id_by_platform = next((
             sign_key['keyid'] for sign_key in db_sign_keys
             if sign_key['platform_id'] == platform_id
@@ -358,11 +361,11 @@ async def main():
     if args.platform_names or args.repo_ids:
         platform_names = args.platform_names
         repo_ids = args.repo_ids
-        exported_paths, platforms_dict = await exporter.export_repos_from_pulp(
+        exported_paths, platforms_dict = sync(exporter.export_repos_from_pulp(
             platform_names=platform_names,
             arches=args.arches,
             repo_ids=repo_ids,
-        )
+        ))
 
     for exp_path in exported_paths:
         string_exp_path = str(exp_path)
@@ -379,8 +382,8 @@ async def main():
                         if sign_key['platform_id'] == platform_id
                     ), None)
                     break
-        await exporter.repomd_signer(repodata, key_id)
+        sync(exporter.repomd_signer(repodata, key_id))
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
