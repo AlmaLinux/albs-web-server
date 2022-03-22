@@ -181,7 +181,7 @@ async def __process_build_task_artifacts(
                 models.Build.repos
             ),
             selectinload(models.BuildTask.rpm_module)
-        ).with_for_update()
+        )
     )
     build_task = build_tasks.scalars().first()
     module_index = None

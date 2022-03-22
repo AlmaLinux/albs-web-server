@@ -24,6 +24,9 @@
     - x86_64
     - aarch64
     - ppc64le
+  weak_arch_list:
+    - { name: i686, depends_on: aarch64 }
+    - { name: ppc64le, depends_on: aarch64 }
   data:
     definitions:
       distribution: AlmaLinux
@@ -334,6 +337,7 @@
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
       debug: false
+      production: true
       priority: 10
     - arch: ppc64le
       name: alma8-distribution-ppc64le
@@ -683,6 +687,10 @@
     - aarch64
     - ppc64le
     - s390x
+  weak_arch_list:
+    - { name: i686, depends_on: aarch64 }
+    - { name: s390x, depends_on: aarch64 }
+    - { name: ppc64le, depends_on: aarch64 }
   data:
     definitions:
       distribution: AlmaLinux

@@ -20,6 +20,7 @@ class PlatformModify(BaseModel):
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_reference: typing.Optional[bool] = False
+    weak_arch_list: typing.Optional[typing.List[typing.Dict]] = None
 
 
 class PlatformCreate(BaseModel):
