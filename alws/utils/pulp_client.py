@@ -265,15 +265,31 @@ class PulpClient:
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
 
-    async def get_rpm_package(self, package_href,
-                              include_fields: typing.List[str] = None,
-                              exclude_fields: typing.List[str] = None):
+    async def __get_content_info(self, package_href,
+                                 include_fields: typing.List[str] = None,
+                                 exclude_fields: typing.List[str] = None):
         params = {}
         if include_fields:
             params['fields'] = include_fields
         if exclude_fields:
             params['exclude_fields'] = exclude_fields
         return await self.request('GET', package_href, params=params)
+
+    async def get_rpm_package(self, package_href,
+                              include_fields: typing.List[str] = None,
+                              exclude_fields: typing.List[str] = None):
+        return await self.__get_content_info(
+            package_href, include_fields=include_fields,
+            exclude_fields=exclude_fields
+        )
+
+    async def get_artifact(self, package_href,
+                           include_fields: typing.List[str] = None,
+                           exclude_fields: typing.List[str] = None):
+        return await self.__get_content_info(
+            package_href, include_fields=include_fields,
+            exclude_fields=exclude_fields
+        )
 
     async def remove_artifact(self, artifact_href: str,
                               need_wait_sync: bool=False):

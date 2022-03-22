@@ -194,15 +194,22 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                                   if pkg.id == package.id)
                 debug = is_debuginfo_rpm(package.name)
                 repo = repo_mapping.get((package.arch, debug))
-                new_pkg_href = await pulp_client.create_rpm_package(
-                    package.name, package.href)
-                if repo.pulp_href not in packages_to_add:
-                    packages_to_add[repo.pulp_href] = []
-                packages_to_add[repo.pulp_href].append(new_pkg_href)
+                artifact_info = await pulp_client.get_artifact(
+                    package.href, include_fields=['sha256'])
+                rpm_pkg = await pulp_client.get_rpm_packages(
+                    {'sha256': artifact_info['sha256']})
+                if rpm_pkg:
+                    new_pkg_href = rpm_pkg[0]['pulp_href']
+                else:
+                    new_pkg_href = await pulp_client.create_rpm_package(
+                        package.name, package.href)
                 if new_pkg_href is None:
                     logging.error('Package %s href is missing', str(package))
                     sign_failed = True
                     continue
+                if repo.pulp_href not in packages_to_add:
+                    packages_to_add[repo.pulp_href] = []
+                packages_to_add[repo.pulp_href].append(new_pkg_href)
                 db_package.artifact.href = new_pkg_href
                 db_package.artifact.sign_key = sign_task.sign_key
                 modified_items.append(db_package)
