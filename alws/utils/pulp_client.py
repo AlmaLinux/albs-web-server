@@ -190,6 +190,16 @@ class PulpClient:
                 repo: str = None
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
+        artifact_info = await self.get_artifact(
+            artifact_href, include_fields=['sha256'])
+        files = await self.get_rpm_packages(
+            params={
+                'sha256': artifact_info['sha256'],
+                'fields': ['pulp_href'],
+            }
+        )
+        if files:
+            return files[0]['pulp_href']
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,
@@ -209,6 +219,16 @@ class PulpClient:
                 repo: str = None
             ) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
+        artifact_info = await self.get_artifact(
+            artifact_href, include_fields=['sha256'])
+        rpm_pkgs = await self.get_rpm_packages(
+            params={
+                'sha256': artifact_info['sha256'],
+                'fields': ['pulp_href'],
+            }
+        )
+        if rpm_pkgs:
+            return rpm_pkgs[0]['pulp_href']
         payload = {
             'relative_path': package_name,
             'artifact': artifact_href,
@@ -222,22 +242,22 @@ class PulpClient:
             hrefs = [item for item in task_result['created_resources']
                      if 'rpm/packages' in item]
             return hrefs[0] if hrefs else None
-        # This situation might happen if upload to pulp and conversion
-        # into the RPM package happened, but sign task was not marked
-        # for success. This way no new resources will be created,
-        # but the task response will contain reference to already
-        # existing resource
-        if task_result['state'] == 'failed':
-            if task_result.get('reserved_resources_record'):
-                return task_result['reserved_resources_record'][0]
         return None
 
-    async def get_rpm_packages(self, params: dict = None) -> list:
-        ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
-        response = await self.request('GET', ENDPOINT, params=params)
+    async def __search_entities(
+            self, endpoint: str, params: dict = None) -> list:
+        response = await self.request('GET', endpoint, params=params)
         if response['count'] == 0:
             return []
         return list(response['results'])
+
+    async def get_files(self, params: dict = None) -> list:
+        endpoint = 'pulp/api/v3/content/file/files'
+        return await self.__search_entities(endpoint, params=params)
+
+    async def get_rpm_packages(self, params: dict = None) -> list:
+        endpoint = 'pulp/api/v3/content/rpm/packages/'
+        return await self.__search_entities(endpoint, params=params)
 
     async def create_file_distro(self, name: str, repository: str,
                                  base_path_start: str = 'build_logs') -> str:

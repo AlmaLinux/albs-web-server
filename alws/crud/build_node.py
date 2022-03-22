@@ -202,9 +202,10 @@ async def __process_build_task_artifacts(
     rpm_artifacts = [item for item in task_artifacts if item.type == 'rpm']
     log_artifacts = [item for item in task_artifacts
                      if item.type == 'build_log']
-    rpm_repositories = [repo for repo in build_task.build.repos
+    repositories = list(build_task.build.repos)
+    rpm_repositories = [repo for repo in repositories
                         if repo.type == 'rpm']
-    log_repositories = [repo for repo in build_task.build.repos
+    log_repositories = [repo for repo in repositories
                         if repo.type == 'build_log']
     db_entities = []
     db_entities.extend(
