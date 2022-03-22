@@ -1,6 +1,5 @@
 import io
 import re
-import hashlib
 import asyncio
 import typing
 import urllib.parse
@@ -8,6 +7,7 @@ from typing import List
 
 import aiohttp
 
+from alws.utils.file_utils import hash_content
 from alws.utils.modularity import get_random_unique_version
 
 
@@ -52,6 +52,17 @@ class PulpClient:
         return await self.create_rpm_repository(
             name, auto_publish=True, create_publication=True)
 
+    async def get_by_href(self, href: str):
+        return await self.request('GET', href)
+
+    async def get_rpm_repository_by_params(
+            self, params: dict) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         params = {'name': name}
@@ -75,6 +86,12 @@ class PulpClient:
         if response['count'] == 0:
             return None
         return response['results'][0]
+
+    async def create_module_by_payload(self, payload: dict):
+        ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
+        task = await self.request('POST', ENDPOINT, json=payload)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources'][0]
 
     async def create_module(self, content: str, name: str, stream: str,
                             context: str, arch: str):
@@ -109,6 +126,12 @@ class PulpClient:
         if response['count']:
             return response['results'][0]['pulp_href']
 
+    async def upload_comps(self, files: dict):
+        endpoint = 'pulp/api/v3/rpm/comps/'
+        task = await self.request('POST', endpoint, data=files)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources']
+
     async def _upload_file(self, content, sha256):
         response = await self.request(
             'POST', 'pulp/api/v3/uploads/', json={'size': len(content)}
@@ -129,14 +152,8 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0]
 
-    # TODO: move this to utils, make it looks better
-    def _hash_content(self, content):
-        hasher = hashlib.new('sha256')
-        hasher.update(content.encode())
-        return hasher.hexdigest()
-
     async def upload_file(self, content=None):
-        file_sha256 = self._hash_content(content)
+        file_sha256 = hash_content(content)
         reference = await self.check_if_artifact_exists(file_sha256)
         if not reference:
             reference = await self._upload_file(content, file_sha256)
@@ -249,6 +266,10 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
+
+    async def get_latest_repo_present_content(self, repo_version: str) -> dict:
+        repo_content = await self.get_by_href(repo_version)
+        return repo_content['content_summary']['present']
 
     async def create_rpm_distro(self, name: str, repository: str,
                                 base_path_start: str = 'builds') -> str:

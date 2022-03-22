@@ -1,4 +1,5 @@
 import aiohttp
+import hashlib
 
 from typing import BinaryIO
 
@@ -22,3 +23,9 @@ async def download_file(url: str, dest: BinaryIO):
         async with session.get(url) as response:
             content = await response.content.read()
             dest.write(content)
+
+
+def hash_content(content):
+    hasher = hashlib.new('sha256')
+    hasher.update(content.encode())
+    return hasher.hexdigest()
