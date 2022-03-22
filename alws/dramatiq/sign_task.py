@@ -18,6 +18,6 @@ async def _complete_sign_task(
             db, task_id, sign_schema.SignTaskComplete(**payload))
 
 
-@dramatiq.actor(max_retries=2, priority=1, time_limit=1200000)
+@dramatiq.actor(max_retries=2, priority=1, time_limit=3600000)
 def complete_sign_task(task_id: int, payload: typing.Dict[str, typing.Any]):
     event_loop.run_until_complete(_complete_sign_task(task_id, payload))

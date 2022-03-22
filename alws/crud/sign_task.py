@@ -197,7 +197,11 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 artifact_info = await pulp_client.get_artifact(
                     package.href, include_fields=['sha256'])
                 rpm_pkg = await pulp_client.get_rpm_packages(
-                    {'sha256': artifact_info['sha256']})
+                    params={
+                        'sha256': artifact_info['sha256'],
+                        'fields': ['pulp_href'],
+                    }
+                )
                 if rpm_pkg:
                     new_pkg_href = rpm_pkg[0]['pulp_href']
                 else:
