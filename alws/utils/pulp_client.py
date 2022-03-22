@@ -187,14 +187,15 @@ class PulpClient:
                 self,
                 file_name: str,
                 artifact_href: str,
-                repo: str
+                repo: str = None
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,
-            'repository': repo
         }
+        if repo:
+            payload['repository'] = repo
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         hrefs = [item for item in task_result['created_resources']
@@ -205,14 +206,15 @@ class PulpClient:
                 self,
                 package_name: str,
                 artifact_href: str,
-                repo: str
+                repo: str = None
             ) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
         payload = {
             'relative_path': package_name,
             'artifact': artifact_href,
-            'repository': repo
         }
+        if repo:
+            payload['repository'] = repo
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         # Success case

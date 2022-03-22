@@ -180,6 +180,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         sign_task = sign_tasks.scalars().first()
 
         if payload.packages:
+            packages_to_add = {}
             for package in payload.packages:
                 # Check that package fingerprint matches the requested
                 if package.fingerprint != sign_task.sign_key.fingerprint:
@@ -194,7 +195,10 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 debug = is_debuginfo_rpm(package.name)
                 repo = repo_mapping.get((package.arch, debug))
                 new_pkg_href = await pulp_client.create_rpm_package(
-                    package.name, package.href, repo.pulp_href)
+                    package.name, package.href)
+                if repo.pulp_href not in packages_to_add:
+                    packages_to_add[repo.pulp_href] = []
+                packages_to_add[repo.pulp_href].append(new_pkg_href)
                 if new_pkg_href is None:
                     logging.error('Package %s href is missing', str(package))
                     sign_failed = True
@@ -203,6 +207,9 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 db_package.artifact.sign_key = sign_task.sign_key
                 modified_items.append(db_package)
                 modified_items.append(db_package.artifact)
+
+            for repo_href, packages in packages_to_add.items():
+                await pulp_client.modify_repository(repo_href, add=packages)
 
         if payload.success and not sign_failed:
             sign_task.status = SignStatus.COMPLETED
