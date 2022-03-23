@@ -333,10 +333,13 @@
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
-      name: almalinux-8-ppc64le-devel
+      name: almalinux-8-devel
+      export_path: almalinux/8/devel/debug/ppc64le/
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
       debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
       production: true
       priority: 10
     - arch: ppc64le
