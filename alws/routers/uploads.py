@@ -20,5 +20,9 @@ async def upload_repometada(
     repository: str = Form(...),
 ):
     uploader = MetadataUploader()
-    await uploader.process_uploaded_files(repository, modules, comps)
-    return {'message': f'{repository} metadata updated'}
+    if modules is None and comps is None:
+        return {'error': 'there is nothing to upload'}
+    updated_metadata = await uploader.process_uploaded_files(
+        repository, modules, comps)
+    msg = f'{", ".join(updated_metadata)} in "{repository}" has been updated'
+    return {'message': msg}

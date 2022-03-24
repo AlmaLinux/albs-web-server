@@ -87,7 +87,7 @@ class PulpClient:
             return None
         return response['results'][0]
 
-    async def create_module_by_payload(self, payload: dict):
+    async def create_module_by_payload(self, payload: dict) -> str:
         ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
@@ -126,9 +126,12 @@ class PulpClient:
         if response['count']:
             return response['results'][0]['pulp_href']
 
-    async def upload_comps(self, files: dict):
+    async def upload_comps(self, data: dict) -> typing.List[str]:
+        """
+        Endpoint will modify and publish repository after adding content units
+        """
         endpoint = 'pulp/api/v3/rpm/comps/'
-        task = await self.request('POST', endpoint, data=files)
+        task = await self.request('POST', endpoint, data=data)
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources']
 
