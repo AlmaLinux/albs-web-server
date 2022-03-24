@@ -8,7 +8,7 @@ from typing import List
 
 import aiohttp
 
-from alws.utils.modularity import get_random_unique_version
+from alws.utils.ids import get_random_unique_version
 
 
 PULP_SEMAPHORE = asyncio.Semaphore(10)
