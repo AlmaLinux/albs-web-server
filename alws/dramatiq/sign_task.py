@@ -18,6 +18,8 @@ async def _complete_sign_task(
             db, task_id, sign_schema.SignTaskComplete(**payload))
 
 
+# Timeout for the task is set to 1 hour in miliseconds. This is needed
+# to process large jobs with a lot of RPM packages inside
 @dramatiq.actor(max_retries=2, priority=1, time_limit=3600000)
 def complete_sign_task(task_id: int, payload: typing.Dict[str, typing.Any]):
     event_loop.run_until_complete(_complete_sign_task(task_id, payload))
