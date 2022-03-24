@@ -1,15 +1,15 @@
 import aiohttp
 import argparse
 import asyncio
-import jmespath
 import json
 import logging
 import os
 import sys
 import typing
 import urllib.parse
-
 from pathlib import Path
+
+import jmespath
 from plumbum import local
 import sqlalchemy
 from sqlalchemy.future import select
@@ -23,6 +23,7 @@ from alws import database
 from alws import models
 from alws.config import settings
 from alws.utils.pulp_client import PulpClient
+from errata_migrator import update_updateinfo
 
 
 def parse_args():
@@ -59,6 +60,7 @@ class Exporter:
         self.logger = logging.getLogger('packages-exporter')
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
+        self.modifyrepo_c = local['modifyrepo_c']
         self.copy_noarch_packages = copy_noarch_packages
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
@@ -377,10 +379,28 @@ class Exporter:
             )
 
     def regenerate_repo_metadata(self, repo_path):
-        exit_code, stdout, stderr = self.createrepo_c.run(
+        _, stdout, _ = self.createrepo_c.run(
             args=['--update', '--keep-all-metadata', repo_path],
         )
         self.logger.info(stdout)
+    
+    def update_ppc64le_errata(self, repodata: Path):
+        output_file = repodata / 'updateinfo.xml'
+        input_repodata = Path(
+            str(repodata).replace('ppc64le', 'x86_64')
+        )
+        input_updateinfo = list(input_repodata.glob('*updateinfo.xml*'))
+        if input_updateinfo:
+            input_updateinfo = input_updateinfo[0]
+            update_updateinfo(
+                str(input_updateinfo),
+                str(repodata), 
+                str(output_file)
+            )
+            self.modifyrepo_c[
+                '--mdtype=updateinfo', str(output_file), str(repodata)
+            ].run()
+            output_file.unlink()
 
 
 def main():
@@ -435,6 +455,8 @@ def main():
                         if sign_key['platform_id'] == platform_id
                     ), None)
                     break
+        if 'ppc64le' in exp_path:
+            exporter.update_ppc64le_errata(repodata)
         sync(exporter.repomd_signer(repodata, key_id))
 
 
