@@ -75,6 +75,49 @@ class Exporter:
                 json_data = json.loads(json_data)
                 return json_data
 
+    async def create_filesystem_exporters(
+            self, repository_ids: typing.List[int],
+            get_publications: bool = False
+    ):
+
+        export_data = []
+
+        async with database.Session() as db:
+            query = select(models.Repository).where(
+                models.Repository.id.in_(repository_ids))
+            result = await db.execute(query)
+            repositories = list(result.scalars().all())
+
+        for repo in repositories:
+            export_path = str(Path(
+                settings.pulp_export_path, repo.export_path, 'Packages'))
+            exporter_name = f'{repo.name}-{repo.arch}-debug' if repo.debug \
+                else f'{repo.name}-{repo.arch}'
+            fs_exporter_href = await self.pulp_client.create_filesystem_exporter(
+                exporter_name, export_path)
+
+            repo_latest_version = await self.pulp_client.get_repo_latest_version(
+                repo.pulp_href
+            )
+            repo_exporter_dict = {
+                'repo_id': repo.id,
+                'repo_latest_version': repo_latest_version,
+                'exporter_name': exporter_name,
+                'export_path': export_path,
+                'exporter_href': fs_exporter_href
+            }
+            if get_publications:
+                publications = self.pulp_client.get_rpm_publications(
+                    repository_version_href=repo_latest_version,
+                    include_fields=['pulp_href']
+                )
+                if publications:
+                    publication_href = publications[0].get('pulp_href')
+                    repo_exporter_dict['publication_href'] = publication_href
+
+            export_data.append(repo_exporter_dict)
+        return export_data
+
     async def sign_repomd_xml(self, data):
         endpoint = 'sign-tasks/sync_sign_task/'
         return await self.make_request('POST', endpoint, data=data)
@@ -83,9 +126,19 @@ class Exporter:
         endpoint = 'sign-keys/'
         return await self.make_request('GET', endpoint)
 
-    async def export_repositories(self, repo_ids: list):
-        endpoint = 'repositories/exports/'
-        return await self.make_request('POST', endpoint, data=repo_ids)
+    async def export_repositories(self, repo_ids: list) -> typing.List[str]:
+        exporters = await self.create_filesystem_exporters(repo_ids)
+        exported_paths = []
+        for exporter in exporters:
+            self.logger.info('Exporting repository using following data: %s',
+                             str(exporter))
+            export_path = exporter['export_path']
+            exported_paths.append(export_path)
+            href = exporter['exporter_href']
+            repository_version = exporter['repo_latest_version']
+            await self.pulp_client.export_to_filesystem(
+                href, repository_version)
+        return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
         string_repodata_path = str(repodata_path)

@@ -378,13 +378,12 @@ class PulpClient:
                                          fse_name: str,
                                          fse_path: str,
                                          fse_method: str = 'hardlink'):
-        endpoint = fse_pulp_href
         params = {
             'name': fse_name,
             'path': fse_path,
             'method': fse_method
         }
-        update_task = await self.request('PUT', endpoint, data=params)
+        update_task = await self.request('PUT', fse_pulp_href, data=params)
         task_result = await self.wait_for_task(update_task['task'])
         return task_result
 
@@ -402,8 +401,7 @@ class PulpClient:
             return []
 
     async def get_filesystem_exporter(self, fse_pulp_href: str):
-        endpoint = fse_pulp_href
-        return await self.request('GET', endpoint)
+        return await self.request('GET', fse_pulp_href)
 
     async def export_to_filesystem(self, fse_pulp_href: str,
                                    fse_repository_version: str):
@@ -422,6 +420,23 @@ class PulpClient:
             return (repository_data.get('latest_version_href'),
                     '-debug-' in repository_data['name'])
         return repository_data.get('latest_version_href')
+
+    async def get_rpm_publications(
+            self, repository_version_href: str = None,
+            include_fields: typing.List[str] = None,
+            exclude_fields: typing.List[str] = None):
+        endpoint = 'pulp/api/v3/publications/rpm/rpm/'
+        params = {}
+        if repository_version_href:
+            params['repository_version'] = repository_version_href
+        if include_fields:
+            params['fields'] = include_fields
+        if exclude_fields:
+            params['exclude_fields'] = exclude_fields
+        result = await self.request('GET', endpoint, params=params)
+        if result['count'] == 0:
+            return []
+        return list(result['results'])
 
     async def get_distro(self, distro_href: str):
         return await self.request('GET', distro_href)
