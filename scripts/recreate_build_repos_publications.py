@@ -15,11 +15,11 @@ from alws.utils.pulp_client import PulpClient
 
 def parse_args():
     parser = argparse.ArgumentParser('recreate_publications')
-    parser.add_argument('-i', '--build-id',
+    parser.add_argument('-i', '--build-id', metavar='build_ids',
                         type=str, nargs='+', required=True,
                         help='List of build ids to re-generate'
                              'repositories publications')
-    parser.add_argument('-h', '--pulp-host', type=str, required=True)
+    parser.add_argument('--pulp-host', type=str, required=True)
     parser.add_argument('-u', '--pulp-user', type=str, required=True)
     parser.add_argument('-p', '--pulp-password', type=str, required=True)
     return parser.parse_args()
