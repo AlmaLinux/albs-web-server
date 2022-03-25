@@ -10,5 +10,6 @@ __all__ = [
     'sign_key',
     'sign_task',
     'tests',
+    'uploads',
     'users'
 ]
