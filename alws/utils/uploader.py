@@ -32,31 +32,10 @@ class MetadataUploader:
                 break
 
     async def upload_comps(self, repo_href: str, comps_content: str) -> None:
-        latest_repo_href = await self.pulp.get_repo_latest_version(repo_href)
-        latest_repo_data = await self.pulp.get_latest_repo_present_content(
-            latest_repo_href)
-        comps_content_keys = (
-            'rpm.packagecategory',
-            'rpm.packagegroup',
-            'rpm.packageenvironment',
-            'rpm.packagelangpacks',
-        )
-        repo_data_hrefs = [
-            latest_repo_data.get(key, {}).get('href')
-            for key in comps_content_keys
-        ]
-        content_to_remove = []
-        for repo_type_href in repo_data_hrefs:
-            if repo_type_href is None:
-                continue
-            content_to_remove.extend([
-                content['pulp_href']
-                async for content in self.iter_repo(repo_type_href)
-            ])
-        await self.pulp.modify_repository(repo_href, remove=content_to_remove)
         data = {
             'file': io.StringIO(comps_content),
             'repository': repo_href,
+            'replace': 'true',
         }
         await self.pulp.upload_comps(data)
 
