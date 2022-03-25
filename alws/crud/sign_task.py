@@ -221,6 +221,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
 
             for repo_href, packages in packages_to_add.items():
                 await pulp_client.modify_repository(repo_href, add=packages)
+                await pulp_client.create_rpm_publication(repo_href)
 
         if payload.success and not sign_failed:
             sign_task.status = SignStatus.COMPLETED

@@ -25,7 +25,7 @@ class PulpClient:
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
-        payload = {'name': name, 'autopublish': True}
+        payload = {'name': name, 'autopublish': False}
         response = await self.request('POST', ENDPOINT, json=payload)
         repo_href = response['pulp_href']
         await self.create_file_publication(repo_href)
