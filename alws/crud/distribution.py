@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import typing
 
 from sqlalchemy import delete
 from sqlalchemy.future import select
@@ -109,17 +110,31 @@ async def get_existing_packages(pulp_client: PulpClient,
                                 repository: models.Repository):
     return await pulp_client.get_rpm_repository_packages(
         repository.pulp_href,
-        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href'])
+        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href',
+                        'arch'])
 
 
 async def get_packages_to_add(
         pulp_client: PulpClient, build_repo: models.Repository,
         dist_repo: models.Repository):
+
+    def filter_by_arch(pkgs: typing.List[dict], repo_arch: str):
+        filtered = []
+        for pkg in pkgs:
+            if pkg['arch'] == 'noarch' and repo_arch != 'src':
+                filtered.append(pkg)
+            elif pkg['arch'] == 'i686' and repo_arch in ('i686', 'x86_64'):
+                filtered.append(pkg)
+            elif pkg['arch'] == repo_arch:
+                filtered.append(pkg)
+        return filtered
+
     dist_packages = await get_existing_packages(pulp_client, dist_repo)
     search_by_href = set([p['pulp_href'] for p in dist_packages])
     build_packages = await get_existing_packages(pulp_client, build_repo)
+    filtered_build_packages = filter_by_arch(build_packages, dist_repo.arch)
     dedup_mapping = {p['location_href']: p['pulp_href']
-                     for p in build_packages}
+                     for p in filtered_build_packages}
     final_packages = [href for href in dedup_mapping.values()
                       if href not in search_by_href]
     return dist_repo.pulp_href, final_packages
