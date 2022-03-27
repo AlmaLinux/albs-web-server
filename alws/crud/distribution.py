@@ -184,11 +184,14 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     modify = await prepare_repo_modify_dict(db_build, db_distro, pulp_client)
+    tasks = []
     for key, value in modify.items():
         if modification == 'add':
-            await pulp_client.modify_repository(add=value, repo_to=key)
+            tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
         else:
-            await pulp_client.modify_repository(remove=value, repo_to=key)
+            tasks.append(pulp_client.modify_repository(
+                remove=value, repo_to=key))
+    await asyncio.gather(*tasks)
 
     if modification == 'add':
         db_distro.builds.append(db_build)
