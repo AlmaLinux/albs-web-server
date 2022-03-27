@@ -3,6 +3,7 @@ import logging
 import typing
 import urllib.parse
 
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -92,9 +93,9 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     if not sign_task:
         return {}
 
-    sign_task.status = SignStatus.IN_PROGRESS
-    db.add(sign_task)
-    await db.commit()
+    await db.execute(update(models.SignTask).where(
+        models.SignTask.id == sign_task.id).values(
+        status=SignStatus.IN_PROGRESS))
 
     build_src_rpms = await db.execute(select(models.SourceRpm).where(
         models.SourceRpm.build_id == sign_task.build_id).options(
@@ -197,10 +198,8 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 artifact_info = await pulp_client.get_artifact(
                     package.href, include_fields=['sha256'])
                 rpm_pkg = await pulp_client.get_rpm_packages(
-                    params={
-                        'sha256': artifact_info['sha256'],
-                        'fields': ['pulp_href'],
-                    }
+                    include_fields=['pulp_href'],
+                    sha256=artifact_info['sha256']
                 )
                 if rpm_pkg:
                     new_pkg_href = rpm_pkg[0]['pulp_href']

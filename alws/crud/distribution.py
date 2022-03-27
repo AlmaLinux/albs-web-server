@@ -105,7 +105,8 @@ async def add_distributions_after_rebuild(
 
 
 async def prepare_repo_modify_dict(db_build: models.Build,
-                                   db_distro: models.Distribution):
+                                   db_distro: models.Distribution,
+                                   existing_packages: dict = None):
     modify = collections.defaultdict(list)
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
@@ -133,8 +134,21 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                     distro_repo.debug == build_artifact.is_debuginfo
                 ]
                 if all(conditions):
-                    modify[distro_repo.pulp_href].append(artifact.href)
-    return modify
+                    if existing_packages:
+                        repo_packages = existing_packages.get(
+                            distro_repo.pulp_href, {})
+                        if artifact.name in repo_packages:
+                            continue
+                    modify[distro_repo.pulp_href].append(build_artifact.href)
+    final = {key: list(set(value)) for key, value in modify.items()}
+    return final
+
+
+async def get_existing_packages(pulp_client: PulpClient,
+                                repository: models.Repository):
+    return await pulp_client.get_rpm_repository_packages(
+        repository.pulp_href,
+        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href'])
 
 
 async def modify_distribution(build_id: int, distribution: str, db: Session,
@@ -158,9 +172,6 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
         ))
         db_build = db_build.scalars().first()
 
-        pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                                 settings.pulp_password)
-
         if modification == 'add':
             if db_build in db_distro.builds:
                 error_msg = f'Packages of build {build_id} have already been' \
@@ -180,7 +191,17 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
         await db.commit()
     await db.refresh(db_distro)
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+    existing_packages_mapping = {}
+    for repo in db_distro.repositories:
+        packages = get_existing_packages(pulp_client, repo)
+        existing_packages_mapping[repo.pulp_href] = {
+            p['location_href']: p['pulp_href'] for p in packages
+        }
     modify = await prepare_repo_modify_dict(db_build, db_distro)
+    import pprint
+    pprint.pprint(modify)
     for key, value in modify.items():
         if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)

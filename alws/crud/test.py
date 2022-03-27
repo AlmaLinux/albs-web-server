@@ -1,7 +1,6 @@
 import re
 from collections import defaultdict
 from io import BytesIO
-from typing import BinaryIO
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
@@ -114,17 +113,23 @@ async def complete_test_task(db: Session, task_id: int,
         task.status = status
         task.alts_response = test_result.dict()
         logs = []
+        new_hrefs = []
         for log in test_result.result.get('logs', []):
             if task.repository:
-                href = await pulp_client.create_file(
-                    log['name'], log['href'], task.repository.pulp_href)
+                href = await pulp_client.create_file(log['name'], log['href'])
             else:
                 href = log['href']
             if not href:
                 continue
+            new_hrefs.append(href)
             log_record = models.TestTaskArtifact(
                 name=log['name'], href=href, test_task_id=task.id)
             logs.append(log_record)
+        if task.repository:
+            await pulp_client.modify_repository(
+                task.repository.pulp_href, add=new_hrefs)
+            await pulp_client.create_file_publication(
+                task.repository.pulp_href)
 
         db.add(task)
         db.add_all(logs)

@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import typing
@@ -22,7 +23,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import add_multilib_packages, get_multilib_packages
 from alws.utils.noarch import save_noarch_packages
-from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_client import PulpClient, create_entity
 
 
 async def get_available_build_task(
@@ -109,62 +110,64 @@ async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
 async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          task_artifacts: list, repositories: list,
                          built_srpm_url: str = None, module_index=None):
-    repo_packages_mapping = {}
-    exceptions = []
-    rpms = []
-    for artifact in task_artifacts:
-        arch = task_arch
-        if artifact.arch == 'src':
-            arch = artifact.arch
-        if arch == 'src' and built_srpm_url is not None:
-            continue
-        repo = next(
+
+    def get_repo(repo_arch, is_debug):
+        return next(
             build_repo for build_repo in repositories
-            if build_repo.arch == arch
-            and build_repo.type == artifact.type
-            and build_repo.debug == artifact.is_debuginfo
+            if build_repo.arch == repo_arch
+            and build_repo.type == 'rpm'
+            and build_repo.debug == is_debug
         )
-        try:
-            href = await pulp_client.create_rpm_package(
-                artifact.name, artifact.href)
-            if repo.pulp_href not in repo_packages_mapping:
-                repo_packages_mapping[repo.pulp_href] = []
-            repo_packages_mapping[repo.pulp_href].append(href)
-        except Exception as e:
-            logging.error('Cannot create RPM package for %s, error: %s',
-                          str(artifact), str(e))
-            exceptions.append(e)
-            continue
+
+    rpms = []
+    arch_repo = get_repo(task_arch, False)
+    debug_repo = get_repo(task_arch, True)
+    src_repo = get_repo('src', False)
+    arch_packages_tasks = []
+    src_packages_tasks = []
+    debug_packages_tasks = []
+    for artifact in task_artifacts:
+        if artifact.arch == 'src' and built_srpm_url is None:
+            src_packages_tasks.append(create_entity(pulp_client, artifact))
+        if artifact.is_debuginfo:
+            debug_packages_tasks.append(create_entity(pulp_client, artifact))
         else:
-            rpms.append(
-                models.BuildTaskArtifact(
-                    build_task_id=task_id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    href=href
-                )
+            arch_packages_tasks.append(create_entity(pulp_client, artifact))
+
+    processed_packages = []
+    for tasks, repo in (
+            (src_packages_tasks, src_repo), (arch_packages_tasks, arch_repo),
+            (debug_packages_tasks, debug_repo)):
+        if tasks:
+            try:
+                results = await asyncio.gather(*tasks)
+            except Exception as e:
+                logging.exception('Cannot create RPM packages for error: %s',
+                                  str(e))
+                raise ArtifactConversionError(
+                    'Cannot put RPM packages into Pulp storage: %s', str(e))
+            else:
+                processed_packages.extend(results)
+                hrefs = [item[0] for item in results]
+                try:
+                    await pulp_client.modify_repository(
+                        repo.pulp_href, add=hrefs)
+                    await pulp_client.create_rpm_publication(repo.pulp_href)
+                except Exception as e:
+                    logging.error('Cannot add RPM packages to the repository: %s',
+                                  str(e))
+                    raise RepositoryAddError(
+                        f'Cannot add RPM packages to the repository {str(repo)}')
+
+    for href, artifact in processed_packages:
+        rpms.append(
+            models.BuildTaskArtifact(
+                build_task_id=task_id,
+                name=artifact.name,
+                type=artifact.type,
+                href=href
             )
-    if exceptions:
-        raise ArtifactConversionError(
-            'Cannot put RPM packages into Pulp storage: %s',
-            '\n'.join([str(e) for e in exceptions]))
-    for repo_href, packages in repo_packages_mapping.items():
-        try:
-            await pulp_client.modify_repository(repo_href, add=packages)
-        except Exception as e:
-            logging.error('Cannot add RPM packages to the repository: %s',
-                          str(e))
-            exceptions.append(e)
-        try:
-            await pulp_client.create_rpm_publication(repo_href)
-        except Exception as e:
-            logging.error('Cannot create a publication for the repository: %s',
-                          str(e))
-            exceptions.append(e)
-    if exceptions:
-        raise RepositoryAddError(
-            'Cannot save RPM packages into Pulp repositories: %s',
-            '\n'.join([str(e) for e in exceptions]))
+        )
 
     if module_index:
         packages_info = {}
@@ -184,27 +187,23 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
 
 async def __process_logs(pulp_client: PulpClient, task_id: int,
                          task_artifacts: list, repositories: list):
-    repo_files_mapping = {}
-    exceptions = []
     logs = []
     str_task_id = str(task_id)
-    for artifact in task_artifacts:
-        repo = next(
-            repo for repo in repositories
-            if repo.name.endswith(str_task_id)
-        )
-        try:
-            href = await pulp_client.create_file(
-                artifact.name, artifact.href)
-            if repo.pulp_href not in repo_files_mapping:
-                repo_files_mapping[repo.pulp_href] = []
-            repo_files_mapping[repo.pulp_href].append(href)
-        except Exception as e:
-            logging.error('Cannot create log file for %s, error: %s',
-                          str(artifact), str(e))
-            exceptions.append(e)
-            continue
-        else:
+    repo = next(
+        repo for repo in repositories
+        if repo.name.endswith(str_task_id)
+    )
+    files = [create_entity(pulp_client, artifact)
+             for artifact in task_artifacts]
+    try:
+        results = await asyncio.gather(*files)
+    except Exception as e:
+        logging.error('Cannot create log files for %s, error: %s',
+                      str(repo), str(e))
+        raise ArtifactConversionError(
+            f'Cannot create log files for {str(repo)}, error: {str(e)}')
+    else:
+        for href, artifact in results:
             logs.append(
                 models.BuildTaskArtifact(
                     build_task_id=task_id,
@@ -213,29 +212,15 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
                     href=href
                 )
             )
-    if exceptions:
-        raise ArtifactConversionError(
-            'Cannot put build logs into Pulp storage: %s',
-            '\n'.join([str(e) for e in exceptions]))
-
-    for repo_href, files in repo_files_mapping.items():
-        try:
-            await pulp_client.modify_repository(repo_href, add=files)
-        except Exception as e:
-            logging.error('Cannot add log files to the repository: %s',
-                          str(e))
-            exceptions.append(e)
-            continue
-        try:
-            await pulp_client.create_file_publication(repo_href)
-        except Exception as e:
-            logging.error('Cannot create publication for log files: %s',
-                          str(e))
-            exceptions.append(e)
-    if exceptions:
+    hrefs = [item[0] for item in results]
+    try:
+        await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
+        await pulp_client.create_file_publication(repo.pulp_href)
+    except Exception as e:
+        logging.error('Cannot add log files to the repository: %s',
+                      str(e))
         raise RepositoryAddError(
-            'Cannot save build log into Pulp repository: %s',
-            '\n'.join([str(e) for e in exceptions]))
+            'Cannot save build log into Pulp repository: %s', str(e))
     return logs
 
 
@@ -284,10 +269,12 @@ async def __process_build_task_artifacts(
     log_repositories = [repo for repo in repositories
                         if repo.type == 'build_log']
     # Committing logs separately for UI to be able to fetch them
+    logging.info('Processing logs')
     logs_entries = await __process_logs(
         pulp_client, build_task.id, log_artifacts, log_repositories)
     db.add_all(logs_entries)
     await db.commit()
+    logging.info('Logs processing is finished')
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
         rpm_artifacts, rpm_repositories,
