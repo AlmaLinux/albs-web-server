@@ -349,7 +349,7 @@ class PulpClient:
             exclude_fields: typing.List[str] = None,
             **search_params):
         latest_version = await self.get_repo_latest_version(repository_href)
-        params = {'repository_version': latest_version, 'limit': 1000}
+        params = {'repository_version': latest_version, 'limit': 10000}
         params.update(**search_params)
         return await self.get_rpm_packages(
             include_fields=include_fields, exclude_fields=exclude_fields,
