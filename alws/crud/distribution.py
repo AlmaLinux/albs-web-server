@@ -105,6 +105,13 @@ async def add_distributions_after_rebuild(
             await pulp_client.create_rpm_publication(repo)
 
 
+async def get_existing_packages(pulp_client: PulpClient,
+                                repository: models.Repository):
+    return await pulp_client.get_rpm_repository_packages(
+        repository.pulp_href,
+        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href'])
+
+
 async def get_packages_to_add(
         pulp_client: PulpClient, build_repo: models.Repository,
         dist_repo: models.Repository):
@@ -126,7 +133,7 @@ async def prepare_repo_modify_dict(db_build: models.Build,
     build_repos = [r for r in db_build.repos if r.type == 'rpm']
     tasks = []
     for repo in build_repos:
-        dist_repo = dist_repo_mapping.get(repo.arch, repo.debug)
+        dist_repo = dist_repo_mapping.get((repo.arch, repo.debug))
         tasks.append(get_packages_to_add(pulp_client, repo, dist_repo))
 
     results = await asyncio.gather(*tasks)
@@ -140,13 +147,6 @@ async def prepare_repo_modify_dict(db_build: models.Build,
             modify[distro_repo.pulp_href].append(task.rpm_module.pulp_href)
 
     return modify
-
-
-async def get_existing_packages(pulp_client: PulpClient,
-                                repository: models.Repository):
-    return await pulp_client.get_rpm_repository_packages(
-        repository.pulp_href,
-        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href'])
 
 
 async def modify_distribution(build_id: int, distribution: str, db: Session,
@@ -183,12 +183,6 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
 
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    existing_packages_mapping = {}
-    for repo in db_distro.repositories:
-        packages = await get_existing_packages(pulp_client, repo)
-        existing_packages_mapping[repo.pulp_href] = {
-            p['location_href']: p['pulp_href'] for p in packages
-        }
     modify = await prepare_repo_modify_dict(db_build, db_distro, pulp_client)
     for key, value in modify.items():
         if modification == 'add':
