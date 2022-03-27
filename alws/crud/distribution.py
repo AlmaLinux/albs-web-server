@@ -108,19 +108,15 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                                    db_distro: models.Distribution,
                                    existing_packages: dict = None):
     already_added = collections.defaultdict(dict)
+    repo_mapping = {(r.arch, r.debug): r for r in db_distro.repositories}
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
             continue
         if task.rpm_module:
-            for distro_repo in db_distro.repositories:
-                conditions = [
-                    distro_repo.arch == task.arch,
-                    not distro_repo.debug
-                ]
-                if all(conditions):
-                    if distro_repo.pulp_href not in already_added:
-                        already_added[distro_repo.pulp_href] = {}
-                    already_added[distro_repo.pulp_href][task.rpm_module.nvsca] = task.rpm_module.pulp_href
+            distro_repo = repo_mapping.get((task.arch, False))
+            if distro_repo.pulp_href not in already_added:
+                already_added[distro_repo.pulp_href] = {}
+            already_added[distro_repo.pulp_href][task.rpm_module.nvsca] = task.rpm_module.pulp_href
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
@@ -129,21 +125,19 @@ async def prepare_repo_modify_dict(db_build: models.Build,
             arch = task.arch
             if build_artifact.arch == 'src':
                 arch = build_artifact.arch
-            for distro_repo in db_distro.repositories:
-                conditions = [
-                    distro_repo.arch == arch,
-                    distro_repo.debug == build_artifact.is_debuginfo
-                ]
-                if all(conditions):
-                    if existing_packages:
-                        repo_packages = existing_packages.get(
-                            distro_repo.pulp_href, {})
-                        if artifact.name in repo_packages:
-                            continue
-                    if distro_repo.pulp_href not in already_added:
-                        already_added[distro_repo.pulp_href] = {}
-                    already_added[distro_repo.pulp_href][artifact.name] = artifact.href
-    modify = {key: list(value.values()) for key, value in already_added}
+            distro_repo = repo_mapping.get((arch, build_artifact.is_debuginfo))
+            if existing_packages:
+                repo_packages = existing_packages.get(
+                    distro_repo.pulp_href, {})
+                if artifact.name in repo_packages:
+                    continue
+            if distro_repo.pulp_href not in already_added:
+                already_added[distro_repo.pulp_href] = {}
+            already_added[distro_repo.pulp_href][artifact.name] = artifact.href
+
+    modify = {}
+    for repo_href, packages in already_added.items():
+        modify[repo_href] = list(packages.values())
     return modify
 
 
