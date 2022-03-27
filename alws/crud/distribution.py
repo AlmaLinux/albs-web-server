@@ -152,7 +152,7 @@ async def get_existing_packages(pulp_client: PulpClient,
 
 
 async def modify_distribution(build_id: int, distribution: str, db: Session,
-                              modification: str):
+                              modification: str, force: bool = False):
 
     async with db.begin():
         db_distro = await db.execute(select(models.Distribution).where(
@@ -172,12 +172,12 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
         ))
         db_build = db_build.scalars().first()
 
-        if modification == 'add':
+        if modification == 'add' and not force:
             if db_build in db_distro.builds:
                 error_msg = f'Packages of build {build_id} have already been' \
                             f' added to {distribution} distribution'
                 raise DistributionError(error_msg)
-        if modification == 'remove':
+        if modification == 'remove' and not force:
             if db_build not in db_distro.builds:
                 error_msg = f'Packages of build {build_id} cannot be removed ' \
                             f'from {distribution} distribution ' \
