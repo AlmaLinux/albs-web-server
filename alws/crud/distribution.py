@@ -177,25 +177,18 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                 error_msg = f'Packages of build {build_id} have already been' \
                             f' added to {distribution} distribution'
                 raise DistributionError(error_msg)
-            db_distro.builds.append(db_build)
         if modification == 'remove':
             if db_build not in db_distro.builds:
                 error_msg = f'Packages of build {build_id} cannot be removed ' \
                             f'from {distribution} distribution ' \
                             f'as they are not added there'
                 raise DistributionError(error_msg)
-            remove_query = models.Build.id.__eq__(build_id)
-            await db.execute(
-                delete(models.DistributionBuilds).where(remove_query)
-            )
 
-        await db.commit()
-    await db.refresh(db_distro)
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     existing_packages_mapping = {}
     for repo in db_distro.repositories:
-        packages = get_existing_packages(pulp_client, repo)
+        packages = await get_existing_packages(pulp_client, repo)
         existing_packages_mapping[repo.pulp_href] = {
             p['location_href']: p['pulp_href'] for p in packages
         }
@@ -205,6 +198,20 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
     for key, value in modify.items():
         if modification == 'add':
             await pulp_client.modify_repository(add=value, repo_to=key)
+            db_distro.builds.append(db_build)
         else:
             await pulp_client.modify_repository(remove=value, repo_to=key)
         await pulp_client.create_rpm_publication(key)
+
+    if modification == 'add':
+        db_distro.builds.append(db_build)
+    else:
+        remove_query = models.Build.id.__eq__(build_id)
+        await db.execute(
+            delete(models.DistributionBuilds).where(remove_query)
+        )
+    db.add(db_distro)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
