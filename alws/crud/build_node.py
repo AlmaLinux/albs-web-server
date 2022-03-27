@@ -219,7 +219,6 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
     hrefs = [item[0] for item in results]
     try:
         await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
-        await pulp_client.create_file_publication(repo.pulp_href)
     except Exception as e:
         logging.error('Cannot add log files to the repository: %s',
                       str(e))
