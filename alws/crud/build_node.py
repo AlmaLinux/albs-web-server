@@ -107,6 +107,12 @@ async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
     return BuildTaskStatus.is_finished(build_task.status)
 
 
+async def __get_rpm_package_info(pulp_client: PulpClient, rpm_href: str) \
+        -> (str, dict):
+    info = await pulp_client.get_rpm_package(rpm_href)
+    return rpm_href, info
+
+
 async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          task_artifacts: list, repositories: list,
                          built_srpm_url: str = None, module_index=None):
@@ -152,7 +158,6 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                 try:
                     await pulp_client.modify_repository(
                         repo.pulp_href, add=hrefs)
-                    await pulp_client.create_rpm_publication(repo.pulp_href)
                 except Exception as e:
                     logging.error('Cannot add RPM packages to the repository: %s',
                                   str(e))
@@ -170,14 +175,13 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
         )
 
     if module_index:
-        packages_info = {}
-        for rpm in rpms:
-            rpm_package = await pulp_client.get_rpm_package(rpm.href)
-            packages_info[rpm.id] = rpm_package
+        results = await asyncio.gather(*[__get_rpm_package_info(
+            pulp_client, rpm.href) for rpm in rpms])
+        packages_info = dict(results)
         try:
             for module in module_index.iter_modules():
                 for rpm in rpms:
-                    rpm_package = packages_info[rpm.id]
+                    rpm_package = packages_info[rpm.href]
                     module.add_rpm_artifact(rpm_package)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
