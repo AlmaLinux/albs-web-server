@@ -107,7 +107,7 @@ async def add_distributions_after_rebuild(
 async def prepare_repo_modify_dict(db_build: models.Build,
                                    db_distro: models.Distribution,
                                    existing_packages: dict = None):
-    modify = collections.defaultdict(list)
+    already_added = collections.defaultdict(dict)
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
             continue
@@ -118,8 +118,9 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                     not distro_repo.debug
                 ]
                 if all(conditions):
-                    modify[distro_repo.pulp_href].append(
-                        task.rpm_module.pulp_href)
+                    if distro_repo.pulp_href not in already_added:
+                        already_added[distro_repo.pulp_href] = {}
+                    already_added[distro_repo.pulp_href][task.rpm_module.nvsca] = task.rpm_module.pulp_href
         for artifact in task.artifacts:
             if artifact.type != 'rpm':
                 continue
@@ -139,9 +140,11 @@ async def prepare_repo_modify_dict(db_build: models.Build,
                             distro_repo.pulp_href, {})
                         if artifact.name in repo_packages:
                             continue
-                    modify[distro_repo.pulp_href].append(build_artifact.href)
-    final = {key: list(set(value)) for key, value in modify.items()}
-    return final
+                    if distro_repo.pulp_href not in already_added:
+                        already_added[distro_repo.pulp_href] = {}
+                    already_added[distro_repo.pulp_href][artifact.name] = artifact.href
+    modify = {key: list(value.values()) for key, value in already_added}
+    return modify
 
 
 async def get_existing_packages(pulp_client: PulpClient,
