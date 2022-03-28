@@ -34,5 +34,9 @@ class SignKeyAlreadyExistsError(ValueError):
     pass
 
 
+class ReleaseLogicError(Exception):
+    pass
+
+
 class BuildAlreadySignedError(ValueError):
     pass

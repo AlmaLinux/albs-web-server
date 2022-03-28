@@ -244,50 +244,42 @@ async def complete_sign_task(db: Session, sign_task_id: int,
 
 async def verify_signed_build(db: Session, build_id: int,
                               platform_id: int) -> bool:
-    async with db.begin():
-        builds = await db.execute(select(models.Build).where(
-            models.Build.id == build_id).options(
-                selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms)
-        ))
-        build = builds.scalars().first()
-        if not build:
-            raise DataNotFoundError(
-                f'Build with ID {build_id} does not exist')
-        if not build.signed:
-            raise SignError(
-                f'Build with ID {build_id} has not already signed')
-        if not build.source_rpms or not build.binary_rpms:
-            raise ValueError(
-                f'No built packages in build with ID {build_id}')
-        platforms = await db.execute(select(models.Platform).where(
-            models.Platform.id == platform_id).options(
-                selectinload(models.Platform.sign_keys)))
-        platform = platforms.scalars().first()
-        if not platform:
-            raise DataNotFoundError(
-                f'platform with ID {platform_id} does not exist')
-        if not platform.sign_keys:
-            raise DataNotFoundError(
-                f'platform with ID {platform_id} connects with no keys')
-        sign_key = platform.sign_keys[0]
-        if not sign_key:
-            raise DataNotFoundError(
-                f'Sign key for Platform ID {platform_id} does not exist')
-        source_rpms = await db.execute(select(models.SourceRpm).where(
-            models.SourceRpm.build_id == build_id).options(
-            selectinload(models.SourceRpm.artifact)))
-        source_rpms = source_rpms.scalars().all()
-        binary_rpms = await db.execute(select(models.BinaryRpm).where(
-            models.BinaryRpm.build_id == build_id).options(
-            selectinload(models.BinaryRpm.artifact)))
-        binary_rpms = binary_rpms.scalars().all()
+    build = await db.execute(select(models.Build).where(
+        models.Build.id == build_id).options(
+            selectinload(models.Build.source_rpms).selectinload(
+                models.SourceRpm.artifact),
+            selectinload(models.Build.binary_rpms).selectinload(
+                models.BinaryRpm.artifact),
+    ))
+    build = build.scalars().first()
+    if not build:
+        raise DataNotFoundError(
+            f'Build with ID {build_id} does not exist')
+    if not build.signed:
+        raise SignError(
+            f'Build with ID {build_id} has not already signed')
+    if not build.source_rpms or not build.binary_rpms:
+        raise ValueError(
+            f'No built packages in build with ID {build_id}')
+    platforms = await db.execute(select(models.Platform).where(
+        models.Platform.id == platform_id).options(
+            selectinload(models.Platform.sign_keys)))
+    platform = platforms.scalars().first()
+    if not platform:
+        raise DataNotFoundError(
+            f'platform with ID {platform_id} does not exist')
+    if not platform.sign_keys:
+        raise DataNotFoundError(
+            f'platform with ID {platform_id} connects with no keys')
+    sign_key = platform.sign_keys[0]
+    if not sign_key:
+        raise DataNotFoundError(
+            f'Sign key for Platform ID {platform_id} does not exist')
 
-        all_rpms = source_rpms + binary_rpms
-        for p in all_rpms:
-            if p.artifact.sign_key != sign_key:
-                raise SignError(
-                    f'Sign key with for pkg ID {p.id} is not matched '
-                    f'by sign key for platform ID {platform_id}')
-        await db.commit()
+    all_rpms = build.source_rpms + build.binary_rpms
+    for rpm in all_rpms:
+        if rpm.artifact.sign_key != sign_key:
+            raise SignError(
+                f'Sign key with for pkg ID {rpm.id} is not matched '
+                f'by sign key for platform ID {platform_id}')
     return True

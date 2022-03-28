@@ -120,7 +120,7 @@ class Platform(Base):
         index=True
     )
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
-    weak_arch_list = sqlalchemy.Column(JSONB, nullable=True) 
+    weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)
     data = sqlalchemy.Column(JSONB, nullable=False)
     is_reference = sqlalchemy.Column(
         sqlalchemy.Boolean, default=False, nullable=True)
