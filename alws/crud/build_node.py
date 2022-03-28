@@ -135,7 +135,7 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
     for artifact in task_artifacts:
         if artifact.arch == 'src' and built_srpm_url is None:
             src_packages_tasks.append(create_entity(pulp_client, artifact))
-        if artifact.is_debuginfo:
+        elif artifact.is_debuginfo:
             debug_packages_tasks.append(create_entity(pulp_client, artifact))
         else:
             arch_packages_tasks.append(create_entity(pulp_client, artifact))
