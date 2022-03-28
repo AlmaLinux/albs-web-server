@@ -220,8 +220,8 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
     try:
         await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
     except Exception as e:
-        logging.error('Cannot add log files to the repository: %s',
-                      str(e))
+        logging.exception('Cannot add log files to the repository: %s',
+                          str(e))
         raise RepositoryAddError(
             'Cannot save build log into Pulp repository: %s', str(e))
     return logs
@@ -261,7 +261,7 @@ async def __process_build_task_artifacts(
             module_index = IndexWrapper.from_template(repo_modules_yaml)
         except Exception as e:
             message = f'Cannot parse modules index: {str(e)}'
-            logging.error('Cannot parse modules index: %s', str(e))
+            logging.exception('Cannot parse modules index: %s', str(e))
             raise ModuleUpdateError(message) from e
     rpm_artifacts = [item for item in task_artifacts if item.type == 'rpm']
     log_artifacts = [item for item in task_artifacts
@@ -302,8 +302,8 @@ async def __process_build_task_artifacts(
             build_task.rpm_module.pulp_href = module_pulp_href
         except Exception as e:
             message = f'Cannot update module information inside Pulp: {str(e)}'
-            logging.error('Cannot update module information inside Pulp: %s',
-                          str(e))
+            logging.exception('Cannot update module information inside Pulp: %s',
+                              str(e))
             raise ModuleUpdateError(message) from e
 
     db.add_all(rpm_entries)
@@ -419,7 +419,7 @@ async def build_done(
             if multilib_pkgs:
                 await add_multilib_packages(db, build_task, multilib_pkgs)
         except Exception as e:
-            logging.error('Cannot process multilib packages: %s', str(e))
+            logging.exception('Cannot process multilib packages: %s', str(e))
             raise MultilibProcessingError('Cannot process multilib packages')
 
     await db.execute(
@@ -430,7 +430,7 @@ async def build_done(
     try:
         await save_noarch_packages(db, build_task)
     except Exception as e:
-        logging.error('Cannot process noarch packages: %s', str(e))
+        logging.exception('Cannot process noarch packages: %s', str(e))
         raise NoarchProcessingError('Cannot process noarch packages')
 
     await db.execute(
