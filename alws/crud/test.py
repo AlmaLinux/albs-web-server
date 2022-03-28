@@ -185,7 +185,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
         repo_url = result.scalars().first()
 
         test_names_query = select(models.TestTaskArtifact).join(
-            models.TestTask, models.TestTaskArtifact.test_task_id == 
+            models.TestTask, models.TestTaskArtifact.test_task_id ==
             models.TestTask.id).where(
                 models.TestTask.build_task_id == build_task_id)
         result = await db.execute(test_names_query)
@@ -196,7 +196,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             test_names[artifact.test_task_id].append(artifact.name)
 
     test_results = []
-    for test_task_test_names in test_names.values():
+    for test_task_id, test_task_test_names in test_names.items():
         for test_name in test_task_test_names:
             log = BytesIO()
             log_href = repo_url + test_name
@@ -205,6 +205,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             tap_status = tap_set_status(tap_results)
             logs_format = get_logs_format(log.getvalue())
             test_tap = {
+                'id': test_task_id,
                 'log': log.getvalue(),
                 'success': tap_status,
                 'logs_format': logs_format,
