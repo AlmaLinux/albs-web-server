@@ -381,7 +381,11 @@ class ReleasePlanner:
                 repo_name
             ))
             repo_key = RepoType(release_repo_name, module_repo['arch'], False)
-            module_info['repositories'].append(repos_mapping[repo_key])
+            module_info['repositories'].append({
+                'name': release_repo_name,
+                'arch': module['arch'],
+                'debug': False,
+            })
 
         endpoint = (f'/api/v1/distros/{clean_ref_dist_name}/'
                     f'{reference_platform.distr_version}/projects/')
