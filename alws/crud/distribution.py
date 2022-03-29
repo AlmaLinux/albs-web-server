@@ -93,7 +93,8 @@ async def add_distributions_after_rebuild(
                              settings.pulp_password)
 
     for db_distro in db_distros:
-        modify = await prepare_repo_modify_dict(db_build, db_distro)
+        modify = await prepare_repo_modify_dict(
+            db_build, db_distro, pulp_client)
         for modification in ('remove', 'add'):
             for key, value in modify.items():
                 if modification == 'add':
