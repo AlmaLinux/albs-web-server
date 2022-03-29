@@ -137,7 +137,7 @@ class ReleasePlanner:
             'fields': 'pulp_href,name,epoch,version,release,arch',
         }
         pulp_packages_by_params = await self._pulp_client.get_rpm_packages(
-            params)
+            **params)
         if pulp_packages_by_params:
             for pkg in pulp_packages_by_params:
                 full_name = self.pkgs_mapping.get(PackageNevra(
