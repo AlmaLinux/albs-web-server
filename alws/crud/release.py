@@ -337,7 +337,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
         ])
         module_info['repositories'].append({
             'name': release_repo_name,
-            'arch': module_repo['arch'],
+            'arch': module['arch'],
             'debug': False
         })
 
