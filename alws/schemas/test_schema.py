@@ -25,6 +25,7 @@ class TestTask(BaseModel):
 
 
 class TestLog(BaseModel):
+    id: int
     log: str
     success: bool
     logs_format: str

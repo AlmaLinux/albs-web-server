@@ -1,7 +1,5 @@
 import re
 import json
-import time
-import random
 import typing
 import hashlib
 import datetime
@@ -13,10 +11,6 @@ from pydantic import BaseModel
 import gi
 gi.require_version('Modulemd', '2.0')
 from gi.repository import Modulemd
-
-
-def get_random_unique_version():
-    return int(str(int(time.time())) + str(random.randint(1000000, 9999999)))
 
 
 def calc_dist_macro(

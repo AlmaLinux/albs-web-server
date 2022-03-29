@@ -1,4 +1,6 @@
+import asyncio
 import collections
+import typing
 
 from sqlalchemy import delete
 from sqlalchemy.future import select
@@ -91,7 +93,8 @@ async def add_distributions_after_rebuild(
                              settings.pulp_password)
 
     for db_distro in db_distros:
-        modify = await prepare_repo_modify_dict(db_build, db_distro)
+        modify = await prepare_repo_modify_dict(
+            db_build, db_distro, pulp_client)
         for modification in ('remove', 'add'):
             for key, value in modify.items():
                 if modification == 'add':
@@ -104,41 +107,66 @@ async def add_distributions_after_rebuild(
             await pulp_client.create_rpm_publication(repo)
 
 
+async def get_existing_packages(pulp_client: PulpClient,
+                                repository: models.Repository):
+    return await pulp_client.get_rpm_repository_packages(
+        repository.pulp_href,
+        include_fields=['pulp_href', 'artifact', 'sha256', 'location_href',
+                        'arch'])
+
+
+async def get_packages_to_add(
+        pulp_client: PulpClient, build_repo: models.Repository,
+        dist_repo: models.Repository):
+
+    def filter_by_arch(pkgs: typing.List[dict], repo_arch: str):
+        filtered = []
+        for pkg in pkgs:
+            if pkg['arch'] == 'noarch' and repo_arch != 'src':
+                filtered.append(pkg)
+            elif pkg['arch'] == 'i686' and repo_arch in ('i686', 'x86_64'):
+                filtered.append(pkg)
+            elif pkg['arch'] == repo_arch:
+                filtered.append(pkg)
+        return filtered
+
+    dist_packages = await get_existing_packages(pulp_client, dist_repo)
+    search_by_href = set([p['pulp_href'] for p in dist_packages])
+    build_packages = await get_existing_packages(pulp_client, build_repo)
+    filtered_build_packages = filter_by_arch(build_packages, dist_repo.arch)
+    dedup_mapping = {p['location_href']: p['pulp_href']
+                     for p in filtered_build_packages}
+    final_packages = [href for href in dedup_mapping.values()
+                      if href not in search_by_href]
+    return dist_repo.pulp_href, final_packages
+
+
 async def prepare_repo_modify_dict(db_build: models.Build,
-                                   db_distro: models.Distribution):
+                                   db_distro: models.Distribution,
+                                   pulp_client: PulpClient):
+    dist_repo_mapping = {(r.arch, r.debug): r for r in db_distro.repositories}
     modify = collections.defaultdict(list)
+    build_repos = [r for r in db_build.repos if r.type == 'rpm']
+    tasks = []
+    for repo in build_repos:
+        dist_repo = dist_repo_mapping.get((repo.arch, repo.debug))
+        tasks.append(get_packages_to_add(pulp_client, repo, dist_repo))
+
+    results = await asyncio.gather(*tasks)
+    modify.update(**dict(results))
+
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
             continue
         if task.rpm_module:
-            for distro_repo in db_distro.repositories:
-                conditions = [
-                    distro_repo.arch == task.arch,
-                    not distro_repo.debug
-                ]
-                if all(conditions):
-                    modify[distro_repo.pulp_href].append(
-                        task.rpm_module.pulp_href)
-        for artifact in task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            build_artifact = build_node_schema.BuildDoneArtifact.from_orm(
-                artifact)
-            arch = task.arch
-            if build_artifact.arch == 'src':
-                arch = build_artifact.arch
-            for distro_repo in db_distro.repositories:
-                conditions = [
-                    distro_repo.arch == arch,
-                    distro_repo.debug == build_artifact.is_debuginfo
-                ]
-                if all(conditions):
-                    modify[distro_repo.pulp_href].append(artifact.href)
+            distro_repo = dist_repo_mapping.get((task.arch, False))
+            modify[distro_repo.pulp_href].append(task.rpm_module.pulp_href)
+
     return modify
 
 
 async def modify_distribution(build_id: int, distribution: str, db: Session,
-                              modification: str):
+                              modification: str, force: bool = False):
 
     async with db.begin():
         db_distro = await db.execute(select(models.Distribution).where(
@@ -152,38 +180,44 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
             models.Build.id.__eq__(build_id)
         ).options(
             selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.artifacts),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_module)
+                models.BuildTask.rpm_module),
+            selectinload(models.Build.repos)
         ))
         db_build = db_build.scalars().first()
 
-        pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                                 settings.pulp_password)
-
-        if modification == 'add':
+        if modification == 'add' and not force:
             if db_build in db_distro.builds:
                 error_msg = f'Packages of build {build_id} have already been' \
                             f' added to {distribution} distribution'
                 raise DistributionError(error_msg)
-            db_distro.builds.append(db_build)
-        if modification == 'remove':
+        if modification == 'remove' and not force:
             if db_build not in db_distro.builds:
                 error_msg = f'Packages of build {build_id} cannot be removed ' \
                             f'from {distribution} distribution ' \
                             f'as they are not added there'
                 raise DistributionError(error_msg)
-            remove_query = models.Build.id.__eq__(build_id)
-            await db.execute(
-                delete(models.DistributionBuilds).where(remove_query)
-            )
 
-        await db.commit()
-    await db.refresh(db_distro)
-    modify = await prepare_repo_modify_dict(db_build, db_distro)
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+    modify = await prepare_repo_modify_dict(db_build, db_distro, pulp_client)
+    tasks = []
     for key, value in modify.items():
         if modification == 'add':
-            await pulp_client.modify_repository(add=value, repo_to=key)
+            tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
         else:
-            await pulp_client.modify_repository(remove=value, repo_to=key)
-        await pulp_client.create_rpm_publication(key)
+            tasks.append(pulp_client.modify_repository(
+                remove=value, repo_to=key))
+    await asyncio.gather(*tasks)
+
+    if modification == 'add':
+        db_distro.builds.append(db_build)
+    else:
+        remove_query = models.Build.id.__eq__(build_id)
+        await db.execute(
+            delete(models.DistributionBuilds).where(remove_query)
+        )
+    db.add(db_distro)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()

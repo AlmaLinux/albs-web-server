@@ -4,10 +4,8 @@ import typing
 import urllib.parse
 
 from alws.config import settings
-from alws.utils.modularity import (
-    IndexWrapper,
-    get_random_unique_version,
-)
+from alws.utils.ids import get_random_unique_version 
+from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 
 

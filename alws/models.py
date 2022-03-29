@@ -360,6 +360,11 @@ class RpmModule(Base):
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
 
+    @property
+    def nvsca(self):
+        return (f'{self.name}-{self.version}-{self.stream}'
+                f'-{self.context}-{self.arch}')
+
 
 class BuildTaskArtifact(Base):
 

@@ -1,7 +1,8 @@
+import asyncio
+import logging
 import re
 from collections import defaultdict
 from io import BytesIO
-from typing import BinaryIO
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
@@ -49,11 +50,7 @@ async def create_test_tasks(db: Session, build_task_id: int):
     )
     db.add(repository)
     await db.commit()
-
-    r_query = select(models.Repository).where(
-        models.Repository.name == repo_name)
-    results = await db.execute(r_query)
-    repository = results.scalars().first()
+    await db.refresh(repository)
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -86,6 +83,11 @@ async def restart_build_tests(db: Session, build_id: int):
         await create_test_tasks(db, build_task_id[0])
 
 
+async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
+    href = await pulp_client.create_file(artifact['name'], artifact['href'])
+    return artifact['name'], href
+
+
 async def complete_test_task(db: Session, task_id: int,
                              test_result: test_schema.TestTaskResult):
     pulp_client = PulpClient(
@@ -93,10 +95,26 @@ async def complete_test_task(db: Session, task_id: int,
         settings.pulp_user,
         settings.pulp_password
     )
+    logs = []
+    new_hrefs = []
+    conv_tasks = []
+    for log in test_result.result.get('logs', []):
+        if log.get('href'):
+            conv_tasks.append(__convert_to_file(pulp_client, log))
+        else:
+            logging.error('Log file %s is missing href', str(log))
+            continue
+    results = await asyncio.gather(*conv_tasks)
+    for name, href in results:
+        new_hrefs.append(href)
+        log_record = models.TestTaskArtifact(
+            name=name, href=href, test_task_id=task_id)
+        logs.append(log_record)
+
     async with db.begin():
         tasks = await db.execute(select(models.TestTask).where(
             models.TestTask.id == task_id).options(
-            selectinload(models.TestTask.repository)).with_for_update())
+            selectinload(models.TestTask.repository)))
         task = tasks.scalars().first()
         status = TestTaskStatus.COMPLETED
         for key, item in test_result.result.items():
@@ -113,22 +131,13 @@ async def complete_test_task(db: Session, task_id: int,
                 break
         task.status = status
         task.alts_response = test_result.dict()
-        logs = []
-        for log in test_result.result.get('logs', []):
-            if task.repository:
-                href = await pulp_client.create_file(
-                    log['name'], log['href'], task.repository.pulp_href)
-            else:
-                href = log['href']
-            if not href:
-                continue
-            log_record = models.TestTaskArtifact(
-                name=log['name'], href=href, test_task_id=task.id)
-            logs.append(log_record)
+    if task.repository:
+        await pulp_client.modify_repository(
+            task.repository.pulp_href, add=new_hrefs)
 
-        db.add(task)
-        db.add_all(logs)
-        await db.commit()
+    db.add(task)
+    db.add_all(logs)
+    await db.commit()
 
 
 async def get_test_tasks_by_build_task(
@@ -185,7 +194,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
         repo_url = result.scalars().first()
 
         test_names_query = select(models.TestTaskArtifact).join(
-            models.TestTask, models.TestTaskArtifact.test_task_id == 
+            models.TestTask, models.TestTaskArtifact.test_task_id ==
             models.TestTask.id).where(
                 models.TestTask.build_task_id == build_task_id)
         result = await db.execute(test_names_query)
@@ -196,7 +205,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             test_names[artifact.test_task_id].append(artifact.name)
 
     test_results = []
-    for test_task_test_names in test_names.values():
+    for test_task_id, test_task_test_names in test_names.items():
         for test_name in test_task_test_names:
             log = BytesIO()
             log_href = repo_url + test_name
@@ -205,6 +214,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             tap_status = tap_set_status(tap_results)
             logs_format = get_logs_format(log.getvalue())
             test_tap = {
+                'id': test_task_id,
                 'log': log.getvalue(),
                 'success': tap_status,
                 'logs_format': logs_format,
