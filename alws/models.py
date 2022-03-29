@@ -120,6 +120,7 @@ class Platform(Base):
         index=True
     )
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
+    copy_priority_arches = sqlalchemy.Column(JSONB, nullable=True)
     weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)
     data = sqlalchemy.Column(JSONB, nullable=False)
     is_reference = sqlalchemy.Column(
