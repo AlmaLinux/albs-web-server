@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 
@@ -144,9 +145,17 @@ async def add_multilib_packages(
     db.add_all(artifacts)
     await db.commit()
 
-    for repo in build_task.build.repos:
-        if repo.arch != 'x86_64' and repo.type != 'rpm':
-            continue
-        hrefs_to_add = debug_pkg_hrefs if repo.debug else pkg_hrefs
-        await pulp_client.modify_repository(
-            repo_to=repo.pulp_href, add=hrefs_to_add)
+    debug_repo = next(
+        r for r in build_task.build.repos if r.type == 'rpm'
+        and r.arch == 'x86_64' and r.debug is True
+    )
+    arch_repo = next(
+        r for r in build_task.build.repos if r.type == 'rpm'
+        and r.arch == 'x86_64' and r.debug is False
+    )
+    await asyncio.gather(
+        pulp_client.modify_repository(
+            repo_to=debug_repo.pulp_href, add=debug_pkg_hrefs),
+        pulp_client.modify_repository(
+            repo_to=arch_repo.pulp_href, add=pkg_hrefs)
+    )
