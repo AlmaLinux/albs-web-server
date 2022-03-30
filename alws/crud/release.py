@@ -146,7 +146,7 @@ async def get_release_plan(db: Session, build_ids: typing.List[int],
             'repository_version': repo_ver_href,
             'fields': 'pulp_href,name,epoch,version,release,arch',
         }
-        pulp_packages_by_params = await pulp_client.get_rpm_packages(params)
+        pulp_packages_by_params = await pulp_client.get_rpm_packages(**params)
         if pulp_packages_by_params:
             repo_href = re.sub(r'versions\/\d+\/$', '', repo_ver_href)
             for pkg in pulp_packages_by_params:
