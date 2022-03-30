@@ -11,7 +11,7 @@ from alws import database
 from alws.crud import repo_exporter
 
 
-async def fs_export_repository(repository_ids: list,
+async def fs_export_repository(repository_ids: typing.List[int],
                                db: database.Session):
     export_task = await repo_exporter.create_pulp_exporters_to_fs(
         db, repository_ids)

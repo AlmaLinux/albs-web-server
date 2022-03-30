@@ -27,7 +27,7 @@ async def modify_platform(
                 f'Platform with name: "{platform.name}" does not exists'
             )
         for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data', 'modularity', 'is_reference'):
+                    'data', 'modularity', 'is_reference', 'weak_arch_list'):
             value = getattr(platform, key, None)
             if value is not None:
                 setattr(db_platform, key, value)
@@ -67,7 +67,7 @@ async def modify_platform(
                 repos_to_remove.append(repo_name)
         remove_query = models.Repository.name.in_(repos_to_remove)
         await db.execute(
-            delete(models.BuildTaskDependency).where(remove_query)
+            delete(models.Repository).where(remove_query)
         )
         await db.commit()
     await db.refresh(db_platform)

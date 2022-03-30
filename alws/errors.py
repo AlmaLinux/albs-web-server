@@ -2,6 +2,10 @@ class BuildError(Exception):
     pass
 
 
+class EmptyBuildError(Exception):
+    pass
+
+
 class SignError(Exception):
     pass
 
@@ -31,4 +35,28 @@ class SignKeyAlreadyExistsError(ValueError):
 
 
 class BuildAlreadySignedError(ValueError):
+    pass
+
+
+class ArtifactConversionError(Exception):
+    pass
+
+
+class SrpmProvisionError(Exception):
+    pass
+
+
+class MultilibProcessingError(Exception):
+    pass
+
+
+class NoarchProcessingError(Exception):
+    pass
+
+
+class ModuleUpdateError(Exception):
+    pass
+
+
+class RepositoryAddError(Exception):
     pass

@@ -5,7 +5,16 @@ import dramatiq
 from sqlalchemy.future import select
 
 from alws import models
+from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import build_node as build_node_crud, test
+from alws.errors import (
+    ArtifactConversionError,
+    ModuleUpdateError,
+    MultilibProcessingError,
+    NoarchProcessingError,
+    RepositoryAddError,
+    SrpmProvisionError,
+)
 from alws.build_planner import BuildPlanner
 from alws.schemas import build_schema, build_node_schema
 from alws.database import SyncSession
@@ -31,6 +40,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 build,
                 platforms=build_request.platforms,
                 is_secure_boot=build_request.is_secure_boot,
+                skip_module_checking=build_request.skip_module_checking,
             )
             await planner.load_platforms()
             for task in build_request.tasks:
@@ -62,7 +72,11 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
 
 @dramatiq.actor(
     max_retries=0,
-    priority=1
+    priority=1,
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
+    throws=(ArtifactConversionError, ModuleUpdateError,
+            MultilibProcessingError, NoarchProcessingError,
+            RepositoryAddError, SrpmProvisionError)
 )
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)

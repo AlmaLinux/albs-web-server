@@ -1,6 +1,5 @@
 import io
 import re
-import hashlib
 import asyncio
 import typing
 import urllib.parse
@@ -8,7 +7,8 @@ from typing import List
 
 import aiohttp
 
-from alws.utils.modularity import get_random_unique_version
+from alws.utils.file_utils import hash_content
+from alws.utils.ids import get_random_unique_version
 
 
 PULP_SEMAPHORE = asyncio.Semaphore(10)
@@ -52,6 +52,17 @@ class PulpClient:
         return await self.create_rpm_repository(
             name, auto_publish=True, create_publication=True)
 
+    async def get_by_href(self, href: str):
+        return await self.request('GET', href)
+
+    async def get_rpm_repository_by_params(
+            self, params: dict) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         params = {'name': name}
@@ -75,6 +86,12 @@ class PulpClient:
         if response['count'] == 0:
             return None
         return response['results'][0]
+
+    async def create_module_by_payload(self, payload: dict) -> str:
+        ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
+        task = await self.request('POST', ENDPOINT, json=payload)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources'][0]
 
     async def create_module(self, content: str, name: str, stream: str,
                             context: str, arch: str):
@@ -109,6 +126,15 @@ class PulpClient:
         if response['count']:
             return response['results'][0]['pulp_href']
 
+    async def upload_comps(self, data: dict) -> typing.List[str]:
+        """
+        Endpoint will modify and publish repository after adding content units
+        """
+        endpoint = 'pulp/api/v3/rpm/comps/'
+        task = await self.request('POST', endpoint, data=data)
+        task_result = await self.wait_for_task(task['task'])
+        return task_result['created_resources']
+
     async def _upload_file(self, content, sha256):
         response = await self.request(
             'POST', 'pulp/api/v3/uploads/', json={'size': len(content)}
@@ -129,14 +155,8 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0]
 
-    # TODO: move this to utils, make it looks better
-    def _hash_content(self, content):
-        hasher = hashlib.new('sha256')
-        hasher.update(content.encode())
-        return hasher.hexdigest()
-
     async def upload_file(self, content=None):
-        file_sha256 = self._hash_content(content)
+        file_sha256 = hash_content(content)
         reference = await self.check_if_artifact_exists(file_sha256)
         if not reference:
             reference = await self._upload_file(content, file_sha256)
@@ -187,14 +207,21 @@ class PulpClient:
                 self,
                 file_name: str,
                 artifact_href: str,
-                repo: str
+                repo: str = None
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
+        artifact_info = await self.get_artifact(
+            artifact_href, include_fields=['sha256'])
+        files = await self.get_files(include_fields=['pulp_href'],
+                                     sha256=artifact_info['sha256'])
+        if files:
+            return files[0]['pulp_href']
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,
-            'repository': repo
         }
+        if repo:
+            payload['repository'] = repo
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
         hrefs = [item for item in task_result['created_resources']
@@ -205,23 +232,37 @@ class PulpClient:
                 self,
                 package_name: str,
                 artifact_href: str,
-                repo: str
-            ) -> str:
+                repo: str = None
+            ) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
+        artifact_info = await self.get_artifact(
+            artifact_href, include_fields=['sha256'])
+        rpm_pkgs = await self.get_rpm_packages(
+            include_fields=['pulp_href'], sha256=artifact_info['sha256'])
+        if rpm_pkgs:
+            return rpm_pkgs[0]['pulp_href']
         payload = {
             'relative_path': package_name,
             'artifact': artifact_href,
-            'repository': repo
         }
+        if repo:
+            payload['repository'] = repo
         task = await self.request('POST', ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task['task'])
-        hrefs = [item for item in task_result['created_resources']
-                 if 'rpm/packages' in item]
-        return hrefs[0] if hrefs else None
+        # Success case
+        if task_result['state'] == 'completed':
+            hrefs = [item for item in task_result['created_resources']
+                     if 'rpm/packages' in item]
+            return hrefs[0] if hrefs else None
+        return None
 
-    async def get_rpm_packages(self, params: dict = None) -> list:
-        ENDPOINT = 'pulp/api/v3/content/rpm/packages/'
-        response = await self.request('GET', ENDPOINT, params=params)
+    async def get_files(self, include_fields: typing.List[str] = None,
+                        exclude_fields: typing.List[str] = None,
+                        **params) -> list:
+        endpoint = 'pulp/api/v3/content/file/files'
+        response = await self.__get_content_info(
+            endpoint, include_fields=include_fields,
+            exclude_fields=exclude_fields, **params)
         if response['count'] == 0:
             return []
         return list(response['results'])
@@ -239,6 +280,10 @@ class PulpClient:
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
 
+    async def get_latest_repo_present_content(self, repo_version: str) -> dict:
+        repo_content = await self.get_by_href(repo_version)
+        return repo_content['content_summary']['present']
+
     async def create_rpm_distro(self, name: str, repository: str,
                                 base_path_start: str = 'builds') -> str:
         ENDPOINT = 'pulp/api/v3/distributions/rpm/rpm/'
@@ -252,15 +297,72 @@ class PulpClient:
         distro = await self.get_distro(task_result['created_resources'][0])
         return distro['base_url']
 
-    async def get_rpm_package(self, package_href,
-                              include_fields: typing.List[str] = None,
-                              exclude_fields: typing.List[str] = None):
+    async def __get_content_info(self, endpoint,
+                                 include_fields: typing.List[str] = None,
+                                 exclude_fields: typing.List[str] = None,
+                                 pure_url=False,
+                                 **search_params):
         params = {}
         if include_fields:
             params['fields'] = include_fields
         if exclude_fields:
             params['exclude_fields'] = exclude_fields
-        return await self.request('GET', package_href, params=params)
+        if search_params:
+            params.update(**search_params)
+
+        return await self.request('GET', endpoint, pure_url=pure_url,
+                                  params=params)
+
+    async def get_rpm_package(self, package_href,
+                              include_fields: typing.List[str] = None,
+                              exclude_fields: typing.List[str] = None):
+        return await self.__get_content_info(
+            package_href, include_fields=include_fields,
+            exclude_fields=exclude_fields
+        )
+
+    async def get_rpm_packages(self, include_fields: typing.List[str] = None,
+                               exclude_fields: typing.List[str] = None,
+                               custom_endpoint: str = None,
+                               **search_params):
+        endpoint = 'pulp/api/v3/content/rpm/packages/'
+        if custom_endpoint:
+            endpoint = custom_endpoint
+        all_rpms = []
+        result = await self.__get_content_info(
+            endpoint, include_fields=include_fields,
+            exclude_fields=exclude_fields, **search_params)
+        if result['count'] == 0:
+            return []
+        all_rpms.extend(result['results'])
+        while result.get('next'):
+            new_url = result.get('next')
+            result = await self.__get_content_info(
+                new_url, pure_url=True, include_fields=include_fields,
+                exclude_fields=exclude_fields, **search_params)
+            all_rpms.extend(result['results'])
+        return all_rpms
+
+    async def get_rpm_repository_packages(
+            self, repository_href: str,
+            include_fields: typing.List[str] = None,
+            exclude_fields: typing.List[str] = None,
+            **search_params):
+        latest_version = await self.get_repo_latest_version(repository_href)
+        params = {'repository_version': latest_version, 'limit': 10000}
+        params.update(**search_params)
+        return await self.get_rpm_packages(
+            include_fields=include_fields, exclude_fields=exclude_fields,
+            **params
+        )
+
+    async def get_artifact(self, package_href,
+                           include_fields: typing.List[str] = None,
+                           exclude_fields: typing.List[str] = None):
+        return await self.__get_content_info(
+            package_href, include_fields=include_fields,
+            exclude_fields=exclude_fields
+        )
 
     async def remove_artifact(self, artifact_href: str,
                               need_wait_sync: bool=False):
@@ -329,13 +431,12 @@ class PulpClient:
                                          fse_name: str,
                                          fse_path: str,
                                          fse_method: str = 'hardlink'):
-        endpoint = fse_pulp_href
         params = {
             'name': fse_name,
             'path': fse_path,
             'method': fse_method
         }
-        update_task = await self.request('PUT', endpoint, data=params)
+        update_task = await self.request('PUT', fse_pulp_href, data=params)
         task_result = await self.wait_for_task(update_task['task'])
         return task_result
 
@@ -353,8 +454,7 @@ class PulpClient:
             return []
 
     async def get_filesystem_exporter(self, fse_pulp_href: str):
-        endpoint = fse_pulp_href
-        return await self.request('GET', endpoint)
+        return await self.request('GET', fse_pulp_href)
 
     async def export_to_filesystem(self, fse_pulp_href: str,
                                    fse_repository_version: str):
@@ -366,9 +466,30 @@ class PulpClient:
         await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
-    async def get_repo_latest_version(self, repo_href: str):
+    async def get_repo_latest_version(self, repo_href: str,
+                                      for_releases: bool = False):
         repository_data = await self.request('GET', repo_href)
+        if for_releases:
+            return (repository_data.get('latest_version_href'),
+                    '-debug-' in repository_data['name'])
         return repository_data.get('latest_version_href')
+
+    async def get_rpm_publications(
+            self, repository_version_href: str = None,
+            include_fields: typing.List[str] = None,
+            exclude_fields: typing.List[str] = None):
+        endpoint = 'pulp/api/v3/publications/rpm/rpm/'
+        params = {}
+        if repository_version_href:
+            params['repository_version'] = repository_version_href
+        if include_fields:
+            params['fields'] = include_fields
+        if exclude_fields:
+            params['exclude_fields'] = exclude_fields
+        result = await self.request('GET', endpoint, params=params)
+        if result['count'] == 0:
+            return []
+        return list(result['results'])
 
     async def get_distro(self, distro_href: str):
         return await self.request('GET', distro_href)
@@ -376,15 +497,21 @@ class PulpClient:
     async def wait_for_task(self, task_href: str):
         task = await self.request('GET', task_href)
         while task['state'] not in ('failed', 'completed'):
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
             task = await self.request('GET', task_href)
+        if task['state'] == 'failed':
+            raise Exception(f'Task {str(task)} has failed')
         return task
 
     async def request(
-        self, method: str, endpoint: str, params: dict = None,
-        json: dict = None, data: dict = None, headers: dict = None
+        self, method: str, endpoint: str, pure_url: bool = False,
+        params: dict = None, json: dict = None, data: dict = None,
+        headers: dict = None
     ):
-        full_url = urllib.parse.urljoin(self._host, endpoint)
+        if pure_url:
+            full_url = endpoint
+        else:
+            full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.request(
                 method,
@@ -398,3 +525,13 @@ class PulpClient:
                 response_json = await response.json()
                 response.raise_for_status()
                 return response_json
+
+
+async def create_entity(pulp_client: PulpClient, artifact):
+    if artifact.type == 'rpm':
+        entity_href = await pulp_client.create_rpm_package(
+            artifact.name, artifact.href)
+    else:
+        entity_href = await pulp_client.create_file(
+            artifact.name, artifact.href)
+    return entity_href, artifact

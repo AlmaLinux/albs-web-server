@@ -120,6 +120,7 @@ class Platform(Base):
         index=True
     )
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
+    weak_arch_list = sqlalchemy.Column(JSONB, nullable=True) 
     data = sqlalchemy.Column(JSONB, nullable=False)
     is_reference = sqlalchemy.Column(
         sqlalchemy.Boolean, default=False, nullable=True)
@@ -357,6 +358,11 @@ class RpmModule(Base):
     arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
+
+    @property
+    def nvsca(self):
+        return (f'{self.name}-{self.version}-{self.stream}'
+                f'-{self.context}-{self.arch}')
 
 
 class BuildTaskArtifact(Base):

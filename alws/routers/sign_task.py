@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, WebSocket
 from alws import database
 from alws.crud import sign_task
 from alws.dependencies import get_db, get_redis, JWTBearer
+from alws import dramatiq
 from alws.schemas import sign_schema
 
 
@@ -45,9 +46,8 @@ async def get_available_sign_task(
 @router.post('/{sign_task_id}/complete/',
              response_model=sign_schema.SignTaskCompleteResponse)
 async def complete_sign_task(
-        sign_task_id: int, payload: sign_schema.SignTaskComplete,
-        db: database.Session = Depends(get_db)):
-    await sign_task.complete_sign_task(db, sign_task_id, payload)
+        sign_task_id: int, payload: sign_schema.SignTaskComplete):
+    dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
     return {'success': True}
 
 

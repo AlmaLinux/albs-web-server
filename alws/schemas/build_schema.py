@@ -75,7 +75,8 @@ class BuildTaskModuleRef(BaseModel):
 class BuildCreatePlatforms(BaseModel):
 
     name: str
-    arch_list: typing.List[str]
+    arch_list: typing.List[typing.Literal['x86_64', 'i686', 'aarch64', 'ppc64le',
+                                          's390x']]
 
 
 class BuildCreate(BaseModel):
@@ -85,6 +86,7 @@ class BuildCreate(BaseModel):
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     is_secure_boot: bool = False
+    skip_module_checking: bool = False
 
 
 class BuildPlatform(BaseModel):

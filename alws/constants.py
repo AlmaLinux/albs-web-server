@@ -6,10 +6,11 @@ from collections import namedtuple
 
 __all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
            'BuildTaskRefType', 'SignStatus', 'RepoType', 'ExportStatus',
-           'debuginfo_regex', 'REQUEST_TIMEOUT']
+           'debuginfo_regex', 'REQUEST_TIMEOUT', 'DRAMATIQ_TASK_TIMEOUT']
 
 
 REQUEST_TIMEOUT = 60  # 1 minute
+DRAMATIQ_TASK_TIMEOUT = 3600000  # 1 hour in milliseconds
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -89,3 +90,5 @@ build_ref_int_mapping: typing.Dict[int, str] = {
 debuginfo_regex = re.compile(r'debug(info|source)')
 
 RepoType = namedtuple('RepoType', ('name', 'arch', 'debug'))
+PackageNevra = namedtuple('PackageNevra',
+                          ('name', 'epoch', 'version', 'release', 'arch'))
