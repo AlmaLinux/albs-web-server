@@ -54,7 +54,10 @@ async def get_available_build_task(
                     models.Build.user),
                 selectinload(models.BuildTask.build).selectinload(
                     models.Build.linked_builds).selectinload(
-                    models.Build.repos)
+                    models.Build.repos),
+                selectinload(models.BuildTask.build).selectinload(
+                    models.Build.platform_flavours).selectinload(
+                    models.PlatformFlavour.repos)
             ).order_by(models.BuildTask.id)
         )
         db_task = db_task.scalars().first()

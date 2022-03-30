@@ -30,7 +30,7 @@ PlatformRepo = sqlalchemy.Table(
 )
 
 FlavourRepo = sqlalchemy.Table(
-    'flavour_repository',
+    'platform_flavour_repository',
     Base.metadata,
     sqlalchemy.Column(
         'flavour_id',
@@ -45,6 +45,22 @@ FlavourRepo = sqlalchemy.Table(
         primary_key=True
     )
 )
+
+BuildPlatformFlavour = sqlalchemy.Table(
+    'build_platform_flavour',
+    Base.metadata,
+    sqlalchemy.Column(
+        'flavour_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platform_flavours.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        primary_key=True
+    )
 
 
 PlatformDependency = sqlalchemy.Table(
@@ -281,6 +297,9 @@ class Build(Base):
     release = relationship('Release')
     source_rpms = relationship('SourceRpm', back_populates='build')
     binary_rpms = relationship('BinaryRpm', back_populates='build')
+    platform_flavors = relationship(
+        'PlatformFlavour', secondary=BuildPlatformFlavour
+    )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                nullable=True)

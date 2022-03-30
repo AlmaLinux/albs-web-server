@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.build_planner import BuildPlanner
 from alws.config import settings
 from alws.errors import DataNotFoundError
 from alws.schemas import build_schema
@@ -25,6 +24,13 @@ async def create_build(
         user_id=user_id,
         mock_options=build.mock_options
     )
+    if build.platform_flavours:
+        flavours = await db.execute(select(models.PlafromFlavour).where(
+            models.PlatformFlavour.id.in_(build.platform_flavours)
+        ))
+        flavours = flavours.scalars().all()
+        for flavour in flavours:
+            db_build.platform_flavors.append(flavour)
     db.add(db_build)
     await db.commit()
     await db.refresh(db_build)
