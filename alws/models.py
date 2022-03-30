@@ -61,7 +61,7 @@ BuildPlatformFlavour = sqlalchemy.Table(
         sqlalchemy.ForeignKey('builds.id'),
         primary_key=True
     )
-
+)
 
 PlatformDependency = sqlalchemy.Table(
     'platform_dependency',
