@@ -24,12 +24,12 @@ async def create_build(
         user_id=user_id,
         mock_options=build.mock_options
     )
-    if build.platform_flavours:
-        flavours = await db.execute(select(models.PlafromFlavour).where(
-            models.PlatformFlavour.id.in_(build.platform_flavours)
+    if build.platform_flavors:
+        flavors = await db.execute(select(models.PlatformFlavour).where(
+            models.PlatformFlavour.id.in_(build.platform_flavors)
         ))
-        flavours = flavours.scalars().all()
-        for flavour in flavours:
+        flavors = flavors.scalars().all()
+        for flavour in flavors:
             db_build.platform_flavors.append(flavour)
     db.add(db_build)
     await db.commit()

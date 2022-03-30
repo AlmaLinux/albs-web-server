@@ -76,8 +76,8 @@ async def get_task(
         for repo in build.repos:
             if repo.arch == task.arch and repo.type != 'build_log':
                 response['repositories'].append(repo)
-    if task.build.platform_flavours:
-        for flavour in task.build.platform_flavours:
+    if task.build.platform_flavors:
+        for flavour in task.build.platform_flavors:
             for repo in flavour.repos:
                 if repo.arch == task.arch:
                     response['repositories'].append(repo)
