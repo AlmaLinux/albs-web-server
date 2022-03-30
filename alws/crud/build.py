@@ -190,6 +190,10 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
+        await db.execute(
+            delete(models.SignTask).where(
+                models.SignTask.build_id == build_id)
+        )
         await db.execute(delete(models.BinaryRpm).where(
             models.BinaryRpm.build_id == build_id))
         await db.execute(delete(models.SourceRpm).where(
