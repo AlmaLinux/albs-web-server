@@ -628,7 +628,7 @@ class PlatformFlavour(Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
-    repos = relationship('Repository', secondary=PlatformRepo)
+    repos = relationship('Repository', secondary=FlavourRepo)
 
 
 async def create_tables():

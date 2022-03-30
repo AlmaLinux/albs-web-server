@@ -56,7 +56,7 @@ async def get_available_build_task(
                     models.Build.linked_builds).selectinload(
                     models.Build.repos),
                 selectinload(models.BuildTask.build).selectinload(
-                    models.Build.platform_flavours).selectinload(
+                    models.Build.platform_flavors).selectinload(
                     models.PlatformFlavour.repos)
             ).order_by(models.BuildTask.id)
         )

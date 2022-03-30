@@ -8,8 +8,8 @@ from alws.schemas import platform_flavors_schema as pf_schema
 from alws.crud import platform_flavors as pf_crud
 
 router = APIRouter(
-    prefix='/platform_flavours',
-    tags=['platform_flavours'],
+    prefix='/platform_flavors',
+    tags=['platform_flavors'],
     dependencies=[Depends(JWTBearer())]
 )
 
