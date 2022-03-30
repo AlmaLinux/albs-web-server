@@ -95,7 +95,7 @@ async def get_builds(
                 for key, value in search_params.dict().items()
                 if key.startswith('rpm_') and value is not None
             })
-            pulp_hrefs = await pulp_client.get_rpm_packages(pulp_params)
+            pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
             pulp_hrefs = [row['pulp_href'] for row in pulp_hrefs]
             query = query.filter(sqlalchemy.and_(
                 models.BuildTaskArtifact.href.in_(pulp_hrefs),
