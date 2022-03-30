@@ -29,6 +29,23 @@ PlatformRepo = sqlalchemy.Table(
     )
 )
 
+FlavourRepo = sqlalchemy.Table(
+    'flavour_repository',
+    Base.metadata,
+    sqlalchemy.Column(
+        'flavour_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platform_flavours.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'repository_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id'),
+        primary_key=True
+    )
+)
+
 
 PlatformDependency = sqlalchemy.Table(
     'platform_dependency',
@@ -585,6 +602,14 @@ class RepoExporter(Base):
     )
     repository = relationship('Repository')
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+
+
+class PlatformFlavour(Base):
+    __tablename__ = 'platform_flavours'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    repos = relationship('Repository', secondary=PlatformRepo)
 
 
 async def create_tables():
