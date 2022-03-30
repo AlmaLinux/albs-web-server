@@ -18,6 +18,9 @@
       - name: '8.5'
         version_prefix: '80500'
         dist_prefix: 'el8.5.0'
+      - name: '8.6'
+        version_prefix: '80600'
+        dist_prefix: 'el8.6.0'
   type: rpm
   arch_list:
     - i686
