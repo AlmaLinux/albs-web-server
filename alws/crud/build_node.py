@@ -158,9 +158,9 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                 try:
                     await pulp_client.modify_repository(
                         repo.pulp_href, add=hrefs)
-                except Exception as e:
+                except Exception:
                     logging.exception('Cannot add RPM packages '
-                                      'to the repository: %s', e)
+                                      'to the repository: %s', str(repo))
                     raise RepositoryAddError(
                         f'Cannot add RPM packages to the repository {str(repo)}')
 
@@ -175,8 +175,8 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
         )
 
     if module_index:
-        results = await asyncio.gather((__get_rpm_package_info(
-            pulp_client, rpm.href) for rpm in rpms))
+        results = await asyncio.gather(*[__get_rpm_package_info(
+            pulp_client, rpm.href) for rpm in rpms])
         packages_info = dict(results)
         try:
             for module in module_index.iter_modules():
