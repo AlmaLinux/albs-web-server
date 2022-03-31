@@ -132,7 +132,6 @@ async def get_module_preview(
         task=module_request.ref,
         platform=platform,
         platform_arches=module_request.platform_arches,
-        skip_module_checking=module_request.skip_module_checking,
     )
     return build_schema.ModulePreview(
         refs=refs,

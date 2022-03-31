@@ -27,6 +27,7 @@ class BuildTaskRef(BaseModel):
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[typing.Union[int, str]]
     is_module: typing.Optional[bool] = False
+    enabled: bool = True
     module_platform_version: typing.Optional[str] = None
     module_version: typing.Optional[str] = None
 
@@ -87,7 +88,6 @@ class BuildCreate(BaseModel):
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     platform_flavors: typing.Optional[typing.List[int]] = None
     is_secure_boot: bool = False
-    skip_module_checking: bool = False
 
 
 class BuildPlatform(BaseModel):
@@ -221,7 +221,6 @@ class ModulePreviewRequest(BaseModel):
     ref: BuildTaskRef
     platform_name: str
     platform_arches: typing.List[str] = []
-    skip_module_checking: bool = False
 
 
 class ModuleRef(BaseModel):
@@ -244,6 +243,7 @@ class ModulePreview(BaseModel):
 async def get_module_data_from_beholder(
     beholder_client: BeholderClient,
     endpoint: str,
+    devel: bool = False, 
 ) -> dict:
     result = {}
     try:
@@ -251,41 +251,43 @@ async def get_module_data_from_beholder(
     except Exception:
         logging.error('Cannot get module info')
         return result
+    result['devel'] = devel
     result['arch'] = beholder_response['arch']
     result['artifacts'] = beholder_response.get('artifacts', [])
-    result['build_orders'] = {
-        item['buildorder']: item['name']
-        for item in beholder_response.get('components', [])
-    }
     return result
 
 
-async def compare_module_data(
+def compare_module_data(
     component_name: str,
-    beholder_data: dict,
+    beholder_data: typing.List[dict],
     tag_name: str,
 ) -> typing.List[dict]:
     pkgs_to_add = []
-    beholder_artifact = next((
-        artifact_dict
-        for artifact_dict in beholder_data.get('artifacts', [])
-        if artifact_dict['sourcerpm']['name'] == component_name
-    ), None)
-    if beholder_artifact is None:
-        return pkgs_to_add
-    srpm = beholder_artifact['sourcerpm']
-    beholder_tag_name = f"{srpm['name']}-{srpm['version']}-{srpm['release']}"
-    beholder_tag_name = clean_module_tag(beholder_tag_name)
-    if beholder_tag_name == tag_name:
-        pkgs_to_add = beholder_artifact['packages']
+    for beholder_dict in beholder_data:
+        beholder_artifact = None
+        for artifact_dict in beholder_dict.get('artifacts', []):
+            artifacr_srpm = artifact_dict.get('sourcerpm')
+            if artifacr_srpm is None:
+                continue
+            if artifacr_srpm.get('name', '') == component_name:
+                beholder_artifact = artifact_dict
+                break
+        if beholder_artifact is None:
+            return pkgs_to_add
+        srpm = beholder_artifact['sourcerpm']
+        beholder_tag_name = (f"{srpm['name']}-{srpm['version']}-"
+                             f"{srpm['release']}")
+        beholder_tag_name = clean_module_tag(beholder_tag_name)
+        if beholder_tag_name == tag_name:
+            pkgs_to_add.extend(beholder_artifact['packages'])
     return pkgs_to_add
 
 
 def clean_module_tag(tag: str):
     clean_tag = re.sub(r'\.alma.*$', '', tag)
-    result = re.sub(r'\.module.*', '', clean_tag)
     raw_part = re.search(r'\.module.*', clean_tag).group()
     latest = re.search(r'\.\d*$', raw_part)
+    result = re.sub(r'\.module.*', '', clean_tag)
     if latest is not None:
         result += latest.group()
     return result
@@ -299,7 +301,7 @@ async def _get_module_ref(
     gitea_client: GiteaClient,
     devel_module: typing.Optional[ModuleWrapper],
     platform_packages_git: str,
-    beholder_data: dict,
+    beholder_data: typing.List[dict],
 ):
     ref_prefix = platform_prefix_list['non_modified']
     if component_name in modified_list:
@@ -309,6 +311,7 @@ async def _get_module_ref(
     commit_id = ''
     enabled = True
     pkgs_to_add = []
+    clean_tag_name = ''
     try:
         response = await gitea_client.get_branch(
             f'rpms/{component_name}', git_ref
@@ -320,22 +323,35 @@ async def _get_module_ref(
     if commit_id:
         tags = await gitea_client.list_tags(f'rpms/{component_name}')
         raw_tag_name = next((
-            tag['name']
-            for tag in tags
+            tag['name'] for tag in tags
             if tag['id'] == commit_id
         ), None)
         if raw_tag_name is not None:
             # we need only last part from tag to comparison
             # imports/c8-stream-rhel8/golang-1.16.7-1.module+el8.5.0+12+1aae3f
             tag_name = raw_tag_name.split('/')[-1]
-            tag_name = clean_module_tag(tag_name)
-            pkgs_to_add = await compare_module_data(
-                component_name, beholder_data, tag_name)
+            clean_tag_name = clean_module_tag(tag_name)
+            data_to_compare = [
+                data for data in beholder_data
+                if not data.get('devel', True)
+            ]
+            pkgs_to_add = compare_module_data(
+                component_name, data_to_compare, clean_tag_name)
+            enabled = not pkgs_to_add
     for pkg_dict in pkgs_to_add:
         module.add_rpm_artifact(pkg_dict)
     module.set_component_ref(component_name, commit_id)
     if devel_module:
         devel_module.set_component_ref(component_name, commit_id)
+        if clean_tag_name:
+            data_to_compare = [
+                data for data in beholder_data
+                if data.get('devel', False)
+            ]
+            pkgs_to_add = compare_module_data(
+                component_name, data_to_compare, clean_tag_name)
+            for pkg_dict in pkgs_to_add:
+                devel_module.add_rpm_artifact(pkg_dict)
     return ModuleRef(
         url=f'{platform_packages_git}{component_name}.git',
         git_ref=git_ref,
@@ -352,7 +368,6 @@ async def get_module_refs(
     task: BuildTaskRef,
     platform: models.Platform,
     platform_arches: typing.List[str],
-    skip_module_checking: bool = False,
 ) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
 
     result = []
@@ -399,28 +414,36 @@ async def get_module_refs(
         stream=task.module_stream_from_ref()
     )
     checking_tasks = []
-    if not skip_module_checking:
-        for arch in platform_arches:
+    for arch in platform_arches:
+        endpoint = (
+            f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
+            f'/module/{module.name}/{module.stream}/{arch}/'
+        )
+        checking_tasks.append(get_module_data_from_beholder(
+            beholder_client, endpoint))
+        if devel_module is not None:
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                f'/module/{module.name}/{module.stream}/{arch}/'
+                f'/module/{devel_module.name}/{devel_module.stream}/{arch}/'
             )
             checking_tasks.append(get_module_data_from_beholder(
-                beholder_client, endpoint))
+                beholder_client, endpoint, devel=True))
     beholder_results = await asyncio.gather(*checking_tasks)
-    beholder_results = next((data for data in beholder_results if data), {})
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
     platform_packages_git = platform.modularity['packages_git']
     component_tasks = []
     for component_name, _ in module.iter_components():
-        component_tasks.append(
-            _get_module_ref(
-                component_name, modified_list, platform_prefix_list,
-                module, gitea_client, devel_module, platform_packages_git,
-                beholder_results,
-            )
-        )
+        component_tasks.append(_get_module_ref(
+            component_name=component_name,
+            modified_list=modified_list,
+            platform_prefix_list=platform_prefix_list,
+            module=module,
+            gitea_client=gitea_client,
+            devel_module=devel_module,
+            platform_packages_git=platform_packages_git,
+            beholder_data=beholder_results,
+        ))
     result = await asyncio.gather(*component_tasks)
     modules = [module.render()]
     if devel_module:
