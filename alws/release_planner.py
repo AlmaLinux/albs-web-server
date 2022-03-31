@@ -521,6 +521,8 @@ class ReleasePlanner:
                 repo_name = repository['name']
                 repo_arch = repository['arch']
                 if repo_id in existing_repo_ids and not force_flag:
+                    if package['href_from_repo'] is not None:
+                        continue
                     full_repo_name = (
                         f"{repo_name}-"
                         f"{'debug-' if repository['debug'] else ''}"
