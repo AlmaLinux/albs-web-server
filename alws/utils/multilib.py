@@ -27,10 +27,13 @@ async def get_multilib_packages(
         src_rpm: str,
 ) -> (dict, list):
 
-    async def call_beholder(endpoint: str) -> dict:
+    async def call_beholder(endpoint: str, is_module: bool = False) -> dict:
         response = {}
+        params = {}
+        if is_module:
+            params['match'] = 'closest'
         try:
-            response = await beholder_client.get(endpoint)
+            response = await beholder_client.get(endpoint, params=params)
         except Exception:
             logging.error(
                 "Cannot get multilib packages, trying next reference platform",
@@ -97,7 +100,7 @@ async def get_multilib_packages(
         if is_module:
             endpoint = (f'api/v1/distros/{ref_name}/{ref_ver}/module/'
                         f'{module_name}/{module_stream}/x86_64/')
-        beholder_response = await call_beholder(endpoint)
+        beholder_response = await call_beholder(endpoint, is_module=is_module)
         multilib_packages = await parse_beholder_response(beholder_response,
                                                           is_module)
         if multilib_packages:
@@ -110,7 +113,7 @@ async def get_multilib_packages(
         if is_module:
             endpoint = (f'api/v1/distros/{distr_name}/{distr_ver}/module/'
                         f'{module_name}/{module_stream}/x86_64/')
-        beholder_response = await call_beholder(endpoint)
+        beholder_response = await call_beholder(endpoint, is_module=is_module)
         multilib_packages = await parse_beholder_response(beholder_response,
                                                           is_module)
 

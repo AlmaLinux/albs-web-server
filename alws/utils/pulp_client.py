@@ -9,6 +9,7 @@ import aiohttp
 # TODO: Return retries for GET requests
 # from aiohttp_retry import RetryClient
 
+from alws.constants import REQUEST_TIMEOUT
 from alws.utils.file_utils import hash_content
 from alws.utils.ids import get_random_unique_version
 
@@ -22,6 +23,7 @@ class PulpClient:
         self._host = host
         self._username = username
         self._password = password
+        self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
         self._auth = aiohttp.BasicAuth(self._username, self._password)
 
     async def create_log_repo(
@@ -525,13 +527,14 @@ class PulpClient:
             full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.request(
-                    method,
-                    full_url,
-                    params=params,
-                    json=json,
-                    data=data,
-                    headers=headers,
-                    auth=self._auth
+                method,
+                full_url,
+                params=params,
+                json=json,
+                data=data,
+                headers=headers,
+                auth=self._auth,
+                timeout=self.__timeout
             ) as response:
                 response_json = await response.json()
                 response.raise_for_status()
