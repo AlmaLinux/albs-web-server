@@ -200,10 +200,12 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
         return
     logs = []
     str_task_id = str(task_id)
-    repo = next(
-        repo for repo in repositories
-        if repo.name.endswith(str_task_id)
-    )
+    repo = [repo for repo in repositories
+            if repo.name.endswith(str_task_id)]
+    if not repo:
+        logging.error('Log repository is absent, skipping logs processing')
+        return
+    repo = repo[0]
     files = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
