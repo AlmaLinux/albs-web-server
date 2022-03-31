@@ -322,7 +322,8 @@ class BuildPlanner:
             arch_tasks = []
             arch_list = self._request_platforms[platform.name]
             if 'i686' in arch_list and arch_list.index('i686') != 0:
-                arch_list.insert(0, arch_list.pop(arch_list.index('i686')))
+                arch_list.remove('i686')
+                arch_list.insert(0, 'i686')
                 self._request_platforms[platform.name] = arch_list
             for arch in self._request_platforms[platform.name]:
                 modules = self._modules_by_target.get(

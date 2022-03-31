@@ -23,7 +23,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import add_multilib_packages, get_multilib_packages
 from alws.utils.noarch import save_noarch_packages
-from alws.utils.pulp_client import PulpClient, create_entity
+from alws.utils.pulp_client import PulpClient
 
 
 async def get_available_build_task(
@@ -45,16 +45,20 @@ async def get_available_build_task(
                         )
                     )
                 ).options(
-                selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.repos),
-                selectinload(models.BuildTask.platform).selectinload(
-                    models.Platform.repos),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.linked_builds).selectinload(
-                    models.Build.repos)
+                    selectinload(models.BuildTask.ref),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.repos),
+                    selectinload(models.BuildTask.platform).selectinload(
+                        models.Platform.repos),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.user),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.linked_builds).selectinload(
+                        models.Build.repos),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.platform_flavors).selectinload(
+                        models.PlatformFlavour.repos),
+                    selectinload(models.BuildTask.rpm_module)
             ).order_by(models.BuildTask.id)
         )
         db_task = db_task.scalars().first()
@@ -134,11 +138,11 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
     debug_packages_tasks = []
     for artifact in task_artifacts:
         if artifact.arch == 'src' and built_srpm_url is None:
-            src_packages_tasks.append(create_entity(pulp_client, artifact))
+            src_packages_tasks.append(pulp_client.create_entity(artifact))
         elif artifact.is_debuginfo:
-            debug_packages_tasks.append(create_entity(pulp_client, artifact))
+            debug_packages_tasks.append(pulp_client.create_entity(artifact))
         else:
-            arch_packages_tasks.append(create_entity(pulp_client, artifact))
+            arch_packages_tasks.append(pulp_client.create_entity(artifact))
 
     processed_packages = []
     for tasks, repo in (
@@ -148,8 +152,8 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
             try:
                 results = await asyncio.gather(*tasks)
             except Exception as e:
-                logging.exception('Cannot create RPM packages for error: %s',
-                                  str(e))
+                logging.exception('Cannot create RPM packages for repo %s',
+                                  str(repo))
                 raise ArtifactConversionError(
                     'Cannot put RPM packages into Pulp storage: %s', str(e))
             else:
@@ -158,9 +162,9 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                 try:
                     await pulp_client.modify_repository(
                         repo.pulp_href, add=hrefs)
-                except Exception as e:
-                    logging.error('Cannot add RPM packages to the repository: %s',
-                                  str(e))
+                except Exception:
+                    logging.exception('Cannot add RPM packages '
+                                      'to the repository: %s', str(repo))
                     raise RepositoryAddError(
                         f'Cannot add RPM packages to the repository {str(repo)}')
 
@@ -191,32 +195,35 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
 
 async def __process_logs(pulp_client: PulpClient, task_id: int,
                          task_artifacts: list, repositories: list):
+    if not repositories:
+        logging.error('Log repository is absent, skipping logs processing')
+        return
     logs = []
     str_task_id = str(task_id)
     repo = next(
         repo for repo in repositories
         if repo.name.endswith(str_task_id)
     )
-    files = [create_entity(pulp_client, artifact)
+    files = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
         results = await asyncio.gather(*files)
     except Exception as e:
-        logging.error('Cannot create log files for %s, error: %s',
-                      str(repo), str(e))
+        logging.exception('Cannot create log files for %s', str(repo))
         raise ArtifactConversionError(
             f'Cannot create log files for {str(repo)}, error: {str(e)}')
-    else:
-        for href, artifact in results:
-            logs.append(
-                models.BuildTaskArtifact(
-                    build_task_id=task_id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    href=href
-                )
+
+    hrefs = []
+    for href, artifact in results:
+        logs.append(
+            models.BuildTaskArtifact(
+                build_task_id=task_id,
+                name=artifact.name,
+                type=artifact.type,
+                href=href
             )
-    hrefs = [item[0] for item in results]
+        )
+        hrefs.append(href)
     try:
         await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
     except Exception as e:
@@ -239,20 +246,20 @@ async def __process_build_task_artifacts(
             models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos
-            ),
             selectinload(models.BuildTask.rpm_module)
         )
     )
     build_task = build_tasks.scalars().first()
     module_index = None
     module_repo = None
+    query = select(models.Repository).join(models.BuildRepo).where(
+        models.BuildRepo.c.build_id == build_task.build_id)
+    repositories = list((await db.execute(query)).scalars().all())
     if build_task.rpm_module:
         module_repo = next(
-            build_repo for build_repo in build_task.build.repos
+            build_repo for build_repo in repositories
             if build_repo.arch == build_task.arch
-            and not build_repo.debug
+            and build_repo.debug is False
             and build_repo.type == 'rpm'
         )
         try:
@@ -266,7 +273,6 @@ async def __process_build_task_artifacts(
     rpm_artifacts = [item for item in task_artifacts if item.type == 'rpm']
     log_artifacts = [item for item in task_artifacts
                      if item.type == 'build_log']
-    repositories = list(build_task.build.repos)
     rpm_repositories = [repo for repo in repositories
                         if repo.type == 'rpm']
     log_repositories = [repo for repo in repositories
@@ -406,7 +412,7 @@ async def build_done(
     ), None)
     multilib_conditions = (
         src_rpm is not None,
-        build_task.arch in ('x86_64', 'i686'),
+        build_task.arch == 'x86_64',
         status == BuildTaskStatus.COMPLETED,
         bool(settings.beholder_host),
         # TODO: Beholder doesn't have authorization right now

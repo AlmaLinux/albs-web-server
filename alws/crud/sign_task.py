@@ -5,11 +5,12 @@ import urllib.parse
 
 from sqlalchemy import update
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
+from alws.database import Session
 from alws.errors import BuildAlreadySignedError, DataNotFoundError, SignError
 from alws.schemas import sign_schema
 from alws.utils.debuginfo import is_debuginfo_rpm
@@ -148,10 +149,10 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     return sign_task_payload
 
 
-async def complete_sign_task(db: Session, sign_task_id: int,
+async def complete_sign_task(sign_task_id: int,
                              payload: sign_schema.SignTaskComplete) \
         -> models.SignTask:
-    async with db.begin():
+    async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
             selectinload(models.Build.repos)))
@@ -166,6 +167,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         binary_rpms = binary_rpms.scalars().all()
 
         all_rpms = source_rpms + binary_rpms
+        all_rpms_mapping = {r.id: r for r in all_rpms}
         modified_items = []
         repo_mapping = await __get_build_repos(
             db, payload.build_id, build=build)
@@ -181,8 +183,10 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         sign_task = sign_tasks.scalars().first()
 
         if payload.packages:
+            sorted_packages = sorted(payload.packages, key=lambda p: p.id)
+            dedup_mapping = {p.name: p for p in sorted_packages}
             packages_to_add = {}
-            for package in payload.packages:
+            for package in dedup_mapping.values():
                 # Check that package fingerprint matches the requested
                 if package.fingerprint != sign_task.sign_key.fingerprint:
                     logging.error('Package %s is signed with a wrong GPG key %s, '
@@ -191,8 +195,7 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                                   sign_task.sign_key.fingerprint)
                     sign_failed = True
                     continue
-                db_package = next(pkg for pkg in all_rpms
-                                  if pkg.id == package.id)
+                db_package = all_rpms_mapping[package.id]
                 debug = is_debuginfo_rpm(package.name)
                 repo = repo_mapping.get((package.arch, debug))
                 artifact_info = await pulp_client.get_artifact(
@@ -218,9 +221,11 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 modified_items.append(db_package)
                 modified_items.append(db_package.artifact)
 
+            tasks = []
             for repo_href, packages in packages_to_add.items():
-                await pulp_client.modify_repository(repo_href, add=packages)
-                await pulp_client.create_rpm_publication(repo_href)
+                tasks.append(pulp_client.modify_repository(
+                    repo_href, add=packages))
+            await asyncio.gather(*tasks)
 
         if payload.success and not sign_failed:
             sign_task.status = SignStatus.COMPLETED
@@ -235,10 +240,10 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         db.add(build)
         if modified_items:
             db.add_all(modified_items)
+        await db.commit()
         sign_tasks = await db.execute(select(models.SignTask).where(
             models.SignTask.id == sign_task_id).options(
             selectinload(models.SignTask.sign_key)))
-        await db.commit()
     return sign_tasks.scalars().first()
 
 

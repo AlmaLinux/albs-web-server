@@ -85,6 +85,7 @@ class BuildCreate(BaseModel):
     tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    platform_flavors: typing.Optional[typing.List[int]] = None
     is_secure_boot: bool = False
     skip_module_checking: bool = False
 

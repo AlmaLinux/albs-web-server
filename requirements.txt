@@ -18,3 +18,4 @@ dramatiq[rabbitmq, watch]
 python-multipart==0.0.5
 plumbum==1.7.2
 tap.py==3.1
+aiohttp_retry==2.4.6
