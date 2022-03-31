@@ -29,6 +29,39 @@ PlatformRepo = sqlalchemy.Table(
     )
 )
 
+FlavourRepo = sqlalchemy.Table(
+    'platform_flavour_repository',
+    Base.metadata,
+    sqlalchemy.Column(
+        'flavour_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platform_flavours.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'repository_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id'),
+        primary_key=True
+    )
+)
+
+BuildPlatformFlavour = sqlalchemy.Table(
+    'build_platform_flavour',
+    Base.metadata,
+    sqlalchemy.Column(
+        'flavour_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platform_flavours.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        primary_key=True
+    )
+)
 
 PlatformDependency = sqlalchemy.Table(
     'platform_dependency',
@@ -264,6 +297,9 @@ class Build(Base):
     release = relationship('Release')
     source_rpms = relationship('SourceRpm', back_populates='build')
     binary_rpms = relationship('BinaryRpm', back_populates='build')
+    platform_flavors = relationship(
+        'PlatformFlavour', secondary=BuildPlatformFlavour
+    )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                nullable=True)
@@ -585,6 +621,14 @@ class RepoExporter(Base):
     )
     repository = relationship('Repository')
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+
+
+class PlatformFlavour(Base):
+    __tablename__ = 'platform_flavours'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    repos = relationship('Repository', secondary=FlavourRepo)
 
 
 async def create_tables():

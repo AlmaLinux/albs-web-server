@@ -1,4 +1,3 @@
-
 __all__ = [
     'build_node',
     'builds',
@@ -11,5 +10,6 @@ __all__ = [
     'sign_task',
     'tests',
     'uploads',
-    'users'
+    'users',
+    'platform_flavors'
 ]
