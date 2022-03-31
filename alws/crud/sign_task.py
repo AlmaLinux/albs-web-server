@@ -5,11 +5,12 @@ import urllib.parse
 
 from sqlalchemy import update
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
+from alws.database import Session
 from alws.errors import BuildAlreadySignedError, DataNotFoundError, SignError
 from alws.schemas import sign_schema
 from alws.utils.debuginfo import is_debuginfo_rpm
@@ -148,10 +149,10 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     return sign_task_payload
 
 
-async def complete_sign_task(db: Session, sign_task_id: int,
+async def complete_sign_task(sign_task_id: int,
                              payload: sign_schema.SignTaskComplete) \
         -> models.SignTask:
-    async with db.begin():
+    async with Session().begin() as db:
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
             selectinload(models.Build.repos)))
