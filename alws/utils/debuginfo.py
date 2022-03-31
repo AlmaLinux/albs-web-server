@@ -8,4 +8,6 @@ __all__ = [
 
 def is_debuginfo_rpm(name: str) -> bool:
     regex = re.compile(r'-debug(info|source)')
+    if '-debuginfod' in name:
+        return False
     return bool(regex.search(name))

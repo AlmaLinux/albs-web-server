@@ -21,9 +21,10 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
-from alws.utils.multilib import add_multilib_packages, get_multilib_packages
+from alws.utils.multilib import add_multilib_packages, get_multilib_packages, add_multilib_module_artifacts
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
+from alws.utils.rpm_package import get_rpm_package_info, update_module_index
 
 
 async def get_available_build_task(
@@ -109,12 +110,6 @@ async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
     return build_tasks.scalars().first()
 
 
-async def __get_rpm_package_info(pulp_client: PulpClient, rpm_href: str) \
-        -> (str, dict):
-    info = await pulp_client.get_rpm_package(rpm_href)
-    return rpm_href, info
-
-
 async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          task_artifacts: list, repositories: list,
                          built_srpm_url: str = None, module_index=None):
@@ -184,16 +179,7 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
         )
 
     if module_index:
-        results = await asyncio.gather(*[__get_rpm_package_info(
-            pulp_client, rpm.href) for rpm in rpms])
-        packages_info = dict(results)
-        try:
-            for module in module_index.iter_modules():
-                for rpm in rpms:
-                    rpm_package = packages_info[rpm.href]
-                    module.add_rpm_artifact(rpm_package)
-        except Exception as e:
-            raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
+        await update_module_index(module_index, pulp_client, rpms)
 
     return rpms
 
@@ -242,7 +228,8 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
 
 
 async def __process_build_task_artifacts(
-        db: Session, task_id: int, task_artifacts: list):
+        db: Session, task_id: int, task_artifacts: list,
+        task_status: BuildTaskStatus):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -301,6 +288,34 @@ async def __process_build_task_artifacts(
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index
     )
+    src_rpm = next((
+        artifact.name for artifact in task_artifacts
+        if artifact.arch == 'src' and artifact.type == 'rpm'
+    ), None)
+    multilib_conditions = (
+        src_rpm is not None,
+        build_task.arch == 'x86_64',
+        task_status == BuildTaskStatus.COMPLETED,
+        bool(settings.beholder_host),
+        # TODO: Beholder doesn't have authorization right now
+        # bool(settings.beholder_token),
+    )
+    if all(multilib_conditions):
+        try:
+            result = await get_multilib_packages(db, build_task, src_rpm)
+            if result and len(result) != 2:
+                logging.error('Wrong result from multilib detection: %s',
+                              ' '.join(result))
+            multilib_pkgs, module_artifacts = result
+            if multilib_pkgs:
+                await add_multilib_packages(db, build_task, multilib_pkgs)
+            if module_artifacts:
+                await add_multilib_module_artifacts(
+                    module_index, pulp_client, db, build_task,
+                    module_artifacts)
+        except Exception as e:
+            logging.exception('Cannot process multilib packages: %s', str(e))
+            raise MultilibProcessingError('Cannot process multilib packages')
     if build_task.rpm_module and module_index:
         try:
             module_pulp_href, sha256 = await pulp_client.create_module(
@@ -401,9 +416,14 @@ async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
+    status = BuildTaskStatus.COMPLETED
+    if request.status == 'failed':
+        status = BuildTaskStatus.FAILED
+    elif request.status == 'excluded':
+        status = BuildTaskStatus.EXCLUDED
     try:
         build_task = await __process_build_task_artifacts(
-            db, request.task_id, request.artifacts)
+            db, request.task_id, request.artifacts, status)
     except (ArtifactConversionError, ModuleUpdateError, RepositoryAddError) as e:
         update_query = update(models.BuildTask).where(
             models.BuildTask.id == request.task_id,
@@ -416,34 +436,6 @@ async def build_done(
         await db.execute(remove_query)
         await db.commit()
         raise e
-
-    status = BuildTaskStatus.COMPLETED
-    if request.status == 'failed':
-        status = BuildTaskStatus.FAILED
-    elif request.status == 'excluded':
-        status = BuildTaskStatus.EXCLUDED
-    src_rpm = next((
-        artifact.name for artifact in request.artifacts
-        if artifact.arch == 'src' and artifact.type == 'rpm'
-    ), None)
-    multilib_conditions = (
-        src_rpm is not None,
-        build_task.arch == 'x86_64',
-        status == BuildTaskStatus.COMPLETED,
-        bool(settings.beholder_host),
-        # TODO: Beholder doesn't have authorization right now
-        # bool(settings.beholder_token),
-    )
-    if all(multilib_conditions):
-        try:
-            multilib_pkgs, module_artifacts = await get_multilib_packages(
-                db, build_task, src_rpm)
-            if multilib_pkgs:
-                await add_multilib_packages(db, build_task,
-                                            multilib_pkgs, module_artifacts)
-        except Exception as e:
-            logging.exception('Cannot process multilib packages: %s', str(e))
-            raise MultilibProcessingError('Cannot process multilib packages')
 
     await db.execute(
         update(models.BuildTask).where(

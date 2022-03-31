@@ -20,6 +20,8 @@ __all__ = [
     'get_multilib_packages',
 ]
 
+from alws.utils.rpm_package import update_module_index
+
 
 async def get_multilib_packages(
         db: Session,
@@ -71,7 +73,6 @@ async def get_multilib_packages(
     db_build_tasks = await db.execute(query)
     task_arches = [task.arch for task in db_build_tasks.scalars().all()]
     result = {}
-    beholder_response = {}
     multilib_packages = []
     module_artifacts = []
     if 'i686' not in task_arches:
@@ -122,27 +123,11 @@ async def get_multilib_packages(
         for pkg in multilib_packages
         if pkg['is_multilib'] is True
     }
-    if is_module and multilib_packages:
-        for artifact_dict in beholder_response.get('artifacts', []):
-            for package in artifact_dict.get('packages', []):
-                if package['name'] in result:
-                    module_artifacts.append(package)
+    module_artifacts = multilib_packages if multilib_packages else []
     return result, module_artifacts
 
 
-async def add_multilib_packages(
-        db: Session,
-        build_task: models.BuildTask,
-        multilib_packages: dict,
-        # TODO: Need to add logic for updating module template 
-        # after placing multilib packages in pulp repos
-        module_artifacts: list,
-):
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
+async def get_build_task_artifacts(db: Session, build_task: models.BuildTask):
     subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
@@ -154,7 +139,23 @@ async def add_multilib_packages(
         models.BuildTaskArtifact.name.not_like('%src.rpm%'),
     ))
     db_artifacts = await db.execute(query)
-    db_artifacts = db_artifacts.scalars().all()
+    db_artifacts = list(db_artifacts.scalars().all())
+    return db_artifacts
+
+
+async def add_multilib_packages(
+        db: Session,
+        build_task: models.BuildTask,
+        multilib_packages: dict,
+        # TODO: Need to add logic for updating module template 
+        # after placing multilib packages in pulp repos
+):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    db_artifacts = await get_build_task_artifacts(db, build_task)
 
     artifacts = []
     pkg_hrefs = []
@@ -201,3 +202,19 @@ async def add_multilib_packages(
         pulp_client.modify_repository(
             repo_to=arch_repo.pulp_href, add=pkg_hrefs)
     )
+
+
+async def add_multilib_module_artifacts(module_index, pulp_client, db: Session,
+                                        build_task: models.BuildTask,
+                                        multilib_artifacts):
+    packages_to_process = {}
+    db_artifacts = await get_build_task_artifacts(db, build_task)
+    for artifact in multilib_artifacts:
+        if not artifact['is_multilib']:
+            continue
+        for package in db_artifacts:
+            if artifact['name'] in package.name:
+                packages_to_process[package.name] = package
+
+    await update_module_index(
+        module_index, pulp_client, list(packages_to_process.values()))
