@@ -228,28 +228,86 @@ class ModuleRef(BaseModel):
     url: str
     git_ref: str
     exist: bool
+    enabled: bool
     mock_options: dict
 
 
 class ModulePreview(BaseModel):
 
     refs: typing.List[ModuleRef]
-    excluded_components: typing.List[typing.Dict[str, str]] = []
     modules_yaml: str
     module_name: str
     module_stream: str
 
 
+async def get_module_data_from_beholder(
+    beholder_client: BeholderClient,
+    endpoint: str,
+) -> dict:
+    result = {}
+    try:
+        beholder_response = await beholder_client.get(endpoint)
+    except Exception:
+        logging.error('Cannot get module info')
+        return result
+    result['arch'] = beholder_response['arch']
+    result['artifacts'] = beholder_response.get('artifacts', [])
+    result['build_orders'] = {
+        item['buildorder']: item['name']
+        for item in beholder_response.get('components', [])
+    }
+    return result
+
+
+async def compare_module_data(
+    component_name: str,
+    beholder_data: dict,
+    tag_name: str,
+) -> typing.List[dict]:
+    pkgs_to_add = []
+    beholder_artifact = next((
+        artifact_dict
+        for artifact_dict in beholder_data.get('artifacts', [])
+        if artifact_dict['sourcerpm']['name'] == component_name
+    ), None)
+    if beholder_artifact is None:
+        return pkgs_to_add
+    srpm = beholder_artifact['sourcerpm']
+    beholder_tag_name = f"{srpm['name']}-{srpm['version']}-{srpm['release']}"
+    beholder_tag_name = clean_module_tag(beholder_tag_name)
+    if beholder_tag_name == tag_name:
+        pkgs_to_add = beholder_artifact['packages']
+    return pkgs_to_add
+
+
+def clean_module_tag(tag: str):
+    clean_tag = re.sub(r'\.alma.*$', '', tag)
+    result = re.sub(r'\.module.*', '', clean_tag)
+    raw_part = re.search(r'\.module.*', clean_tag).group()
+    latest = re.search(r'\.\d*$', raw_part)
+    if latest is not None:
+        result += latest.group()
+    return result
+
+
 async def _get_module_ref(
-            component_name, modified_list, platform_prefix_list,
-            module, gitea_client, devel_module, platform_packages_git
-        ):
+    component_name: str,
+    modified_list: list,
+    platform_prefix_list: list,
+    module: ModuleWrapper,
+    gitea_client: GiteaClient,
+    devel_module: typing.Optional[ModuleWrapper],
+    platform_packages_git: str,
+    beholder_data: dict,
+):
     ref_prefix = platform_prefix_list['non_modified']
     if component_name in modified_list:
         ref_prefix = platform_prefix_list['modified']
     git_ref = f'{ref_prefix}-stream-{module.stream}'
     exist = True
     commit_id = ''
+    enabled = True
+    pkgs_to_add = []
     try:
         response = await gitea_client.get_branch(
             f'rpms/{component_name}', git_ref
@@ -258,6 +316,22 @@ async def _get_module_ref(
     except aiohttp.client_exceptions.ClientResponseError as e:
         if e.status == 404:
             exist = False
+    if commit_id:
+        tags = await gitea_client.list_tags(f'rpms/{component_name}')
+        raw_tag_name = next((
+            tag['name']
+            for tag in tags
+            if tag['id'] == commit_id
+        ), None)
+        if raw_tag_name is not None:
+            # we need only last part from tag to comparison
+            # imports/c8-stream-rhel8/golang-1.16.7-1.module+el8.5.0+12+1aae3f
+            tag_name = raw_tag_name.split('/')[-1]
+            tag_name = clean_module_tag(tag_name)
+            pkgs_to_add = await compare_module_data(
+                component_name, beholder_data, tag_name)
+    for pkg_dict in pkgs_to_add:
+        module.add_rpm_artifact(pkg_dict)
     module.set_component_ref(component_name, commit_id)
     if devel_module:
         devel_module.set_component_ref(component_name, commit_id)
@@ -265,10 +339,9 @@ async def _get_module_ref(
         url=f'{platform_packages_git}{component_name}.git',
         git_ref=git_ref,
         exist=exist,
+        enabled=enabled,
         mock_options={
-            'definitions': {
-                k: v for k, v in module.iter_mock_definitions()
-            }
+            'definitions': dict(module.iter_mock_definitions()),
         },
         ref_type=BuildTaskRefType.GIT_BRANCH
     )
@@ -277,34 +350,9 @@ async def _get_module_ref(
 async def get_module_refs(
     task: BuildTaskRef,
     platform: models.Platform,
-    platform_arches: list[str],
+    platform_arches: typing.List[str],
     skip_module_checking: bool = False,
-) -> tuple[list[ModuleRef], list[str], list[dict[str, str]]]:
-    async def check_module_updates(endpoint: str) -> None:
-        try:
-            beholder_response = await beholder_client.get(endpoint)
-        except Exception:
-            logging.error('Cannot get module info')
-            return
-        beholder_components = {
-            item['ref']: item['name']
-            for item in beholder_response.get('components', [])
-        }
-        for ref_id, component_name in beholder_components.items():
-            try:
-                git_branch = await gitea_client.get_branch(
-                    f'rpms/{component_name}', task.git_ref)
-                git_ref_id = git_branch['commit']['id']
-            except Exception:
-                logging.exception('Cannot get git_ref_commit_id:')
-                continue
-            if git_ref_id == ref_id:
-                for artifact in beholder_response['artifacts']:
-                    srpm_name = artifact['sourcerpm']['name']
-                    if srpm_name != component_name:
-                        continue
-                    components_to_exclude.append(srpm_name)
-                    pkgs_to_add.extend(artifact['packages'])
+) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
 
     result = []
     gitea_client = GiteaClient(
@@ -316,8 +364,6 @@ async def get_module_refs(
         host=settings.beholder_host,
         token=settings.beholder_token,
     )
-    components_to_exclude = []
-    pkgs_to_add = []
     clean_dist_name = re.search(
         r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
     ).groupdict().get('dist_name', '')
@@ -358,29 +404,24 @@ async def get_module_refs(
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
                 f'/module/{module.name}/{module.stream}/{arch}/'
             )
-            checking_tasks.append(check_module_updates(endpoint))
-    await asyncio.gather(*checking_tasks)
+            checking_tasks.append(get_module_data_from_beholder(
+                beholder_client, endpoint))
+    beholder_results = await asyncio.gather(*checking_tasks)
+    beholder_results = next((data for data in beholder_results if data), {})
 
-    for pkg_dict in pkgs_to_add:
-        module.add_rpm_artifact(pkg_dict)
     platform_prefix_list = platform.modularity['git_tag_prefix']
     platform_packages_git = platform.modularity['packages_git']
     component_tasks = []
     for component_name, _ in module.iter_components():
-        if component_name in components_to_exclude:
-            continue
         component_tasks.append(
             _get_module_ref(
                 component_name, modified_list, platform_prefix_list,
-                module, gitea_client, devel_module, platform_packages_git
+                module, gitea_client, devel_module, platform_packages_git,
+                beholder_results,
             )
         )
     result = await asyncio.gather(*component_tasks)
     modules = [module.render()]
     if devel_module:
         modules.append(devel_module.render())
-    components_to_exclude = [
-        {'url': component_name, 'git_ref': task.git_ref}
-        for component_name in set(components_to_exclude)
-    ]
-    return result, modules, components_to_exclude
+    return result, modules
