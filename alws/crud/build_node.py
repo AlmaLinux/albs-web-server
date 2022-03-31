@@ -45,19 +45,20 @@ async def get_available_build_task(
                         )
                     )
                 ).options(
-                selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.repos),
-                selectinload(models.BuildTask.platform).selectinload(
-                    models.Platform.repos),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.user),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.linked_builds).selectinload(
-                    models.Build.repos),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.platform_flavors).selectinload(
-                    models.PlatformFlavour.repos)
+                    selectinload(models.BuildTask.ref),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.repos),
+                    selectinload(models.BuildTask.platform).selectinload(
+                        models.Platform.repos),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.user),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.linked_builds).selectinload(
+                        models.Build.repos),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.platform_flavors).selectinload(
+                        models.PlatformFlavour.repos),
+                    selectinload(models.BuildTask.rpm_module)
             ).order_by(models.BuildTask.id)
         )
         db_task = db_task.scalars().first()
