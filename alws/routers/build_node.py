@@ -76,8 +76,25 @@ async def get_task(
         for repo in build.repos:
             if repo.arch == task.arch and repo.type != 'build_log':
                 response['repositories'].append(repo)
+    if task.build.platform_flavors:
+        for flavour in task.build.platform_flavors:
+            for repo in flavour.repos:
+                if repo.arch == task.arch:
+                    response['repositories'].append(repo)
     if task.build.mock_options:
         response['platform'].add_mock_options(task.build.mock_options)
     if task.mock_options:
         response['platform'].add_mock_options(task.mock_options)
+    if task.rpm_module:
+        module = task.rpm_module
+        module_build_options = {'definitions': {
+            '_module_build': '1',
+            'modularitylabel': ':'.join([
+                module.name,
+                module.stream,
+                module.version,
+                module.context
+            ])
+        }}
+        response['platform'].add_mock_options(module_build_options)
     return response

@@ -6,6 +6,8 @@ import urllib.parse
 from typing import List
 
 import aiohttp
+# TODO: Return retries for GET requests
+# from aiohttp_retry import RetryClient
 
 from alws.utils.file_utils import hash_content
 from alws.utils.ids import get_random_unique_version
@@ -494,6 +496,15 @@ class PulpClient:
     async def get_distro(self, distro_href: str):
         return await self.request('GET', distro_href)
 
+    async def create_entity(self, artifact):
+        if artifact.type == 'rpm':
+            entity_href = await self.create_rpm_package(
+                artifact.name, artifact.href)
+        else:
+            entity_href = await self.create_file(
+                artifact.name, artifact.href)
+        return entity_href, artifact
+
     async def wait_for_task(self, task_href: str):
         task = await self.request('GET', task_href)
         while task['state'] not in ('failed', 'completed'):
@@ -514,24 +525,14 @@ class PulpClient:
             full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
             async with aiohttp.request(
-                method,
-                full_url,
-                params=params,
-                json=json,
-                data=data,
-                headers=headers,
-                auth=self._auth
+                    method,
+                    full_url,
+                    params=params,
+                    json=json,
+                    data=data,
+                    headers=headers,
+                    auth=self._auth
             ) as response:
                 response_json = await response.json()
                 response.raise_for_status()
                 return response_json
-
-
-async def create_entity(pulp_client: PulpClient, artifact):
-    if artifact.type == 'rpm':
-        entity_href = await pulp_client.create_rpm_package(
-            artifact.name, artifact.href)
-    else:
-        entity_href = await pulp_client.create_file(
-            artifact.name, artifact.href)
-    return entity_href, artifact

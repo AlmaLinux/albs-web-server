@@ -1,0 +1,74 @@
+- name: AlmaLinux-8-beta
+  repositories:
+    - name: almalinux-8-beta
+      arch: i686
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-i686-dr/
+      export_path: almalinux/8.6-beta/i686/
+      production: false
+      debug: false
+      priority: 5
+    - name: almalinux-8-beta
+      arch: x86_64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-x86_64-dr/
+      export_path: almalinux/8.6-beta/x86_64/
+      production: false
+      debug: false
+      priority: 5
+    - name: almalinux-8-beta
+      arch: aarch64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-aarch64-dr/
+      export_path: almalinux/8.6-beta/aarch64/
+      production: false
+      debug: false
+      priority: 5
+    - name: almalinux-8-beta
+      arch: ppc64le
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-ppc64le-dr/
+      export_path: almalinux/8.6-beta/ppc64le/
+      production: false
+      debug: false
+      priority: 5
+    - name: almalinux-8-beta-debuginfo
+      arch: i686
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-i686-dr/
+      export_path: almalinux/8.6-beta/debug/i686/
+      production: false
+      debug: true
+      priority: 5
+    - name: almalinux-8-beta-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-x86_64-dr/
+      export_path: almalinux/8.6-beta/debug/x86_64/
+      production: false
+      debug: true
+      priority: 5
+    - name: almalinux-8-beta-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-aarch64-dr/
+      export_path: almalinux/8.6-beta/debug/aarch64/
+      production: false
+      debug: true
+      priority: 5
+    - name: almalinux-8-beta-debuginfo
+      arch: ppc64le
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-ppc64le-dr/
+      export_path: almalinux/8.6-beta/debug/ppc64le/
+      production: false
+      debug: true
+      priority: 5
+    - name: almalinux-8-beta
+      arch: src
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-src-dr/
+      export_path: almalinux/8.6-beta/source/
+      production: false
+      debug: false
+      priority: 5
