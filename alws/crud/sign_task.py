@@ -152,7 +152,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
 async def complete_sign_task(sign_task_id: int,
                              payload: sign_schema.SignTaskComplete) \
         -> models.SignTask:
-    async with Session().begin() as db:
+    async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
             selectinload(models.Build.repos)))
