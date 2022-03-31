@@ -75,7 +75,7 @@ async def get_multilib_packages(
     multilib_packages = []
     module_artifacts = []
     if 'i686' not in task_arches:
-        return result
+        return result, module_artifacts
 
     beholder_client = BeholderClient(
         host=settings.beholder_host,
