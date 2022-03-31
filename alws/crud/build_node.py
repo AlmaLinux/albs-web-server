@@ -246,7 +246,10 @@ async def __process_build_task_artifacts(
             models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
-            selectinload(models.BuildTask.rpm_module)
+            selectinload(models.BuildTask.rpm_module),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos
+            ),
         )
     )
     build_task = build_tasks.scalars().first()
