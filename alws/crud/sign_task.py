@@ -182,8 +182,10 @@ async def complete_sign_task(db: Session, sign_task_id: int,
         sign_task = sign_tasks.scalars().first()
 
         if payload.packages:
+            sorted_packages = sorted(payload.packages, key=lambda p: p.id)
+            dedup_mapping = {p.name: p for p in sorted_packages}
             packages_to_add = {}
-            for package in payload.packages:
+            for package in dedup_mapping.values():
                 # Check that package fingerprint matches the requested
                 if package.fingerprint != sign_task.sign_key.fingerprint:
                     logging.error('Package %s is signed with a wrong GPG key %s, '

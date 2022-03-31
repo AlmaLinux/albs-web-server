@@ -194,6 +194,9 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
 
 async def __process_logs(pulp_client: PulpClient, task_id: int,
                          task_artifacts: list, repositories: list):
+    if not repositories:
+        logging.error('Log repository is absent, skipping logs processing')
+        return
     logs = []
     str_task_id = str(task_id)
     repo = next(
@@ -242,16 +245,15 @@ async def __process_build_task_artifacts(
             models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos
-            ),
             selectinload(models.BuildTask.rpm_module)
         )
     )
     build_task = build_tasks.scalars().first()
     module_index = None
     module_repo = None
-    repositories = list(build_task.build.repos)
+    query = select(models.Repository).join(models.BuildRepo).where(
+        models.BuildRepo.c.build_id == build_task.build_id)
+    repositories = list((await db.execute(query)).scalars().all())
     if build_task.rpm_module:
         module_repo = next(
             build_repo for build_repo in repositories
