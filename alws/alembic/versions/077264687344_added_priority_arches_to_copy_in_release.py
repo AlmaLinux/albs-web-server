@@ -1,7 +1,7 @@
 """Added priority arches to copy in release
 
 Revision ID: 077264687344
-Revises: 970f3174985b
+Revises: 5c3da459c12f
 Create Date: 2022-03-29 10:01:32.470281
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '077264687344'
-down_revision = '970f3174985b'
+down_revision = '5c3da459c12f'
 branch_labels = None
 depends_on = None
 
