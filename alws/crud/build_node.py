@@ -286,8 +286,9 @@ async def __process_build_task_artifacts(
     logging.info('Processing logs')
     logs_entries = await __process_logs(
         pulp_client, build_task.id, log_artifacts, log_repositories)
-    db.add_all(logs_entries)
-    await db.commit()
+    if logs_entries:
+        db.add_all(logs_entries)
+        await db.commit()
     logging.info('Logs processing is finished')
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
@@ -317,7 +318,8 @@ async def __process_build_task_artifacts(
                               str(e))
             raise ModuleUpdateError(message) from e
 
-    db.add_all(rpm_entries)
+    if rpm_entries:
+        db.add_all(rpm_entries)
     db.add(build_task)
     await db.commit()
     await db.refresh(build_task)
