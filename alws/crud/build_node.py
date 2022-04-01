@@ -200,10 +200,12 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
         return
     logs = []
     str_task_id = str(task_id)
-    repo = next(
-        repo for repo in repositories
-        if repo.name.endswith(str_task_id)
-    )
+    repo = [repo for repo in repositories
+            if repo.name.endswith(str_task_id)]
+    if not repo:
+        logging.error('Log repository is absent, skipping logs processing')
+        return
+    repo = repo[0]
     files = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
@@ -246,7 +248,10 @@ async def __process_build_task_artifacts(
             models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
-            selectinload(models.BuildTask.rpm_module)
+            selectinload(models.BuildTask.rpm_module),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos
+            ),
         )
     )
     build_task = build_tasks.scalars().first()
@@ -281,8 +286,9 @@ async def __process_build_task_artifacts(
     logging.info('Processing logs')
     logs_entries = await __process_logs(
         pulp_client, build_task.id, log_artifacts, log_repositories)
-    db.add_all(logs_entries)
-    await db.commit()
+    if logs_entries:
+        db.add_all(logs_entries)
+        await db.commit()
     logging.info('Logs processing is finished')
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
@@ -312,7 +318,8 @@ async def __process_build_task_artifacts(
                               str(e))
             raise ModuleUpdateError(message) from e
 
-    db.add_all(rpm_entries)
+    if rpm_entries:
+        db.add_all(rpm_entries)
     db.add(build_task)
     await db.commit()
     await db.refresh(build_task)

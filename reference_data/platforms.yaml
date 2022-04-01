@@ -27,6 +27,9 @@
     - x86_64
     - aarch64
     - ppc64le
+  copy_priority_arches:
+    - x86_64
+    - aarch64
   weak_arch_list:
     - { name: i686, depends_on: aarch64 }
     - { name: ppc64le, depends_on: aarch64 }
@@ -693,6 +696,9 @@
     - aarch64
     - ppc64le
     - s390x
+  copy_priority_arches:
+    - x86_64
+    - aarch64
   weak_arch_list:
     - { name: i686, depends_on: aarch64 }
     - { name: s390x, depends_on: aarch64 }

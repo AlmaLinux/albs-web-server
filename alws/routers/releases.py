@@ -6,6 +6,7 @@ from alws import database
 from alws.crud import release as r_crud
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import release_schema
+from alws.release_planner import ReleasePlanner
 
 
 router = APIRouter(
@@ -24,8 +25,9 @@ async def get_releases(db: database.Session = Depends(get_db)):
 async def create_new_release(payload: release_schema.ReleaseCreate,
                              db: database.Session = Depends(get_db),
                              user: dict = Depends(JWTBearer())):
-    release = await r_crud.create_new_release(
-        db, user['identity']['user_id'], payload)
+    release_planner = ReleasePlanner(db)
+    release = await release_planner.create_new_release(
+        user['identity']['user_id'], payload)
     return release
 
 
@@ -33,12 +35,14 @@ async def create_new_release(payload: release_schema.ReleaseCreate,
 async def update_release(release_id: int,
                          payload: release_schema.ReleaseUpdate,
                          db: database.Session = Depends(get_db)):
-    return await r_crud.update_release(db, release_id, payload)
+    release_planner = ReleasePlanner(db)
+    return await release_planner.update_release(release_id, payload)
 
 
 @router.post('/{release_id}/commit/',
              response_model=release_schema.ReleaseCommitResult)
 async def commit_release(release_id: int,
                          db: database.Session = Depends(get_db)):
-    release, message = await r_crud.commit_release(db, release_id)
+    release_planner = ReleasePlanner(db)
+    release, message = await release_planner.commit_release(release_id)
     return {'release': release, 'message': message}
