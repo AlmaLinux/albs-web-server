@@ -207,7 +207,7 @@ class BuildPlanner:
                 )
                 artifacts_to_remove = []
                 for artifact_name in module.get_rpm_artifacts():
-                    if any((artifact_name.startswith(ref_name)
+                    if any((artifact_name.startswith(ref_name.split('-')[0])
                             for ref_name in clean_ref_names)):
                         artifacts_to_remove.append(artifact_name)
                 for artifact_name in artifacts_to_remove:
@@ -231,7 +231,7 @@ class BuildPlanner:
                     )
                     artifacts_to_remove = []
                     for artifact_name in devel_module.get_rpm_artifacts():
-                        if any((artifact_name.startswith(ref_name)
+                        if any((artifact_name.startswith(ref_name.split('-')[0])
                                 for ref_name in clean_ref_names)):
                             artifacts_to_remove.append(artifact_name)
                     for artifact_name in artifacts_to_remove:

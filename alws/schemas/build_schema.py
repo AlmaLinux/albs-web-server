@@ -273,13 +273,15 @@ def compare_module_data(
                 beholder_artifact = artifact_dict
                 break
         if beholder_artifact is None:
-            return pkgs_to_add
+            continue
         srpm = beholder_artifact['sourcerpm']
         beholder_tag_name = (f"{srpm['name']}-{srpm['version']}-"
                              f"{srpm['release']}")
         beholder_tag_name = clean_module_tag(beholder_tag_name)
         if beholder_tag_name == tag_name:
-            pkgs_to_add.extend(beholder_artifact['packages'])
+            for package in beholder_artifact['packages']:
+                package['devel'] = beholder_dict.get('devel', False)
+                pkgs_to_add.append(package)
     return pkgs_to_add
 
 
@@ -334,23 +336,17 @@ async def _get_module_ref(
             pkgs_to_add = compare_module_data(
                 component_name, beholder_data, clean_tag_name)
             enabled = not pkgs_to_add
-            # we shouldn't add devel packages to regular module template
-            pkgs_to_add = [pkg for pkg in pkgs_to_add
-                           if not pkg['name'].endswith('-devel')]
     for pkg_dict in pkgs_to_add:
+        if pkg_dict['devel']:
+            continue
         module.add_rpm_artifact(pkg_dict)
     module.set_component_ref(component_name, commit_id)
     if devel_module:
         devel_module.set_component_ref(component_name, commit_id)
-        if clean_tag_name:
-            data_to_compare = [
-                data for data in beholder_data
-                if data.get('devel', False)
-            ]
-            pkgs_to_add = compare_module_data(
-                component_name, data_to_compare, clean_tag_name)
-            for pkg_dict in pkgs_to_add:
-                devel_module.add_rpm_artifact(pkg_dict)
+        for pkg_dict in pkgs_to_add:
+            if not pkg_dict['devel']:
+                continue
+            devel_module.add_rpm_artifact(pkg_dict)
     return ModuleRef(
         url=f'{platform_packages_git}{component_name}.git',
         git_ref=git_ref,
