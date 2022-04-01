@@ -135,9 +135,9 @@ class BuildPlanner:
     def remove_force_to_build_artifacts_from_template(
         self,
         module: ModuleWrapper,
-        refs_to_exclude: typing.List[build_schema.BuildTaskRef],
+        build_task_refs: typing.List[build_schema.BuildTaskRef],
     ):
-        for ref in refs_to_exclude:
+        for ref in build_task_refs:
             for artifact in ref.added_artifacts:
                 module.remove_rpm_artifact(artifact)
 
@@ -150,10 +150,8 @@ class BuildPlanner:
             ))
             return
 
-        refs_to_exclude = []
         if isinstance(task, build_schema.BuildTaskModuleRef):
             raw_refs = [ref for ref in task.refs if ref.enabled]
-            refs_to_exclude = [ref for ref in task.refs if not ref.enabled]
             _index = IndexWrapper.from_template(task.modules_yaml)
             module = _index.get_module(task.module_name, task.module_stream)
             devel_module = None
@@ -215,7 +213,7 @@ class BuildPlanner:
                     self._request_platforms[platform.name]
                 )
                 self.remove_force_to_build_artifacts_from_template(
-                    module, refs_to_exclude)
+                    module, raw_refs)
                 module_index = IndexWrapper()
                 module_index.add_module(module)
                 if len(module_templates) > 1:
@@ -234,7 +232,7 @@ class BuildPlanner:
                         f'{devel_module.name}:{devel_module.stream}'
                     )
                     self.remove_force_to_build_artifacts_from_template(
-                        devel_module, refs_to_exclude)
+                        devel_module, raw_refs)
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
