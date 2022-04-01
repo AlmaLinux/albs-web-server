@@ -137,6 +137,8 @@ class BuildPlanner:
         module: ModuleWrapper,
         build_task_refs: typing.List[build_schema.BuildTaskRef],
     ):
+        # if some refs with added artifacts in module template
+        # was enabled to build, we should delete them from template
         for ref in build_task_refs:
             for artifact in ref.added_artifacts:
                 module.remove_rpm_artifact(artifact)

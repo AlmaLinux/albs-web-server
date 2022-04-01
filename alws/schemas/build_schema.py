@@ -2,7 +2,6 @@ import asyncio
 import typing
 import logging
 import datetime
-import re
 import urllib.parse
 
 import aiohttp.client_exceptions
@@ -15,7 +14,15 @@ from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
-from alws.utils.modularity import ModuleWrapper, get_modified_refs_list, RpmArtifact
+from alws.utils.modularity import (
+    ModuleWrapper,
+    get_modified_refs_list,
+    RpmArtifact,
+)
+from alws.utils.parsing import (
+    clean_module_tag,
+    get_clean_distr_name,
+)
 
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
@@ -287,16 +294,6 @@ def compare_module_data(
     return pkgs_to_add
 
 
-def clean_module_tag(tag: str):
-    clean_tag = re.sub(r'\.alma.*$', '', tag)
-    raw_part = re.search(r'\.module.*', clean_tag).group()
-    latest = re.search(r'\.\d*$', raw_part)
-    result = re.sub(r'\.module.*', '', clean_tag)
-    if latest is not None:
-        result += latest.group()
-    return result
-
-
 async def _get_module_ref(
     component_name: str,
     modified_list: list,
@@ -383,9 +380,7 @@ async def get_module_refs(
         host=settings.beholder_host,
         token=settings.beholder_token,
     )
-    clean_dist_name = re.search(
-        r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
-    ).groupdict().get('dist_name', '')
+    clean_dist_name = get_clean_distr_name(platform.name)
     distr_ver = platform.distr_version
     modified_list = await get_modified_refs_list(
         platform.modularity['modified_packages_url']
