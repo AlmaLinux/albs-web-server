@@ -141,8 +141,10 @@ class BuildPlanner:
             ))
             return
 
+        clean_ref_names = []
         if isinstance(task, build_schema.BuildTaskModuleRef):
             raw_refs = [ref for ref in task.refs if ref.enabled]
+            clean_ref_names = [ref.git_repo_name for ref in raw_refs]
             _index = IndexWrapper.from_template(task.modules_yaml)
             module = _index.get_module(task.module_name, task.module_stream)
             devel_module = None
@@ -156,9 +158,8 @@ class BuildPlanner:
             if devel_module:
                 module_templates.append(devel_module.render())
         else:
-            platform = self._platforms[0]
             raw_refs, module_templates = await build_schema.get_module_refs(
-                task, platform, self._request_platforms[platform.name],
+                task, self._platforms[0],
             )
         refs = [
             models.BuildTaskRef(
@@ -204,6 +205,13 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
+                artifacts_to_remove = []
+                for artifact_name in module.get_rpm_artifacts():
+                    if any((artifact_name.startswith(ref_name)
+                            for ref_name in clean_ref_names)):
+                        artifacts_to_remove.append(artifact_name)
+                for artifact_name in artifacts_to_remove:
+                    module.remove_rpm_artifact(artifact_name)
                 module_index = IndexWrapper()
                 module_index.add_module(module)
                 if len(module_templates) > 1:
@@ -221,6 +229,13 @@ class BuildPlanner:
                     mock_options['module_enable'].append(
                         f'{devel_module.name}:{devel_module.stream}'
                     )
+                    artifacts_to_remove = []
+                    for artifact_name in devel_module.get_rpm_artifacts():
+                        if any((artifact_name.startswith(ref_name)
+                                for ref_name in clean_ref_names)):
+                            artifacts_to_remove.append(artifact_name)
+                    for artifact_name in artifacts_to_remove:
+                        devel_module.remove_rpm_artifact(artifact_name)
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),

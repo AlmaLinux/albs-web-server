@@ -230,6 +230,9 @@ class ModuleWrapper:
         elif not self.name.endswith('-devel'):
             self._stream.add_rpm_artifact(artifact)
 
+    def remove_rpm_artifact(self, artifact: str):
+        self._stream.remove_rpm_artifact(artifact)
+
     def is_artifact_filtered(self, artifact: str) -> bool:
         for filter_name in self._stream.get_rpm_filters():
             if artifact.startswith(filter_name):

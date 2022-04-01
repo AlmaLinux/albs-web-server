@@ -243,7 +243,7 @@ class ModulePreview(BaseModel):
 async def get_module_data_from_beholder(
     beholder_client: BeholderClient,
     endpoint: str,
-    devel: bool = False, 
+    devel: bool = False,
 ) -> dict:
     result = {}
     try:
@@ -331,12 +331,10 @@ async def _get_module_ref(
             # imports/c8-stream-rhel8/golang-1.16.7-1.module+el8.5.0+12+1aae3f
             tag_name = raw_tag_name.split('/')[-1]
             clean_tag_name = clean_module_tag(tag_name)
-            data_to_compare = [
-                data for data in beholder_data
-                if not data.get('devel', True)
-            ]
             pkgs_to_add = compare_module_data(
-                component_name, data_to_compare, clean_tag_name)
+                component_name, beholder_data, clean_tag_name)
+            pkgs_to_add = [pkg for pkg in pkgs_to_add
+                           if not pkg['name'].endswith('-devel')]
             enabled = not pkgs_to_add
     for pkg_dict in pkgs_to_add:
         module.add_rpm_artifact(pkg_dict)
@@ -367,7 +365,7 @@ async def _get_module_ref(
 async def get_module_refs(
     task: BuildTaskRef,
     platform: models.Platform,
-    platform_arches: typing.List[str],
+    platform_arches: typing.List[str] = None,
 ) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
 
     result = []
@@ -414,6 +412,8 @@ async def get_module_refs(
         stream=task.module_stream_from_ref()
     )
     checking_tasks = []
+    if platform_arches is None:
+        platform_arches = []
     for arch in platform_arches:
         endpoint = (
             f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
