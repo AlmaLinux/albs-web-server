@@ -14,7 +14,7 @@ from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
 from alws.utils.modularity import (
-    ModuleWrapper, calc_dist_macro, IndexWrapper, RpmArtifact
+    ModuleWrapper, calc_dist_macro, IndexWrapper
 )
 from alws.utils.gitea import (
     GiteaClient,
@@ -132,26 +132,14 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
-    def remove_force_artifacts_to_build_from_template(
+    def remove_force_to_build_artifacts_from_template(
         self,
         module: ModuleWrapper,
-        clean_ref_names: typing.List[str],
+        refs_to_exclude: typing.List[build_schema.BuildTaskRef],
     ):
-        artifacts_to_remove = []
-        names_to_exclude = []
-        for artifact in module.get_rpm_artifacts():
-            if artifact not in '.src':
-                continue
-            srpm_name = RpmArtifact.from_str(artifact).name
-            if any((ref_name.startswith(srpm_name)
-                    for ref_name in clean_ref_names)):
-                names_to_exclude.append(srpm_name)
-        for artifact_name in module.get_rpm_artifacts():
-            if any((artifact_name.startswith(exclude_name)
-                    for exclude_name in names_to_exclude)):
-                artifacts_to_remove.append(artifact_name)
-        for artifact_name in artifacts_to_remove:
-            module.remove_rpm_artifact(artifact_name)
+        for ref in refs_to_exclude:
+            for artifact in ref.added_artifacts:
+                module.remove_rpm_artifact(artifact)
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
@@ -162,10 +150,10 @@ class BuildPlanner:
             ))
             return
 
-        clean_ref_names = []
+        refs_to_exclude = []
         if isinstance(task, build_schema.BuildTaskModuleRef):
             raw_refs = [ref for ref in task.refs if ref.enabled]
-            clean_ref_names = [ref.git_repo_name for ref in raw_refs]
+            refs_to_exclude = [ref for ref in task.refs if not ref.enabled]
             _index = IndexWrapper.from_template(task.modules_yaml)
             module = _index.get_module(task.module_name, task.module_stream)
             devel_module = None
@@ -226,8 +214,8 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
-                self.remove_force_artifacts_to_build_from_template(
-                    module, clean_ref_names)
+                self.remove_force_to_build_artifacts_from_template(
+                    module, refs_to_exclude)
                 module_index = IndexWrapper()
                 module_index.add_module(module)
                 if len(module_templates) > 1:
@@ -245,8 +233,8 @@ class BuildPlanner:
                     mock_options['module_enable'].append(
                         f'{devel_module.name}:{devel_module.stream}'
                     )
-                    self.remove_force_artifacts_to_build_from_template(
-                        devel_module, clean_ref_names)
+                    self.remove_force_to_build_artifacts_from_template(
+                        devel_module, refs_to_exclude)
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),

@@ -15,7 +15,7 @@ from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
-from alws.utils.modularity import ModuleWrapper, get_modified_refs_list
+from alws.utils.modularity import ModuleWrapper, get_modified_refs_list, RpmArtifact
 
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
@@ -28,6 +28,7 @@ class BuildTaskRef(BaseModel):
     ref_type: typing.Optional[typing.Union[int, str]]
     is_module: typing.Optional[bool] = False
     enabled: bool = True
+    added_artifacts: typing.Optional[list] = []
     module_platform_version: typing.Optional[str] = None
     module_version: typing.Optional[str] = None
 
@@ -228,7 +229,8 @@ class ModuleRef(BaseModel):
     url: str
     git_ref: str
     exist: bool
-    enabled: bool
+    enabled: bool = True
+    added_artifacts: typing.Optional[list] = []
     mock_options: dict
 
 
@@ -313,6 +315,7 @@ async def _get_module_ref(
     commit_id = ''
     enabled = True
     pkgs_to_add = []
+    added_packages = []
     clean_tag_name = ''
     try:
         response = await gitea_client.get_branch(
@@ -340,6 +343,8 @@ async def _get_module_ref(
         if pkg_dict['devel']:
             continue
         module.add_rpm_artifact(pkg_dict)
+        added_packages.append(
+            RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
     module.set_component_ref(component_name, commit_id)
     if devel_module:
         devel_module.set_component_ref(component_name, commit_id)
@@ -347,10 +352,13 @@ async def _get_module_ref(
             if not pkg_dict['devel']:
                 continue
             devel_module.add_rpm_artifact(pkg_dict)
+            added_packages.append(
+                RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
     return ModuleRef(
         url=f'{platform_packages_git}{component_name}.git',
         git_ref=git_ref,
         exist=exist,
+        added_artifacts=added_packages,
         enabled=enabled,
         mock_options={
             'definitions': dict(module.iter_mock_definitions()),
