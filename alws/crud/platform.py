@@ -26,11 +26,15 @@ async def modify_platform(
             raise DataNotFoundError(
                 f'Platform with name: "{platform.name}" does not exists'
             )
-        for key in ('type', 'distr_type', 'distr_version', 'arch_list',
-                    'data', 'modularity', 'is_reference', 'weak_arch_list'):
-            value = getattr(platform, key, None)
+        fields_to_update = (
+            'type', 'distr_type', 'distr_version', 'arch_list',
+            'data', 'modularity', 'is_reference', 'weak_arch_list',
+            'copy_priority_arches',
+        )
+        for field in fields_to_update:
+            value = getattr(platform, field, None)
             if value is not None:
-                setattr(db_platform, key, value)
+                setattr(db_platform, field, value)
         db_repos = {repo.name: repo for repo in db_platform.repos}
         payload_repos = getattr(platform, 'repos', None)
         new_repos = {}
