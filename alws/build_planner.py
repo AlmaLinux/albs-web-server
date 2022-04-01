@@ -14,7 +14,7 @@ from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
 from alws.utils.modularity import (
-    ModuleWrapper, calc_dist_macro, IndexWrapper
+    ModuleWrapper, calc_dist_macro, IndexWrapper, RpmArtifact
 )
 from alws.utils.gitea import (
     GiteaClient,
@@ -132,6 +132,27 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
+    def remove_force_artifacts_to_build_from_template(
+        self,
+        module: ModuleWrapper,
+        clean_ref_names: typing.List[str],
+    ):
+        artifacts_to_remove = []
+        names_to_exclude = []
+        for artifact in module.get_rpm_artifacts():
+            if artifact not in '.src':
+                continue
+            srpm_name = RpmArtifact.from_str(artifact).name
+            if any((ref_name.startswith(srpm_name)
+                    for ref_name in clean_ref_names)):
+                names_to_exclude.append(srpm_name)
+        for artifact_name in module.get_rpm_artifacts():
+            if any((artifact_name.startswith(exclude_name)
+                    for exclude_name in names_to_exclude)):
+                artifacts_to_remove.append(artifact_name)
+        for artifact_name in artifacts_to_remove:
+            module.remove_rpm_artifact(artifact_name)
+
     async def add_task(self, task: build_schema.BuildTaskRef):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
             await self._add_single_ref(models.BuildTaskRef(
@@ -205,13 +226,8 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
-                artifacts_to_remove = []
-                for artifact_name in module.get_rpm_artifacts():
-                    if any((artifact_name.startswith(ref_name.split('-')[0])
-                            for ref_name in clean_ref_names)):
-                        artifacts_to_remove.append(artifact_name)
-                for artifact_name in artifacts_to_remove:
-                    module.remove_rpm_artifact(artifact_name)
+                self.remove_force_artifacts_to_build_from_template(
+                    module, clean_ref_names)
                 module_index = IndexWrapper()
                 module_index.add_module(module)
                 if len(module_templates) > 1:
@@ -229,13 +245,8 @@ class BuildPlanner:
                     mock_options['module_enable'].append(
                         f'{devel_module.name}:{devel_module.stream}'
                     )
-                    artifacts_to_remove = []
-                    for artifact_name in devel_module.get_rpm_artifacts():
-                        if any((artifact_name.startswith(ref_name.split('-')[0])
-                                for ref_name in clean_ref_names)):
-                            artifacts_to_remove.append(artifact_name)
-                    for artifact_name in artifacts_to_remove:
-                        devel_module.remove_rpm_artifact(artifact_name)
+                    self.remove_force_artifacts_to_build_from_template(
+                        devel_module, clean_ref_names)
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
