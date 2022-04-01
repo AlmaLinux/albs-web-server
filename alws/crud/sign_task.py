@@ -240,11 +240,6 @@ async def complete_sign_task(sign_task_id: int,
         db.add(build)
         if modified_items:
             db.add_all(modified_items)
-        await db.commit()
-        sign_tasks = await db.execute(select(models.SignTask).where(
-            models.SignTask.id == sign_task_id).options(
-            selectinload(models.SignTask.sign_key)))
-    return sign_tasks.scalars().first()
 
 
 async def verify_signed_build(db: Session, build_id: int,
