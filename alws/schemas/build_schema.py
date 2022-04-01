@@ -333,9 +333,10 @@ async def _get_module_ref(
             clean_tag_name = clean_module_tag(tag_name)
             pkgs_to_add = compare_module_data(
                 component_name, beholder_data, clean_tag_name)
+            enabled = not pkgs_to_add
+            # we shouldn't add devel packages to regular module template
             pkgs_to_add = [pkg for pkg in pkgs_to_add
                            if not pkg['name'].endswith('-devel')]
-            enabled = not pkgs_to_add
     for pkg_dict in pkgs_to_add:
         module.add_rpm_artifact(pkg_dict)
     module.set_component_ref(component_name, commit_id)
