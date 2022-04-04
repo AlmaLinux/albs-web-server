@@ -61,7 +61,8 @@ async def get_builds(
         selectinload(models.Build.linked_builds),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.test_tasks),
-        selectinload(models.Build.sign_tasks)
+        selectinload(models.Build.sign_tasks),
+        selectinload(models.Build.platform_flavors)
     ).distinct(models.Build.id)
 
     pulp_params = {
@@ -126,9 +127,10 @@ async def get_builds(
 
 async def get_module_preview(
                 platform: models.Platform,
+                flavors: typing.List[models.PlatformFlavour],
                 module_request: build_schema.ModulePreviewRequest
             ) -> build_schema.ModulePreview:
-    refs, modules = await build_schema.get_module_refs(module_request.ref, platform)
+    refs, modules = await build_schema.get_module_refs(module_request.ref, platform, flavors)
     return build_schema.ModulePreview(
         refs=refs,
         module_name=module_request.ref.git_repo_name,

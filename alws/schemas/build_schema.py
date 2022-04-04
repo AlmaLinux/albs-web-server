@@ -9,6 +9,7 @@ from pydantic import BaseModel, validator, Field, conlist
 
 from alws.config import settings
 from alws.constants import BuildTaskRefType
+from alws.models import BuildPlatformFlavour
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
 )
@@ -188,6 +189,15 @@ class BuildCreateResponse(BaseModel):
         orm_mode = True
 
 
+class PlatformFlavour(BaseModel):
+
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 class Build(BaseModel):
 
     id: int
@@ -197,6 +207,7 @@ class Build(BaseModel):
     sign_tasks: typing.List[BuildSignTask]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    platform_flavors: typing.List[PlatformFlavour]
 
     @validator('linked_builds', pre=True)
     def linked_builds_validator(cls, v):
@@ -217,6 +228,7 @@ class ModulePreviewRequest(BaseModel):
 
     ref: BuildTaskRef
     platform_name: str
+    flavors: typing.Optional[typing.List[int]] = None
 
 
 class ModuleRef(BaseModel):
@@ -269,7 +281,7 @@ async def _get_module_ref(
     )
 
 
-async def get_module_refs(task, platform):
+async def get_module_refs(task, platform, flavors):
     result = []
     gitea_client = GiteaClient(
         settings.gitea_host,
@@ -305,6 +317,9 @@ async def get_module_refs(task, platform):
         stream=task.module_stream_from_ref()
     )
     platform_prefix_list = platform.modularity['git_tag_prefix']
+    for flavor in flavors:
+        if flavor.modularity and flavor.modularity.get('git_tag_prefix'):
+            platform_prefix_list = flavor.modularity['git_tag_prefix']
     platform_packages_git = platform.modularity['packages_git']
     component_tasks = []
     for component_name, _ in module.iter_components():
