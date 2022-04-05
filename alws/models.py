@@ -592,6 +592,7 @@ class SignTask(Base):
         sqlalchemy.Integer,
         default=SignStatus.IDLE
     )
+    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 

@@ -1,3 +1,4 @@
+import datetime
 import itertools
 
 from fastapi import APIRouter, Depends, Response, status
@@ -8,6 +9,7 @@ from alws.config import settings
 from alws.crud import build_node
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import build_node_schema
+from alws.constants import BuildTaskStatus
 
 
 router = APIRouter(
@@ -34,11 +36,16 @@ async def build_done(
             response: Response,
             db: database.Session = Depends(get_db),
         ):
-    task_already_finished = await build_node.check_build_task_is_finished(
-        db, build_done_.task_id)
-    if task_already_finished:
+    build_task = await build_node.get_build_task(db, build_done_.task_id)
+    if BuildTaskStatus.is_finished(build_task.status):
         response.status_code = status.HTTP_409_CONFLICT
         return {'ok': False}
+    # We're setting build task timestamp to 3 hours upwards, so
+    # dramatiq can have a time to complete task and build node
+    # won't rebuild task again and again while it's in the queue
+    # in the future this probably should be handled somehow better 
+    build_task.ts = datetime.datetime.now() + datetime.timedelta(hours=3)
+    await db.commit()
     dramatiq.build_done.send(build_done_.dict())
     return {'ok': True}
 

@@ -1,6 +1,7 @@
 import uuid
 import json
 import typing
+import datetime
 
 import aioredis
 from fastapi import APIRouter, Depends, Query, WebSocket
@@ -46,7 +47,12 @@ async def get_available_sign_task(
 @router.post('/{sign_task_id}/complete/',
              response_model=sign_schema.SignTaskCompleteResponse)
 async def complete_sign_task(
-        sign_task_id: int, payload: sign_schema.SignTaskComplete):
+        sign_task_id: int,
+        payload: sign_schema.SignTaskComplete,
+        db: database.Session = Depends(get_db)):
+    task = await sign_task.get_sign_task(db, sign_task_id)
+    task.ts = datetime.datetime.now() + datetime.timedelta(hours=2)
+    await db.commit()
     dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
     return {'success': True}
 

@@ -103,12 +103,10 @@ async def ping_tasks(
         await db.commit()
 
 
-async def check_build_task_is_finished(db: Session, task_id: int) -> bool:
-    async with db.begin():
-        build_tasks = await db.execute(select(models.BuildTask).where(
-            models.BuildTask.id == task_id))
-        build_task = build_tasks.scalars().first()
-    return BuildTaskStatus.is_finished(build_task.status)
+async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
+    build_tasks = await db.execute(select(models.BuildTask).where(
+        models.BuildTask.id == task_id))
+    return build_tasks.scalars().first()
 
 
 async def __get_rpm_package_info(pulp_client: PulpClient, rpm_href: str) \
@@ -137,8 +135,9 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
     src_packages_tasks = []
     debug_packages_tasks = []
     for artifact in task_artifacts:
-        if artifact.arch == 'src' and built_srpm_url is None:
-            src_packages_tasks.append(pulp_client.create_entity(artifact))
+        if artifact.arch == 'src':
+            if built_srpm_url is None:
+                src_packages_tasks.append(pulp_client.create_entity(artifact))
         elif artifact.is_debuginfo:
             debug_packages_tasks.append(pulp_client.create_entity(artifact))
         else:
@@ -146,27 +145,33 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
 
     processed_packages = []
     for tasks, repo in (
-            (src_packages_tasks, src_repo), (arch_packages_tasks, arch_repo),
-            (debug_packages_tasks, debug_repo)):
-        if tasks:
-            try:
-                results = await asyncio.gather(*tasks)
-            except Exception as e:
-                logging.exception('Cannot create RPM packages for repo %s',
-                                  str(repo))
-                raise ArtifactConversionError(
-                    'Cannot put RPM packages into Pulp storage: %s', str(e))
-            else:
-                processed_packages.extend(results)
-                hrefs = [item[0] for item in results]
-                try:
-                    await pulp_client.modify_repository(
-                        repo.pulp_href, add=hrefs)
-                except Exception:
-                    logging.exception('Cannot add RPM packages '
-                                      'to the repository: %s', str(repo))
-                    raise RepositoryAddError(
-                        f'Cannot add RPM packages to the repository {str(repo)}')
+                (src_packages_tasks, src_repo),
+                (arch_packages_tasks, arch_repo),
+                (debug_packages_tasks, debug_repo)
+            ):
+        if not tasks:
+            continue
+        try:
+            results = await asyncio.gather(*tasks)
+        except Exception as e:
+            logging.exception(
+                'Cannot create RPM packages for repo %s',
+                str(repo)
+            )
+            raise ArtifactConversionError(
+                'Cannot put RPM packages into Pulp storage: %s', str(e))
+        processed_packages.extend(results)
+        hrefs = [item[0] for item in results]
+        try:
+            await pulp_client.modify_repository(
+                repo.pulp_href, add=hrefs)
+        except Exception:
+            logging.exception(
+                'Cannot add RPM packages to the repository: %s', str(repo)
+            )
+            raise RepositoryAddError(
+                f'Cannot add RPM packages to the repository {str(repo)}'
+            )
 
     for href, artifact in processed_packages:
         rpms.append(
@@ -337,7 +342,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
                 models.BuildTask.status < BuildTaskStatus.COMPLETED,
             ),
         )
-        uncompleted_tasks_ids = list(uncompleted_tasks_ids.scalars().all())
+        uncompleted_tasks_ids = uncompleted_tasks_ids.scalars().all()
 
     # if SRPM isn't built in first arch of project,
     # we need to stop building project
@@ -374,8 +379,12 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
             srpm_artifact.name,
         )
         insert_values = [
-            {'build_task_id': task_id, 'name': srpm_artifact.name,
-                'type': 'rpm', 'href': srpm_artifact.href}
+            {
+                'build_task_id': task_id,
+                'name': srpm_artifact.name,
+                'type': 'rpm',
+                'href': srpm_artifact.href
+            }
             for task_id in uncompleted_tasks_ids
         ]
 
