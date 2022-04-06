@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, Any
 
 import dramatiq
@@ -6,7 +5,7 @@ from sqlalchemy.future import select
 
 from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
-from alws.crud import build_node as build_node_crud, test
+from alws.crud import build_node as build_node_crud, platform_flavors, test
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
@@ -39,9 +38,9 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 db,
                 build,
                 platforms=build_request.platforms,
+                platform_flavors=build_request.platform_flavors,
                 is_secure_boot=build_request.is_secure_boot,
             )
-            await planner.load_platforms()
             for task in build_request.tasks:
                 await planner.add_task(task)
             for linked_id in build_request.linked_builds:

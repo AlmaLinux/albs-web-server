@@ -592,6 +592,7 @@ class SignTask(Base):
         sqlalchemy.Integer,
         default=SignStatus.IDLE
     )
+    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
@@ -629,6 +630,7 @@ class PlatformFlavour(Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    modularity = sqlalchemy.Column(JSONB, nullable=True)
     repos = relationship('Repository', secondary=FlavourRepo)
 
 

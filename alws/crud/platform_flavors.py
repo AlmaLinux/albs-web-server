@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from alws import models
-from alws.schemas.platform_flavors_schema import CreateFlavour
+from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
 
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
@@ -32,8 +32,27 @@ async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
     return db_flavour.scalars().all()
 
 
-async def list_flavours(db) -> List[models.PlatformFlavour]:
-    flavours = await db.execute(select(models.PlatformFlavour).options(
+async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
+    db_flavour = await find_flavour_by_id(db, flavour.id)
+    for key in ('name', 'modularity'):
+        if getattr(flavour, key):
+            setattr(db_flavour, key, getattr(flavour, key))
+    await db.commit()
+    return await find_flavour_by_id(db, flavour.id)
+
+
+async def list_flavours(db, ids: List[int] = None) -> List[models.PlatformFlavour]:
+    query = select(models.PlatformFlavour).options(
         selectinload(models.PlatformFlavour.repos)
-    ))
-    return flavours.scalars().all()
+    )
+    if ids is not None:
+        query = query.where(models.PlatformFlavour.id.in_(ids))
+    flavors = await db.execute(query)
+    return flavors.scalars().all()
+
+
+async def find_flavour_by_id(db, id: int):
+    db_flavour = await db.execute(select(models.PlatformFlavour).where(
+        models.PlatformFlavour.id == id
+    ).options(selectinload(models.PlatformFlavour.repos)))
+    return db_flavour.scalars().first()

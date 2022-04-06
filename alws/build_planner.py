@@ -2,8 +2,9 @@ import logging
 import asyncio
 import typing
 import collections
+import itertools
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.future import select
 
 from alws import models
@@ -31,6 +32,7 @@ class BuildPlanner:
                 db: Session,
                 build: models.Build,
                 platforms: typing.List[build_schema.BuildCreatePlatforms],
+                platform_flavors: typing.Optional[typing.List[int]],
                 is_secure_boot: bool,
             ):
         self._db = db
@@ -49,13 +51,17 @@ class BuildPlanner:
             platform.name: platform.arch_list for platform in platforms
         }
         self._platforms = []
+        self._platform_flavors = []
         self._modules_by_target = collections.defaultdict(list)
         self._module_build_index = {}
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
         self._is_secure_boot = is_secure_boot
+        self.load_platforms()
+        if platform_flavors:
+            self.load_platform_flavors(platform_flavors)
 
-    async def load_platforms(self):
+    def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
         self._platforms = self._db.execute(select(models.Platform).where(
             models.Platform.name.in_(platform_names)))
@@ -68,6 +74,16 @@ class BuildPlanner:
             raise DataNotFoundError(
                 f'platforms: {missing_platforms} cannot be found in database'
             )
+
+    def load_platform_flavors(self, flavors):
+        db_flavors = self._db.execute(
+            select(models.PlatformFlavour).where(
+                models.PlatformFlavour.id.in_(flavors)
+        ).options(
+            selectinload(models.PlatformFlavour.repos)
+        )).scalars().all()
+        if db_flavors:
+            self._platform_flavors = db_flavors
 
     async def create_build_repo(
                 self,
@@ -168,7 +184,7 @@ class BuildPlanner:
                 module_templates.append(devel_module.render())
         else:
             raw_refs, module_templates = await build_schema.get_module_refs(
-                task, self._platforms[0],
+                task, self._platforms[0], self._platform_flavors
             )
         refs = [
             models.BuildTaskRef(
@@ -188,9 +204,21 @@ class BuildPlanner:
             mock_options = {'definitions': {}}
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
+        modularity_version = None
+        for platform in self._platforms:
+            modularity_version = platform.modularity['versions'][-1]
+            for flavour in self._platform_flavors:
+                if flavour.modularity and flavour.modularity.get('versions'):
+                    modularity_version = flavour.modularity['versions'][-1]
             if task.module_platform_version:
+                flavour_versions = [
+                    flavour.modularity['versions']
+                    for flavour in self._platform_flavors
+                    if flavour.modularity and flavour.modularity.get('versions')
+                ]
                 modularity_version = next(
-                    item for item in platform.modularity['versions']
+                    item for item in itertools.chain(
+                        platform.modularity['versions'], *flavour_versions)
                     if item['name'] == task.module_platform_version
                 )
             for arch in self._request_platforms[platform.name]:
@@ -264,7 +292,7 @@ class BuildPlanner:
             await self._add_single_ref(
                 ref,
                 mock_options=mock_options,
-                ref_platform_version=task.module_platform_version
+                modularity_version=modularity_version,
             )
 
     async def get_ref_commit_id(self, git_name, git_branch):
@@ -277,7 +305,7 @@ class BuildPlanner:
             self,
             ref: models.BuildTaskRef,
             mock_options: typing.Optional[dict[str, typing.Any]] = None,
-            ref_platform_version: typing.Optional[str] = None):
+            modularity_version: typing.Optional[dict] = None):
         parsed_dist_macro = None
         if ref.git_ref is not None:
             parsed_dist_macro = parse_git_ref(r'(el[\d]+_[\d]+)', ref.git_ref)
@@ -301,12 +329,7 @@ class BuildPlanner:
                         platform.module_build_index += 1
                         build_index = platform.module_build_index
                         self._module_build_index[platform.name] = build_index
-                    platform_dist = platform.modularity['versions'][-1]['dist_prefix']
-                    if ref_platform_version:
-                        platform_dist = next(
-                            i for i in platform.modularity['versions']
-                            if i['name'] == ref_platform_version
-                        )['dist_prefix']
+                    platform_dist = modularity_version['dist_prefix']
                     dist_macro = calc_dist_macro(
                         module.name,
                         module.stream,

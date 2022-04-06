@@ -61,7 +61,8 @@ async def get_builds(
         selectinload(models.Build.linked_builds),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.test_tasks),
-        selectinload(models.Build.sign_tasks)
+        selectinload(models.Build.sign_tasks),
+        selectinload(models.Build.platform_flavors)
     ).distinct(models.Build.id)
 
     pulp_params = {
@@ -126,11 +127,13 @@ async def get_builds(
 
 async def get_module_preview(
                 platform: models.Platform,
+                flavors: typing.List[models.PlatformFlavour],
                 module_request: build_schema.ModulePreviewRequest
             ) -> build_schema.ModulePreview:
     refs, modules = await build_schema.get_module_refs(
         task=module_request.ref,
         platform=platform,
+        flavors=flavors,
         platform_arches=module_request.platform_arches,
     )
     return build_schema.ModulePreview(
@@ -200,6 +203,8 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         await db.execute(
             delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
         )
+        await db.execute(delete(models.BuildPlatformFlavour).where(
+            models.BuildPlatformFlavour.c.build_id == build_id))
         await db.execute(
             delete(models.SignTask).where(
                 models.SignTask.build_id == build_id)

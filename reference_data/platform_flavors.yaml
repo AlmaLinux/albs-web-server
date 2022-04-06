@@ -1,4 +1,12 @@
 - name: AlmaLinux-8-beta
+  modularity:
+    git_tag_prefix:
+      modified: a8-beta
+      non_modified: c8-beta
+    versions:
+      - name: '8.6'
+        version_prefix: '80600'
+        dist_prefix: 'el8.6.0'
   repositories:
     - name: almalinux-8-beta
       arch: i686

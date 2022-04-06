@@ -12,7 +12,8 @@ from alws import database
 from alws.crud import (
     build as build_crud,
     build_node,
-    platform as platform_crud
+    platform as platform_crud,
+    platform_flavors as flavors_crud
 )
 from alws.dependencies import get_db, JWTBearer
 from alws.errors import DataNotFoundError
@@ -63,7 +64,12 @@ async def get_module_preview(
     platform = await platform_crud.get_platform(
         db, module_request.platform_name
     )
-    return await build_crud.get_module_preview(platform, module_request)
+    flavors = []
+    if module_request.flavors:
+        flavors = await flavors_crud.list_flavours(
+            db, ids=module_request.flavors
+        )
+    return await build_crud.get_module_preview(platform, flavors, module_request)
 
 
 @router.get('/{build_id}/', response_model=build_schema.Build)

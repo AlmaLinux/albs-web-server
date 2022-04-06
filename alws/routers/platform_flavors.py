@@ -22,6 +22,14 @@ async def create_flavour(
     return await pf_crud.create_flavour(db, flavour)
 
 
+@router.patch('/', response_model=pf_schema.FlavourResponse)
+async def update_flavour(
+    flavour: pf_schema.UpdateFlavour,
+    db: database.Session = Depends(get_db)
+):
+    return await pf_crud.update_flavour(db, flavour)
+
+
 @router.get('/', response_model=List[pf_schema.FlavourResponse])
 async def get_flavours(
     db: database.Session = Depends(get_db)

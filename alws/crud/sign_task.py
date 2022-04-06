@@ -1,9 +1,11 @@
+import datetime
 import asyncio
 import logging
 import typing
 import urllib.parse
+from collections import defaultdict
 
-from sqlalchemy import update
+from sqlalchemy import update, or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -71,7 +73,8 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate) \
             raise DataNotFoundError(
                 f'Sign key with ID {payload.sign_key_id} does not exist')
         sign_task = models.SignTask(
-            status=SignStatus.IDLE, build_id=payload.build_id,
+            status=SignStatus.IDLE,
+            build_id=payload.build_id,
             sign_key_id=payload.sign_key_id
         )
         db.add(sign_task)
@@ -87,7 +90,11 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     sign_tasks = await db.execute(select(models.SignTask).join(
         models.SignTask.sign_key).where(
             models.SignTask.status == SignStatus.IDLE,
-            models.SignKey.keyid.in_(key_ids)
+            models.SignKey.keyid.in_(key_ids),
+            or_(
+                models.SignTask.ts <= datetime.datetime.now(),
+                models.SignTask.ts.is_(None)
+            )
         ).options(selectinload(models.SignTask.sign_key))
     )
     sign_task = sign_tasks.scalars().first()
@@ -148,10 +155,17 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     sign_task_payload['packages'] = packages
     return sign_task_payload
 
+async def get_sign_task(db, sign_task_id: int) -> models.SignTask:
+    sign_tasks = await db.execute(select(models.SignTask).where(
+        models.SignTask.id == sign_task_id
+    ).options(selectinload(models.SignTask.sign_key)))
+    return sign_tasks.scalars().first()
 
-async def complete_sign_task(sign_task_id: int,
-                             payload: sign_schema.SignTaskComplete) \
-        -> models.SignTask:
+
+async def complete_sign_task(
+            sign_task_id: int,
+            payload: sign_schema.SignTaskComplete
+        ) -> models.SignTask:
     async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
@@ -185,6 +199,9 @@ async def complete_sign_task(sign_task_id: int,
         if payload.packages:
             sorted_packages = sorted(payload.packages, key=lambda p: p.id)
             dedup_mapping = {p.name: p for p in sorted_packages}
+            dedup_ids = defaultdict(set)
+            for package in sorted_packages:
+                dedup_ids[package.name].add((package.id, package.arch))
             packages_to_add = {}
             for package in dedup_mapping.values():
                 # Check that package fingerprint matches the requested
@@ -195,31 +212,32 @@ async def complete_sign_task(sign_task_id: int,
                                   sign_task.sign_key.fingerprint)
                     sign_failed = True
                     continue
-                db_package = all_rpms_mapping[package.id]
-                debug = is_debuginfo_rpm(package.name)
-                repo = repo_mapping.get((package.arch, debug))
-                artifact_info = await pulp_client.get_artifact(
-                    package.href, include_fields=['sha256'])
-                rpm_pkg = await pulp_client.get_rpm_packages(
-                    include_fields=['pulp_href'],
-                    sha256=artifact_info['sha256']
-                )
-                if rpm_pkg:
-                    new_pkg_href = rpm_pkg[0]['pulp_href']
-                else:
-                    new_pkg_href = await pulp_client.create_rpm_package(
-                        package.name, package.href)
-                if new_pkg_href is None:
-                    logging.error('Package %s href is missing', str(package))
-                    sign_failed = True
-                    continue
-                if repo.pulp_href not in packages_to_add:
-                    packages_to_add[repo.pulp_href] = []
-                packages_to_add[repo.pulp_href].append(new_pkg_href)
-                db_package.artifact.href = new_pkg_href
-                db_package.artifact.sign_key = sign_task.sign_key
-                modified_items.append(db_package)
-                modified_items.append(db_package.artifact)
+                for pkg_id, pkg_arch in dedup_ids[package.name]:
+                    db_package = all_rpms_mapping[pkg_id]
+                    debug = is_debuginfo_rpm(package.name)
+                    repo = repo_mapping.get((pkg_arch, debug))
+                    artifact_info = await pulp_client.get_artifact(
+                        package.href, include_fields=['sha256'])
+                    rpm_pkg = await pulp_client.get_rpm_packages(
+                        include_fields=['pulp_href'],
+                        sha256=artifact_info['sha256']
+                    )
+                    if rpm_pkg:
+                        new_pkg_href = rpm_pkg[0]['pulp_href']
+                    else:
+                        new_pkg_href = await pulp_client.create_rpm_package(
+                            package.name, package.href)
+                    if new_pkg_href is None:
+                        logging.error('Package %s href is missing', str(package))
+                        sign_failed = True
+                        continue
+                    if repo.pulp_href not in packages_to_add:
+                        packages_to_add[repo.pulp_href] = []
+                    packages_to_add[repo.pulp_href].append(new_pkg_href)
+                    db_package.artifact.href = new_pkg_href
+                    db_package.artifact.sign_key = sign_task.sign_key
+                    modified_items.append(db_package)
+                    modified_items.append(db_package.artifact)
 
             tasks = []
             for repo_href, packages in packages_to_add.items():
