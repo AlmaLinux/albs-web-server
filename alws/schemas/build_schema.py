@@ -287,10 +287,11 @@ def compare_module_data(
         beholder_tag_name = (f"{srpm['name']}-{srpm['version']}-"
                              f"{srpm['release']}")
         beholder_tag_name = clean_module_tag(beholder_tag_name)
-        if beholder_tag_name == tag_name:
-            for package in beholder_artifact['packages']:
-                package['devel'] = beholder_dict.get('devel', False)
-                pkgs_to_add.append(package)
+        if beholder_tag_name != tag_name:
+            continue
+        for package in beholder_artifact['packages']:
+            package['devel'] = beholder_dict.get('devel', False)
+            pkgs_to_add.append(package)
     return pkgs_to_add
 
 
@@ -348,7 +349,7 @@ async def _get_module_ref(
         for pkg_dict in pkgs_to_add:
             if not pkg_dict['devel']:
                 continue
-            devel_module.add_rpm_artifact(pkg_dict)
+            devel_module.add_rpm_artifact(pkg_dict, devel=True)
             added_packages.append(
                 RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
     return ModuleRef(
