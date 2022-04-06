@@ -339,8 +339,10 @@ class PulpClient:
         all_rpms.extend(result['results'])
         while result.get('next'):
             new_url = result.get('next')
+            parsed_url = urllib.parse.urlsplit(new_url)
+            new_url = parsed_url.path + '?' + parsed_url.query
             result = await self.__get_content_info(
-                new_url, pure_url=True, include_fields=include_fields,
+                new_url, include_fields=include_fields,
                 exclude_fields=exclude_fields, **search_params)
             all_rpms.extend(result['results'])
         return all_rpms
