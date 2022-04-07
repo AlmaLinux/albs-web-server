@@ -21,10 +21,10 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
-from alws.utils.multilib import add_multilib_packages, get_multilib_packages, add_multilib_module_artifacts
+from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
-from alws.utils.rpm_package import get_rpm_package_info, update_module_index
+from alws.utils.rpm_package import update_module_index
 
 
 async def get_available_build_task(
@@ -112,7 +112,8 @@ async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
 
 async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          task_artifacts: list, repositories: list,
-                         built_srpm_url: str = None, module_index=None):
+                         built_srpm_url: str = None, module_index=None,
+                         module_name: str = None, module_stream: str = None):
 
     def get_repo(repo_arch, is_debug):
         return next(
@@ -179,7 +180,8 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
         )
 
     if module_index:
-        await update_module_index(module_index, pulp_client, rpms)
+        await update_module_index(module_index, pulp_client, module_name,
+                                  module_stream, rpms)
 
     return rpms
 
@@ -282,11 +284,18 @@ async def __process_build_task_artifacts(
         db.add_all(logs_entries)
         await db.commit()
     logging.info('Logs processing is finished')
+    module_name = None
+    module_stream = None
+    if build_task.rpm_module:
+        module_name = build_task.rpm_module.name
+        module_stream = build_task.rpm_module.stream
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
         rpm_artifacts, rpm_repositories,
         built_srpm_url=build_task.built_srpm_url,
-        module_index=module_index
+        module_index=module_index,
+        module_name=module_name,
+        module_stream=module_stream
     )
     src_rpm = next((
         artifact.name for artifact in task_artifacts
@@ -301,18 +310,11 @@ async def __process_build_task_artifacts(
         # bool(settings.beholder_token),
     )
     if all(multilib_conditions):
+        processor = MultilibProcessor(build_task, pulp_client=pulp_client,
+                                      module_index=module_index)
         try:
-            result = await get_multilib_packages(db, build_task, src_rpm)
-            if result and len(result) != 2:
-                logging.error('Wrong result from multilib detection: %s',
-                              ' '.join(result))
-            multilib_pkgs, module_artifacts = result
-            if multilib_pkgs:
-                await add_multilib_packages(db, build_task, multilib_pkgs)
-            if module_artifacts:
-                await add_multilib_module_artifacts(
-                    module_index, pulp_client, db, build_task,
-                    module_artifacts)
+            await processor.add_multilib_packages(src_rpm)
+            await processor.add_multilib_module_artifacts()
         except Exception as e:
             logging.exception('Cannot process multilib packages: %s', str(e))
             raise MultilibProcessingError('Cannot process multilib packages')

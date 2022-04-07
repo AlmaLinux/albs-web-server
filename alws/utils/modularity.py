@@ -230,6 +230,15 @@ class ModuleWrapper:
         elif not self.name.endswith('-devel'):
             self._stream.add_rpm_artifact(artifact)
 
+    def add_multilib_rpm_artifact(self, rpm_pkg: dict):
+        # Python modules do not have multilib packages
+        if 'python' in self.name:
+            return
+        artifact = RpmArtifact.from_pulp_model(rpm_pkg)
+        artifact_str = artifact.as_artifact()
+        if self.arch == 'x86_64' and artifact.arch == 'i686':
+            self._stream.add_rpm_artifact(artifact_str)
+
     def is_artifact_filtered(self, artifact: str) -> bool:
         for filter_name in self._stream.get_rpm_filters():
             if artifact.startswith(filter_name):
@@ -350,6 +359,12 @@ class IndexWrapper:
             module = self._index.get_module(module_name)
             for stream in module.get_all_streams():
                 yield ModuleWrapper(stream)
+
+    def has_devel_module(self):
+        for module_name in self._index.get_module_names():
+            if '-devel' in module_name:
+                return True
+        return False
 
     def render(self) -> str:
         return self._index.dump_to_string()
