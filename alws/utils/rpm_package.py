@@ -25,7 +25,8 @@ async def update_module_index(module_index, pulp_client: PulpClient,
     packages_info = dict(results)
     try:
         if module_index.has_devel_module():
-            module = module_index.get_module(f'{module_name}-devel')
+            module = module_index.get_module(
+                f'{module_name}-devel', module_stream)
         else:
             module = module_index.get_module(module_name, module_stream)
         for rpm in rpm_packages:
