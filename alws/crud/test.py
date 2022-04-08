@@ -24,14 +24,16 @@ async def create_test_tasks(db: Session, build_task_id: int):
     )
     build_task_query = await db.execute(
         select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id)
-        .options(selectinload(models.BuildTask.artifacts))
+            models.BuildTask.id == build_task_id,
+        ).options(selectinload(models.BuildTask.artifacts)),
     )
     build_task = build_task_query.scalars().first()
 
     latest_revision_query = select(
-        func.max(models.TestTask.revision)).filter(
-        models.TestTask.build_task_id == build_task_id)
+        func.max(models.TestTask.revision),
+    ).filter(
+        models.TestTask.build_task_id == build_task_id,
+    )
     result = await db.execute(latest_revision_query)
     latest_revision = result.scalars().first()
     if latest_revision:
@@ -48,9 +50,10 @@ async def create_test_tasks(db: Session, build_task_id: int):
         name=repo_name, url=repo_url, arch=build_task.arch,
         pulp_href=repo_href, type='test_log', debug=False
     )
-    db.add(repository)
-    await db.commit()
-    await db.refresh(repository)
+    async with db.begin():
+        db.add(repository)
+        await db.commit()
+        await db.refresh(repository)
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -70,22 +73,25 @@ async def create_test_tasks(db: Session, build_task_id: int):
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
-    db.add_all(test_tasks)
-    await db.commit()
+    async with db.begin():
+        db.add_all(test_tasks)
+        await db.commit()
 
 
 async def restart_build_tests(db: Session, build_id: int):
-    async with db.begin():
-        build_task_ids = await db.execute(
-            select(models.BuildTask.id).where(
-                models.BuildTask.build_id == build_id))
+    build_task_ids = await db.execute(
+        select(models.BuildTask.id).where(
+            models.BuildTask.build_id == build_id))
     for build_task_id in build_task_ids:
         await create_test_tasks(db, build_task_id[0])
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
     href = await pulp_client.create_file(artifact['name'], artifact['href'])
-    return artifact['name'], href
+    # in some cases, file in pulp have different name, so it's will be failsafe
+    # if we would save in DB name from pulp instead of name from celery
+    file = await pulp_client.get_by_href(href)
+    return file['relative_path'], href
 
 
 async def complete_test_task(db: Session, task_id: int,
@@ -131,13 +137,12 @@ async def complete_test_task(db: Session, task_id: int,
                 break
         task.status = status
         task.alts_response = test_result.dict()
+        db.add(task)
+        db.add_all(logs)
+        await db.commit()
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)
-
-    db.add(task)
-    db.add_all(logs)
-    await db.commit()
 
 
 async def get_test_tasks_by_build_task(
@@ -183,16 +188,12 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
     list
 
     """
-    subquery = select(models.TestTask.repository_id).where(
-        models.TestTask.build_task_id == build_task_id).scalar_subquery()
-    repo_url_query = select(models.Repository.url).where(
-        models.Repository.id == subquery)
-    repo_url = await db.execute(repo_url_query)
-    repo_url = repo_url.scalars().first()
-
     test_tasks = select(models.TestTask).where(
         models.TestTask.build_task_id == build_task_id,
-    ).options(selectinload(models.TestTask.artifacts))
+    ).options(
+        selectinload(models.TestTask.artifacts),
+        selectinload(models.TestTask.repository),
+    )
     test_tasks = await db.execute(test_tasks)
     test_tasks = test_tasks.scalars().all()
 
@@ -202,7 +203,8 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             if not artifact.name.startswith('tests_'):
                 continue
             log = BytesIO()
-            log_href = urllib.parse.urljoin(repo_url, artifact.name)
+            log_href = urllib.parse.urljoin(test_task.repository.url,
+                                            artifact.name)
             await download_file(log_href, log)
             tap_results = parse_tap_output(log.getvalue())
             tap_status = tap_set_status(tap_results)
