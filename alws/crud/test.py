@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import re
-from collections import defaultdict
+import urllib
 from io import BytesIO
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
@@ -183,38 +183,32 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
     list
 
     """
-    async with db.begin():
-        repo_id_query = select(models.TestTask.repository_id).where(
-            models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(repo_id_query)
-        repo_id = result.scalars().first()
-        repo_url_query = select(models.Repository.url).where(
-            models.Repository.id == repo_id)
-        result = await db.execute(repo_url_query)
-        repo_url = result.scalars().first()
+    subquery = select(models.TestTask.repository_id).where(
+        models.TestTask.build_task_id == build_task_id).scalar_subquery()
+    repo_url_query = select(models.Repository.url).where(
+        models.Repository.id == subquery)
+    repo_url = await db.execute(repo_url_query)
+    repo_url = repo_url.scalars().first()
 
-        test_names_query = select(models.TestTaskArtifact).join(
-            models.TestTask, models.TestTaskArtifact.test_task_id ==
-            models.TestTask.id).where(
-                models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(test_names_query)
-        test_artifacts = result.scalars().all()
-    test_names = defaultdict(list)
-    for artifact in test_artifacts:
-        if artifact.name.startswith('tests_'):
-            test_names[artifact.test_task_id].append(artifact.name)
+    test_tasks = select(models.TestTask).where(
+        models.TestTask.build_task_id == build_task_id,
+    ).options(selectinload(models.TestTask.artifacts))
+    test_tasks = await db.execute(test_tasks)
+    test_tasks = test_tasks.scalars().all()
 
     test_results = []
-    for test_task_id, test_task_test_names in test_names.items():
-        for test_name in test_task_test_names:
+    for test_task in test_tasks:
+        for artifact in test_task.artifacts:
+            if not artifact.name.startswith('tests_'):
+                continue
             log = BytesIO()
-            log_href = repo_url + test_name
+            log_href = urllib.parse.urljoin(repo_url, artifact.name)
             await download_file(log_href, log)
             tap_results = parse_tap_output(log.getvalue())
             tap_status = tap_set_status(tap_results)
             logs_format = get_logs_format(log.getvalue())
             test_tap = {
-                'id': test_task_id,
+                'id': test_task.id,
                 'log': log.getvalue(),
                 'success': tap_status,
                 'logs_format': logs_format,
