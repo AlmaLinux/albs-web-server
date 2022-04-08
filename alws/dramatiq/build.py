@@ -40,7 +40,6 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 platforms=build_request.platforms,
                 platform_flavors=build_request.platform_flavors,
                 is_secure_boot=build_request.is_secure_boot,
-                skip_module_checking=build_request.skip_module_checking,
             )
             for task in build_request.tasks:
                 await planner.add_task(task)
