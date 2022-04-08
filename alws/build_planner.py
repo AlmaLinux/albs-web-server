@@ -202,8 +202,6 @@ class BuildPlanner:
                 mock_options['definitions'] = {}
         else:
             mock_options = {'definitions': {}}
-        for platform in self._platforms:
-            modularity_version = platform.modularity['versions'][-1]
         modularity_version = None
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
