@@ -53,27 +53,27 @@ async def create_test_tasks(db: Session, build_task_id: int):
         )
         db.add(repository)
         await db.commit()
-    await db.refresh(repository)
+    # await db.refresh(repository)
 
     test_tasks = []
+    for artifact in build_task.artifacts:
+        if artifact.type != 'rpm':
+            continue
+        artifact_info = await pulp_client.get_rpm_package(
+            artifact.href,
+            include_fields=['name', 'version', 'release', 'arch']
+        )
+        task = models.TestTask(build_task_id=build_task_id,
+                               package_name=artifact_info['name'],
+                               package_version=artifact_info['version'],
+                               env_arch=build_task.arch,
+                               status=TestTaskStatus.CREATED,
+                               revision=new_revision,
+                               repository_id=repository.id)
+        if artifact_info.get('release'):
+            task.package_release = artifact_info['release']
+        test_tasks.append(task)
     async with db.begin():
-        for artifact in build_task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            artifact_info = await pulp_client.get_rpm_package(
-                artifact.href,
-                include_fields=['name', 'version', 'release', 'arch']
-            )
-            task = models.TestTask(build_task_id=build_task_id,
-                                   package_name=artifact_info['name'],
-                                   package_version=artifact_info['version'],
-                                   env_arch=build_task.arch,
-                                   status=TestTaskStatus.CREATED,
-                                   revision=new_revision,
-                                   repository_id=repository.id)
-            if artifact_info.get('release'):
-                task.package_release = artifact_info['release']
-            test_tasks.append(task)
         db.add_all(test_tasks)
         await db.commit()
 
