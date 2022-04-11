@@ -401,6 +401,9 @@ async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
+    remove_dep_query = delete(models.BuildTaskDependency).where(
+        models.BuildTaskDependency.c.build_task_dependency == request.task_id
+    )
     try:
         build_task = await __process_build_task_artifacts(
             db, request.task_id, request.artifacts)
@@ -410,10 +413,7 @@ async def build_done(
         ).values(status=BuildTaskStatus.FAILED)
         await db.execute(update_query)
 
-        remove_query = delete(models.BuildTaskDependency).where(
-            models.BuildTaskDependency.c.build_task_dependency == request.task_id,
-        )
-        await db.execute(remove_query)
+        await db.execute(remove_dep_query)
         await db.commit()
         raise e
 
@@ -455,12 +455,6 @@ async def build_done(
         logging.exception('Cannot process noarch packages: %s', str(e))
         raise NoarchProcessingError('Cannot process noarch packages')
 
-    await db.execute(
-        delete(models.BuildTaskDependency).where(
-            models.BuildTaskDependency.c.build_task_dependency == request.task_id
-        )
-    )
-
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
@@ -501,3 +495,5 @@ async def build_done(
     except Exception as e:
         raise SrpmProvisionError(f'Cannot update subsequent tasks '
                                  f'with the source RPM link {str(e)}')
+
+    await db.execute(remove_dep_query)
