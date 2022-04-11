@@ -22,38 +22,38 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
+    build_task_query = await db.execute(
+        select(models.BuildTask).where(
+            models.BuildTask.id == build_task_id,
+        ).options(selectinload(models.BuildTask.artifacts)),
+    )
+    build_task = build_task_query.scalars().first()
+
+    latest_revision_query = select(
+        func.max(models.TestTask.revision),
+    ).filter(
+        models.TestTask.build_task_id == build_task_id,
+    )
+    result = await db.execute(latest_revision_query)
+    latest_revision = result.scalars().first()
+    await db.close()
+    if latest_revision:
+        new_revision = latest_revision + 1
+    else:
+        new_revision = 1
+
+    # Create logs repository
+    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+    repo_url, repo_href = await pulp_client.create_log_repo(
+        repo_name, distro_path_start='test_logs')
+
+    repository = models.Repository(
+        name=repo_name, url=repo_url, arch=build_task.arch,
+        pulp_href=repo_href, type='test_log', debug=False
+    )
     async with db.begin():
-        build_task_query = await db.execute(
-            select(models.BuildTask).where(
-                models.BuildTask.id == build_task_id,
-            ).options(selectinload(models.BuildTask.artifacts)),
-        )
-        build_task = build_task_query.scalars().first()
-
-        latest_revision_query = select(
-            func.max(models.TestTask.revision),
-        ).filter(
-            models.TestTask.build_task_id == build_task_id,
-        )
-        result = await db.execute(latest_revision_query)
-        latest_revision = result.scalars().first()
-        if latest_revision:
-            new_revision = latest_revision + 1
-        else:
-            new_revision = 1
-
-        # Create logs repository
-        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-        repo_url, repo_href = await pulp_client.create_log_repo(
-            repo_name, distro_path_start='test_logs')
-
-        repository = models.Repository(
-            name=repo_name, url=repo_url, arch=build_task.arch,
-            pulp_href=repo_href, type='test_log', debug=False
-        )
         db.add(repository)
         await db.commit()
-    # await db.refresh(repository)
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -86,13 +86,9 @@ async def restart_build_tests(db: Session, build_id: int):
         await create_test_tasks(db, build_task_id[0])
 
 
-async def __convert_to_file(pulp_client: PulpClient, artifact: dict,
-                            repo: str):
-    href = await pulp_client.create_file(
-        artifact['name'], artifact['href'], skip_checking=True)
-    # in some cases, file in pulp have different name, so it's will be failsafe
-    # if we would save in DB name from pulp instead of name from celery
-    # file = await pulp_client.get_by_href(href)
+async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
+    href = await pulp_client.create_file(artifact['name'], artifact['href'],
+                                         skip_checking=True)
     return artifact['name'], href
 
 
@@ -106,40 +102,40 @@ async def complete_test_task(db: Session, task_id: int,
     logs = []
     new_hrefs = []
     conv_tasks = []
-    async with db.begin():
-        task = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id,
-        ).options(selectinload(models.TestTask.repository)))
-        task = task.scalars().first()
-        status = TestTaskStatus.COMPLETED
-        for log in test_result.result.get('logs', []):
-            if log.get('href'):
-                conv_tasks.append(__convert_to_file(pulp_client, log,
-                                                    task.repository.pulp_href))
-            else:
-                logging.error('Log file %s is missing href', str(log))
-                continue
-        results = await asyncio.gather(*conv_tasks)
-        for name, href in results:
-            new_hrefs.append(href)
-            log_record = models.TestTaskArtifact(
-                name=name, href=href, test_task_id=task_id)
-            logs.append(log_record)
+    task = await db.execute(select(models.TestTask).where(
+        models.TestTask.id == task_id,
+    ).options(selectinload(models.TestTask.repository)))
+    task = task.scalars().first()
+    await db.close()
+    status = TestTaskStatus.COMPLETED
+    for log in test_result.result.get('logs', []):
+        if log.get('href'):
+            conv_tasks.append(__convert_to_file(pulp_client, log))
+        else:
+            logging.error('Log file %s is missing href', str(log))
+            continue
+    results = await asyncio.gather(*conv_tasks)
+    for name, href in results:
+        new_hrefs.append(href)
+        log_record = models.TestTaskArtifact(
+            name=name, href=href, test_task_id=task_id)
+        logs.append(log_record)
 
-        for key, item in test_result.result.items():
-            if key == 'tests':
-                for test_item in item.values():
-                    if not test_item.get('success', False):
-                        status = TestTaskStatus.FAILED
-                        break
-            # Skip logs from processing
-            elif key == 'logs':
-                continue
-            elif not item.get('success', False):
-                status = TestTaskStatus.FAILED
-                break
-        task.status = status
-        task.alts_response = test_result.dict()
+    for key, item in test_result.result.items():
+        if key == 'tests':
+            for test_item in item.values():
+                if not test_item.get('success', False):
+                    status = TestTaskStatus.FAILED
+                    break
+        # Skip logs from processing
+        elif key == 'logs':
+            continue
+        elif not item.get('success', False):
+            status = TestTaskStatus.FAILED
+            break
+    task.status = status
+    task.alts_response = test_result.dict()
+    async with db.begin():
         db.add(task)
         db.add_all(logs)
         await db.commit()
