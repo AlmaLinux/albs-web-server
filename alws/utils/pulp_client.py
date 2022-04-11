@@ -209,13 +209,16 @@ class PulpClient:
                 self,
                 file_name: str,
                 artifact_href: str,
-                repo: str = None
+                repo: str = None,
+                skip_checking: bool = False,
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
-        artifact_info = await self.get_artifact(
-            artifact_href, include_fields=['sha256'])
-        files = await self.get_files(include_fields=['pulp_href'],
-                                     sha256=artifact_info['sha256'])
+        files = None
+        if not skip_checking:
+            artifact_info = await self.get_artifact(
+                artifact_href, include_fields=['sha256'])
+            files = await self.get_files(include_fields=['pulp_href'],
+                                         sha256=artifact_info['sha256'])
         if files:
             return files[0]['pulp_href']
         payload = {

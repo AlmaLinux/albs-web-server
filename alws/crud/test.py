@@ -53,7 +53,7 @@ async def create_test_tasks(db: Session, build_task_id: int):
     async with db.begin():
         db.add(repository)
         await db.commit()
-        await db.refresh(repository)
+    await db.refresh(repository)
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -86,12 +86,14 @@ async def restart_build_tests(db: Session, build_id: int):
         await create_test_tasks(db, build_task_id[0])
 
 
-async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
-    href = await pulp_client.create_file(artifact['name'], artifact['href'])
+async def __convert_to_file(pulp_client: PulpClient, artifact: dict,
+                            repo: str):
+    href = await pulp_client.create_file(
+        artifact['name'], artifact['href'], skip_checking=True)
     # in some cases, file in pulp have different name, so it's will be failsafe
     # if we would save in DB name from pulp instead of name from celery
-    file = await pulp_client.get_by_href(href)
-    return file['relative_path'], href
+    # file = await pulp_client.get_by_href(href)
+    return artifact['name'], href
 
 
 async def complete_test_task(db: Session, task_id: int,
@@ -104,9 +106,15 @@ async def complete_test_task(db: Session, task_id: int,
     logs = []
     new_hrefs = []
     conv_tasks = []
+    task = await db.execute(select(models.TestTask).where(
+        models.TestTask.id == task_id,
+    ).options(selectinload(models.TestTask.repository)))
+    task = task.scalars().first()
+    status = TestTaskStatus.COMPLETED
     for log in test_result.result.get('logs', []):
         if log.get('href'):
-            conv_tasks.append(__convert_to_file(pulp_client, log))
+            conv_tasks.append(__convert_to_file(pulp_client, log,
+                                                task.repository.pulp_href))
         else:
             logging.error('Log file %s is missing href', str(log))
             continue
@@ -118,11 +126,6 @@ async def complete_test_task(db: Session, task_id: int,
         logs.append(log_record)
 
     async with db.begin():
-        tasks = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id).options(
-            selectinload(models.TestTask.repository)))
-        task = tasks.scalars().first()
-        status = TestTaskStatus.COMPLETED
         for key, item in test_result.result.items():
             if key == 'tests':
                 for test_item in item.values():
