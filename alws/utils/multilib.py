@@ -11,12 +11,12 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.dependencies import get_db
+from alws.errors import ModuleUpdateError
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
-from alws.utils.rpm_package import update_module_index
-
+from alws.utils.rpm_package import get_rpm_package_info
 
 __all__ = [
     'get_build_task_artifacts',
@@ -208,8 +208,6 @@ class MultilibProcessor:
             db.add_all(artifacts)
             await db.commit()
 
-        logging.error('Usual multilib: %s', str(pkg_hrefs))
-        logging.error('Debug multilib: %s', str(debug_pkg_hrefs))
         debug_repo = next(
             r for r in self._build_task.build.repos if r.type == 'rpm'
             and r.arch == 'x86_64' and r.debug is True
@@ -224,6 +222,26 @@ class MultilibProcessor:
             self._pulp_client.modify_repository(
                 repo_to=arch_repo.pulp_href, add=pkg_hrefs)
         )
+
+    async def update_module_index(self, rpm_packages: list):
+        results = await asyncio.gather(*(get_rpm_package_info(
+            self._pulp_client, rpm.href) for rpm in rpm_packages))
+        packages_info = dict(results)
+        # If module has devel sibling and it's not Python then multilib
+        # goes into devel module
+        module_name = self._build_task.rpm_module.name
+        module_stream = self._build_task.rpm_module.stream
+        if self._module_index.has_devel_module():
+            module = self._module_index.get_module(
+                f'{module_name}-devel', module_stream)
+        else:
+            module = self._module_index.get_module(module_name, module_stream)
+        try:
+            for rpm in rpm_packages:
+                rpm_package = packages_info[rpm.href]
+                module.add_multilib_rpm_artifact(rpm_package)
+        except Exception as e:
+            raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
 
     async def add_multilib_module_artifacts(self):
         if not self._module_index:
@@ -241,10 +259,4 @@ class MultilibProcessor:
                     if artifact['name'] in package.name:
                         packages_to_process[package.name] = package
 
-        await update_module_index(
-            self._module_index, self._pulp_client,
-            self._build_task.rpm_module.name,
-            self._build_task.rpm_module.stream,
-            list(packages_to_process.values()),
-            multilib=True
-        )
+        await self.update_module_index(list(packages_to_process.values()))

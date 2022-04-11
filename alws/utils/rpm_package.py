@@ -19,21 +19,14 @@ async def get_rpm_package_info(pulp_client: PulpClient, rpm_href: str) \
 
 async def update_module_index(module_index, pulp_client: PulpClient,
                               module_name: str, module_stream: str,
-                              rpm_packages, multilib: bool = False):
+                              rpm_packages):
     results = await asyncio.gather(*(get_rpm_package_info(
         pulp_client, rpm.href) for rpm in rpm_packages))
     packages_info = dict(results)
     try:
-        if module_index.has_devel_module():
-            module = module_index.get_module(
-                f'{module_name}-devel', module_stream)
-        else:
-            module = module_index.get_module(module_name, module_stream)
+        module = module_index.get_module(module_name, module_stream)
         for rpm in rpm_packages:
             rpm_package = packages_info[rpm.href]
-            if multilib:
-                module.add_multilib_rpm_artifact(rpm_package)
-            else:
-                module.add_rpm_artifact(rpm_package)
+            module.add_rpm_artifact(rpm_package)
     except Exception as e:
         raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
