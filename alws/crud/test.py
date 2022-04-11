@@ -22,35 +22,35 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
-    build_task_query = await db.execute(
-        select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id,
-        ).options(selectinload(models.BuildTask.artifacts)),
-    )
-    build_task = build_task_query.scalars().first()
-
-    latest_revision_query = select(
-        func.max(models.TestTask.revision),
-    ).filter(
-        models.TestTask.build_task_id == build_task_id,
-    )
-    result = await db.execute(latest_revision_query)
-    latest_revision = result.scalars().first()
-    if latest_revision:
-        new_revision = latest_revision + 1
-    else:
-        new_revision = 1
-
-    # Create logs repository
-    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-    repo_url, repo_href = await pulp_client.create_log_repo(
-        repo_name, distro_path_start='test_logs')
-
-    repository = models.Repository(
-        name=repo_name, url=repo_url, arch=build_task.arch,
-        pulp_href=repo_href, type='test_log', debug=False
-    )
     async with db.begin():
+        build_task_query = await db.execute(
+            select(models.BuildTask).where(
+                models.BuildTask.id == build_task_id,
+            ).options(selectinload(models.BuildTask.artifacts)),
+        )
+        build_task = build_task_query.scalars().first()
+
+        latest_revision_query = select(
+            func.max(models.TestTask.revision),
+        ).filter(
+            models.TestTask.build_task_id == build_task_id,
+        )
+        result = await db.execute(latest_revision_query)
+        latest_revision = result.scalars().first()
+        if latest_revision:
+            new_revision = latest_revision + 1
+        else:
+            new_revision = 1
+
+        # Create logs repository
+        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+        repo_url, repo_href = await pulp_client.create_log_repo(
+            repo_name, distro_path_start='test_logs')
+
+        repository = models.Repository(
+            name=repo_name, url=repo_url, arch=build_task.arch,
+            pulp_href=repo_href, type='test_log', debug=False
+        )
         db.add(repository)
         await db.commit()
     await db.refresh(repository)
