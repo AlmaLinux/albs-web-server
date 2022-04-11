@@ -91,24 +91,18 @@ class BuildPlanner:
                 arch: str,
                 repo_type: str,
                 is_debug: typing.Optional[bool] = False,
-                task_id: typing.Optional[int] = None
             ):
-        suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
         repo_name = (
-            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}{suffix}'
+            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}br'
         )
-        if repo_type == 'rpm':
-            repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
-                repo_name)
-            modules = self._modules_by_target.get((platform.name, arch), [])
-            if modules:
-                await self._pulp_client.modify_repository(
-                    pulp_href, add=[module.pulp_href for module in modules]
-                )
-        else:
-            repo_url, pulp_href = await self._pulp_client.create_log_repo(
-                repo_name)
+        repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
+            repo_name)
+        modules = self._modules_by_target.get((platform.name, arch), [])
+        if modules:
+            await self._pulp_client.modify_repository(
+                pulp_href, add=[module.pulp_href for module in modules]
+            )
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -136,13 +130,6 @@ class BuildPlanner:
                     'rpm',
                     is_debug=True
                 ))
-        for task in self._build.tasks:
-            tasks.append(self.create_build_repo(
-                task.platform,
-                task.arch,
-                'build_log',
-                task_id=task.id
-            ))
         await asyncio.gather(*tasks)
 
     async def add_linked_builds(self, linked_build):

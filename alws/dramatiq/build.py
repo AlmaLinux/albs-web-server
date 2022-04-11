@@ -59,6 +59,12 @@ async def _build_done(request: build_node_schema.BuildDone):
             await test.create_test_tasks(db, request.task_id)
 
 
+async def _create_log_repo(task_id: int):
+    async for db in get_db():
+        task = await build_node_crud.get_build_task(db, task_id)
+        await build_node_crud.create_build_log_repo(db, task)
+
+
 @dramatiq.actor(
     max_retries=0,
     priority=0
@@ -79,3 +85,11 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)
     event_loop.run_until_complete(_build_done(parsed_build))
+
+
+@dramatiq.actor(
+    max_retries=0,
+    priority=0,
+)
+def create_log_repo(task_id: int):
+    event_loop.run_until_complete(_create_log_repo(task_id))

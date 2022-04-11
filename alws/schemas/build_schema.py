@@ -32,7 +32,7 @@ class BuildTaskRef(BaseModel):
 
     url: str
     git_ref: typing.Optional[str]
-    ref_type: typing.Optional[typing.Union[int, str]]
+    ref_type: typing.Optional[int]
     is_module: typing.Optional[bool] = False
     enabled: bool = True
     added_artifacts: typing.Optional[list] = []
@@ -52,9 +52,9 @@ class BuildTaskRef(BaseModel):
 
     @validator('ref_type', pre=True)
     def ref_type_validator(cls, v):
-        if v is None:
-            return v
-        return v if isinstance(v, int) else BuildTaskRefType.from_text(v)
+        if isinstance(v, str):
+            v = BuildTaskRefType.from_text(v)
+        return v
 
     def ref_type_to_str(self):
         return BuildTaskRefType.to_text(self.ref_type)
