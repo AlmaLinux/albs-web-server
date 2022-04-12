@@ -497,3 +497,4 @@ async def build_done(
                                  f'with the source RPM link {str(e)}')
 
     await db.execute(remove_dep_query)
+    await db.commit()
