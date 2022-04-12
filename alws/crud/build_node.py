@@ -93,6 +93,41 @@ async def update_failed_build_items(db: Session, build_id: int):
         await db.commit()
 
 
+async def log_repo_exists(db: Session, task: models.BuildTask):
+    repo = await db.execute(select(models.Repository).where(
+        models.Repository.name == task.get_log_repo_name()
+    ))
+    return bool(repo.scalars().first())
+
+
+async def create_build_log_repo(db: Session, task: models.BuildTask):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    repo_name = task.get_log_repo_name()
+    repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
+    log_repo = models.Repository(
+        name=repo_name,
+        url=repo_url,
+        arch=task.arch,
+        pulp_href=pulp_href,
+        type='build_log',
+        debug=False
+    )
+    db.add(log_repo)
+    await db.flush()
+    await db.refresh(log_repo)
+    await db.execute(
+        insert(models.BuildRepo).values(
+            build_id=task.build_id,
+            repository_id=log_repo.id
+        )
+    )
+    await db.commit()
+
+
 async def ping_tasks(
             db: Session,
             task_list: typing.List[int]
@@ -105,8 +140,11 @@ async def ping_tasks(
 
 
 async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
-    build_tasks = await db.execute(select(models.BuildTask).where(
-        models.BuildTask.id == task_id))
+    build_tasks = await db.execute(
+        select(models.BuildTask).where(models.BuildTask.id == task_id).options(
+            selectinload(models.BuildTask.platform)
+        )
+    )
     return build_tasks.scalars().first()
 
 
