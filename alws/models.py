@@ -373,13 +373,10 @@ class BuildTask(Base):
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
 
     def get_log_repo_name(self):
-        return '-'.join([
-            self.platform.name,
-            self.arch,
+        return '-'.join((
             str(self.build_id),
             'artifacts',
-            str(self.id)
-        ])
+        ))
 
 
 class BuildTaskRef(Base):
