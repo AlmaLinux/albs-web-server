@@ -86,6 +86,7 @@ async def update_failed_build_items(db: Session, build_id: int):
         failed_tasks = await db.execute(query)
         for task in failed_tasks.scalars():
             task.status = BuildTaskStatus.IDLE
+            task.ts = None
             if last_task is not None:
                 await db.run_sync(add_build_task_dependencies, task, last_task)
             last_task = task
@@ -497,4 +498,3 @@ async def build_done(
                                  f'with the source RPM link {str(e)}')
 
     await db.execute(remove_dep_query)
-    await db.commit()
