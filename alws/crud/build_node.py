@@ -320,11 +320,7 @@ async def __process_build_task_artifacts(
                      if item.type == 'build_log']
     rpm_repositories = [repo for repo in repositories
                         if repo.type == 'rpm']
-    log_repository = next((
-        repo for repo in repositories
-        if repo.type == 'build_log'
-        and repo.name == build_task.get_log_repo_name()
-    ), None)
+    log_repository = build_task.get_log_repository()
     # Committing logs separately for UI to be able to fetch them
     logging.info('Processing logs')
     logs_entries = await __process_logs(
@@ -332,7 +328,7 @@ async def __process_build_task_artifacts(
     if logs_entries:
         db.add_all(logs_entries)
         await db.commit()
-    logging.info('Logs processing is finished')
+        logging.info('Logs processing is finished')
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
         rpm_artifacts, rpm_repositories,

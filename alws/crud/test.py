@@ -24,8 +24,12 @@ async def create_test_tasks(db: Session, build_task_id: int):
     )
     build_task_query = await db.execute(
         select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id)
-        .options(selectinload(models.BuildTask.artifacts))
+            models.BuildTask.id == build_task_id,
+        ).options(
+            selectinload(models.BuildTask.artifacts),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos),
+        ),
     )
     build_task = build_task_query.scalars().first()
 
@@ -39,18 +43,10 @@ async def create_test_tasks(db: Session, build_task_id: int):
     else:
         new_revision = 1
 
-    # Create logs repository
-    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-    repo_url, repo_href = await pulp_client.create_log_repo(
-        repo_name, distro_path_start='test_logs')
-
-    repository = models.Repository(
-        name=repo_name, url=repo_url, arch=build_task.arch,
-        pulp_href=repo_href, type='test_log', debug=False
-    )
-    db.add(repository)
-    await db.commit()
-    await db.refresh(repository)
+    repository = build_task.get_log_repository()
+    if repository is None:
+        logging.error('Log repository is absent, cannot create test tasks')
+        return
 
     test_tasks = []
     for artifact in build_task.artifacts:

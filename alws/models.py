@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import typing
 
 import sqlalchemy
 from sqlalchemy.orm import relationship
@@ -372,11 +373,22 @@ class BuildTask(Base):
     rpm_module = relationship('RpmModule')
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
 
-    def get_log_repo_name(self):
+    def get_log_repo_name(self) -> str:
         return '-'.join((
             str(self.build_id),
             'artifacts',
         ))
+
+    def get_log_repository(self) -> typing.Optional[Repository]:
+        """
+        Before calling this method, we should load/join
+        repos from build into build_task
+        """
+        log_repo_name = self.get_log_repo_name()
+        return next((
+            repo for repo in self.build.repos
+            if repo.type == 'build_log' and repo.name == log_repo_name
+        ), None)
 
 
 class BuildTaskRef(Base):
