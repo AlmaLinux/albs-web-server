@@ -25,7 +25,7 @@ def clean_module_tag(tag: str):
 
 def get_clean_distr_name(distr_name: str) -> str:
     clean_distr_name = re.search(
-        r'(?P<dist_name>[a-z]+)', distr_name, re.IGNORECASE,
+        r'^(?P<dist_name>[a-z]+)', distr_name, re.IGNORECASE,
     ).groupdict().get('dist_name', '')
     return clean_distr_name
 
