@@ -141,7 +141,8 @@ async def get_test_tasks_by_build_task(
         revision: int = None):
     async with db.begin():
         query = select(models.TestTask).where(
-            models.TestTask.build_task_id == build_task_id)
+            models.TestTask.build_task_id == build_task_id,
+        ).options(selectinload(models.TestTask.build_task))
         # If latest=False, but revision is not set, should return
         # latest results anyway
         if (not latest and not revision) or latest:
@@ -151,7 +152,11 @@ async def get_test_tasks_by_build_task(
         elif revision:
             query = query.filter(models.TestTask.revision == revision)
         result = await db.execute(query)
-        return result.scalars().all()
+        results = []
+        for result in result.scalars().all():
+            result.build_id = result.build_task.build_id
+            results.append(result)
+        return results
 
 
 def get_logs_format(logs: bytes) -> str:
