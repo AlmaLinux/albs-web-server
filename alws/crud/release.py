@@ -9,11 +9,11 @@ from alws import models
 async def get_releases(page_number: typing.Optional[int],
                        db: Session
 ) -> typing.List[models.Release]:
-    release_result = await db.execute(select(models.Release).options(
+    query = select(models.Release).options(
         selectinload(models.Release.created_by),
         selectinload(models.Release.platform),
-    ).order_by(models.Release.id))
-    releases = release_result.scalars().all()
+    ).order_by(models.Release.id)
     if page_number:
-        releases = releases[10 * page_number - 10 : 10 * page_number]
-    return releases
+        query = query.slice(10 * page_number - 10, 10 * page_number)
+    release_result = await db.execute(query)
+    return release_result.scalars().all()
