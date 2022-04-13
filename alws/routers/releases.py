@@ -17,8 +17,9 @@ router = APIRouter(
 
 
 @router.get('/', response_model=typing.List[release_schema.Release])
-async def get_releases(db: database.Session = Depends(get_db)):
-    return await r_crud.get_releases(db)
+async def get_releases(pageNumber: int = None,
+                       db: database.Session = Depends(get_db)):
+    return await r_crud.get_releases(pageNumber, db)
 
 
 @router.post('/new/', response_model=release_schema.Release)
