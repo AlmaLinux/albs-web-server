@@ -436,25 +436,12 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
     await db.commit()
 
 
-async def build_done(
+async def _build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
-    remove_dep_query = delete(models.BuildTaskDependency).where(
-        models.BuildTaskDependency.c.build_task_dependency == request.task_id
-    )
-    try:
-        build_task = await __process_build_task_artifacts(
-            db, request.task_id, request.artifacts)
-    except (ArtifactConversionError, ModuleUpdateError, RepositoryAddError) as e:
-        update_query = update(models.BuildTask).where(
-            models.BuildTask.id == request.task_id,
-        ).values(status=BuildTaskStatus.FAILED)
-        await db.execute(update_query)
-
-        await db.execute(remove_dep_query)
-        await db.commit()
-        raise e
+    build_task = await __process_build_task_artifacts(
+        db, request.task_id, request.artifacts)
 
     status = BuildTaskStatus.COMPLETED
     if request.status == 'failed':
@@ -535,4 +522,20 @@ async def build_done(
         raise SrpmProvisionError(f'Cannot update subsequent tasks '
                                  f'with the source RPM link {str(e)}')
 
-    await db.execute(remove_dep_query)
+
+async def build_done(
+        db: Session, request: build_node_schema.BuildDone):
+    try:
+        await _build_done(db, request)
+    except Exception as e:
+        await db.execute(
+            update(models.BuildTask).where(
+                models.BuildTask.id == request.task_id).values(
+                status=BuildTaskStatus.FAILED)
+        )
+        raise e
+    finally:
+        await db.execute(delete(models.BuildTaskDependency).where(
+            models.BuildTaskDependency.c.build_task_dependency == request.task_id
+        ))
+        await db.commit()

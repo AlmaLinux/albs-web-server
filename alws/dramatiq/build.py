@@ -5,9 +5,10 @@ from sqlalchemy.future import select
 
 from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
-from alws.crud import build_node as build_node_crud, platform_flavors, test
+from alws.crud import build_node as build_node_crud, test
 from alws.errors import (
     ArtifactConversionError,
+    EmptyBuildError,
     ModuleUpdateError,
     MultilibProcessingError,
     NoarchProcessingError,
@@ -67,7 +68,8 @@ async def _create_log_repo(task_id: int):
 
 @dramatiq.actor(
     max_retries=0,
-    priority=0
+    priority=0,
+    throws=(EmptyBuildError,),
 )
 def start_build(build_id: int, build_request: Dict[str, Any]):
     parsed_build = build_schema.BuildCreate(**build_request)
