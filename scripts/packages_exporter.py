@@ -45,8 +45,11 @@ def parse_args():
     parser.add_argument(
         '-copy', '--copy_noarch_packages', action='store_true',
         default=False, required=False,
-        help='Copy noarch packages from x86_64 repos into ppc64le',
+        help='Copy noarch packages from x86_64 repos into others',
     )
+    parser.add_argument('-check', '--only_check_noarch', action='store_true',
+                        default=False, required=False,
+                        help='Only check noarch packages without copying')
     return parser.parse_args()
 
 
@@ -55,6 +58,7 @@ class Exporter:
         self,
         pulp_client,
         copy_noarch_packages,
+        only_check_noarch,
     ):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('packages-exporter')
@@ -62,6 +66,7 @@ class Exporter:
         self.createrepo_c = local['createrepo_c']
         self.modifyrepo_c = local['modifyrepo_c']
         self.copy_noarch_packages = copy_noarch_packages
+        self.only_check_noarch = only_check_noarch
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
@@ -191,21 +196,15 @@ class Exporter:
     async def copy_noarch_packages_from_x86_64_repo(
         self,
         source_repo_name: str,
-        source_repo_href: str,
+        source_repo_packages: typing.List[dict],
         destination_repo_name: str,
         destination_repo_href: str,
     ) -> None:
 
-        # Get packages x86_64
-        source_repo_packages = await self.retrieve_all_packages_from_pulp(
-            await self.pulp_client.get_repo_latest_version(source_repo_href),
-        )
-        # Get packages ppc64le
         destination_repo_packages = await self.retrieve_all_packages_from_pulp(
             await self.pulp_client.get_repo_latest_version(
                 destination_repo_href))
 
-        # Compare packages
         packages_to_add = []
         packages_to_remove = []
         for package_dict in source_repo_packages:
@@ -235,8 +234,7 @@ class Exporter:
                                  full_name, destination_repo_name,
                                  source_repo_name)
 
-        # package transfer
-        if packages_to_add:
+        if packages_to_add and not self.only_check_noarch:
             await self.pulp_client.modify_repository(
                 destination_repo_href,
                 add=packages_to_add,
@@ -255,13 +253,14 @@ class Exporter:
         if not self.copy_noarch_packages:
             self.logger.info('Skip copying noarch packages')
             return
-        for repo_name, repo_href in source_repo_dict.items():
-            dest_repo_name = repo_name.replace('x86_64', 'ppc64le')
-            dest_repo_href = destination_repo_dict.get(dest_repo_name)
-            if dest_repo_href is not None:
+        for source_repo_name, repo_href in source_repo_dict.items():
+            source_repo_packages = await self.retrieve_all_packages_from_pulp(
+                await self.pulp_client.get_repo_latest_version(repo_href),
+            )
+            for dest_repo_name, dest_repo_href in destination_repo_dict.items():
                 tasks.append(self.copy_noarch_packages_from_x86_64_repo(
-                    source_repo_name=repo_name,
-                    source_repo_href=repo_href,
+                    source_repo_name=source_repo_name,
+                    source_repo_packages=source_repo_packages,
                     destination_repo_name=dest_repo_name,
                     destination_repo_href=dest_repo_href,
                 ))
@@ -300,7 +299,7 @@ class Exporter:
 
         repo_ids_to_export = []
         repos_x86_64 = {}
-        repos_ppc64le = {}
+        other_repos = {}
         for db_platform in db_platforms:
             platforms_dict[db_platform.id] = []
             for repo in db_platform.repos:
@@ -312,8 +311,8 @@ class Exporter:
                                  f"{repo.arch}")
                     if repo.arch == 'x86_64':
                         repos_x86_64[repo_name] = repo.pulp_href
-                    if repo.arch == 'ppc64le':
-                        repos_ppc64le[repo_name] = repo.pulp_href
+                    else:
+                        other_repos[repo_name] = repo.pulp_href
                     if arches is not None:
                         if repo.arch in arches:
                             platforms_dict[db_platform.id].append(
@@ -322,7 +321,9 @@ class Exporter:
                     else:
                         platforms_dict[db_platform.id].append(repo.export_path)
                         repo_ids_to_export.append(repo.id)
-        await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
+        await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
+        if self.only_check_noarch:
+            return [], platforms_dict
         exported_paths = await self.export_repositories(
             list(set(repo_ids_to_export)))
         self.logger.info('All repositories exported in following paths:\n%s',
@@ -383,7 +384,7 @@ class Exporter:
             args=['--update', '--keep-all-metadata', repo_path],
         )
         self.logger.info(stdout)
-    
+
     def update_ppc64le_errata(self, repodata: Path):
         output_file = repodata / 'updateinfo.xml'
         input_repodata = Path(
@@ -394,7 +395,7 @@ class Exporter:
             input_updateinfo = input_updateinfo[0]
             update_updateinfo(
                 str(input_updateinfo),
-                str(repodata), 
+                str(repodata),
                 str(output_file)
             )
             self.modifyrepo_c[
@@ -417,6 +418,7 @@ def main():
     exporter = Exporter(
         pulp_client=pulp_client,
         copy_noarch_packages=args.copy_noarch_packages,
+        only_check_noarch=args.only_check_noarch,
     )
 
     sync(exporter.delete_existing_exporters_from_pulp())
