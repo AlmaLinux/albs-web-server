@@ -211,6 +211,11 @@ class Exporter:
 
         packages_to_add = []
         packages_to_remove = []
+        add_msg = '%s added from "%s" repo into "%s" repo'
+        replace_msg = '%s replaced in "%s" repo from "%s" repo'
+        if self.only_check_noarch:
+            add_msg = '%s can be added from "%s" repo into "%s" repo'
+            replace_msg = '%s can be replaced in "%s" repo from "%s" repo'
         for package_dict in source_repo_packages:
             pkg_name = package_dict['name']
             pkg_version = package_dict['version']
@@ -227,15 +232,13 @@ class Exporter:
                 if is_modular:
                     continue
                 packages_to_add.append(package_dict['pulp_href'])
-                self.logger.info('%s added from "%s" repo into "%s" repo',
-                                 full_name, source_repo_name,
+                self.logger.info(add_msg, full_name, source_repo_name,
                                  destination_repo_name)
                 continue
             if package_dict['sha256'] != compared_pkg['sha256']:
                 packages_to_remove.append(compared_pkg['pulp_href'])
                 packages_to_add.append(package_dict['pulp_href'])
-                self.logger.info('%s replaced in "%s" repo from "%s" repo',
-                                 full_name, destination_repo_name,
+                self.logger.info(replace_msg, full_name, destination_repo_name,
                                  source_repo_name)
 
         if packages_to_add and not self.only_check_noarch:
