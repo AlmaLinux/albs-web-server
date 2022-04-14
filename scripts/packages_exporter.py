@@ -51,6 +51,11 @@ def parse_args():
         default=False, required=False,
         help='Copy noarch packages from x86_64 repos into others',
     )
+    parser.add_argument(
+        '-show-differ', '--show_differ_packages', action='store_true',
+        default=False, required=False,
+        help='Shows only packages that have different checksum',
+    )
     parser.add_argument('-check', '--only_check_noarch', action='store_true',
                         default=False, required=False,
                         help='Only check noarch packages without copying')
@@ -63,6 +68,7 @@ class Exporter:
         pulp_client,
         copy_noarch_packages,
         only_check_noarch,
+        show_differ_packages,
     ):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('packages-exporter')
@@ -71,6 +77,7 @@ class Exporter:
         self.modifyrepo_c = local['modifyrepo_c']
         self.copy_noarch_packages = copy_noarch_packages
         self.only_check_noarch = only_check_noarch
+        self.show_differ_packages = show_differ_packages
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
@@ -230,7 +237,7 @@ class Exporter:
                         pkg['release'] == pkg_release))
             ), None)
             if compared_pkg is None:
-                if is_modular:
+                if is_modular or self.show_differ_packages:
                     continue
                 packages_to_add.append(package_dict['pulp_href'])
                 self.logger.info(add_msg, full_name, source_repo_name,
@@ -442,6 +449,7 @@ def main():
         pulp_client=pulp_client,
         copy_noarch_packages=args.copy_noarch_packages,
         only_check_noarch=args.only_check_noarch,
+        show_differ_packages=args.show_differ_packages,
     )
 
     sync(exporter.delete_existing_exporters_from_pulp())
