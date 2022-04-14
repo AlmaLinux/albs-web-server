@@ -16,7 +16,9 @@ router = APIRouter(
 )
 
 
-@router.get('/', response_model=typing.List[release_schema.Release])
+@router.get('/', response_model=typing.Union[
+    typing.List[release_schema.Release],
+    release_schema.ReleaseResponse])
 async def get_releases(pageNumber: int = None,
                        db: database.Session = Depends(get_db)):
     return await r_crud.get_releases(pageNumber, db)
