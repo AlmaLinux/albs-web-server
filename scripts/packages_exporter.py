@@ -261,10 +261,15 @@ class Exporter:
             self.logger.info('Skip copying noarch packages')
             return
         for source_repo_name, repo_href in source_repo_dict.items():
+            source_is_debug = '-debug-' in source_repo_name
             source_repo_packages = await self.retrieve_all_packages_from_pulp(
                 await self.pulp_client.get_repo_latest_version(repo_href),
             )
             for dest_repo_name, dest_repo_href in destination_repo_dict.items():
+                dest_repo_is_debug = '-debug-' in dest_repo_name
+                if source_is_debug != dest_repo_is_debug or (
+                        '-src-' in dest_repo_name):
+                    continue
                 tasks.append(self.copy_noarch_packages_from_x86_64_repo(
                     source_repo_name=source_repo_name,
                     source_repo_packages=source_repo_packages,
