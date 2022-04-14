@@ -24,6 +24,27 @@ class PulpClient:
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
 
+    async def get_file_repositories(self, params: dict) -> typing.List[dict]:
+        ENDPOINT = 'pulp/api/v3/repositories/file/file/'
+        result = []
+        response = await self.request('GET', ENDPOINT, json=params)
+        return result
+
+    async def iter_repo(self, endpoint: str) -> dict:
+        next_page = endpoint
+        while True:
+            if 'limit' in next_page and re.search(
+                    r'limit=(\d+)', next_page).groups()[0] == '100':
+                next_page = next_page.replace('limit=100', 'limit=1000')
+            parsed_url = urllib.parse.urlsplit(next_page)
+            path = parsed_url.path + '?' + parsed_url.query
+            page = await self.get_by_href(path)
+            for content_item in page['results']:
+                yield content_item
+            next_page = page.get('next')
+            if not next_page:
+                break
+
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
@@ -371,12 +392,12 @@ class PulpClient:
             exclude_fields=exclude_fields
         )
 
-    async def remove_artifact(self, artifact_href: str,
-                              need_wait_sync: bool=False):
-        await self.request('DELETE', artifact_href)
-        if need_wait_sync:
-            remove_task = await self.get_distro(artifact_href)
-            return remove_task
+    async def delete_by_href(self, href: str, wait_for_result: bool = False):
+        task = await self.request('DELETE', href)
+        if wait_for_result:
+            result = await self.wait_for_task(task['task'])
+            return result
+        return task
 
     async def create_rpm_remote(self, remote_name: str, remote_url: str,
                                 remote_policy: str = 'on_demand') -> str:

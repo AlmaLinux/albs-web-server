@@ -4,7 +4,7 @@ import typing
 import urllib.parse
 
 from alws.config import settings
-from alws.utils.ids import get_random_unique_version 
+from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 
@@ -13,21 +13,6 @@ class MetadataUploader:
     def __init__(self):
         self.pulp = PulpClient(settings.pulp_host, settings.pulp_user,
                                settings.pulp_password)
-
-    async def iter_repo(self, repo_href: str) -> dict:
-        next_page = repo_href
-        while True:
-            if 'limit' in next_page and re.search(
-                    r'limit=(\d+)', next_page).groups()[0] == '100':
-                next_page = next_page.replace('limit=100', 'limit=1000')
-            parsed_url = urllib.parse.urlsplit(next_page)
-            path = parsed_url.path + '?' + parsed_url.query
-            page = await self.pulp.get_by_href(path)
-            for pkg in page['results']:
-                yield pkg
-            next_page = page.get('next')
-            if not next_page:
-                break
 
     async def upload_comps(self, repo_href: str, comps_content: str) -> None:
         data = {
@@ -53,7 +38,7 @@ class MetadataUploader:
                 continue
             repo_modules_to_remove.extend([
                 content['pulp_href']
-                async for content in self.iter_repo(repo_type_href)
+                async for content in self.pulp.iter_repo(repo_type_href)
             ])
         artifact_href, _ = await self.pulp.upload_file(module_content)
         _index = IndexWrapper.from_template(module_content)
