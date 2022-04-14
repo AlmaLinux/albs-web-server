@@ -194,7 +194,7 @@ class Exporter:
             new_url = response.get('next')
             parsed_url = urllib.parse.urlsplit(new_url)
             new_url = parsed_url.path + '?' + parsed_url.query
-            response = await self.pulp_client.get_by_href(new_url)
+            response = await self.pulp_client.request('GET', new_url)
             packages.extend(response['results'])
         return packages
 
