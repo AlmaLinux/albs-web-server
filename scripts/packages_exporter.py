@@ -190,11 +190,12 @@ class Exporter:
         response = await self.pulp_client.request('GET', endpoint,
                                                   params=params)
         packages = response['results']
-        next_page = response.get('next')
-        while next_page is not None:
-            next_packages = await self.pulp_client.request('GET', next_page)
-            packages.extend(next_packages['results'])
-            next_page = next_packages.get('next')
+        while response.get('next'):
+            new_url = response.get('next')
+            parsed_url = urllib.parse.urlsplit(new_url)
+            new_url = parsed_url.path + '?' + parsed_url.query
+            response = await self.pulp_client.get_by_href(new_url)
+            packages.extend(response['results'])
         return packages
 
     async def copy_noarch_packages_from_x86_64_repo(
