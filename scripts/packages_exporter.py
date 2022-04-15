@@ -268,15 +268,14 @@ class Exporter:
         if not self.copy_noarch_packages:
             self.logger.info('Skip copying noarch packages')
             return
-        for source_repo_name, repo_href in source_repo_dict.items():
-            source_is_debug = '-debug-' in source_repo_name
+        for source_repo_name, repo_data in source_repo_dict.items():
+            repo_href, source_is_debug = repo_data
             source_repo_packages = await self.retrieve_all_packages_from_pulp(
                 await self.pulp_client.get_repo_latest_version(repo_href),
             )
-            for dest_repo_name, dest_repo_href in destination_repo_dict.items():
-                dest_repo_is_debug = '-debug-' in dest_repo_name
-                if source_is_debug != dest_repo_is_debug or (
-                        '-src-' in dest_repo_name):
+            for dest_repo_name, dest_repo_data in destination_repo_dict.items():
+                dest_repo_href, dest_repo_is_debug = dest_repo_data
+                if source_is_debug != dest_repo_is_debug:
                     continue
                 tasks.append(self.copy_noarch_packages_from_x86_64_repo(
                     source_repo_name=source_repo_name,
@@ -287,11 +286,30 @@ class Exporter:
         self.logger.info('Start checking and copying noarch packages in repos')
         await asyncio.gather(*tasks)
 
+    def get_full_repo_name(self, repo: models.Repository) -> str:
+        return f"{repo.name}-{'debuginfo-' if repo.debug else ''}{repo.arch}"
+
+    async def check_noarch_in_user_distribution_repos(self, distr_name: str):
+        async with database.Session() as db:
+            db_distr = await db.execute(select(models.Distribution).where(
+                models.Distribution.name == distr_name,
+            ).options(selectinload(models.Distribution.repositories)))
+        db_distr = db_distr.scalars().first()
+        repos_x86_64 = {}
+        other_repos = {}
+        for repo in db_distr.repositories:
+            if repo.arch == 'src':
+                continue
+            if repo.arch == 'x86_64':
+                repos_x86_64[repo.name] = (repo.pulp_href, repo.debug)
+            else:
+                other_repos[repo.name] = (repo.pulp_href, repo.debug)
+        await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
+
     async def export_repos_from_pulp(
         self,
         platform_names: typing.List[str] = None,
         repo_ids: typing.List[int] = None,
-        distr_name: str = None,
         arches: typing.List[str] = None,
     ) -> typing.Tuple[typing.List[str], typing.Dict[int, str]]:
         platforms_dict = {}
@@ -305,55 +323,40 @@ class Exporter:
                 repo_ids,
             )
         self.logger.info(msg, msg_values)
-        if distr_name:
-            query = select(models.Distribution).where(
-                models.Distribution.name == distr_name,
-            ).options(selectinload(models.Distribution.repositories))
-        else:
-            where_conditions = models.Platform.is_reference.is_(False)
-            if platform_names is not None:
-                where_conditions = sqlalchemy.and_(
-                    models.Platform.name.in_(platform_names),
-                    models.Platform.is_reference.is_(False),
-                )
-            query = select(models.Platform).where(
-                where_conditions).options(selectinload(models.Platform.repos))
+        where_conditions = models.Platform.is_reference.is_(False)
+        if platform_names is not None:
+            where_conditions = sqlalchemy.and_(
+                models.Platform.name.in_(platform_names),
+                models.Platform.is_reference.is_(False),
+            )
+        query = select(models.Platform).where(
+            where_conditions).options(selectinload(models.Platform.repos))
         async with database.Session() as db:
             db_platforms = await db.execute(query)
         db_platforms = db_platforms.scalars().all()
 
         repo_ids_to_export = []
         repos_x86_64 = {}
-        other_repos = {}
+        repos_ppc64le = {}
         for db_platform in db_platforms:
             platforms_dict[db_platform.id] = []
-            if distr_name:
-                repositories = db_platform.repositories
-            else:
-                repositories = db_platform.repos
-            for repo in repositories:
-                if repo_ids is not None and repo.id not in repo_ids:
+            for repo in db_platform.repos:
+                if (repo_ids is not None and repo.id not in repo_ids) or (
+                        repo.production is False):
                     continue
-                if repo.production is True or bool(distr_name):
-                    repo_name = (f"{repo.name}-"
-                                 f"{'debuginfo-' if repo.debug else ''}"
-                                 f"{repo.arch}")
-                    if repo.arch == 'x86_64':
-                        repos_x86_64[repo_name] = repo.pulp_href
-                    else:
-                        other_repos[repo_name] = repo.pulp_href
-                    if arches is not None:
-                        if repo.arch in arches:
-                            platforms_dict[db_platform.id].append(
-                                getattr(repo, 'export_path', None))
-                            repo_ids_to_export.append(repo.id)
-                    else:
-                        platforms_dict[db_platform.id].append(
-                            getattr(repo, 'export_path', None))
+                repo_name = self.get_full_repo_name(repo)
+                if repo.arch == 'x86_64':
+                    repos_x86_64[repo_name] = (repo.pulp_href, repo.debug)
+                if repo.arch == 'ppc64le':
+                    repos_ppc64le[repo_name] = (repo.pulp_href, repo.debug)
+                if arches is not None:
+                    if repo.arch in arches:
+                        platforms_dict[db_platform.id].append(repo.export_path)
                         repo_ids_to_export.append(repo.id)
-        await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
-        if self.only_check_noarch:
-            return [], platforms_dict
+                else:
+                    platforms_dict[db_platform.id].append(repo.export_path)
+                    repo_ids_to_export.append(repo.id)
+        await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
         exported_paths = await self.export_repositories(
             list(set(repo_ids_to_export)))
         self.logger.info('All repositories exported in following paths:\n%s',
@@ -385,13 +388,11 @@ class Exporter:
         repos_x86_64 = {}
         repos_ppc64le = {}
         for db_repo in db_repos.scalars().all():
-            repo_name = (f"{db_repo.name}-"
-                         f"{'debuginfo-' if db_repo.debug else ''}"
-                         f"{db_repo.arch}")
+            repo_name = self.get_full_repo_name(db_repo)
             if db_repo.arch == 'x86_64':
-                repos_x86_64[repo_name] = db_repo.pulp_href
+                repos_x86_64[repo_name] = (db_repo.pulp_href, db_repo.debug)
             if db_repo.arch == 'ppc64le':
-                repos_ppc64le[repo_name] = db_repo.pulp_href
+                repos_ppc64le[repo_name] = (db_repo.pulp_href, db_repo.debug)
         await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
@@ -451,7 +452,10 @@ def main():
         only_check_noarch=args.only_check_noarch,
         show_differ_packages=args.show_differ_packages,
     )
-
+    if args.distribution:
+        sync(exporter.check_noarch_in_user_distribution_repos(
+            args.distribution))
+        return
     sync(exporter.delete_existing_exporters_from_pulp())
 
     db_sign_keys = sync(exporter.get_sign_keys())
@@ -464,14 +468,13 @@ def main():
             if sign_key['platform_id'] == platform_id
         ), None)
 
-    if args.platform_names or args.repo_ids or args.distribution:
+    if args.platform_names or args.repo_ids:
         platform_names = args.platform_names
         repo_ids = args.repo_ids
         exported_paths, platforms_dict = sync(exporter.export_repos_from_pulp(
             platform_names=platform_names,
             arches=args.arches,
             repo_ids=repo_ids,
-            distr_name=args.distribution,
         ))
 
     for exp_path in exported_paths:
