@@ -32,31 +32,31 @@ def parse_args():
         description='Packages exporter script. Exports repositories from Pulp'
                     'and transfer them to the filesystem'
     )
-    parser.add_argument('-names', '--platform_names',
+    parser.add_argument('-names', '--platform-names',
                         type=str, nargs='+', required=False,
                         help='List of platform names to export')
-    parser.add_argument('-repos', '--repo_ids',
+    parser.add_argument('-repos', '--repo-ids',
                         type=int, nargs='+', required=False,
                         help='List of repo ids to export')
     parser.add_argument('-a', '--arches', type=str, nargs='+',
                         required=False, help='List of arches to export')
-    parser.add_argument('-id', '--release_id', type=int,
+    parser.add_argument('-id', '--release-id', type=int,
                         required=False, help='Extract repos by release_id')
     parser.add_argument(
         '-distr', '--distribution', type=str, required=False,
         help='Check noarch packages by distribution'
     )
     parser.add_argument(
-        '-copy', '--copy_noarch_packages', action='store_true',
+        '-copy', '--copy-noarch-packages', action='store_true',
         default=False, required=False,
         help='Copy noarch packages from x86_64 repos into others',
     )
     parser.add_argument(
-        '-show-differ', '--show_differ_packages', action='store_true',
+        '-show-differ', '--show-differ-packages', action='store_true',
         default=False, required=False,
         help='Shows only packages that have different checksum',
     )
-    parser.add_argument('-check', '--only_check_noarch', action='store_true',
+    parser.add_argument('-check', '--only-check-noarch', action='store_true',
                         default=False, required=False,
                         help='Only check noarch packages without copying')
     return parser.parse_args()
