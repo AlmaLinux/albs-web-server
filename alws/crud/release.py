@@ -13,7 +13,7 @@ async def get_releases(page_number: typing.Optional[int],
     query = select(models.Release).options(
         selectinload(models.Release.created_by),
         selectinload(models.Release.platform),
-    ).order_by(models.Release.id)
+    ).order_by(models.Release.id.desc())
     if page_number:
         query = query.slice(10 * page_number - 10, 10 * page_number)
     release_result = await db.execute(query)
