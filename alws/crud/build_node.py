@@ -86,10 +86,46 @@ async def update_failed_build_items(db: Session, build_id: int):
         failed_tasks = await db.execute(query)
         for task in failed_tasks.scalars():
             task.status = BuildTaskStatus.IDLE
+            task.ts = None
             if last_task is not None:
                 await db.run_sync(add_build_task_dependencies, task, last_task)
             last_task = task
         await db.commit()
+
+
+async def log_repo_exists(db: Session, task: models.BuildTask):
+    repo = await db.execute(select(models.Repository).where(
+        models.Repository.name == task.get_log_repo_name()
+    ))
+    return bool(repo.scalars().first())
+
+
+async def create_build_log_repo(db: Session, task: models.BuildTask):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
+    repo_name = task.get_log_repo_name()
+    repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
+    log_repo = models.Repository(
+        name=repo_name,
+        url=repo_url,
+        arch=task.arch,
+        pulp_href=pulp_href,
+        type='build_log',
+        debug=False
+    )
+    db.add(log_repo)
+    await db.flush()
+    await db.refresh(log_repo)
+    await db.execute(
+        insert(models.BuildRepo).values(
+            build_id=task.build_id,
+            repository_id=log_repo.id
+        )
+    )
+    await db.commit()
 
 
 async def ping_tasks(
@@ -104,8 +140,11 @@ async def ping_tasks(
 
 
 async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
-    build_tasks = await db.execute(select(models.BuildTask).where(
-        models.BuildTask.id == task_id))
+    build_tasks = await db.execute(
+        select(models.BuildTask).where(models.BuildTask.id == task_id).options(
+            selectinload(models.BuildTask.platform)
+        )
+    )
     return build_tasks.scalars().first()
 
 
@@ -401,6 +440,9 @@ async def build_done(
             db: Session,
             request: build_node_schema.BuildDone
         ):
+    remove_dep_query = delete(models.BuildTaskDependency).where(
+        models.BuildTaskDependency.c.build_task_dependency == request.task_id
+    )
     try:
         build_task = await __process_build_task_artifacts(
             db, request.task_id, request.artifacts)
@@ -410,10 +452,7 @@ async def build_done(
         ).values(status=BuildTaskStatus.FAILED)
         await db.execute(update_query)
 
-        remove_query = delete(models.BuildTaskDependency).where(
-            models.BuildTaskDependency.c.build_task_dependency == request.task_id,
-        )
-        await db.execute(remove_query)
+        await db.execute(remove_dep_query)
         await db.commit()
         raise e
 
@@ -455,12 +494,6 @@ async def build_done(
         logging.exception('Cannot process noarch packages: %s', str(e))
         raise NoarchProcessingError('Cannot process noarch packages')
 
-    await db.execute(
-        delete(models.BuildTaskDependency).where(
-            models.BuildTaskDependency.c.build_task_dependency == request.task_id
-        )
-    )
-
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
@@ -501,3 +534,5 @@ async def build_done(
     except Exception as e:
         raise SrpmProvisionError(f'Cannot update subsequent tasks '
                                  f'with the source RPM link {str(e)}')
+
+    await db.execute(remove_dep_query)

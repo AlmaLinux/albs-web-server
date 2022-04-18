@@ -40,7 +40,6 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 platforms=build_request.platforms,
                 platform_flavors=build_request.platform_flavors,
                 is_secure_boot=build_request.is_secure_boot,
-                skip_module_checking=build_request.skip_module_checking,
             )
             for task in build_request.tasks:
                 await planner.add_task(task)
@@ -58,6 +57,12 @@ async def _build_done(request: build_node_schema.BuildDone):
         await build_node_crud.build_done(db, request)
         if request.status == 'done':
             await test.create_test_tasks(db, request.task_id)
+
+
+async def _create_log_repo(task_id: int):
+    async for db in get_db():
+        task = await build_node_crud.get_build_task(db, task_id)
+        await build_node_crud.create_build_log_repo(db, task)
 
 
 @dramatiq.actor(
@@ -80,3 +85,11 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)
     event_loop.run_until_complete(_build_done(parsed_build))
+
+
+@dramatiq.actor(
+    max_retries=0,
+    priority=0,
+)
+def create_log_repo(task_id: int):
+    event_loop.run_until_complete(_create_log_repo(task_id))

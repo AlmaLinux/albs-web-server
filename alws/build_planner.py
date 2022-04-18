@@ -2,7 +2,6 @@ import logging
 import asyncio
 import typing
 import collections
-import re
 import itertools
 
 from sqlalchemy.orm import Session, selectinload
@@ -13,7 +12,6 @@ from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
-from alws.utils.beholder_client import BeholderClient
 from alws.utils.pulp_client import PulpClient
 from alws.utils.parsing import parse_git_ref
 from alws.utils.modularity import (
@@ -36,7 +34,6 @@ class BuildPlanner:
                 platforms: typing.List[build_schema.BuildCreatePlatforms],
                 platform_flavors: typing.Optional[typing.List[int]],
                 is_secure_boot: bool,
-                skip_module_checking: bool,
             ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -60,7 +57,6 @@ class BuildPlanner:
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
         self._is_secure_boot = is_secure_boot
-        self._skip_module_checking = skip_module_checking
         self.load_platforms()
         if platform_flavors:
             self.load_platform_flavors(platform_flavors)
@@ -78,7 +74,7 @@ class BuildPlanner:
             raise DataNotFoundError(
                 f'platforms: {missing_platforms} cannot be found in database'
             )
-    
+
     def load_platform_flavors(self, flavors):
         db_flavors = self._db.execute(
             select(models.PlatformFlavour).where(
@@ -95,24 +91,18 @@ class BuildPlanner:
                 arch: str,
                 repo_type: str,
                 is_debug: typing.Optional[bool] = False,
-                task_id: typing.Optional[int] = None
             ):
-        suffix = 'br' if repo_type != 'build_log' else f'artifacts-{task_id}'
         debug_suffix = 'debug-' if is_debug else ''
         repo_name = (
-            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}{suffix}'
+            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}br'
         )
-        if repo_type == 'rpm':
-            repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
-                repo_name)
-            modules = self._modules_by_target.get((platform.name, arch), [])
-            if modules:
-                await self._pulp_client.modify_repository(
-                    pulp_href, add=[module.pulp_href for module in modules]
-                )
-        else:
-            repo_url, pulp_href = await self._pulp_client.create_log_repo(
-                repo_name)
+        repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
+            repo_name)
+        modules = self._modules_by_target.get((platform.name, arch), [])
+        if modules:
+            await self._pulp_client.modify_repository(
+                pulp_href, add=[module.pulp_href for module in modules]
+            )
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -140,17 +130,21 @@ class BuildPlanner:
                     'rpm',
                     is_debug=True
                 ))
-        for task in self._build.tasks:
-            tasks.append(self.create_build_repo(
-                task.platform,
-                task.arch,
-                'build_log',
-                task_id=task.id
-            ))
         await asyncio.gather(*tasks)
 
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
+
+    def remove_force_to_build_artifacts_from_template(
+        self,
+        module: ModuleWrapper,
+        build_task_refs: typing.List[build_schema.BuildTaskRef],
+    ):
+        # if some refs with added artifacts in module template
+        # was enabled to build, we should delete them from template
+        for ref in build_task_refs:
+            for artifact in ref.added_artifacts:
+                module.remove_rpm_artifact(artifact)
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
@@ -162,7 +156,7 @@ class BuildPlanner:
             return
 
         if isinstance(task, build_schema.BuildTaskModuleRef):
-            raw_refs = task.refs
+            raw_refs = [ref for ref in task.refs if ref.enabled]
             _index = IndexWrapper.from_template(task.modules_yaml)
             module = _index.get_module(task.module_name, task.module_stream)
             devel_module = None
@@ -179,6 +173,15 @@ class BuildPlanner:
             raw_refs, module_templates = await build_schema.get_module_refs(
                 task, self._platforms[0], self._platform_flavors
             )
+        refs = [
+            models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=BuildTaskRefType.GIT_BRANCH
+            ) for ref in raw_refs
+        ]
+        if not refs:
+            raise EmptyBuildError
         module = None
         if self._build.mock_options:
             mock_options = self._build.mock_options.copy()
@@ -186,21 +189,12 @@ class BuildPlanner:
                 mock_options['definitions'] = {}
         else:
             mock_options = {'definitions': {}}
-        beholder_client = BeholderClient(
-            host=settings.beholder_host,
-            token=settings.beholder_token,
-        )
-        modules_to_exclude = []
         modularity_version = None
         for platform in self._platforms:
             modularity_version = platform.modularity['versions'][-1]
             for flavour in self._platform_flavors:
                 if flavour.modularity and flavour.modularity.get('versions'):
                     modularity_version = flavour.modularity['versions'][-1]
-            clean_dist_name = re.search(
-                r'(?P<dist_name>[a-z]+)', platform.name, re.IGNORECASE,
-            ).groupdict().get('dist_name', '')
-            distr_ver = platform.distr_version
             if task.module_platform_version:
                 flavour_versions = [
                     flavour.modularity['versions']
@@ -214,38 +208,6 @@ class BuildPlanner:
                 )
             for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_templates[0])
-                endpoint = (
-                    f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                    f'/module/{module.name}/{module.stream}/{arch}/'
-                )
-                pkgs_to_add = []
-                if not self._skip_module_checking:
-                    try:
-                        beholder_response = await beholder_client.get(endpoint)
-                    except Exception:
-                        logging.error('Cannot get module info')
-                        beholder_response = {}
-                    beholder_components = {
-                        item['ref']: item['name']
-                        for item in beholder_response.get('components', [])
-                    }
-                    for ref_id, component_name in beholder_components.items():
-                        try:
-                            git_ref_id = await self.get_ref_commit_id(
-                                component_name, module.stream)
-                        except Exception:
-                            logging.exception('Cannot get git_ref_commit_id:')
-                            continue
-                        if git_ref_id == ref_id:
-                            for artifact in beholder_response['artifacts']:
-                                srpm_name = artifact['sourcerpm']['name']
-                                if srpm_name != component_name:
-                                    continue
-                                modules_to_exclude.append(srpm_name)
-                                pkgs_to_add.extend(artifact['packages'])
-                for pkg_dict in pkgs_to_add:
-                    module.add_rpm_artifact(pkg_dict)
-
                 module.add_module_dependencies_from_mock_defs(
                     mock_modules=mock_options.get('module_enable', []))
                 mock_options['module_enable'] = [
@@ -265,6 +227,8 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
+                self.remove_force_to_build_artifacts_from_template(
+                    module, raw_refs)
                 module_index = IndexWrapper()
                 module_index.add_module(module)
                 if len(module_templates) > 1:
@@ -282,6 +246,8 @@ class BuildPlanner:
                     mock_options['module_enable'].append(
                         f'{devel_module.name}:{devel_module.stream}'
                     )
+                    self.remove_force_to_build_artifacts_from_template(
+                        devel_module, raw_refs)
                     module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
@@ -307,19 +273,6 @@ class BuildPlanner:
         self._db.add_all(all_modules)
         for key, value in module.iter_mock_definitions():
             mock_options['definitions'][key] = value
-        modules_to_exclude = set(modules_to_exclude)
-        refs = [
-            models.BuildTaskRef(
-                url=ref.url,
-                git_ref=ref.git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH
-            ) for ref in raw_refs
-            if not any((
-                module_name in ref.url for module_name in modules_to_exclude
-            ))
-        ]
-        if not refs:
-            raise EmptyBuildError
         for ref in refs:
             await self._add_single_ref(
                 ref,

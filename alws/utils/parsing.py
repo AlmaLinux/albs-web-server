@@ -5,6 +5,7 @@ from alws.constants import TestCaseStatus
 
 
 __all__ = [
+    'clean_module_tag',
     'get_clean_distr_name',
     'parse_git_ref',
     'parse_tap_output',
@@ -12,9 +13,19 @@ __all__ = [
 ]
 
 
+def clean_module_tag(tag: str):
+    clean_tag = re.sub(r'\.alma.*$', '', tag)
+    raw_part = re.search(r'\.module.*', clean_tag).group()
+    latest = re.search(r'\.\d*$', raw_part)
+    result = re.sub(r'\.module.*', '', clean_tag)
+    if latest is not None:
+        result += latest.group()
+    return result
+
+
 def get_clean_distr_name(distr_name: str) -> str:
     clean_distr_name = re.search(
-        r'(?P<dist_name>[a-z]+)', distr_name, re.IGNORECASE,
+        r'^(?P<dist_name>[a-z]+)', distr_name, re.IGNORECASE,
     ).groupdict().get('dist_name', '')
     return clean_distr_name
 

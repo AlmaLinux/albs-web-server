@@ -2,6 +2,7 @@ import datetime
 import itertools
 
 from fastapi import APIRouter, Depends, Response, status
+from dramatiq import pipeline
 
 from alws import database
 from alws import dramatiq
@@ -46,7 +47,14 @@ async def build_done(
     # in the future this probably should be handled somehow better 
     build_task.ts = datetime.datetime.now() + datetime.timedelta(hours=3)
     await db.commit()
-    dramatiq.build_done.send(build_done_.dict())
+    if not await build_node.log_repo_exists(db, build_task):
+        pipe = pipeline([
+            dramatiq.create_log_repo.message(build_task.id),
+            dramatiq.build_done.message_with_options(args=(build_done_.dict(), ), pipe_ignore=True)
+        ])
+        pipe.run()
+    else:
+        dramatiq.build_done.send(build_done_.dict())
     return {'ok': True}
 
 

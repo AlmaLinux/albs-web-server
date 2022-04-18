@@ -40,8 +40,11 @@ class PulpClient:
             create_publication: bool = False,
             base_path_start: str = 'builds') -> (str, str):
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
-        payload = {'name': name, 'autopublish': auto_publish,
-                   'retain_repo_versions': 1}
+        payload = {
+            'name': name,
+            'autopublish': auto_publish,
+            'retain_repo_versions': 5,
+        }
         response = await self.request('POST', endpoint, json=payload)
         repo_href = response['pulp_href']
         if create_publication:

@@ -78,6 +78,7 @@ class ReleasePlanner:
                     src_rpm_names.append(artifact_name)
                 pkg_info = await self._pulp_client.get_rpm_package(
                     rpm.artifact.href, include_fields=packages_fields)
+                pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
                 pkg_info['href_from_repo'] = None
                 pkg_info['full_name'] = artifact_name
