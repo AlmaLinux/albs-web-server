@@ -136,7 +136,7 @@ class BuildSignTask(BaseModel):
         orm_mode = True
 
 
-class RpmModule:
+class RpmModule(BaseModel):
     id: int
     name: str
     arch: str
