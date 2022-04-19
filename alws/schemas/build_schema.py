@@ -139,6 +139,9 @@ class BuildSignTask(BaseModel):
 class RpmModule(BaseModel):
     id: int
     name: str
+    version: str
+    stream: str
+    context: str
     arch: str
     sha256: str
 
