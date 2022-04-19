@@ -62,6 +62,8 @@ async def get_builds(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.test_tasks),
         selectinload(models.Build.sign_tasks),
+        selectinload(models.Build.tasks).selectinload(
+            models.BuildTask.rpm_module),
         selectinload(models.Build.platform_flavors)
     ).distinct(models.Build.id)
 
