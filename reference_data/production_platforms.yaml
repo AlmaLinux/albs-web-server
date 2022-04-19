@@ -36,6 +36,7 @@
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
+        kernel-rpm-macros
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
@@ -703,6 +704,7 @@
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
+        kernel-rpm-macros
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
