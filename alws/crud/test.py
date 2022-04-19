@@ -18,7 +18,7 @@ from alws.utils.parsing import parse_tap_output, tap_set_status
 
 async def create_test_tasks(db: Session, build_task_id: int):
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )
@@ -96,7 +96,7 @@ async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
 async def complete_test_task(db: Session, task_id: int,
                              test_result: test_schema.TestTaskResult):
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )

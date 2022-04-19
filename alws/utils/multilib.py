@@ -47,7 +47,7 @@ class MultilibProcessor:
         self._pulp_client = pulp_client
         if not pulp_client:
             self._pulp_client = PulpClient(
-                settings.pulp_host, settings.pulp_user,
+                settings.pulp_internal_host, settings.pulp_user,
                 settings.pulp_password
             )
         self._module_index = module_index

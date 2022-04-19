@@ -39,7 +39,7 @@ class ReleasePlanner:
         self.max_list_len = 100  # max elements in list for pulp request
         self._beholder_client = BeholderClient(settings.beholder_host)
         self._pulp_client = PulpClient(
-            settings.pulp_host,
+            settings.pulp_internal_host,
             settings.pulp_user,
             settings.pulp_password
         )

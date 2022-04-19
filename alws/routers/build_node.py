@@ -66,7 +66,7 @@ async def get_task(
     task = await build_node.get_available_build_task(db, request)
     if not task:
         return
-    # generate full url to builted SRPM for using less memory in database
+    # generate full url to built SRPM for using less memory in database
     built_srpm_url = task.built_srpm_url
     if built_srpm_url is not None:
         built_srpm_url = "{}/pulp/content/builds/{}".format(

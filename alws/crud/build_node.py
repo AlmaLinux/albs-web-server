@@ -101,7 +101,7 @@ async def log_repo_exists(db: Session, task: models.BuildTask):
 
 async def create_build_log_repo(db: Session, task: models.BuildTask):
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )
@@ -110,7 +110,7 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
     if pulp_repo:
         pulp_href = pulp_repo['pulp_href']
         repo_url = (await pulp_client.get_log_distro(repo_name))['base_url']
-    else: 
+    else:
         repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
     if await log_repo_exists(db, task):
         return
@@ -485,7 +485,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
 async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     success = True
     pulp = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )

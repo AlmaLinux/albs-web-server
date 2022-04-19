@@ -11,10 +11,11 @@ from alws.utils.pulp_client import PulpClient
 
 class MetadataUploader:
     def __init__(self):
-        self.pulp = PulpClient(settings.pulp_host, settings.pulp_user,
+        self.pulp = PulpClient(settings.pulp_internal_host, settings.pulp_user,
                                settings.pulp_password)
 
-    async def iter_repo(self, repo_href: str) -> dict:
+    async def iter_repo(self, repo_href: str) \
+            -> typing.Generator[dict, None, None]:
         next_page = repo_href
         while True:
             if 'limit' in next_page and re.search(
