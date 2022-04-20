@@ -10,7 +10,7 @@ __all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
 
 
 REQUEST_TIMEOUT = 60  # 1 minute
-DRAMATIQ_TASK_TIMEOUT = 3600000  # 1 hour in milliseconds
+DRAMATIQ_TASK_TIMEOUT = 36000000  # 10 hours in milliseconds
 
 
 class BuildTaskStatus(enum.IntEnum):

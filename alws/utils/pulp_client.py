@@ -57,6 +57,14 @@ class PulpClient:
         return await self.create_rpm_repository(
             name, auto_publish=True, create_publication=True)
 
+    async def get_repo_modules(self, repo_href: str) -> typing.List[str]:
+        version = await self.get_by_href(repo_href)
+        content = await self.get_latest_repo_present_content(version['latest_version_href'])
+        if not content.get('rpm.modulemd', {}).get('href'):
+            return []
+        modules = await self.get_by_href(content['rpm.modulemd']['href'])
+        return [module['pulp_href'] for module in modules.get('results', [])]
+
     async def get_by_href(self, href: str):
         return await self.request('GET', href)
 

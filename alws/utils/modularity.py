@@ -332,7 +332,7 @@ class IndexWrapper:
         if not ret:
             raise ValueError(
                 f'Can not parse modules.yaml template, '
-                f'error: {error[0].get_error()}'
+                f'error: {error[0].get_gerror()}'
             )
         return IndexWrapper(index)
 

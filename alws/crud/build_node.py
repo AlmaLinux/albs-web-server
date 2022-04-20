@@ -356,17 +356,17 @@ async def __process_build_task_artifacts(
                 build_task.rpm_module.context,
                 build_task.rpm_module.arch
             )
+            old_modules = await pulp_client.get_repo_modules(module_repo.pulp_href)
             await pulp_client.modify_repository(
                 module_repo.pulp_href,
                 add=[module_pulp_href],
-                remove=[build_task.rpm_module.pulp_href]
+                remove=old_modules
             )
             build_task.rpm_module.sha256 = sha256
             build_task.rpm_module.pulp_href = module_pulp_href
         except Exception as e:
             message = f'Cannot update module information inside Pulp: {str(e)}'
-            logging.exception('Cannot update module information inside Pulp: %s',
-                              str(e))
+            logging.exception(message)
             raise ModuleUpdateError(message) from e
 
     if rpm_entries:
@@ -442,13 +442,13 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
 
 
 async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
-    sucess = True
+    success = True
     try:
         async with db.begin():
             await build_done(db, request)
     except Exception:
         logging.exception('Build done failed:')
-        sucess = False
+        success = False
         # TODO: also add error to database.
         update_query = update(models.BuildTask).where(
             models.BuildTask.id == request.task_id,
@@ -460,7 +460,7 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
         )
         await db.execute(remove_dep_query)
         await db.commit()
-    return sucess
+    return success
 
 
 async def build_done(db: Session, request: build_node_schema.BuildDone):
