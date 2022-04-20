@@ -117,7 +117,7 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
 
     db.add_all(build_tasks)
     db.add_all(new_noarch_artifacts)
-    await db.commit()
+    await db.flush()
 
     for repo_href, content_dict in repos_to_update.items():
         await pulp_client.modify_repository(

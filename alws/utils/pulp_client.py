@@ -68,6 +68,22 @@ class PulpClient:
             return None
         return response['results'][0]
 
+    async def get_log_repository(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/repositories/file/file/'
+        params = {'name': name}
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+        
+    async def get_log_distro(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/distributions/file/file/'
+        params = {'name__contains': name}
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         params = {'name': name}

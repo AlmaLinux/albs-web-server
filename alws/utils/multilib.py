@@ -143,7 +143,7 @@ async def add_multilib_packages(
                 else:
                     pkg_hrefs.append(href)
     db.add_all(artifacts)
-    await db.commit()
+    await db.flush()
 
     debug_repo = next(
         r for r in build_task.build.repos if r.type == 'rpm'

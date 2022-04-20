@@ -107,7 +107,14 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
         settings.pulp_password
     )
     repo_name = task.get_log_repo_name()
-    repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
+    pulp_repo = await pulp_client.get_log_repository(repo_name)
+    if pulp_repo:
+        pulp_href = pulp_repo['pulp_href']
+        repo_url = (await pulp_client.get_log_distro(repo_name))['base_url']
+    else: 
+        repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
+    if await log_repo_exists(db, task):
+        return
     log_repo = models.Repository(
         name=repo_name,
         url=repo_url,
@@ -332,7 +339,7 @@ async def __process_build_task_artifacts(
         pulp_client, build_task.id, log_artifacts, log_repositories)
     if logs_entries:
         db.add_all(logs_entries)
-        await db.commit()
+        await db.flush()
     logging.info('Logs processing is finished')
     rpm_entries = await __process_rpms(
         pulp_client, build_task.id, build_task.arch,
@@ -365,7 +372,7 @@ async def __process_build_task_artifacts(
     if rpm_entries:
         db.add_all(rpm_entries)
     db.add(build_task)
-    await db.commit()
+    await db.flush()
     await db.refresh(build_task)
     return build_task
 
@@ -433,29 +440,32 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         await db.execute(update_query)
         await db.execute(insert(models.BuildTaskArtifact), insert_values)
 
-    await db.commit()
 
-
-async def build_done(
-            db: Session,
-            request: build_node_schema.BuildDone
-        ):
-    remove_dep_query = delete(models.BuildTaskDependency).where(
-        models.BuildTaskDependency.c.build_task_dependency == request.task_id
-    )
+async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
+    sucess = True
     try:
-        build_task = await __process_build_task_artifacts(
-            db, request.task_id, request.artifacts)
-    except (ArtifactConversionError, ModuleUpdateError, RepositoryAddError) as e:
+        async with db.begin():
+            await build_done(db, request)
+    except Exception:
+        logging.exception('Build done failed:')
+        sucess = False
+        # TODO: also add error to database.
         update_query = update(models.BuildTask).where(
             models.BuildTask.id == request.task_id,
         ).values(status=BuildTaskStatus.FAILED)
         await db.execute(update_query)
-
+    finally:
+        remove_dep_query = delete(models.BuildTaskDependency).where(
+            models.BuildTaskDependency.c.build_task_dependency == request.task_id
+        )
         await db.execute(remove_dep_query)
         await db.commit()
-        raise e
+    return sucess
 
+
+async def build_done(db: Session, request: build_node_schema.BuildDone):
+    build_task = await __process_build_task_artifacts(
+        db, request.task_id, request.artifacts)
     status = BuildTaskStatus.COMPLETED
     if request.status == 'failed':
         status = BuildTaskStatus.FAILED
@@ -474,25 +484,17 @@ async def build_done(
         # bool(settings.beholder_token),
     )
     if all(multilib_conditions):
-        try:
-            multilib_pkgs = await get_multilib_packages(
-                db, build_task, src_rpm)
-            if multilib_pkgs:
-                await add_multilib_packages(db, build_task, multilib_pkgs)
-        except Exception as e:
-            logging.exception('Cannot process multilib packages: %s', str(e))
-            raise MultilibProcessingError('Cannot process multilib packages')
+        multilib_pkgs = await get_multilib_packages(
+            db, build_task, src_rpm)
+        if multilib_pkgs:
+            await add_multilib_packages(db, build_task, multilib_pkgs)
 
     await db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
 
-    try:
-        await save_noarch_packages(db, build_task)
-    except Exception as e:
-        logging.exception('Cannot process noarch packages: %s', str(e))
-        raise NoarchProcessingError('Cannot process noarch packages')
+    await save_noarch_packages(db, build_task)
 
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
@@ -521,18 +523,12 @@ async def build_done(
     if srpm:
         if build_task.built_srpm_url is None:
             db.add(srpm)
-            await db.commit()
+            await db.flush()
             await db.refresh(srpm)
         for binary_rpm in binary_rpms:
             binary_rpm.source_rpm = srpm
 
     db.add_all(binary_rpms)
-    await db.commit()
+    await db.flush()
 
-    try:
-        await __update_built_srpm_url(db, build_task)
-    except Exception as e:
-        raise SrpmProvisionError(f'Cannot update subsequent tasks '
-                                 f'with the source RPM link {str(e)}')
-
-    await db.execute(remove_dep_query)
+    await __update_built_srpm_url(db, build_task)
