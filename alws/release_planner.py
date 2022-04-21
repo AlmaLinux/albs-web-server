@@ -66,7 +66,7 @@ class ReleasePlanner:
             selectinload(models.Build.repos)
         )
         build_result = await self._db.execute(builds_q)
-        modules_to_release = {}
+        modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
             build_rpms = build.source_rpms + build.binary_rpms
             for rpm in build_rpms:
@@ -109,7 +109,9 @@ class ReleasePlanner:
                         module_repo.url)
                     module_index = IndexWrapper.from_template(template)
                     for module in module_index.iter_modules():
-                        modules_to_release[key] = {
+                        # in some cases we have also devel module in template,
+                        # we should add all modules from template
+                        modules_to_release[key].append({
                             'build_id': build.id,
                             'name': module.name,
                             'stream': module.stream,
@@ -117,8 +119,13 @@ class ReleasePlanner:
                             'context': module.context,
                             'arch': module.arch,
                             'template': module.render()
-                        }
-        return pulp_packages, src_rpm_names, list(modules_to_release.values())
+                        })
+        pulp_rpm_modules = [
+            module_dict
+            for module_list in modules_to_release.values()
+            for module_dict in module_list
+        ]
+        return pulp_packages, src_rpm_names, pulp_rpm_modules
 
     async def check_package_presence_in_repo(
         self,
