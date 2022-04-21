@@ -294,10 +294,6 @@ class PulpClient:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
         artifact_info = await self.get_artifact(
             artifact_href, include_fields=['sha256'])
-        files = await self.get_files(include_fields=['pulp_href'],
-                                     sha256=artifact_info['sha256'])
-        if files:
-            return files[0]['pulp_href']
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,
