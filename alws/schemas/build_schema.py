@@ -162,6 +162,7 @@ class BuildTask(BaseModel):
     artifacts: typing.List[BuildTaskArtifact]
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
+    error: typing.Optional[str]
 
     class Config:
         orm_mode = True

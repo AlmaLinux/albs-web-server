@@ -39,7 +39,7 @@ async def get_noarch_packages(
     return noarch_packages, debug_noarch_packages
 
 
-async def save_noarch_packages(db: Session, build_task: models.BuildTask):
+async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task: models.BuildTask):
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,

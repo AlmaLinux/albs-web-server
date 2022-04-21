@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import typing
+import traceback
 
 import sqlalchemy
 from sqlalchemy import delete, insert, update
@@ -205,7 +206,8 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                 str(repo)
             )
             raise ArtifactConversionError(
-                'Cannot put RPM packages into Pulp storage: %s', str(e))
+                f'Cannot put RPM packages into Pulp storage: {e}'
+            )
         processed_packages.extend(results)
         hrefs = [item[0] for item in results]
         try:
@@ -288,15 +290,10 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
 
 
 async def __process_build_task_artifacts(
-        db: Session, task_id: int, task_artifacts: list):
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password
-    )
+        db: Session, pulp_client: PulpClient, task_id: int, task_artifacts: list):
     build_tasks = await db.execute(
         select(models.BuildTask).where(
-            models.BuildTask.id == task_id).options(
+            models.BuildTask.id == task_id).with_for_update().options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
             selectinload(models.BuildTask.rpm_module),
@@ -443,16 +440,21 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
 
 async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     success = True
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     try:
         async with db.begin():
-            await build_done(db, request)
+            async with pulp.begin():
+                await build_done(db, pulp, request)
     except Exception:
         logging.exception('Build done failed:')
         success = False
-        # TODO: also add error to database.
         update_query = update(models.BuildTask).where(
             models.BuildTask.id == request.task_id,
-        ).values(status=BuildTaskStatus.FAILED)
+        ).values(status=BuildTaskStatus.FAILED, error=traceback.format_exc())
         await db.execute(update_query)
     finally:
         remove_dep_query = delete(models.BuildTaskDependency).where(
@@ -463,9 +465,9 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     return success
 
 
-async def build_done(db: Session, request: build_node_schema.BuildDone):
+async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.BuildDone):
     build_task = await __process_build_task_artifacts(
-        db, request.task_id, request.artifacts)
+        db, pulp, request.task_id, request.artifacts)
     status = BuildTaskStatus.COMPLETED
     if request.status == 'failed':
         status = BuildTaskStatus.FAILED
@@ -487,14 +489,14 @@ async def build_done(db: Session, request: build_node_schema.BuildDone):
         multilib_pkgs = await get_multilib_packages(
             db, build_task, src_rpm)
         if multilib_pkgs:
-            await add_multilib_packages(db, build_task, multilib_pkgs)
+            await add_multilib_packages(db, pulp, build_task, multilib_pkgs)
 
     await db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
 
-    await save_noarch_packages(db, build_task)
+    await save_noarch_packages(db, pulp, build_task)
 
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
@@ -530,5 +532,4 @@ async def build_done(db: Session, request: build_node_schema.BuildDone):
 
     db.add_all(binary_rpms)
     await db.flush()
-
     await __update_built_srpm_url(db, build_task)

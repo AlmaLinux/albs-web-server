@@ -93,14 +93,10 @@ async def get_multilib_packages(
 
 async def add_multilib_packages(
         db: Session,
+        pulp_client: PulpClient,
         build_task: models.BuildTask,
         multilib_packages: dict,
 ):
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
     subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
