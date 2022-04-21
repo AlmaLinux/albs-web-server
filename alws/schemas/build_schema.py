@@ -136,6 +136,19 @@ class BuildSignTask(BaseModel):
         orm_mode = True
 
 
+class RpmModule(BaseModel):
+    id: int
+    name: str
+    version: str
+    stream: str
+    context: str
+    arch: str
+    sha256: str
+
+    class Config:
+        orm_mode = True
+
+
 class BuildTask(BaseModel):
 
     id: int
@@ -145,6 +158,7 @@ class BuildTask(BaseModel):
     arch: str
     platform: BuildPlatform
     ref: BuildTaskRef
+    rpm_module: typing.Optional[RpmModule]
     artifacts: typing.List[BuildTaskArtifact]
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
