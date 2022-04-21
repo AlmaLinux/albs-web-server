@@ -1,4 +1,5 @@
 import re
+import typing
 from tap import parser
 
 from alws.constants import TestCaseStatus
@@ -10,7 +11,16 @@ __all__ = [
     'parse_git_ref',
     'parse_tap_output',
     'tap_set_status',
+    'slice_list',
 ]
+
+
+def slice_list(source_list: list,
+               max_len: int) -> typing.Generator[typing.List[str], None, None]:
+    return (
+        source_list[i:i + max_len]
+        for i in range(0, len(source_list), max_len)
+    )
 
 
 def clean_module_tag(tag: str):
