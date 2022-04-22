@@ -356,10 +356,11 @@ class ReleasePlanner:
                 for dist_name in [clean_ref_dist_name, base_platform.name]
                 for module_arch in module_arch_list
             ]
-            module_response = None
+            module_responses = []
             for endpoint in endpoints:
                 try:
-                    module_response = await self._beholder_client.get(endpoint)
+                    module_responses.append(
+                        await self._beholder_client.get(endpoint))
                 except Exception:
                     pass
             module_info = {
@@ -367,33 +368,34 @@ class ReleasePlanner:
                 'repositories': []
             }
             rpm_modules.append(module_info)
-            if not module_response:
-                continue
-            for _packages in module_response['artifacts']:
-                for pkg in _packages['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'])
-                    beholder_cache[key] = pkg
-                    for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'], weak_arch)
-                        replaced_pkg = copy.deepcopy(pkg)
-                        for repo in replaced_pkg['repositories']:
-                            if repo['arch'] == pkg['arch']:
-                                repo['arch'] = weak_arch
-                        beholder_cache[second_key] = replaced_pkg
-            module_repo = module_response['repository']
-            repo_name = repo_name_regex.search(
-                module_repo['name']).groupdict()['name']
-            release_repo_name = '-'.join((
-                clean_base_dist_name_lower,
-                base_platform.distr_version,
-                repo_name
-            ))
-            repo_key = RepoType(release_repo_name, module_repo['arch'], False)
-            module_info['repositories'].append({
-                'name': release_repo_name,
-                'arch': module['arch'],
-                'debug': False,
-            })
+            for module_response in module_responses:
+                for _packages in module_response['artifacts']:
+                    for pkg in _packages['packages']:
+                        key = (pkg['name'], pkg['version'], pkg['arch'])
+                        beholder_cache[key] = pkg
+                        for weak_arch in strong_arches[pkg['arch']]:
+                            second_key = (
+                                pkg['name'], pkg['version'], weak_arch)
+                            replaced_pkg = copy.deepcopy(pkg)
+                            for repo in replaced_pkg['repositories']:
+                                if repo['arch'] == pkg['arch']:
+                                    repo['arch'] = weak_arch
+                            beholder_cache[second_key] = replaced_pkg
+                module_repo = module_response['repository']
+                repo_name = repo_name_regex.search(
+                    module_repo['name']).groupdict()['name']
+                release_repo_name = '-'.join((
+                    clean_base_dist_name_lower,
+                    base_platform.distr_version,
+                    repo_name
+                ))
+                repo_key = RepoType(
+                    release_repo_name, module_repo['arch'], False)
+                module_info['repositories'].append({
+                    'name': release_repo_name,
+                    'arch': module['arch'],
+                    'debug': False,
+                })
 
         endpoint = (f'/api/v1/distros/{clean_ref_dist_name}/'
                     f'{reference_platform.distr_version}/projects/')
