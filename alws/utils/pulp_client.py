@@ -23,6 +23,7 @@ class PulpClient:
         self._username = username
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
+        self._current_transaction = None
 
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
@@ -57,12 +58,36 @@ class PulpClient:
         return await self.create_rpm_repository(
             name, auto_publish=True, create_publication=True)
 
+    async def get_repo_modules(self, repo_href: str) -> typing.List[str]:
+        version = await self.get_by_href(repo_href)
+        content = await self.get_latest_repo_present_content(version['latest_version_href'])
+        if not content.get('rpm.modulemd', {}).get('href'):
+            return []
+        modules = await self.get_by_href(content['rpm.modulemd']['href'])
+        return [module['pulp_href'] for module in modules.get('results', [])]
+
     async def get_by_href(self, href: str):
         return await self.request('GET', href)
 
     async def get_rpm_repository_by_params(
             self, params: dict) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+
+    async def get_log_repository(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/repositories/file/file/'
+        params = {'name': name}
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results'][0]
+        
+    async def get_log_distro(self, name: str) -> typing.Union[dict, None]:
+        endpoint = 'pulp/api/v3/distributions/file/file/'
+        params = {'name__contains': name}
         response = await self.request('GET', endpoint, params=params)
         if response['count'] == 0:
             return None
@@ -182,9 +207,51 @@ class PulpClient:
                 modules_yaml = await response.text()
                 response.raise_for_status()
                 return modules_yaml
+    
+    def begin(self):
+        return self
 
-    async def modify_repository(self, repo_to: str, add: List[str] = None,
-                                remove: List[str] = None):
+    async def __aenter__(self):
+        if self._current_transaction is not None:
+            raise ValueError('Another transaction already in progress')
+        self._current_transaction = {}
+
+    async def __aexit__(self, exc_type, exc_value, exc_traceback):
+        if exc_type is not None:
+            await self.rollback()
+        else:
+            await self.commit()
+        self._current_transaction = None
+    
+    async def rollback(self):
+        # TODO: write description here, what should be done in rollback in real world
+        pass
+
+    async def commit(self):
+        tasks = []
+        for repo, payload in self._current_transaction.items():
+            tasks.append(self._modify_repository(
+                repo, list(payload['add']), list(payload['remove'])
+            ))
+        await asyncio.gather(*tasks)
+
+    async def _update_transaction(
+                self,
+                repo_to: str,
+                add: List[str] = None,
+                remove: List[str] = None
+            ):
+        if not self._current_transaction.get(repo_to):
+            self._current_transaction[repo_to] = {'add': set(), 'remove': set()}
+        self._current_transaction[repo_to]['add'].update(add or [])
+        self._current_transaction[repo_to]['remove'].update(remove or [])
+    
+    async def _modify_repository(
+                self,
+                repo_to: str,
+                add: List[str] = None,
+                remove: List[str] = None
+            ):
         ENDPOINT = urllib.parse.urljoin(repo_to, 'modify/')
         payload = {}
         if add:
@@ -194,6 +261,16 @@ class PulpClient:
         task = await self.request('POST', ENDPOINT, json=payload)
         response = await self.wait_for_task(task['task'])
         return response
+
+    async def modify_repository(
+                self,
+                repo_to: str,
+                add: List[str] = None,
+                remove: List[str] = None
+            ):
+        if self._current_transaction:
+            return await self._update_transaction(repo_to, add, remove)
+        return await self._modify_repository(repo_to, add, remove)
 
     async def create_file_publication(self, repository: str):
         ENDPOINT = 'pulp/api/v3/publications/file/file/'
@@ -216,14 +293,8 @@ class PulpClient:
                 skip_checking: bool = False,
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
-        files = None
-        if not skip_checking:
-            artifact_info = await self.get_artifact(
-                artifact_href, include_fields=['sha256'])
-            files = await self.get_files(include_fields=['pulp_href'],
-                                         sha256=artifact_info['sha256'])
-        if files:
-            return files[0]['pulp_href']
+        artifact_info = await self.get_artifact(
+            artifact_href, include_fields=['sha256'])
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,

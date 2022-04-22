@@ -39,7 +39,7 @@ async def get_noarch_packages(
     return noarch_packages, debug_noarch_packages
 
 
-async def save_noarch_packages(db: Session, build_task: models.BuildTask):
+async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task: models.BuildTask):
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
@@ -117,7 +117,7 @@ async def save_noarch_packages(db: Session, build_task: models.BuildTask):
 
     db.add_all(build_tasks)
     db.add_all(new_noarch_artifacts)
-    await db.commit()
+    await db.flush()
 
     for repo_href, content_dict in repos_to_update.items():
         await pulp_client.modify_repository(
