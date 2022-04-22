@@ -36,7 +36,6 @@ async def create_test_tasks(db: Session, build_task_id: int):
     )
     result = await db.execute(latest_revision_query)
     latest_revision = result.scalars().first()
-    await db.close()
     if latest_revision:
         new_revision = latest_revision + 1
     else:
@@ -51,9 +50,8 @@ async def create_test_tasks(db: Session, build_task_id: int):
         name=repo_name, url=repo_url, arch=build_task.arch,
         pulp_href=repo_href, type='test_log', debug=False
     )
-    async with db.begin():
-        db.add(repository)
-        await db.commit()
+    db.add(repository)
+    await db.flush()
 
     test_tasks = []
     for artifact in build_task.artifacts:
@@ -73,22 +71,20 @@ async def create_test_tasks(db: Session, build_task_id: int):
         if artifact_info.get('release'):
             task.package_release = artifact_info['release']
         test_tasks.append(task)
-    async with db.begin():
-        db.add_all(test_tasks)
-        await db.commit()
+    db.add_all(test_tasks)
+    await db.commit()
 
 
 async def restart_build_tests(db: Session, build_id: int):
     build_task_ids = await db.execute(
         select(models.BuildTask.id).where(
             models.BuildTask.build_id == build_id))
-    for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id[0])
+    for build_task_id in build_task_ids.scalars().all():
+        await create_test_tasks(db, build_task_id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
-    href = await pulp_client.create_file(artifact['name'], artifact['href'],
-                                         skip_checking=True)
+    href = await pulp_client.create_file(artifact['name'], artifact['href'])
     return artifact['name'], href
 
 
@@ -106,7 +102,6 @@ async def complete_test_task(db: Session, task_id: int,
         models.TestTask.id == task_id,
     ).options(selectinload(models.TestTask.repository)))
     task = task.scalars().first()
-    await db.close()
     status = TestTaskStatus.COMPLETED
     for log in test_result.result.get('logs', []):
         if log.get('href'):
@@ -135,10 +130,9 @@ async def complete_test_task(db: Session, task_id: int,
             break
     task.status = status
     task.alts_response = test_result.dict()
-    async with db.begin():
-        db.add(task)
-        db.add_all(logs)
-        await db.commit()
+    db.add(task)
+    db.add_all(logs)
+    await db.commit()
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)
@@ -147,19 +141,18 @@ async def complete_test_task(db: Session, task_id: int,
 async def get_test_tasks_by_build_task(
         db: Session, build_task_id: int, latest: bool = True,
         revision: int = None):
-    async with db.begin():
-        query = select(models.TestTask).where(
-            models.TestTask.build_task_id == build_task_id)
-        # If latest=False, but revision is not set, should return
-        # latest results anyway
-        if (not latest and not revision) or latest:
-            subquery = select(func.max(models.TestTask.revision)).filter(
-                models.TestTask.build_task_id == build_task_id).scalar_subquery()
-            query = query.filter(models.TestTask.revision == subquery)
-        elif revision:
-            query = query.filter(models.TestTask.revision == revision)
-        result = await db.execute(query)
-        return result.scalars().all()
+    query = select(models.TestTask).where(
+        models.TestTask.build_task_id == build_task_id)
+    # If latest=False, but revision is not set, should return
+    # latest results anyway
+    if (not latest and not revision) or latest:
+        subquery = select(func.max(models.TestTask.revision)).filter(
+            models.TestTask.build_task_id == build_task_id).scalar_subquery()
+        query = query.filter(models.TestTask.revision == subquery)
+    elif revision:
+        query = query.filter(models.TestTask.revision == revision)
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 def get_logs_format(logs: bytes) -> str:
