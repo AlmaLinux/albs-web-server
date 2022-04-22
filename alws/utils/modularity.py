@@ -224,12 +224,12 @@ class ModuleWrapper:
 
     def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False):
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
-        if self.is_artifact_filtered(artifact):
-            if self.name.endswith('-devel'):
-                self._stream.add_rpm_artifact(artifact)
+        if self.is_artifact_filtered(artifact) and self.name.endswith('-devel'):
+            self._stream.add_rpm_artifact(artifact)
         if devel:
             self._stream.add_rpm_artifact(artifact)
-        elif not self.name.endswith('-devel'):
+        if (not self.name.endswith('-devel')
+                and not self.is_artifact_filtered(artifact)):
             self._stream.add_rpm_artifact(artifact)
 
     def remove_rpm_artifact(self, artifact: str):
@@ -349,6 +349,12 @@ class IndexWrapper:
 
     def add_module(self, module: ModuleWrapper):
         self._index.add_module_stream(module._stream)
+
+    def has_devel_module(self):
+        for module_name in self._index.get_module_names():
+            if '-devel' in module_name:
+                return True
+        return False
 
     def iter_modules(self):
         for module_name in self._index.get_module_names():
