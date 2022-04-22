@@ -22,64 +22,69 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
-    build_task_query = await db.execute(
-        select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id,
-        ).options(selectinload(models.BuildTask.artifacts)),
-    )
-    build_task = build_task_query.scalars().first()
-
-    latest_revision_query = select(
-        func.max(models.TestTask.revision),
-    ).filter(
-        models.TestTask.build_task_id == build_task_id,
-    )
-    result = await db.execute(latest_revision_query)
-    latest_revision = result.scalars().first()
-    if latest_revision:
-        new_revision = latest_revision + 1
-    else:
-        new_revision = 1
-
-    # Create logs repository
-    repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-    repo_url, repo_href = await pulp_client.create_log_repo(
-        repo_name, distro_path_start='test_logs')
-
-    repository = models.Repository(
-        name=repo_name, url=repo_url, arch=build_task.arch,
-        pulp_href=repo_href, type='test_log', debug=False
-    )
-    db.add(repository)
-    await db.flush()
-
-    test_tasks = []
-    for artifact in build_task.artifacts:
-        if artifact.type != 'rpm':
-            continue
-        artifact_info = await pulp_client.get_rpm_package(
-            artifact.href,
-            include_fields=['name', 'version', 'release', 'arch']
+    async with db.begin():
+        build_task_query = await db.execute(
+            select(models.BuildTask).where(
+                models.BuildTask.id == build_task_id,
+            ).options(selectinload(models.BuildTask.artifacts)),
         )
-        task = models.TestTask(build_task_id=build_task_id,
-                               package_name=artifact_info['name'],
-                               package_version=artifact_info['version'],
-                               env_arch=build_task.arch,
-                               status=TestTaskStatus.CREATED,
-                               revision=new_revision,
-                               repository_id=repository.id)
-        if artifact_info.get('release'):
-            task.package_release = artifact_info['release']
-        test_tasks.append(task)
-    db.add_all(test_tasks)
-    await db.commit()
+        build_task = build_task_query.scalars().first()
+
+        latest_revision_query = select(
+            func.max(models.TestTask.revision),
+        ).filter(
+            models.TestTask.build_task_id == build_task_id,
+        )
+        result = await db.execute(latest_revision_query)
+        latest_revision = result.scalars().first()
+        if latest_revision:
+            new_revision = latest_revision + 1
+        else:
+            new_revision = 1
+
+        # Create logs repository
+        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+        repo_url, repo_href = await pulp_client.create_log_repo(
+            repo_name, distro_path_start='test_logs')
+
+        repository = models.Repository(
+            name=repo_name, url=repo_url, arch=build_task.arch,
+            pulp_href=repo_href, type='test_log', debug=False
+        )
+        db.add(repository)
+        await db.flush()
+
+        test_tasks = []
+        for artifact in build_task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            artifact_info = await pulp_client.get_rpm_package(
+                artifact.href,
+                include_fields=['name', 'version', 'release', 'arch']
+            )
+            task = models.TestTask(
+                build_task_id=build_task_id,
+                package_name=artifact_info['name'],
+                package_version=artifact_info['version'],
+                env_arch=build_task.arch,
+                status=TestTaskStatus.CREATED,
+                revision=new_revision,
+                repository_id=repository.id,
+            )
+            if artifact_info.get('release'):
+                task.package_release = artifact_info['release']
+            test_tasks.append(task)
+        db.add_all(test_tasks)
+        await db.commit()
 
 
 async def restart_build_tests(db: Session, build_id: int):
-    build_task_ids = await db.execute(
-        select(models.BuildTask.id).where(
-            models.BuildTask.build_id == build_id))
-    for build_task_id in build_task_ids.scalars().all():
+    async with db.begin():
+        build_task_ids = await db.execute(
+            select(models.BuildTask.id).where(
+                models.BuildTask.build_id == build_id))
+        build_task_ids = build_task_ids.scalars().all()
+    for build_task_id in build_task_ids:
         await create_test_tasks(db, build_task_id)
 
 
@@ -98,41 +103,42 @@ async def complete_test_task(db: Session, task_id: int,
     logs = []
     new_hrefs = []
     conv_tasks = []
-    task = await db.execute(select(models.TestTask).where(
-        models.TestTask.id == task_id,
-    ).options(selectinload(models.TestTask.repository)))
-    task = task.scalars().first()
-    status = TestTaskStatus.COMPLETED
-    for log in test_result.result.get('logs', []):
-        if log.get('href'):
-            conv_tasks.append(__convert_to_file(pulp_client, log))
-        else:
-            logging.error('Log file %s is missing href', str(log))
-            continue
-    results = await asyncio.gather(*conv_tasks)
-    for name, href in results:
-        new_hrefs.append(href)
-        log_record = models.TestTaskArtifact(
-            name=name, href=href, test_task_id=task_id)
-        logs.append(log_record)
+    async with db.begin():
+        task = await db.execute(select(models.TestTask).where(
+            models.TestTask.id == task_id,
+        ).options(selectinload(models.TestTask.repository)))
+        task = task.scalars().first()
+        status = TestTaskStatus.COMPLETED
+        for log in test_result.result.get('logs', []):
+            if log.get('href'):
+                conv_tasks.append(__convert_to_file(pulp_client, log))
+            else:
+                logging.error('Log file %s is missing href', str(log))
+                continue
+        results = await asyncio.gather(*conv_tasks)
+        for name, href in results:
+            new_hrefs.append(href)
+            log_record = models.TestTaskArtifact(
+                name=name, href=href, test_task_id=task_id)
+            logs.append(log_record)
 
-    for key, item in test_result.result.items():
-        if key == 'tests':
-            for test_item in item.values():
-                if not test_item.get('success', False):
-                    status = TestTaskStatus.FAILED
-                    break
-        # Skip logs from processing
-        elif key == 'logs':
-            continue
-        elif not item.get('success', False):
-            status = TestTaskStatus.FAILED
-            break
-    task.status = status
-    task.alts_response = test_result.dict()
-    db.add(task)
-    db.add_all(logs)
-    await db.commit()
+        for key, item in test_result.result.items():
+            if key == 'tests':
+                for test_item in item.values():
+                    if not test_item.get('success', False):
+                        status = TestTaskStatus.FAILED
+                        break
+            # Skip logs from processing
+            elif key == 'logs':
+                continue
+            elif not item.get('success', False):
+                status = TestTaskStatus.FAILED
+                break
+        task.status = status
+        task.alts_response = test_result.dict()
+        db.add(task)
+        db.add_all(logs)
+        await db.commit()
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)
