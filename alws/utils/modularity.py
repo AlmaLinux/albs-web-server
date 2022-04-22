@@ -119,7 +119,8 @@ class ModuleWrapper:
             raise ValueError('can not parse modules.yaml template')
         return ModuleWrapper(md_stream)
 
-    def generate_new_version(self, platform_prefix: str) -> int:
+    @staticmethod
+    def generate_new_version(platform_prefix: str) -> int:
         return int(platform_prefix + datetime.datetime.utcnow().strftime(
             '%Y%m%d%H%M%S'))
 
