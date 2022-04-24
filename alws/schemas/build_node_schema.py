@@ -12,7 +12,6 @@ class TaskRepo(BaseModel):
 
     name: str
     url: str
-    priority: int
 
     class Config:
         orm_mode = True
