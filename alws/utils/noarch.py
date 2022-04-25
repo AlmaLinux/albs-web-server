@@ -40,6 +40,7 @@ async def get_noarch_packages(
 
 
 async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task: models.BuildTask):
+    new_binary_rpms = []
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
@@ -57,13 +58,13 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
     if not all(
             BuildTaskStatus.is_finished(task.status)
             for task in build_tasks):
-        return
+        return new_binary_rpms
 
     build_task_ids = [task.id for task in build_tasks]
     noarch_packages, debug_noarch_packages = await get_noarch_packages(
         db, build_task_ids)
     if not any((noarch_packages, debug_noarch_packages)):
-        return
+        return new_binary_rpms
 
     repos_to_update = {}
     new_noarch_artifacts = []
@@ -91,14 +92,18 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
 
         artifacts_to_create = {**noarch, **debug_noarch}
         for name, href in artifacts_to_create.items():
-            new_noarch_artifacts.append(
-                models.BuildTaskArtifact(
-                    build_task_id=task.id,
-                    name=name,
-                    type='rpm',
-                    href=href,
-                )
+            artifact = models.BuildTaskArtifact(
+                build_task_id=task.id,
+                name=name,
+                type='rpm',
+                href=href,
             )
+            new_noarch_artifacts.append(artifact)
+            if task.id != build_task.id:
+                binary_rpm = models.BinaryRpm()
+                binary_rpm.artifact = artifact
+                binary_rpm.build = build_task.build
+                new_binary_rpms.append(binary_rpm)
 
         for repo in build_task.build.repos:
             if (repo.arch == 'src' or repo.type != 'rpm'
@@ -115,7 +120,6 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
                 'remove': remove_content,
             }
 
-    db.add_all(build_tasks)
     db.add_all(new_noarch_artifacts)
     await db.flush()
 
@@ -125,3 +129,4 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
             add=content_dict['add'],
             remove=content_dict['remove'],
         )
+    return new_binary_rpms

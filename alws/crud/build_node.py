@@ -15,10 +15,7 @@ from alws.constants import BuildTaskStatus
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
-    MultilibProcessingError,
-    NoarchProcessingError,
     RepositoryAddError,
-    SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
@@ -496,13 +493,12 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
             models.BuildTask.id == request.task_id).values(status=status)
     )
 
-    await save_noarch_packages(db, pulp, build_task)
+    binary_rpms = await save_noarch_packages(db, pulp, build_task)
 
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
     srpm = None
-    binary_rpms = []
     for rpm in rpms_result.scalars().all():
         if rpm.name.endswith('.src.rpm') and (
                 build_task.built_srpm_url is not None):
