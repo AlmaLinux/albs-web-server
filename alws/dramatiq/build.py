@@ -68,7 +68,8 @@ async def _create_log_repo(task_id: int):
 
 @dramatiq.actor(
     max_retries=0,
-    priority=0
+    priority=0,
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def start_build(build_id: int, build_request: Dict[str, Any]):
     parsed_build = build_schema.BuildCreate(**build_request)
@@ -91,6 +92,7 @@ def build_done(request: Dict[str, Any]):
 @dramatiq.actor(
     max_retries=0,
     priority=0,
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def create_log_repo(task_id: int):
     event_loop.run_until_complete(_create_log_repo(task_id))
