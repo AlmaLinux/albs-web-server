@@ -1,3 +1,4 @@
+import logging
 import re
 import json
 import typing
@@ -119,7 +120,8 @@ class ModuleWrapper:
             raise ValueError('can not parse modules.yaml template')
         return ModuleWrapper(md_stream)
 
-    def generate_new_version(self, platform_prefix: str) -> int:
+    @staticmethod
+    def generate_new_version(platform_prefix: str) -> int:
         return int(platform_prefix + datetime.datetime.utcnow().strftime(
             '%Y%m%d%H%M%S'))
 
@@ -135,7 +137,13 @@ class ModuleWrapper:
         modules = []
         if mock_modules:
             for module in mock_modules:
-                module_name, module_stream = module.split(':')
+                module_dep = module.split(':')
+                if len(module_dep) != 2:
+                    logging.error(
+                        'Incorrect build-time dependency definition: %s',
+                        module)
+                    continue
+                module_name, module_stream = module_dep
                 modules.append((module_name, module_stream))
         if self._stream.get_dependencies():
             old_deps = self._stream.get_dependencies()[0]
@@ -332,7 +340,7 @@ class IndexWrapper:
         if not ret:
             raise ValueError(
                 f'Can not parse modules.yaml template, '
-                f'error: {error[0].get_error()}'
+                f'error: {error[0].get_gerror()}'
             )
         return IndexWrapper(index)
 

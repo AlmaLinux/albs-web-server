@@ -215,7 +215,7 @@ async def complete_sign_task(
                 for pkg_id, pkg_arch in dedup_ids[package.name]:
                     db_package = all_rpms_mapping[pkg_id]
                     debug = is_debuginfo_rpm(package.name)
-                    repo = repo_mapping.get((pkg_arch, debug))
+                    repo = repo_mapping[(pkg_arch, debug)]
                     artifact_info = await pulp_client.get_artifact(
                         package.href, include_fields=['sha256'])
                     rpm_pkg = await pulp_client.get_rpm_packages(
