@@ -28,6 +28,13 @@ class Release(BaseModel):
         orm_mode = True
 
 
+class ReleaseResponse(BaseModel):
+
+    releases: typing.List[Release]
+    total_releases: typing.Optional[int]
+    current_page: typing.Optional[int]
+
+
 class ReleaseCreate(BaseModel):
     builds: typing.List[int]
     build_tasks: typing.Optional[typing.List[int]]
