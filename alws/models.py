@@ -29,39 +29,6 @@ PlatformRepo = sqlalchemy.Table(
     )
 )
 
-FlavourRepo = sqlalchemy.Table(
-    'platform_flavour_repository',
-    Base.metadata,
-    sqlalchemy.Column(
-        'flavour_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platform_flavours.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'repository_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
-)
-
-BuildPlatformFlavour = sqlalchemy.Table(
-    'build_platform_flavour',
-    Base.metadata,
-    sqlalchemy.Column(
-        'flavour_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platform_flavours.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'build_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
-    )
-)
 
 PlatformDependency = sqlalchemy.Table(
     'platform_dependency',
@@ -153,8 +120,6 @@ class Platform(Base):
         index=True
     )
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
-    copy_priority_arches = sqlalchemy.Column(JSONB, nullable=True)
-    weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)
     data = sqlalchemy.Column(JSONB, nullable=False)
     is_reference = sqlalchemy.Column(
         sqlalchemy.Boolean, default=False, nullable=True)
@@ -208,9 +173,6 @@ class Repository(CustomRepoRepr):
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
-    export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
-                                 nullable=False)
 
 
 class RepositoryRemote(CustomRepoRepr):
@@ -298,9 +260,6 @@ class Build(Base):
     release = relationship('Release')
     source_rpms = relationship('SourceRpm', back_populates='build')
     binary_rpms = relationship('BinaryRpm', back_populates='build')
-    platform_flavors = relationship(
-        'PlatformFlavour', secondary=BuildPlatformFlavour
-    )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                nullable=True)
@@ -372,15 +331,6 @@ class BuildTask(Base):
     rpm_module = relationship('RpmModule')
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
 
-    def get_log_repo_name(self):
-        return '-'.join([
-            self.platform.name,
-            self.arch,
-            str(self.build_id),
-            'artifacts',
-            str(self.id)
-        ])
-
 
 class BuildTaskRef(Base):
 
@@ -405,11 +355,6 @@ class RpmModule(Base):
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
 
-    @property
-    def nvsca(self):
-        return (f'{self.name}-{self.version}-{self.stream}'
-                f'-{self.context}-{self.arch}')
-
 
 class BuildTaskArtifact(Base):
 
@@ -424,6 +369,7 @@ class BuildTaskArtifact(Base):
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    sha256 = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     build_task = relationship('BuildTask', back_populates='artifacts')
     sign_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
@@ -601,7 +547,6 @@ class SignTask(Base):
         sqlalchemy.Integer,
         default=SignStatus.IDLE
     )
-    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
@@ -632,15 +577,6 @@ class RepoExporter(Base):
     )
     repository = relationship('Repository')
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-
-
-class PlatformFlavour(Base):
-    __tablename__ = 'platform_flavours'
-
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
-    modularity = sqlalchemy.Column(JSONB, nullable=True)
-    repos = relationship('Repository', secondary=FlavourRepo)
 
 
 async def create_tables():
