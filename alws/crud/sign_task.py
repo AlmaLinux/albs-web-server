@@ -200,6 +200,8 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 if art_info['256'] != package.sha256:
                     logging.error('Sha256 mismatch. Expected: %s got %s',
                                   art_info['256'], package.sha256)
+                    sign_failed = True
+                    continue
                 db_package.artifact.href = new_pkg_href
                 db_package.artifact.sign_key = sign_task.sign_key
                 db_package.artifact.sha256 = package.sha256
