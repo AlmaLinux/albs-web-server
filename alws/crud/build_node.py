@@ -315,7 +315,7 @@ async def __process_build_task_artifacts(
         status: BuildTaskStatus):
     build_tasks = await db.execute(
         select(models.BuildTask).where(
-            models.BuildTask.id == task_id).options(
+            models.BuildTask.id == task_id).with_for_update().options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
             selectinload(models.BuildTask.rpm_module),
