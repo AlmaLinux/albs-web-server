@@ -195,8 +195,14 @@ async def complete_sign_task(db: Session, sign_task_id: int,
                 repo = repo_mapping.get((package.arch, debug))
                 new_pkg_href = await pulp_client.create_rpm_package(
                     package.name, package.href, repo.pulp_href)
+                art_info = await pulp_client.get_rpm_package(
+                 package.href, include_fields=['sha256'])
+                if art_info['256'] != package.sha256:
+                    logging.error('Sha256 mismatch. Expected: %s got %s',
+                                  art_info['256'], package.sha256)
                 db_package.artifact.href = new_pkg_href
                 db_package.artifact.sign_key = sign_task.sign_key
+                db_package.artifact.sha256 = package.sha256
                 modified_items.append(db_package)
                 modified_items.append(db_package.artifact)
 

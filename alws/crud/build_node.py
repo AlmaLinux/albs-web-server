@@ -15,7 +15,7 @@ from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import add_multilib_packages, get_multilib_packages
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.pulp_client import PulpClient
-
+from alws.errors import MismatchSha256Error
 
 async def get_available_build_task(
             db: Session,
@@ -103,6 +103,10 @@ async def __process_rpms(pulp_client: PulpClient, task_id: int, task_arch: str,
                          built_srpm_url: str = None, module_index=None):
     rpms = []
     for artifact in task_artifacts:
+        art_info = await pulp_client.get_rpm_package(
+            artifact.href, include_fields=['sha256'])
+        if art_info['256'] != artifact.sha256:
+            raise MismatchSha256Error('Sha256 mismatch!')
         arch = task_arch
         if artifact.arch == 'src':
             arch = artifact.arch
