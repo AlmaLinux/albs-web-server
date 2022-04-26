@@ -15,13 +15,12 @@ from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
+from alws.utils.rpm_package import get_rpm_package_info
 
 
 __all__ = [
     'MultilibProcessor',
 ]
-
-from alws.utils.rpm_package import get_rpm_package_info
 
 
 async def get_build_task_artifacts(db: Session, build_task: models.BuildTask):
@@ -73,9 +72,9 @@ class MultilibProcessor:
             return self._is_multilib_needed
 
         query = select(models.BuildTask.arch).where(sqlalchemy.and_(
-                models.BuildTask.build_id == self._build_task.build_id,
-                models.BuildTask.index == self._build_task.index,
-                models.BuildTask.status == BuildTaskStatus.COMPLETED,
+            models.BuildTask.build_id == self._build_task.build_id,
+            models.BuildTask.index == self._build_task.index,
+            models.BuildTask.status == BuildTaskStatus.COMPLETED,
         ))
         result = True
         db_build_tasks = await self._db.execute(query)
