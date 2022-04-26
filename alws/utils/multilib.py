@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 import typing
 
 import jmespath
@@ -11,7 +10,6 @@ from sqlalchemy.orm import Session
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
-from alws.dependencies import get_db
 from alws.errors import ModuleUpdateError
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
@@ -20,8 +18,7 @@ from alws.utils.pulp_client import PulpClient
 
 
 __all__ = [
-    'add_multilib_packages',
-    'get_multilib_packages',
+    'MultilibProcessor',
 ]
 
 from alws.utils.rpm_package import get_rpm_package_info
@@ -44,8 +41,9 @@ async def get_build_task_artifacts(db: Session, build_task: models.BuildTask):
 
 
 class MultilibProcessor:
-    def __init__(self, build_task: models.BuildTask,
+    def __init__(self, db, build_task: models.BuildTask,
                  pulp_client: PulpClient = None, module_index=None):
+        self._db = db
         self._build_task = build_task
         self._pulp_client = pulp_client
         if not pulp_client:
@@ -80,12 +78,11 @@ class MultilibProcessor:
                 models.BuildTask.status == BuildTaskStatus.COMPLETED,
         ))
         result = True
-        async for db in get_db():
-            db_build_tasks = await db.execute(query)
-            task_arches = list(db_build_tasks.scalars().all())
-            if 'i686' not in task_arches:
-                result = False
-            self._is_multilib_needed = result
+        db_build_tasks = await self._db.execute(query)
+        task_arches = list(db_build_tasks.scalars().all())
+        if 'i686' not in task_arches:
+            result = False
+        self._is_multilib_needed = result
         return result
 
     @staticmethod
@@ -139,7 +136,6 @@ class MultilibProcessor:
             packages_mapping = {f'{i["name"]}-{i["version"]}': i
                                 for i in packages}
             packages = list(packages_mapping.values())
-        logging.info('Found something: %s', str(packages))
         return packages
 
     async def get_packages(self, src_rpm: str):
@@ -180,33 +176,33 @@ class MultilibProcessor:
         artifacts = []
         pkg_hrefs = []
         debug_pkg_hrefs = []
-        async for db in get_db():
-            db_artifacts = await get_build_task_artifacts(db, self._build_task)
-            for artifact in db_artifacts:
-                href = artifact.href
-                rpm_pkg = await self._pulp_client.get_rpm_package(
-                    package_href=href,
-                    include_fields=['name', 'version'],
+        db_artifacts = await get_build_task_artifacts(
+            self._db, self._build_task)
+        for artifact in db_artifacts:
+            href = artifact.href
+            rpm_pkg = await self._pulp_client.get_rpm_package(
+                package_href=href,
+                include_fields=['name', 'version'],
+            )
+            artifact_name = rpm_pkg.get('name', '')
+            for pkg_name, pkg_version in multilib_packages.items():
+                add_conditions = (
+                    artifact_name == pkg_name,
+                    href not in pkg_hrefs or href not in debug_pkg_hrefs,
                 )
-                artifact_name = rpm_pkg.get('name', '')
-                for pkg_name, pkg_version in multilib_packages.items():
-                    add_conditions = (
-                        artifact_name == pkg_name,
-                        href not in pkg_hrefs or href not in debug_pkg_hrefs,
-                    )
-                    if all(add_conditions):
-                        artifacts.append(models.BuildTaskArtifact(
-                            build_task_id=self._build_task.id,
-                            name=artifact.name,
-                            type=artifact.type,
-                            href=href,
-                        ))
-                        if is_debuginfo_rpm(artifact_name):
-                            debug_pkg_hrefs.append(href)
-                        else:
-                            pkg_hrefs.append(href)
-            db.add_all(artifacts)
-            await db.commit()
+                if all(add_conditions):
+                    artifacts.append(models.BuildTaskArtifact(
+                        build_task_id=self._build_task.id,
+                        name=artifact.name,
+                        type=artifact.type,
+                        href=href,
+                    ))
+                    if is_debuginfo_rpm(artifact_name):
+                        debug_pkg_hrefs.append(href)
+                    else:
+                        pkg_hrefs.append(href)
+        self._db.add_all(artifacts)
+        await self._db.flush()
         debug_repo = next(
             r for r in self._build_task.build.repos if r.type == 'rpm'
             and r.arch == 'x86_64' and r.debug is True
@@ -259,150 +255,13 @@ class MultilibProcessor:
         if not artifacts:
             return
         packages_to_process = {}
-        async for db in get_db():
-            db_artifacts = await get_build_task_artifacts(db, self._build_task)
-            for artifact in artifacts:
-                if not artifact['is_multilib']:
-                    continue
-                for package in db_artifacts:
-                    if artifact['name'] in package.name:
-                        packages_to_process[artifact['name']] = package
+        db_artifacts = await get_build_task_artifacts(
+            self._db, self._build_task)
+        for artifact in artifacts:
+            if not artifact['is_multilib']:
+                continue
+            for package in db_artifacts:
+                if artifact['name'] in package.name:
+                    packages_to_process[artifact['name']] = package
 
         await self.update_module_index(list(packages_to_process.values()))
-
-
-async def get_multilib_packages(
-        db: Session,
-        build_task: models.BuildTask,
-        src_rpm: str,
-) -> dict:
-
-    async def call_beholder(endpoint: str) -> dict:
-        response = {}
-        try:
-            response = await beholder_client.get(endpoint)
-        except Exception:
-            logging.error(
-                "Cannot get multilib packages, trying next reference platform",
-            )
-        return response
-
-    async def parse_beholder_response(beholder_response: dict) -> dict:
-        multilib_dict = jmespath.search(
-            "packages[?arch=='i686'].{name: name, version: version, "
-            "repos: repositories}",
-            beholder_response,
-        )
-        multilib_dict = jmespath.search(
-            "[*].{name: name, version: version, "
-            "is_multilib: repos[?arch=='x86_64'].arch[] | "
-            "contains(@, 'x86_64')}",
-            multilib_dict,
-        )
-        return multilib_dict if multilib_dict is not None else {}
-
-    query = select(models.BuildTask).where(sqlalchemy.and_(
-        models.BuildTask.build_id == build_task.build_id,
-        models.BuildTask.index == build_task.index,
-        models.BuildTask.status == BuildTaskStatus.COMPLETED,
-    ))
-    db_build_tasks = await db.execute(query)
-    task_arches = [task.arch for task in db_build_tasks.scalars().all()]
-    result = {}
-    multilib_packages = {}
-    if 'i686' not in task_arches:
-        return result
-
-    beholder_client = BeholderClient(
-        host=settings.beholder_host,
-        token=settings.beholder_token,
-    )
-
-    for ref_platform in build_task.platform.reference_platforms:
-        ref_name = ref_platform.name[:-1]
-        ref_ver = ref_platform.distr_version
-        endpoint = f'api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}'
-        pkg_info = await call_beholder(endpoint)
-        multilib_packages = await parse_beholder_response(pkg_info)
-        if multilib_packages:
-            break
-
-    if not multilib_packages:
-        distr_name = build_task.platform.data['definitions']['distribution']
-        distr_ver = build_task.platform.distr_version
-        endpoint = f'api/v1/distros/{distr_name}/{distr_ver}/project/{src_rpm}'
-        pkg_info = await call_beholder(endpoint)
-        multilib_packages = await parse_beholder_response(pkg_info)
-
-    result = {
-        pkg['name']: pkg['version']
-        for pkg in multilib_packages
-        if pkg['is_multilib'] is True
-    }
-    return result
-
-
-async def add_multilib_packages(
-        db: Session,
-        pulp_client: PulpClient,
-        build_task: models.BuildTask,
-        multilib_packages: dict,
-):
-    subquery = select(models.BuildTask.id).where(sqlalchemy.and_(
-        models.BuildTask.build_id == build_task.build_id,
-        models.BuildTask.index == build_task.index,
-        models.BuildTask.arch == 'i686',
-    )).scalar_subquery()
-    query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
-        models.BuildTaskArtifact.build_task_id == subquery,
-        models.BuildTaskArtifact.type == 'rpm',
-        models.BuildTaskArtifact.name.not_like('%src.rpm%'),
-    ))
-    db_artifacts = await db.execute(query)
-    db_artifacts = db_artifacts.scalars().all()
-
-    artifacts = []
-    pkg_hrefs = []
-    debug_pkg_hrefs = []
-
-    for artifact in db_artifacts:
-        href = artifact.href
-        rpm_pkg = await pulp_client.get_rpm_package(
-            package_href=href,
-            include_fields=['name', 'version'],
-        )
-        artifact_name = rpm_pkg.get('name', '')
-        for pkg_name, pkg_version in multilib_packages.items():
-            add_conditions = (
-               artifact_name == pkg_name,
-               rpm_pkg.get('version', '') == pkg_version,
-               href not in pkg_hrefs or href not in debug_pkg_hrefs,
-            )
-            if all(add_conditions):
-                artifacts.append(models.BuildTaskArtifact(
-                    build_task_id=build_task.id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    href=href,
-                ))
-                if re.search(r'-debug(info|source)$', artifact_name):
-                    debug_pkg_hrefs.append(href)
-                else:
-                    pkg_hrefs.append(href)
-    db.add_all(artifacts)
-    await db.flush()
-
-    debug_repo = next(
-        r for r in build_task.build.repos if r.type == 'rpm'
-        and r.arch == 'x86_64' and r.debug is True
-    )
-    arch_repo = next(
-        r for r in build_task.build.repos if r.type == 'rpm'
-        and r.arch == 'x86_64' and r.debug is False
-    )
-    await asyncio.gather(
-        pulp_client.modify_repository(
-            repo_to=debug_repo.pulp_href, add=debug_pkg_hrefs),
-        pulp_client.modify_repository(
-            repo_to=arch_repo.pulp_href, add=pkg_hrefs)
-    )

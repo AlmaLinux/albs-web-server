@@ -226,24 +226,22 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
 
     if module_index:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
-        results = await asyncio.gather(*[get_rpm_package_info(
+        results = await asyncio.gather(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
-            for rpm in rpms])
+            for rpm in rpms))
         packages_info = dict(results)
         srpm_info = None
         # we need to put source RPM in module as well, but it can be skipped
         # because it's built before
         if built_srpm_url is not None:
             task_query = select(models.BuildTask.build_id).where(
-                models.BuildTask.id == task_id)
-            res = await db.execute(task_query)
-            build_id = res.scalar()
+                models.BuildTask.id == task_id).scalar_subquery()
             srpm = next(
                 item for item in task_artifacts if item.arch == 'src'
                 and item.type == 'rpm'
             )
             srpm_query = select(models.SourceRpm).where(
-                models.SourceRpm.build_id == build_id).options(
+                models.SourceRpm.build_id == task_query).options(
                 selectinload(models.SourceRpm.artifact)
             )
             res = await db.execute(srpm_query)
@@ -380,17 +378,15 @@ async def __process_build_task_artifacts(
     )
     if all(multilib_conditions):
         processor = MultilibProcessor(
-            build_task, pulp_client=pulp_client, module_index=module_index)
+            db, build_task, pulp_client=pulp_client, module_index=module_index)
         multilib_packages = await processor.get_packages(src_rpm)
         if module_index:
             multilib_module_artifacts = await processor.get_module_artifacts()
-            logging.info('Found multilib artifacts: %s', str(multilib_module_artifacts))
             await processor.add_multilib_module_artifacts(
                 prepared_artifacts=multilib_module_artifacts)
             multilib_packages.update({
-                    i['name']: i['version'] for i in multilib_module_artifacts
-                }
-            )
+                i['name']: i['version'] for i in multilib_module_artifacts
+            })
         await processor.add_multilib_packages(multilib_packages)
     if build_task.rpm_module and module_index:
         try:
