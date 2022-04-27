@@ -215,7 +215,7 @@ class BuildPlanner:
                 # mock_options['module_enable'] = [
                 #     f'{module.name}:{module.stream}'
                 # ]
-                mock_options['module_enable'] += [
+                mock_options['module_enable'] = [
                     f'{dep_name}:{dep_stream}'
                     for dep_name, dep_stream in module.iter_dependencies()
                 ]
