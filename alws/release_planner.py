@@ -22,7 +22,7 @@ from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.modularity import IndexWrapper
-from alws.utils.parsing import get_clean_distr_name
+from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
 
 
@@ -36,6 +36,7 @@ class ReleasePlanner:
         self.packages_presence_info = None
         self.latest_repo_versions = None
         self.base_platform = None
+        self.max_list_len = 100  # max elements in list for pulp request
         self._beholder_client = BeholderClient(settings.beholder_host)
         self._pulp_client = PulpClient(
             settings.pulp_host,
@@ -122,6 +123,7 @@ class ReleasePlanner:
 
     async def check_package_presence_in_repo(
         self,
+        pkg_names: list,
         pkgs_nevra: dict,
         repo_ver_href: str,
         repo_id: int,
@@ -129,7 +131,7 @@ class ReleasePlanner:
         repo_arch: str,
     ):
         params = {
-            'name__in': ','.join(pkgs_nevra['name']),
+            'name__in': ','.join(pkg_names),
             'epoch__in': ','.join(pkgs_nevra['epoch']),
             'version__in': ','.join(pkgs_nevra['version']),
             'release__in': ','.join(pkgs_nevra['release']),
@@ -204,13 +206,20 @@ class ReleasePlanner:
                     # for other packages check repos by package arch
                     if pkg_arch != 'noarch' and repo_arch != pkg_arch:
                         continue
-                    tasks.append(self.check_package_presence_in_repo(
-                        pkg_dict[pkg_arch],
-                        repo_ver_href,
-                        repo_id,
-                        pkg_arch,
-                        repo_arch,
-                    ))
+                    pkgs_nevra = pkg_dict[pkg_arch]
+                    # in cases when we releasing large build,
+                    # we failed with too large pulp request line
+                    sliced_pkg_names = slice_list(list(pkgs_nevra['name']),
+                                                  self.max_list_len)
+                    for pkg_names in sliced_pkg_names:
+                        tasks.append(self.check_package_presence_in_repo(
+                            pkg_names,
+                            pkgs_nevra,
+                            repo_ver_href,
+                            repo_id,
+                            pkg_arch,
+                            repo_arch,
+                        ))
         await asyncio.gather(*tasks)
         pkgs_in_repos = defaultdict(list)
         for pkg_info in packages:
