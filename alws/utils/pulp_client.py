@@ -289,11 +289,9 @@ class PulpClient:
                 self,
                 file_name: str,
                 artifact_href: str,
-                repo: str = None
+                repo: str = None,
             ) -> str:
         ENDPOINT = 'pulp/api/v3/content/file/files/'
-        artifact_info = await self.get_artifact(
-            artifact_href, include_fields=['sha256'])
         payload = {
             'relative_path': file_name,
             'artifact': artifact_href,
