@@ -54,20 +54,22 @@ class ReleasePlanner:
 
         builds_q = select(models.Build).where(
             models.Build.id.in_(build_ids)).options(
-            selectinload(
-                models.Build.source_rpms).selectinload(
-                models.SourceRpm.artifact),
-            selectinload(
-                models.Build.binary_rpms).selectinload(
-                models.BinaryRpm.artifact),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_module
-            ),
-            selectinload(models.Build.repos)
+                selectinload(models.Build.platform_flavors),
+                selectinload(
+                    models.Build.source_rpms).selectinload(
+                    models.SourceRpm.artifact),
+                selectinload(
+                    models.Build.binary_rpms).selectinload(
+                    models.BinaryRpm.artifact),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.rpm_module
+                ),
+                selectinload(models.Build.repos)
         )
         build_result = await self._db.execute(builds_q)
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
+            is_stable = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
             for rpm in build_rpms:
                 artifact_task_id = rpm.artifact.build_task_id
@@ -78,6 +80,7 @@ class ReleasePlanner:
                     src_rpm_names.append(artifact_name)
                 pkg_info = await self._pulp_client.get_rpm_package(
                     rpm.artifact.href, include_fields=packages_fields)
+                pkg_info['is_stable'] = is_stable
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
                 pkg_info['href_from_repo'] = None
@@ -194,7 +197,10 @@ class ReleasePlanner:
         pkg_dict[nevra.arch]['version'].add(nevra.version)
         pkg_dict[nevra.arch]['release'].add(nevra.release)
 
-    async def prepare_and_execute_async_tasks(self, packages) -> (dict, dict):
+    async def prepare_and_execute_async_tasks(
+        self,
+        packages: typing.List[dict],
+    ) -> typing.Tuple[dict, dict]:
         tasks = []
         packages_from_repos = {}
         for is_debug in (True, False):
@@ -260,6 +266,7 @@ class ReleasePlanner:
         added_packages = set()
         for pkg in pulp_packages:
             full_name = pkg['full_name']
+            pkg.pop('is_stable')
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(pkg)
@@ -292,7 +299,6 @@ class ReleasePlanner:
         self,
         build_ids: typing.List[int],
         base_platform: models.Platform,
-        reference_platform: models.Platform,
         build_tasks: typing.List[int] = None,
     ) -> dict:
         packages = []
@@ -313,11 +319,6 @@ class ReleasePlanner:
             raise ValueError(f'Base distribution name is malformed: '
                              f'{base_platform.name}')
         clean_base_dist_name_lower = clean_base_dist_name.lower()
-
-        clean_ref_dist_name = get_clean_distr_name(reference_platform.name)
-        if clean_ref_dist_name is None:
-            raise ValueError(f'Reference distribution name is malformed: '
-                             f'{reference_platform.name}')
 
         for repo in base_platform.repos:
             repo_dict = {
@@ -345,37 +346,50 @@ class ReleasePlanner:
             )
 
         for module in pulp_rpm_modules:
+            module_name = module['name']
+            module_stream = module['stream']
             module_arch_list = [module['arch']]
             for strong_arch, weak_arches in strong_arches.items():
                 if module['arch'] in weak_arches:
                     module_arch_list.append(strong_arch)
-            endpoints = [
-                f'/api/v1/distros/{dist_name}/'
-                f'{reference_platform.distr_version}/module/{module["name"]}/'
-                f'{module["stream"]}/{module_arch}/'
-                for dist_name in [clean_ref_dist_name, base_platform.name]
-                for module_arch in module_arch_list
+            endpoints = self._beholder_client.create_module_beholder_endpoints(
+                module_name,
+                module_stream,
+                module_arch_list,
+                base_platform.reference_platforms,
+            )
+            module_responses = [
+                response
+                async for response in self._beholder_client.iter_endpoints(
+                    endpoints)
             ]
-            module_responses = []
-            for endpoint in endpoints:
-                try:
-                    module_responses.append(
-                        await self._beholder_client.get(endpoint))
-                except Exception:
-                    pass
+            if not module_responses:
+                endpoints = self._beholder_client.create_module_beholder_endpoints(
+                    module_name,
+                    module_stream,
+                    module_arch_list,
+                    [base_platform],
+                )
+                module_responses = [
+                    response
+                    async for response in self._beholder_client.iter_endpoints(
+                        endpoints, is_module=True)
+                ]
             module_info = {
                 'module': module,
                 'repositories': []
             }
             rpm_modules.append(module_info)
             for module_response in module_responses:
+                is_stable = module_response['is_stable']
                 for _packages in module_response['artifacts']:
                     for pkg in _packages['packages']:
-                        key = (pkg['name'], pkg['version'], pkg['arch'])
+                        key = (pkg['name'], pkg['version'],
+                               pkg['arch'], is_stable)
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
-                            second_key = (
-                                pkg['name'], pkg['version'], weak_arch)
+                            second_key = (pkg['name'], pkg['version'],
+                                          weak_arch, is_stable)
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
@@ -397,21 +411,35 @@ class ReleasePlanner:
                     'debug': False,
                 })
 
-        endpoint = (f'/api/v1/distros/{clean_ref_dist_name}/'
-                    f'{reference_platform.distr_version}/projects/')
-        beholder_response = await self._beholder_client.post(endpoint,
-                                                             src_rpm_names)
-        for pkg_list in beholder_response.get('packages', {}):
-            for pkg in pkg_list['packages']:
-                key = (pkg['name'], pkg['version'], pkg['arch'])
-                beholder_cache[key] = pkg
-                for weak_arch in strong_arches[pkg['arch']]:
-                    second_key = (pkg['name'], pkg['version'], weak_arch)
-                    replaced_pkg = copy.deepcopy(pkg)
-                    for repo in replaced_pkg['repositories']:
-                        if repo['arch'] == pkg['arch']:
-                            repo['arch'] = weak_arch
-                    beholder_cache[second_key] = replaced_pkg
+        endpoints = self._beholder_client.create_beholder_endpoints(
+            base_platform.reference_platforms)
+        beholder_responses = [
+            response
+            async for response in self._beholder_client.iter_endpoints(
+                endpoints, data=src_rpm_names)
+        ]
+        if not beholder_responses:
+            endpoints = self._beholder_client.create_beholder_endpoints(
+                [base_platform])
+            beholder_responses = [
+                response
+                async for response in self._beholder_client.iter_endpoints(
+                    endpoints, data=src_rpm_names)
+            ]
+        for beholder_response in beholder_responses:
+            is_stable = beholder_response['is_stable']
+            for pkg_list in beholder_response.get('packages', {}):
+                for pkg in pkg_list['packages']:
+                    key = (pkg['name'], pkg['version'], pkg['arch'], is_stable)
+                    beholder_cache[key] = pkg
+                    for weak_arch in strong_arches[pkg['arch']]:
+                        second_key = (pkg['name'], pkg['version'],
+                                      weak_arch, is_stable)
+                        replaced_pkg = copy.deepcopy(pkg)
+                        for repo in replaced_pkg['repositories']:
+                            if repo['arch'] == pkg['arch']:
+                                repo['arch'] = weak_arch
+                        beholder_cache[second_key] = replaced_pkg
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -426,10 +454,11 @@ class ReleasePlanner:
             pkg_version = package['version']
             pkg_arch = package['arch']
             full_name = package['full_name']
+            is_stable = package.pop('is_stable')
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
-            key = (pkg_name, pkg_version, pkg_arch)
+            key = (pkg_name, pkg_version, pkg_arch, is_stable)
             predicted_package = beholder_cache.get(key, [])
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
@@ -492,9 +521,10 @@ class ReleasePlanner:
         packages_to_repo_layout = {}
         if not release_plan.get('packages') or (
                 not release_plan.get('repositories')):
-            raise EmptyReleasePlan('Cannot execute plan with empty packages '
-                                    'or repositories: {packages}, {repositories}'
-                                    .format_map(release_plan))
+            raise EmptyReleasePlan(
+                'Cannot execute plan with empty packages or repositories: '
+                '{packages}, {repositories}'.format_map(release_plan)
+            )
         for build_id in release.build_ids:
             try:
                 verified = await sign_task.verify_signed_build(
@@ -591,39 +621,32 @@ class ReleasePlanner:
         await asyncio.gather(*publication_tasks)
 
     async def create_new_release(
-                self, user_id: int, payload: release_schema.ReleaseCreate
-            ) -> models.Release:
+        self,
+        user_id: int,
+        payload: release_schema.ReleaseCreate,
+    ) -> models.Release:
         async with self._db.begin():
             user_q = select(models.User).where(models.User.id == user_id)
             user_result = await self._db.execute(user_q)
-            platform_result = await self._db.execute(
+            platform = await self._db.execute(
                 select(models.Platform).where(
-                    models.Platform.id.in_(
-                        (payload.platform_id, payload.reference_platform_id)
-                    )
-                ).options(selectinload(models.Platform.repos.and_(
-                    models.Repository.production.is_(True)
-                )))
+                    models.Platform.id == payload.platform_id,
+                ).options(
+                    selectinload(models.Platform.reference_platforms),
+                    selectinload(models.Platform.repos.and_(
+                        models.Repository.production.is_(True)))
+                ),
             )
-            platforms = platform_result.scalars().all()
-            base_platform = next(item for item in platforms
-                                 if item.id == payload.platform_id)
-            reference_platform = next(
-                item for item in platforms
-                if item.id == payload.reference_platform_id
-            )
-
+            platform = platform.scalars().first()
             user = user_result.scalars().first()
             new_release = models.Release()
             new_release.build_ids = payload.builds
             if getattr(payload, 'build_tasks', None):
                 new_release.build_task_ids = payload.build_tasks
-            new_release.platform = base_platform
-            new_release.reference_platform_id = payload.reference_platform_id
+            new_release.platform = platform
             new_release.plan = await self.get_release_plan(
                 build_ids=payload.builds,
-                base_platform=base_platform,
-                reference_platform=reference_platform,
+                base_platform=platform,
                 build_tasks=payload.build_tasks
             )
             new_release.created_by = user
@@ -639,14 +662,16 @@ class ReleasePlanner:
         return release_res.scalars().first()
 
     async def update_release(
-            self, release_id: int,
-            payload: release_schema.ReleaseUpdate
+        self, release_id: int,
+        payload: release_schema.ReleaseUpdate,
     ) -> models.Release:
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
             ).options(
                 selectinload(models.Release.created_by),
+                selectinload(models.Release.platform).selectinload(
+                    models.Platform.reference_platforms),
                 selectinload(models.Release.platform).selectinload(
                     models.Platform.repos.and_(
                         models.Repository.production.is_(True)
@@ -675,16 +700,9 @@ class ReleasePlanner:
                 release.build_ids = payload.builds
                 if build_tasks:
                     release.build_task_ids = payload.build_tasks
-                reference_platform = await self._db.execute(
-                    select(models.Platform).where(
-                        models.Platform.id == release.reference_platform_id
-                    )
-                )
-                reference_platform = reference_platform.scalars().first()
                 release.plan = await self.get_release_plan(
                     build_ids=payload.builds,
-                    base_platform=release.platform,
-                    reference_platform=reference_platform,
+                    base_platform=self.base_platform,
                     build_tasks=payload.build_tasks,
                 )
             self._db.add(release)
@@ -692,8 +710,10 @@ class ReleasePlanner:
         await self._db.refresh(release)
         return release
 
-
-    async def commit_release(self, release_id: int) -> (models.Release, str):
+    async def commit_release(
+        self,
+        release_id: int,
+    ) -> typing.Tuple[models.Release, str]:
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
