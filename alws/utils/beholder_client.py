@@ -20,27 +20,28 @@ class BeholderClient:
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     @staticmethod
-    def create_module_beholder_endpoints(
-        module_name: str,
-        module_stream: str,
-        module_arch_list: typing.List[str],
+    def create_endpoints(
         platforms_list: typing.List[Platform],
-    ) -> typing.Generator[None, None, str]:
-        return (
-            f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
-            f'{platform.distr_version}/module/{module_name}/'
-            f'{module_stream}/{module_arch}/'
-            for platform in platforms_list
-            for module_arch in module_arch_list
-        )
-
-    @staticmethod
-    def create_beholder_endpoints(platforms_list: typing.List[Platform]):
-        return (
-            f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
-            f'{platform.distr_version}/projects/'
+        module_name: str = None,
+        module_stream: str = None,
+        module_arch_list: typing.List[str] = None,
+    ) -> typing.Generator[None, None, typing.Tuple[str, int]]:
+        generator = (
+            (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+             f'{platform.distr_version}/projects/',
+             getattr(platform, 'priority', 10))
             for platform in platforms_list
         )
+        if any((module_name, module_stream, module_arch_list)):
+            generator = (
+                (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+                 f'{platform.distr_version}/module/{module_name}/'
+                 f'{module_stream}/{module_arch}/',
+                 getattr(platform, 'priority', 10))
+                for platform in platforms_list
+                for module_arch in module_arch_list
+            )
+        return generator
 
     async def iter_endpoints(
         self,
@@ -48,17 +49,50 @@ class BeholderClient:
         is_module: bool = False,
         data: typing.Union[dict, list] = None,
     ) -> typing.Generator[dict, None, None]:
-        for endpoint in endpoints:
-            is_stable = '-beta' in endpoint
+        for endpoint, priority in endpoints:
             try:
                 if is_module:
                     response = await self.get(endpoint)
                 else:
                     response = await self.post(endpoint, data)
-                response['is_stable'] = is_stable
+                response['is_beta'] = '-beta' in endpoint
+                response['priority'] = priority
                 yield response
             except Exception:
                 pass
+
+    async def retrieve_responses(
+        self,
+        platform: Platform,
+        module_name: str = None,
+        module_stream: str = None,
+        module_arch_list: typing.List[str] = None,
+        is_module: bool = False,
+        data: typing.Union[dict, list] = None,
+    ) -> typing.List[dict]:
+        async def _get_responses():
+            return [
+                response
+                async for response in self.iter_endpoints(
+                    endpoints, is_module, data)
+            ]
+
+        endpoints = self.create_endpoints(
+            platform.reference_platforms,
+            module_name,
+            module_stream,
+            module_arch_list,
+        )
+        responses = await _get_responses()
+        if not responses:
+            endpoints = self.create_endpoints(
+                [platform],
+                module_name,
+                module_stream,
+                module_arch_list,
+            )
+            responses = await _get_responses()
+        return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)

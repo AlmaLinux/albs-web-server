@@ -70,7 +70,7 @@ class ReleasePlanner:
         build_result = await self._db.execute(builds_q)
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
-            is_stable = bool(build.platform_flavors)
+            is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
             for rpm in build_rpms:
                 artifact_task_id = rpm.artifact.build_task_id
@@ -81,7 +81,7 @@ class ReleasePlanner:
                     src_rpm_names.append(artifact_name)
                 pkg_info = await self._pulp_client.get_rpm_package(
                     rpm.artifact.href, include_fields=packages_fields)
-                pkg_info['is_stable'] = is_stable
+                pkg_info['is_beta'] = is_beta
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
                 pkg_info['href_from_repo'] = None
@@ -275,7 +275,7 @@ class ReleasePlanner:
         added_packages = set()
         for pkg in pulp_packages:
             full_name = pkg['full_name']
-            pkg.pop('is_stable')
+            pkg.pop('is_beta')
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(pkg)
@@ -361,44 +361,28 @@ class ReleasePlanner:
             for strong_arch, weak_arches in strong_arches.items():
                 if module['arch'] in weak_arches:
                     module_arch_list.append(strong_arch)
-            endpoints = self._beholder_client.create_module_beholder_endpoints(
+            module_responses = await self._beholder_client.retrieve_responses(
+                base_platform,
                 module_name,
                 module_stream,
                 module_arch_list,
-                base_platform.reference_platforms,
+                is_module=True,
             )
-            module_responses = [
-                response
-                async for response in self._beholder_client.iter_endpoints(
-                    endpoints)
-            ]
-            if not module_responses:
-                endpoints = self._beholder_client.create_module_beholder_endpoints(
-                    module_name,
-                    module_stream,
-                    module_arch_list,
-                    [base_platform],
-                )
-                module_responses = [
-                    response
-                    async for response in self._beholder_client.iter_endpoints(
-                        endpoints, is_module=True)
-                ]
             module_info = {
                 'module': module,
                 'repositories': []
             }
             rpm_modules.append(module_info)
             for module_response in module_responses:
-                is_stable = module_response['is_stable']
+                is_beta = module_response['is_beta']
                 for _packages in module_response['artifacts']:
                     for pkg in _packages['packages']:
                         key = (pkg['name'], pkg['version'],
-                               pkg['arch'], is_stable)
+                               pkg['arch'], is_beta)
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
                             second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, is_stable)
+                                          weak_arch, is_beta)
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
@@ -420,30 +404,19 @@ class ReleasePlanner:
                     'debug': False,
                 })
 
-        endpoints = self._beholder_client.create_beholder_endpoints(
-            base_platform.reference_platforms)
-        beholder_responses = [
-            response
-            async for response in self._beholder_client.iter_endpoints(
-                endpoints, data=src_rpm_names)
-        ]
-        if not beholder_responses:
-            endpoints = self._beholder_client.create_beholder_endpoints(
-                [base_platform])
-            beholder_responses = [
-                response
-                async for response in self._beholder_client.iter_endpoints(
-                    endpoints, data=src_rpm_names)
-            ]
+        beholder_responses = await self._beholder_client.retrieve_responses(
+            base_platform,
+            data=src_rpm_names,
+        )
         for beholder_response in beholder_responses:
-            is_stable = beholder_response['is_stable']
+            is_beta = beholder_response['is_beta']
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'], is_stable)
+                    key = (pkg['name'], pkg['version'], pkg['arch'], is_beta)
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
                         second_key = (pkg['name'], pkg['version'],
-                                      weak_arch, is_stable)
+                                      weak_arch, is_beta)
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
@@ -463,12 +436,15 @@ class ReleasePlanner:
             pkg_version = package['version']
             pkg_arch = package['arch']
             full_name = package['full_name']
-            is_stable = package.pop('is_stable')
+            is_beta = package.pop('is_beta')
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
-            key = (pkg_name, pkg_version, pkg_arch, is_stable)
+            key = (pkg_name, pkg_version, pkg_arch, is_beta)
             predicted_package = beholder_cache.get(key, [])
+            if not predicted_package and is_beta:
+                key = (pkg_name, pkg_version, pkg_arch, False)
+                predicted_package = beholder_cache.get(key, [])
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
             repositories = []
