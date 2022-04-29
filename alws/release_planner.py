@@ -328,6 +328,14 @@ class ReleasePlanner:
             raise ValueError(f'Base distribution name is malformed: '
                              f'{base_platform.name}')
         clean_base_dist_name_lower = clean_base_dist_name.lower()
+        base_dist_name = (
+            f'{clean_base_dist_name_lower}-{base_platform.distr_version}'
+        )
+        ref_dist_names = [
+            f'{get_clean_distr_name(ref_platform.name).lower()}-'
+            f'{ref_platform.distr_version}'
+            for ref_platform in base_platform.reference_platforms
+        ]
 
         for repo in base_platform.repos:
             repo_dict = {
@@ -380,7 +388,8 @@ class ReleasePlanner:
                         key = (pkg['name'], pkg['version'],
                                pkg['arch'], is_beta)
                         pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
-                            clean_base_dist_name_lower,
+                            base_dist_name,
+                            ref_dist_names,
                             pkg['repositories'],
                         )
                         beholder_cache[key] = pkg
@@ -418,7 +427,8 @@ class ReleasePlanner:
                 for pkg in pkg_list['packages']:
                     key = (pkg['name'], pkg['version'], pkg['arch'], is_beta)
                     pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
-                        clean_base_dist_name_lower,
+                        base_dist_name,
+                        ref_dist_names,
                         pkg['repositories'],
                     )
                     beholder_cache[key] = pkg

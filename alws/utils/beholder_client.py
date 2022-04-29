@@ -22,11 +22,16 @@ class BeholderClient:
     @staticmethod
     def clean_beholder_repo_names(
         base_dist_name: str,
+        ref_dist_names: typing.List[str],
         beholder_repos: typing.List[dict],
     ) -> typing.List[dict]:
         for repo in beholder_repos:
-            ref_distr = repo['name'].split('-')[0]
-            repo['name'] = repo['name'].replace(ref_distr, base_dist_name)
+            repo_name = repo['name']
+            repo['name'] = next(
+                repo_name.replace(ref_dist_name, base_dist_name)
+                for ref_dist_name in ref_dist_names
+                if repo_name.startswith(ref_dist_name)
+            )
         return beholder_repos
 
     @staticmethod
