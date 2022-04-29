@@ -1,3 +1,5 @@
+import re
+
 import aiohttp
 import argparse
 import asyncio
@@ -81,6 +83,10 @@ class Exporter:
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
+        self.export_error_file = os.path.abspath(
+            os.path.expanduser('~/export.err'))
+        if os.path.exists(self.export_error_file):
+            os.remove(self.export_error_file)
 
     async def make_request(self, method: str, endpoint: str,
                            params: dict = None, data: dict = None):
@@ -306,6 +312,56 @@ class Exporter:
                 other_repos[repo.name] = (repo.pulp_href, repo.debug)
         await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
 
+    async def check_rpms_signature(self, repository_path: str, key_id: str):
+        key_id_lower = key_id.lower()
+        signature_regex = re.compile(
+            r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>\w+)', re.IGNORECASE)
+        errored_packages = set()
+        no_signature_packages = set()
+        wrong_signature_packages = set()
+        rpm = local['rpm']
+        for package in os.listdir(repository_path):
+            package_path = os.path.join(repository_path, package)
+            args = ('-qip', package_path)
+            exit_code, out, err = rpm.run(args=args, retcode=None)
+            if exit_code != 0:
+                self.logger.error('Cannot get information about package %s, %s',
+                                  package_path, '\n'.join((out, err)))
+                errored_packages.add(package_path)
+                continue
+            signature_result = signature_regex.search(out)
+            if not signature_result:
+                self.logger.error('Cannot detect information '
+                                  'about package %s signature', package_path)
+                errored_packages.add(package_path)
+                continue
+            pkg_key_id = signature_result.groupdict().get('key_id', '').lower()
+            if pkg_key_id == 'None':
+                self.logger.error('Package %s is not signed', package_path)
+                no_signature_packages.add(package_path)
+            elif pkg_key_id != key_id_lower:
+                self.logger.error('Package %s is signed with wrong key, '
+                                  'expected "%s", got "%s"',
+                                  package_path, key_id_lower, pkg_key_id)
+                wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
+
+        if errored_packages or no_signature_packages or wrong_signature_packages:
+            if not os.path.exists(self.export_error_file):
+                mode = 'wt'
+            else:
+                mode = 'at'
+            lines = []
+            if errored_packages:
+                lines.append('Packages that we cannot get information about:')
+                lines.extend(list(errored_packages))
+            if no_signature_packages:
+                lines.append('Packages without signature:')
+                lines.extend(list(no_signature_packages))
+            if wrong_signature_packages:
+                lines.append('Packages with wrong signature')
+            with open(self.export_error_file, mode=mode) as f:
+                f.writelines(lines)
+
     async def export_repos_from_pulp(
         self,
         platform_names: typing.List[str] = None,
@@ -369,7 +425,6 @@ class Exporter:
     ) -> typing.Tuple[typing.List[str], int]:
         self.logger.info('Start exporting packages from release id=%s',
                          release_id)
-        repo_ids = []
         async with database.Session() as db:
             db_release = await db.execute(
                 select(models.Release).where(models.Release.id == release_id))
@@ -478,6 +533,8 @@ def main():
         ))
 
     for exp_path in exported_paths:
+        if key_id_by_platform:
+            sync(exporter.check_rpms_signature(exp_path, key_id_by_platform))
         string_exp_path = str(exp_path)
         path = Path(exp_path)
         repo_path = path.parent
