@@ -20,20 +20,30 @@ class BeholderClient:
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     @staticmethod
+    def clean_beholder_repo_names(
+        base_dist_name: str,
+        beholder_repos: typing.List[dict],
+    ) -> typing.List[dict]:
+        for repo in beholder_repos:
+            ref_distr = repo['name'].split('-')[0]
+            repo['name'] = repo['name'].replace(ref_distr, base_dist_name)
+        return beholder_repos
+
+    @staticmethod
     def create_endpoints(
         platforms_list: typing.List[Platform],
         module_name: str = None,
         module_stream: str = None,
         module_arch_list: typing.List[str] = None,
     ) -> typing.Generator[None, None, typing.Tuple[str, int]]:
-        generator = (
+        endpoints = (
             (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
              f'{platform.distr_version}/projects/',
              getattr(platform, 'priority', 10))
             for platform in platforms_list
         )
         if any((module_name, module_stream, module_arch_list)):
-            generator = (
+            endpoints = (
                 (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
                  f'{platform.distr_version}/module/{module_name}/'
                  f'{module_stream}/{module_arch}/',
@@ -41,7 +51,7 @@ class BeholderClient:
                 for platform in platforms_list
                 for module_arch in module_arch_list
             )
-        return generator
+        return endpoints
 
     async def iter_endpoints(
         self,

@@ -379,6 +379,10 @@ class ReleasePlanner:
                     for pkg in _packages['packages']:
                         key = (pkg['name'], pkg['version'],
                                pkg['arch'], is_beta)
+                        pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
+                            clean_base_dist_name_lower,
+                            pkg['repositories'],
+                        )
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
                             second_key = (pkg['name'], pkg['version'],
@@ -413,6 +417,10 @@ class ReleasePlanner:
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
                     key = (pkg['name'], pkg['version'], pkg['arch'], is_beta)
+                    pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
+                        clean_base_dist_name_lower,
+                        pkg['repositories'],
+                    )
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
                         second_key = (pkg['name'], pkg['version'],
