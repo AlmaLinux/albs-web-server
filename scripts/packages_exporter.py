@@ -325,7 +325,8 @@ class Exporter:
     async def check_rpms_signature(self, repository_path: str, sign_keys: list):
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
         signature_regex = re.compile(
-            r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>\w+)', re.IGNORECASE)
+            r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>(\()?\w+(\))?)',
+            re.IGNORECASE)
         errored_packages = set()
         no_signature_packages = set()
         wrong_signature_packages = set()
@@ -335,6 +336,7 @@ class Exporter:
             if not package_path.endswith('.rpm'):
                 self.logger.debug('Skipping non-RPM file or directory: %s',
                                   package_path)
+                continue
             args = ('-qip', package_path)
             exit_code, out, err = rpm.run(args=args, retcode=None)
             if exit_code != 0:
