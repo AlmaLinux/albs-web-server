@@ -332,6 +332,9 @@ class Exporter:
         rpm = local['rpm']
         for package in os.listdir(repository_path):
             package_path = os.path.join(repository_path, package)
+            if not package_path.endswith('.rpm'):
+                self.logger.debug('Skipping non-RPM file or directory: %s',
+                                  package_path)
             args = ('-qip', package_path)
             exit_code, out, err = rpm.run(args=args, retcode=None)
             if exit_code != 0:
@@ -346,7 +349,7 @@ class Exporter:
                 errored_packages.add(package_path)
                 continue
             pkg_key_id = signature_result.groupdict().get('key_id', '').lower()
-            if pkg_key_id == 'None':
+            if 'none' in pkg_key_id:
                 self.logger.error('Package %s is not signed', package_path)
                 no_signature_packages.add(package_path)
             elif pkg_key_id not in key_ids_lower:
@@ -440,6 +443,9 @@ class Exporter:
                     local['sudo']['chown', '-R',
                                   f'{self.current_user}:{self.current_user}',
                                   f'{repo_path}'].run()
+                    # removing files with partial modulemd data
+                    local['find'][repo_path, '-type', 'f', '-name', '*snippet',
+                                  '-exec', 'rm', '-f', '{}', '+'].run()
                     await self.check_rpms_signature(
                         repo_path, db_platform.sign_keys)
                 finally:
