@@ -28,6 +28,10 @@ from alws.utils.pulp_client import PulpClient
 from errata_migrator import update_updateinfo
 
 
+KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
+    '~/config/known_subkeys.json'))
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         'packages_exporter',
@@ -89,6 +93,10 @@ class Exporter:
             os.path.expanduser('~/export.err'))
         if os.path.exists(self.export_error_file):
             os.remove(self.export_error_file)
+        self.known_subkeys = {}
+        if os.path.exists(KNOWN_SUBKEYS_CONFIG):
+            with open(KNOWN_SUBKEYS_CONFIG, 'rt') as f:
+                self.known_subkeys = json.load(f)
 
     async def make_request(self, method: str, endpoint: str,
                            params: dict = None, data: dict = None):
@@ -342,9 +350,17 @@ class Exporter:
                 self.logger.error('Package %s is not signed', package_path)
                 no_signature_packages.add(package_path)
             elif pkg_key_id not in key_ids_lower:
-                self.logger.error('Package %s is signed with wrong key, '
-                                  'expected "%s", got "%s"',
-                                  package_path, str(key_ids_lower), pkg_key_id)
+                # Check if package is signed with known sub-key
+                signed_with_subkey = False
+                for key, subkeys in self.known_subkeys.items():
+                    if pkg_key_id in subkeys:
+                        signed_with_subkey = True
+                        break
+                if not signed_with_subkey:
+                    self.logger.error('Package %s is signed with wrong key, '
+                                      'expected "%s", got "%s"',
+                                      package_path, str(key_ids_lower),
+                                      pkg_key_id)
                 wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
 
         if errored_packages or no_signature_packages or wrong_signature_packages:
