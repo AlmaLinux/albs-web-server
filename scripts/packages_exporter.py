@@ -436,7 +436,18 @@ class Exporter:
             exported_paths = await self.export_repositories(
                 list(set(repo_ids_to_export)))
             for repo_path in exported_paths:
-                await self.check_rpms_signature(repo_path, db_platform.sign_keys)
+                try:
+                    local['sudo']['chown', '-R',
+                                  f'{self.current_user}:{self.current_user},'
+                                  f'{repo_path}'].run()
+                    await self.check_rpms_signature(
+                        repo_path, db_platform.sign_keys)
+                finally:
+                    local['sudo'][
+                        'chown', '-R',
+                        f'{self.pulp_system_user}:{self.pulp_system_user},'
+                        f'{repo_path}'
+                    ].run()
             self.logger.info('All repositories exported in following paths:\n%s',
                              '\n'.join((str(path) for path in exported_paths)))
         await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
