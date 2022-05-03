@@ -330,20 +330,28 @@ class Exporter:
         errored_packages = set()
         no_signature_packages = set()
         wrong_signature_packages = set()
-        rpm = local['rpm']
         for package in os.listdir(repository_path):
             package_path = os.path.join(repository_path, package)
             if not package_path.endswith('.rpm'):
                 self.logger.debug('Skipping non-RPM file or directory: %s',
                                   package_path)
                 continue
-            args = ('-qip', package_path)
-            exit_code, out, err = rpm.run(args=args, retcode=None)
+            args = ('rpm', '-qip', package_path)
+            exit_code, out, err = local['sudo'].run(args=args, retcode=None)
             if exit_code != 0:
                 self.logger.error('Cannot get information about package %s, %s',
                                   package_path, '\n'.join((out, err)))
                 errored_packages.add(package_path)
                 continue
+            signature_line = None
+            for line in out.split('\n'):
+                line = line.strip()
+                if line.startswith('Signature'):
+                    signature_line = line
+                    break
+            if not signature_line:
+                self.logger.error('No information about package %s signature',
+                                  package_path)
             signature_result = signature_regex.search(out)
             if not signature_result:
                 self.logger.error('Cannot detect information '
@@ -582,12 +590,12 @@ def main():
         try:
             local['sudo']['chown', '-R',
                           f'{exporter.current_user}:{exporter.current_user}',
-                          f'{string_exp_path}'].run()
+                          f'{repo_path}'].run()
             exporter.regenerate_repo_metadata(repo_path)
         finally:
             local['sudo']['chown', '-R',
                           f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                          f'{string_exp_path}'].run()
+                          f'{repo_path}'].run()
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
             for repo_export_path in platform_repos:
