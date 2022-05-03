@@ -438,14 +438,14 @@ class Exporter:
             for repo_path in exported_paths:
                 try:
                     local['sudo']['chown', '-R',
-                                  f'{self.current_user}:{self.current_user},'
+                                  f'{self.current_user}:{self.current_user}',
                                   f'{repo_path}'].run()
                     await self.check_rpms_signature(
                         repo_path, db_platform.sign_keys)
                 finally:
                     local['sudo'][
                         'chown', '-R',
-                        f'{self.pulp_system_user}:{self.pulp_system_user},'
+                        f'{self.pulp_system_user}:{self.pulp_system_user}',
                         f'{repo_path}'
                     ].run()
             self.logger.info('All repositories exported in following paths:\n%s',
@@ -573,12 +573,12 @@ def main():
         repodata = repo_path / 'repodata'
         try:
             local['sudo']['chown', '-R',
-                          f'{exporter.current_user}:{exporter.current_user},'
+                          f'{exporter.current_user}:{exporter.current_user}',
                           f'{string_exp_path}'].run()
             exporter.regenerate_repo_metadata(repo_path)
         finally:
             local['sudo']['chown', '-R',
-                          f'{exporter.pulp_system_user}:{exporter.pulp_system_user},'
+                          f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                           f'{string_exp_path}'].run()
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
