@@ -352,7 +352,8 @@ class Exporter:
             if not signature_line:
                 self.logger.error('No information about package %s signature',
                                   package_path)
-            signature_result = signature_regex.search(out)
+                continue
+            signature_result = signature_regex.search(signature_line)
             if not signature_result:
                 self.logger.error('Cannot detect information '
                                   'about package %s signature', package_path)
@@ -449,6 +450,9 @@ class Exporter:
             exported_paths = await self.export_repositories(
                 list(set(repo_ids_to_export)))
             for repo_path in exported_paths:
+                if not os.path.exists(repo_path):
+                    self.logger.error('Path %s does not exist', repo_path)
+                    continue
                 try:
                     local['sudo']['chown', '-R',
                                   f'{self.current_user}:{self.current_user}',
@@ -592,22 +596,22 @@ def main():
                           f'{exporter.current_user}:{exporter.current_user}',
                           f'{repo_path}'].run()
             exporter.regenerate_repo_metadata(repo_path)
+            key_id = key_id_by_platform or None
+            for platform_id, platform_repos in platforms_dict.items():
+                for repo_export_path in platform_repos:
+                    if repo_export_path in string_exp_path:
+                        key_id = next((
+                            sign_key['keyid'] for sign_key in db_sign_keys
+                            if sign_key['platform_id'] == platform_id
+                        ), None)
+                        break
+            if 'ppc64le' in exp_path:
+                exporter.update_ppc64le_errata(repodata)
+            sync(exporter.repomd_signer(repodata, key_id))
         finally:
             local['sudo']['chown', '-R',
                           f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                           f'{repo_path}'].run()
-        key_id = key_id_by_platform or None
-        for platform_id, platform_repos in platforms_dict.items():
-            for repo_export_path in platform_repos:
-                if repo_export_path in string_exp_path:
-                    key_id = next((
-                        sign_key['keyid'] for sign_key in db_sign_keys
-                        if sign_key['platform_id'] == platform_id
-                    ), None)
-                    break
-        if 'ppc64le' in exp_path:
-            exporter.update_ppc64le_errata(repodata)
-        sync(exporter.repomd_signer(repodata, key_id))
 
 
 if __name__ == '__main__':
