@@ -191,8 +191,12 @@ class PulpClient:
             'POST', 'pulp/api/v3/uploads/', json={'size': len(content)}
         )
         upload_href = response['pulp_href']
+        if isinstance(content, bytes):
+            file = io.BytesIO(content)
+        else:
+            file = io.StringIO(content)
         payload = {
-            'file': io.StringIO(content)
+            'file': file,
         }
         headers = {
             'Content-Range': f'bytes 0-{len(content) - 1}/{len(content)}'

@@ -27,5 +27,8 @@ async def download_file(url: str, dest: BinaryIO):
 
 def hash_content(content):
     hasher = hashlib.new('sha256')
-    hasher.update(content.encode())
+    if isinstance(content, bytes):
+        hasher.update(content)
+    else:
+        hasher.update(content.encode())
     return hasher.hexdigest()
