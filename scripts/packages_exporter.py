@@ -322,7 +322,7 @@ class Exporter:
                 other_repos[repo.name] = (repo.pulp_href, repo.debug)
         await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
 
-    async def check_rpms_signature(self, repository_path: str, sign_keys: list):
+    def check_rpms_signature(self, repository_path: str, sign_keys: list):
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
         signature_regex = re.compile(
             r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>(\()?\w+(\))?)',
@@ -429,6 +429,7 @@ class Exporter:
 
         repos_x86_64 = {}
         repos_ppc64le = {}
+        final_export_paths = []
         for db_platform in db_platforms:
             repo_ids_to_export = []
             platforms_dict[db_platform.id] = []
@@ -450,6 +451,7 @@ class Exporter:
                     repo_ids_to_export.append(repo.id)
             exported_paths = await self.export_repositories(
                 list(set(repo_ids_to_export)))
+            final_export_paths.extend(exported_paths)
             for repo_path in exported_paths:
                 if not os.path.exists(repo_path):
                     self.logger.error('Path %s does not exist', repo_path)
@@ -461,8 +463,7 @@ class Exporter:
                     # removing files with partial modulemd data
                     local['find'][repo_path, '-type', 'f', '-name', '*snippet',
                                   '-exec', 'rm', '-f', '{}', '+'].run()
-                    await self.check_rpms_signature(
-                        repo_path, db_platform.sign_keys)
+                    self.check_rpms_signature(repo_path, db_platform.sign_keys)
                 finally:
                     local['sudo'][
                         'chown', '-R',
@@ -472,7 +473,7 @@ class Exporter:
             self.logger.info('All repositories exported in following paths:\n%s',
                              '\n'.join((str(path) for path in exported_paths)))
         await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
-        return exported_paths, platforms_dict
+        return final_export_paths, platforms_dict
 
     async def export_repos_from_release(
         self,
