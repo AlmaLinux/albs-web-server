@@ -591,9 +591,9 @@ def main():
         path = Path(exp_path)
         repo_path = path.parent
         repodata = repo_path / 'repodata'
+        if not os.path.exists(repo_path):
+            continue
         try:
-            if not os.path.exists(repo_path):
-                continue
             local['sudo']['chown', '-R',
                           f'{exporter.current_user}:{exporter.current_user}',
                           f'{repo_path}'].run()
