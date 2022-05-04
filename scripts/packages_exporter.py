@@ -390,9 +390,10 @@ class Exporter:
                 lines.append('Packages without signature:')
                 lines.extend(list(no_signature_packages))
             if wrong_signature_packages:
-                lines.append('Packages with wrong signature')
+                lines.append('Packages with wrong signature:')
+                lines.extend(wrong_signature_packages)
             with open(self.export_error_file, mode=mode) as f:
-                f.writelines(lines)
+                f.write('\n'.join(lines))
 
     async def export_repos_from_pulp(
         self,
