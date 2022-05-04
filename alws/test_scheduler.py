@@ -1,7 +1,6 @@
 import logging
 import random
 import threading
-import traceback
 import asyncio
 
 from sqlalchemy.future import select
@@ -23,69 +22,73 @@ class TestTaskScheduler(threading.Thread):
         self._alts_client = AltsClient(settings.alts_host, settings.alts_token)
 
     async def _schedule_tasks_for_execution(self):
-        session = SyncSession()
         updated_tasks = []
-        try:
-            tasks_query = session.execute(
-                select(models.TestTask).where(
-                    models.TestTask.status == TestTaskStatus.CREATED).options(
-                    selectinload(models.TestTask.build_task).selectinload(
-                        models.BuildTask.build).selectinload(
-                        models.Build.repos),
-                    selectinload(models.TestTask.build_task).selectinload(
-                        models.BuildTask.build).selectinload(
-                        models.Build.linked_builds),
-                    selectinload(models.TestTask.build_task).selectinload(
-                        models.BuildTask.platform),
-                    selectinload(models.TestTask.build_task).selectinload(
-                        models.BuildTask.rpm_module),
-                ).limit(10)
-            )
-            tasks = tasks_query.scalars()
-            for task in tasks:
-                task.status = TestTaskStatus.STARTED
-                repositories = [{'name': item.name, 'baseurl': item.url}
-                                for item in task.build_task.build.repos
-                                if item.type == 'rpm'
-                                and item.arch == task.env_arch]
-                for build in task.build_task.build.linked_builds:
-                    rpm_repos = [{'name': item.name, 'baseurl': item.url}
-                                 for item in build.repos
-                                 if item.type == 'rpm'
-                                 and item.arch == task.env_arch]
-                    repositories.extend(rpm_repos)
-                platform = task.build_task.platform
-                module_info = task.build_task.rpm_module
-                module_name = module_info.name if module_info else None
-                module_stream = module_info.stream if module_info else None
-                module_version = module_info.version if module_info else None
+        with SyncSession() as session:
+            with session.begin():
                 try:
-                    logging.debug(
-                        'Scheduling testing for %s-%s-%s',
-                        task.package_name, task.package_version,
-                        task.package_release
+                    tasks_query = session.execute(
+                        select(models.TestTask).where(
+                            models.TestTask.status == TestTaskStatus.CREATED,
+                        ).options(
+                            selectinload(models.TestTask.build_task).selectinload(
+                                models.BuildTask.build).selectinload(
+                                models.Build.repos),
+                            selectinload(models.TestTask.build_task).selectinload(
+                                models.BuildTask.build).selectinload(
+                                models.Build.linked_builds),
+                            selectinload(models.TestTask.build_task).selectinload(
+                                models.BuildTask.platform),
+                            selectinload(models.TestTask.build_task).selectinload(
+                                models.BuildTask.rpm_module),
+                        ).limit(10)
                     )
-                    callback_href = f'/api/v1/tests/{task.id}/result/'
-                    response = await self._alts_client.schedule_task(
-                        platform.test_dist_name, platform.distr_version,
-                        task.env_arch, task.package_name, task.package_version,
-                        callback_href, package_release=task.package_release,
-                        repositories=repositories, module_name=module_name,
-                        module_stream=module_stream,
-                        module_version=module_version)
-                    updated_tasks.append(task)
-                    logging.debug(f'Got response from ALTS: {response}')
+                    for task in tasks_query.scalars():
+                        task.status = TestTaskStatus.STARTED
+                        repositories = [{'name': item.name, 'baseurl': item.url}
+                                        for item in task.build_task.build.repos
+                                        if item.type == 'rpm'
+                                        and item.arch == task.env_arch]
+                        for build in task.build_task.build.linked_builds:
+                            rpm_repos = [{'name': item.name, 'baseurl': item.url}
+                                        for item in build.repos
+                                        if item.type == 'rpm'
+                                        and item.arch == task.env_arch]
+                            repositories.extend(rpm_repos)
+                        platform = task.build_task.platform
+                        module_info = task.build_task.rpm_module
+                        module_name = module_info.name if module_info else None
+                        module_stream = module_info.stream if module_info else None
+                        module_version = module_info.version if module_info else None
+                        try:
+                            logging.debug(
+                                'Scheduling testing for %s-%s-%s',
+                                task.package_name, task.package_version,
+                                task.package_release
+                            )
+                            callback_href = f'/api/v1/tests/{task.id}/result/'
+                            response = await self._alts_client.schedule_task(
+                                platform.test_dist_name,
+                                platform.distr_version,
+                                task.env_arch,
+                                task.package_name,
+                                task.package_version,
+                                callback_href,
+                                package_release=task.package_release,
+                                repositories=repositories,
+                                module_name=module_name,
+                                module_stream=module_stream,
+                                module_version=module_version,
+                            )
+                            updated_tasks.append(task)
+                            logging.debug('Got response from ALTS: %s', response)
+                        except Exception as e:
+                            logging.exception('Cannot schedule test task:')
                 except Exception as e:
-                    logging.error('Cannot schedule test task: %s', str(e))
-                    logging.error('Traceback info: %s', traceback.format_exc())
-        except Exception as e:
-            logging.error('Cannot run scheduling loop: %s', str(e))
-            logging.error('Traceback info: %s', traceback.format_exc())
-        finally:
-            if updated_tasks:
-                session.add_all(updated_tasks)
-                session.commit()
-            session.close()
+                    logging.exception('Cannot run scheduling loop:')
+                finally:
+                    if updated_tasks:
+                        session.add_all(updated_tasks)
+                        session.commit()
 
     async def run(self) -> None:
         self._term_event.wait(10)
@@ -94,7 +97,6 @@ class TestTaskScheduler(threading.Thread):
             try:
                 await self._schedule_tasks_for_execution()
             except Exception as e:
-                logging.error(f'Error during scheduler loop: {e}')
-                logging.error(f'Traceback: {traceback.format_exc()}')
+                logging.exception('Error during scheduler loop:')
             finally:
                 await asyncio.sleep(random.randint(5, 10))

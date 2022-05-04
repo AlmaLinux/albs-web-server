@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import re
-from collections import defaultdict
+import urllib
 from io import BytesIO
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
@@ -22,52 +22,60 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
-    build_task_query = await db.execute(
-        select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id,
-        ).options(
-            selectinload(models.BuildTask.artifacts),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos),
-        ),
-    )
-    build_task = build_task_query.scalars().first()
-
-    latest_revision_query = select(
-        func.max(models.TestTask.revision)).filter(
-        models.TestTask.build_task_id == build_task_id)
-    result = await db.execute(latest_revision_query)
-    latest_revision = result.scalars().first()
-    if latest_revision:
-        new_revision = latest_revision + 1
-    else:
-        new_revision = 1
-
-    repository = build_task.get_log_repository()
-    if repository is None:
-        logging.error('Log repository is absent, cannot create test tasks')
-        return
-
-    test_tasks = []
-    for artifact in build_task.artifacts:
-        if artifact.type != 'rpm':
-            continue
-        artifact_info = await pulp_client.get_rpm_package(
-            artifact.href,
-            include_fields=['name', 'version', 'release', 'arch']
+    async with db.begin():
+        build_task_query = await db.execute(
+            select(models.BuildTask).where(
+                models.BuildTask.id == build_task_id,
+            ).options(selectinload(models.BuildTask.artifacts)),
         )
-        task = models.TestTask(build_task_id=build_task_id,
-                               package_name=artifact_info['name'],
-                               package_version=artifact_info['version'],
-                               env_arch=build_task.arch,
-                               status=TestTaskStatus.CREATED,
-                               revision=new_revision,
-                               repository_id=repository.id)
-        if artifact_info.get('release'):
-            task.package_release = artifact_info['release']
-        test_tasks.append(task)
-    db.add_all(test_tasks)
-    await db.commit()
+        build_task = build_task_query.scalars().first()
+
+        latest_revision_query = select(
+            func.max(models.TestTask.revision),
+        ).filter(
+            models.TestTask.build_task_id == build_task_id,
+        )
+        result = await db.execute(latest_revision_query)
+        latest_revision = result.scalars().first()
+        if latest_revision:
+            new_revision = latest_revision + 1
+        else:
+            new_revision = 1
+
+        # Create logs repository
+        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
+        repo_url, repo_href = await pulp_client.create_log_repo(
+            repo_name, distro_path_start='test_logs')
+
+        repository = models.Repository(
+            name=repo_name, url=repo_url, arch=build_task.arch,
+            pulp_href=repo_href, type='test_log', debug=False
+        )
+        db.add(repository)
+        await db.flush()
+
+        test_tasks = []
+        for artifact in build_task.artifacts:
+            if artifact.type != 'rpm':
+                continue
+            artifact_info = await pulp_client.get_rpm_package(
+                artifact.href,
+                include_fields=['name', 'version', 'release', 'arch']
+            )
+            task = models.TestTask(
+                build_task_id=build_task_id,
+                package_name=artifact_info['name'],
+                package_version=artifact_info['version'],
+                env_arch=build_task.arch,
+                status=TestTaskStatus.CREATED,
+                revision=new_revision,
+                repository_id=repository.id,
+            )
+            if artifact_info.get('release'):
+                task.package_release = artifact_info['release']
+            test_tasks.append(task)
+        db.add_all(test_tasks)
+        await db.commit()
 
 
 async def restart_build_tests(db: Session, build_id: int):
@@ -75,8 +83,9 @@ async def restart_build_tests(db: Session, build_id: int):
         build_task_ids = await db.execute(
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id))
+        build_task_ids = build_task_ids.scalars().all()
     for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id[0])
+        await create_test_tasks(db, build_task_id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
@@ -94,25 +103,25 @@ async def complete_test_task(db: Session, task_id: int,
     logs = []
     new_hrefs = []
     conv_tasks = []
-    for log in test_result.result.get('logs', []):
-        if log.get('href'):
-            conv_tasks.append(__convert_to_file(pulp_client, log))
-        else:
-            logging.error('Log file %s is missing href', str(log))
-            continue
-    results = await asyncio.gather(*conv_tasks)
-    for name, href in results:
-        new_hrefs.append(href)
-        log_record = models.TestTaskArtifact(
-            name=name, href=href, test_task_id=task_id)
-        logs.append(log_record)
-
     async with db.begin():
-        tasks = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id).options(
-            selectinload(models.TestTask.repository)))
-        task = tasks.scalars().first()
+        task = await db.execute(select(models.TestTask).where(
+            models.TestTask.id == task_id,
+        ).options(selectinload(models.TestTask.repository)))
+        task = task.scalars().first()
         status = TestTaskStatus.COMPLETED
+        for log in test_result.result.get('logs', []):
+            if log.get('href'):
+                conv_tasks.append(__convert_to_file(pulp_client, log))
+            else:
+                logging.error('Log file %s is missing href', str(log))
+                continue
+        results = await asyncio.gather(*conv_tasks)
+        for name, href in results:
+            new_hrefs.append(href)
+            log_record = models.TestTaskArtifact(
+                name=name, href=href, test_task_id=task_id)
+            logs.append(log_record)
+
         for key, item in test_result.result.items():
             if key == 'tests':
                 for test_item in item.values():
@@ -127,36 +136,29 @@ async def complete_test_task(db: Session, task_id: int,
                 break
         task.status = status
         task.alts_response = test_result.dict()
+        db.add(task)
+        db.add_all(logs)
+        await db.commit()
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)
-
-    db.add(task)
-    db.add_all(logs)
-    await db.commit()
 
 
 async def get_test_tasks_by_build_task(
         db: Session, build_task_id: int, latest: bool = True,
         revision: int = None):
-    async with db.begin():
-        query = select(models.TestTask).where(
-            models.TestTask.build_task_id == build_task_id,
-        ).options(selectinload(models.TestTask.build_task))
-        # If latest=False, but revision is not set, should return
-        # latest results anyway
-        if (not latest and not revision) or latest:
-            subquery = select(func.max(models.TestTask.revision)).filter(
-                models.TestTask.build_task_id == build_task_id).scalar_subquery()
-            query = query.filter(models.TestTask.revision == subquery)
-        elif revision:
-            query = query.filter(models.TestTask.revision == revision)
-        result = await db.execute(query)
-        results = []
-        for result in result.scalars().all():
-            result.build_id = result.build_task.build_id
-            results.append(result)
-        return results
+    query = select(models.TestTask).where(
+        models.TestTask.build_task_id == build_task_id)
+    # If latest=False, but revision is not set, should return
+    # latest results anyway
+    if (not latest and not revision) or latest:
+        subquery = select(func.max(models.TestTask.revision)).filter(
+            models.TestTask.build_task_id == build_task_id).scalar_subquery()
+        query = query.filter(models.TestTask.revision == subquery)
+    elif revision:
+        query = query.filter(models.TestTask.revision == revision)
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 def get_logs_format(logs: bytes) -> str:
@@ -184,38 +186,29 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
     list
 
     """
-    async with db.begin():
-        repo_id_query = select(models.TestTask.repository_id).where(
-            models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(repo_id_query)
-        repo_id = result.scalars().first()
-        repo_url_query = select(models.Repository.url).where(
-            models.Repository.id == repo_id)
-        result = await db.execute(repo_url_query)
-        repo_url = result.scalars().first()
-
-        test_names_query = select(models.TestTaskArtifact).join(
-            models.TestTask, models.TestTaskArtifact.test_task_id ==
-            models.TestTask.id).where(
-                models.TestTask.build_task_id == build_task_id)
-        result = await db.execute(test_names_query)
-        test_artifacts = result.scalars().all()
-    test_names = defaultdict(list)
-    for artifact in test_artifacts:
-        if artifact.name.startswith('tests_'):
-            test_names[artifact.test_task_id].append(artifact.name)
+    test_tasks = select(models.TestTask).where(
+        models.TestTask.build_task_id == build_task_id,
+    ).options(
+        selectinload(models.TestTask.artifacts),
+        selectinload(models.TestTask.repository),
+    )
+    test_tasks = await db.execute(test_tasks)
+    test_tasks = test_tasks.scalars().all()
 
     test_results = []
-    for test_task_id, test_task_test_names in test_names.items():
-        for test_name in test_task_test_names:
+    for test_task in test_tasks:
+        for artifact in test_task.artifacts:
+            if not artifact.name.startswith('tests_'):
+                continue
             log = BytesIO()
-            log_href = repo_url + test_name
+            log_href = urllib.parse.urljoin(test_task.repository.url,
+                                            artifact.name)
             await download_file(log_href, log)
             tap_results = parse_tap_output(log.getvalue())
             tap_status = tap_set_status(tap_results)
             logs_format = get_logs_format(log.getvalue())
             test_tap = {
-                'id': test_task_id,
+                'id': test_task.id,
                 'log': log.getvalue(),
                 'success': tap_status,
                 'logs_format': logs_format,

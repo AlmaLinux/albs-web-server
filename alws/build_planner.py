@@ -206,22 +206,25 @@ class BuildPlanner:
                         platform.modularity['versions'], *flavour_versions)
                     if item['name'] == task.module_platform_version
                 )
+            module_version = ModuleWrapper.generate_new_version(
+               modularity_version['version_prefix']
+            )
+            if task.module_version:
+                module_version = int(task.module_version)
             for arch in self._request_platforms[platform.name]:
                 module = ModuleWrapper.from_template(module_templates[0])
                 module.add_module_dependencies_from_mock_defs(
                     mock_modules=mock_options.get('module_enable', []))
+                # TODO: Rework to be able to set enabled modules from UI,
+                #  including ability to disable default modules from template
+                # mock_options['module_enable'] = [
+                #     f'{module.name}:{module.stream}'
+                # ]
                 mock_options['module_enable'] = [
-                    f'{module.name}:{module.stream}'
-                ]
-                mock_options['module_enable'] += [
                     f'{dep_name}:{dep_stream}'
                     for dep_name, dep_stream in module.iter_dependencies()
                 ]
-                if task.module_version is not None:
-                    module.version = int(task.module_version)
-                else:
-                    module.version = module.generate_new_version(
-                        modularity_version['version_prefix'])
+                module.version = module_version
                 module.context = module.generate_new_context()
                 module.arch = arch
                 module.set_arch_list(
