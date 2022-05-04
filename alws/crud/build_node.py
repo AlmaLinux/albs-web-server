@@ -224,7 +224,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         )
 
-    if module_index:
+    not_filtered_rpms = []
+    if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
         results = await asyncio.gather(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
@@ -236,31 +237,40 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         if built_srpm_url is not None:
             task_query = select(models.BuildTask.build_id).where(
                 models.BuildTask.id == task_id).scalar_subquery()
-            srpm = next(
-                item for item in task_artifacts if item.arch == 'src'
-                and item.type == 'rpm'
-            )
-            srpm_query = select(models.SourceRpm).where(
-                models.SourceRpm.build_id == task_query).options(
-                selectinload(models.SourceRpm.artifact)
-            )
-            res = await db.execute(srpm_query)
-            srpms = res.scalars().all()
-            srpm_href = next(
-                i.artifact.href for i in srpms if i.artifact.name == srpm.name
-            )
-            srpm_info = await pulp_client.get_rpm_package(
-                srpm_href, include_fields=pkg_fields)
+            srpms = [item for item in task_artifacts if item.arch == 'src'
+                     and item.type == 'rpm']
+            if srpms:
+                srpm = srpms[0]
+            else:
+                srpm = None
+            if srpm:
+                not_filtered_rpms.append(srpm)
+                srpm_query = select(models.SourceRpm).where(
+                    models.SourceRpm.build_id == task_query).options(
+                    selectinload(models.SourceRpm.artifact)
+                )
+                res = await db.execute(srpm_query)
+                srpms = res.scalars().all()
+                srpm_href = next(
+                    i.artifact.href for i in srpms
+                    if i.artifact.name == srpm.name
+                )
+                srpm_info = await pulp_client.get_rpm_package(
+                    srpm_href, include_fields=pkg_fields)
         try:
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    module.add_rpm_artifact(rpm_package)
+                    added = module.add_rpm_artifact(rpm_package)
+                    if added:
+                        not_filtered_rpms.append(rpm)
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
 
+    if module_index:
+        return not_filtered_rpms
     return rpms
 
 
@@ -458,6 +468,9 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
             ),
         )
         srpm_artifact = srpm_artifact.scalars().first()
+        if not srpm_artifact:
+            logging.error('Cannot find source RPM to insert proper link')
+            return
 
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
             build_task.platform.name,
