@@ -244,7 +244,6 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             else:
                 srpm = None
             if srpm:
-                not_filtered_rpms.append(srpm)
                 srpm_query = select(models.SourceRpm).where(
                     models.SourceRpm.build_id == task_query).options(
                     selectinload(models.SourceRpm.artifact)
