@@ -224,7 +224,6 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         )
 
-    not_filtered_rpms = []
     if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
         results = await asyncio.gather(*(get_rpm_package_info(
@@ -261,15 +260,11 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
                     added = module.add_rpm_artifact(rpm_package)
-                    if added:
-                        not_filtered_rpms.append(rpm)
-                        if srpm_info:
-                            module.add_rpm_artifact(srpm_info)
+                    if added and srpm_info:
+                        module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
 
-    if module_index:
-        return not_filtered_rpms
     return rpms
 
 
