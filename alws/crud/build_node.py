@@ -263,8 +263,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                     added = module.add_rpm_artifact(rpm_package)
                     if added:
                         not_filtered_rpms.append(rpm)
-                if srpm_info:
-                    module.add_rpm_artifact(srpm_info)
+                        if srpm_info:
+                            module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
 
