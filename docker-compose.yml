@@ -164,6 +164,18 @@ services:
     depends_on:
       - mosquitto
 
+  oval_cacher:
+    image: albs-oval-cacher:latest
+    env_file:
+      - vars.env
+    build:
+      context: .
+      dockerfile: Dockerfile.oval-cacher
+    restart: "no"
+    depends_on:
+      - web_server
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && PYTHONPATH='.' python alws/scripts/oval_cacher/oval_cacher.py'"
+
   git_cacher:
     image: albs-git-cacher:latest
     env_file:

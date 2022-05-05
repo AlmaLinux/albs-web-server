@@ -11,5 +11,6 @@ __all__ = [
     'tests',
     'uploads',
     'users',
+    'errata',
     'platform_flavors'
 ]

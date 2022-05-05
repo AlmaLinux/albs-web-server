@@ -655,37 +655,37 @@ class ErrataRecord(Base):
         nullable=False
     )
     platform = relationship('Platform')
+    summary = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    solution = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
     issued_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
     updated_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
-    description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    summary = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     # Maybe integer?
     version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     severity = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    solution = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    release = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     rights = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    pushcount = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    # Errata-only fields
-    collection_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    short_collection_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     # OVAL-only fields
-    definition_id = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    definition_version = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    definition_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    definition_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     definition_class = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     affected_cpe = sqlalchemy.Column(JSONB, nullable=False, default=[])
-    # TODO:
-    # references
-    # packages
-    # modules
+    criteria = sqlalchemy.Column(JSONB, nullable=True)
+    original_criteria = sqlalchemy.Column(JSONB, nullable=False)
+    tests = sqlalchemy.Column(JSONB, nullable=True)
+    original_tests = sqlalchemy.Column(JSONB, nullable=False)
+    objects = sqlalchemy.Column(JSONB, nullable=True)
+    original_objects = sqlalchemy.Column(JSONB, nullable=False)
+    states = sqlalchemy.Column(JSONB, nullable=True)
+    original_states = sqlalchemy.Column(JSONB, nullable=False)
+
+    references = relationship('ErrataReference')
+    packages = relationship('ErrataPackage')
 
 
 class ErrataReference(Base):
@@ -702,8 +702,7 @@ class ErrataReference(Base):
         sqlalchemy.ForeignKey('errata_records.id'),
         nullable=False
     )
-    # TODO:
-    #   cves
+    cves = relationship('ErrataCVE')
 
 
 class ErrataCVE(Base):
@@ -735,29 +734,8 @@ class ErrataPackage(Base):
     release = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     epoch = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    filename = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    relogin_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    restart_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    src_rpm = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    checksum = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    checksum_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-
-
-class ErrataModule(Base):
-    __tablename__ = 'errata_module'
-
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    errata_record_id = sqlalchemy.Column(
-        sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_records.id'),
-        nullable=False
-    )
-    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    stream = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    context = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
 async def create_tables():
