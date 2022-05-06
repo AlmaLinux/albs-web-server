@@ -441,6 +441,76 @@
       repository_sync_policy: additive
       priority: 10
     - name: almalinux-8-baseos-debuginfo
+      arch: i686
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/i686/
+      export_path: almalinux/8/BaseOS/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-8-appstream-debuginfo
+      arch: i686
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/i686/
+      export_path: almalinux/8/AppStream/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-8-powertools-debuginfo
+      arch: i686
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/i686/
+      export_path: almalinux/8/PowerTools/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-highavailability-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/i686/
+      export_path: almalinux/8/HighAvailability/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-resilientstorage-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/i686/
+      export_path: almalinux/8/ResilientStorage/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-devel-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/i686/
+      export_path: almalinux/8/devel/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-extras-debuginfo
+      type: rpm
+      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/i686/
+      export_path: almalinux/8/extras/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-8-baseos-debuginfo
       arch: x86_64
       type: rpm
       remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/x86_64/
