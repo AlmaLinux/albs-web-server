@@ -382,11 +382,10 @@ class ReleasePlanner:
             }
             rpm_modules.append(module_info)
             for module_response in module_responses:
-                is_beta = module_response['is_beta']
+                # is_beta = module_response['is_beta']
                 for _packages in module_response['artifacts']:
                     for pkg in _packages['packages']:
-                        key = (pkg['name'], pkg['version'],
-                               pkg['arch'], is_beta)
+                        key = (pkg['name'], pkg['version'], pkg['arch'])
                         pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
                             base_dist_name,
                             ref_dist_names,
@@ -394,8 +393,7 @@ class ReleasePlanner:
                         )
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
-                            second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, is_beta)
+                            second_key = (pkg['name'], pkg['version'], weak_arch)
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
