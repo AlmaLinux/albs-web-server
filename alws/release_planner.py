@@ -330,13 +330,13 @@ class ReleasePlanner:
         clean_base_dist_name_lower = clean_base_dist_name.lower()
 
         ref_platform_names = []
-        platform_list = base_platform.reference_platforms + [base_platform]
-        for ref_platform in sorted(platform_list,
+        for ref_platform in sorted(base_platform.reference_platforms,
                                    key=lambda x: getattr(x, 'priority', 10)):
             clean_name = get_clean_distr_name(ref_platform.name)
             if clean_name in ref_platform_names:
                 continue
             ref_platform_names.append(clean_name)
+        ref_platform_names.append(clean_base_dist_name)
 
         for repo in base_platform.repos:
             repo_dict = {
