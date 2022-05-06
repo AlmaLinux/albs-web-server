@@ -422,10 +422,10 @@ class ReleasePlanner:
             data=src_rpm_names,
         )
         for beholder_response in beholder_responses:
-            is_beta = beholder_response['is_beta']
+            # is_beta = beholder_response['is_beta']
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'], is_beta)
+                    key = (pkg['name'], pkg['version'], pkg['arch'])
                     pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
                         base_dist_name,
                         ref_dist_names,
@@ -433,8 +433,7 @@ class ReleasePlanner:
                     )
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'],
-                                      weak_arch, is_beta)
+                        second_key = (pkg['name'], pkg['version'], weak_arch)
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
@@ -458,11 +457,11 @@ class ReleasePlanner:
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
-            key = (pkg_name, pkg_version, pkg_arch, is_beta)
+            key = (pkg_name, pkg_version, pkg_arch)
             predicted_package = beholder_cache.get(key, [])
-            if not predicted_package and is_beta:
-                key = (pkg_name, pkg_version, pkg_arch, False)
-                predicted_package = beholder_cache.get(key, [])
+            # if not predicted_package and is_beta:
+            #     key = (pkg_name, pkg_version, pkg_arch, False)
+            #     predicted_package = beholder_cache.get(key, [])
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
             repositories = []
