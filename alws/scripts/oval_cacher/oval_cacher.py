@@ -40,15 +40,15 @@ def extract_packages_from_definition(definition: OvalDefinition):
 async def mainloop():
     api = SecurityApiClient(config.base_security_api_url)
     albs_api = AlbsApiClient(config.albs_api_url, config.albs_jwt_token)
-    # TODO: add a log of logging
+    # TODO: add a lot of logging
     while True:
-        # processed_errata_ids = set(
-        #   re.sub(r'^AL', 'RH', record)
-        #   for record in await albs_api.list_errata_record_ids()
-        # )
+        processed_errata_ids = set(
+            re.sub(r"^AL", "RH", record)
+            for record in await albs_api.list_errata_record_ids()
+        )
         async for item in api.iter_oval_items():
-            # if item.RHSA in processed_errata_ids:
-            #   continue
+            if item.RHSA in processed_errata_ids:
+                continue
             oval_info, cvrf = await asyncio.gather(
                 *(api.get_full_oval_info(item), api.get_cvrf(item))
             )

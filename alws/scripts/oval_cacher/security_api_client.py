@@ -35,9 +35,6 @@ class SecurityApiClient:
         tests = response.pop("tests")["rpminfo_test"]
         advisory = definition["metadata"]["advisory"]
         advisory["affected_cpe_list"] = advisory["affected_cpe_list"]["cpe"]
-        import pprint
-
-        pprint.pprint(definition)  # TODO: remove
         return OvalDefinition(
             objects=objects,
             definition=definition,

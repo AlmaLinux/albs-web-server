@@ -1,7 +1,7 @@
 from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -73,29 +73,64 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     await db.commit()
 
 
-async def list_errata_records(
-    db, errata_record_id: Optional[str] = None, page: Optional[int] = None
-):
+async def get_errata_record(db, errata_record_id: str):
+    options = [
+        selectinload(models.ErrataRecord.packages),
+        selectinload(models.ErrataRecord.references).selectinload(
+            models.ErrataReference.cves
+        ),
+    ]
     query = (
         select(models.ErrataRecord)
-        .options(
-            selectinload(models.ErrataRecord.packages),
-            selectinload(models.ErrataRecord.references).selectinload(
-                models.ErrataReference.cves
-            ),
-        )
-        .order_by(models.ErrataRecord.id.desc())
+        .options(*options)
+        .order_by(models.ErrataRecord.updated_date.desc())
+        .where(models.ErrataRecord.id == errata_record_id)
     )
+    return (await db.execute(query)).scalars().first()
+
+
+async def list_errata_records(
+    db,
+    page: Optional[int] = None,
+    compact: Optional[bool] = False,
+    errata_id: Optional[str] = None,
+    title: Optional[str] = None,
+    platform: Optional[str] = None,
+    cve_id: Optional[str] = None,
+):
+    options = []
+    if compact:
+        options.append(
+            load_only(models.ErrataRecord.id, models.ErrataRecord.updated_date)
+        )
+    else:
+        options.extend(
+            [
+                selectinload(models.ErrataRecord.packages),
+                selectinload(models.ErrataRecord.references).selectinload(
+                    models.ErrataReference.cves
+                ),
+            ]
+        )
+    query = (
+        select(models.ErrataRecord)
+        .options(*options)
+        .order_by(models.ErrataRecord.updated_date.desc())
+    )
+    if errata_id:
+        query = query.filter(models.ErrataRecord.id.like(f"%/{errata_id}%"))
+    if title:
+        query = query.filter(models.ErrataRecord.title.like(f"%/{title}%"))
+    if platform:
+        query = query.filter(models.ErrataRecord.platform_id == platform)
+    if cve_id:
+        query = query.filter(models.ErrataCVE.id.like(f"%/{cve_id}%"))
     if page:
         query = query.slice(10 * page - 10, 10 * page)
-    if errata_record_id is not None:
-        query = query.where(models.ErrataRecord.id == errata_record_id)
-    if page:
-        return {
-            "total_records": (
-                await db.execute(func.count(models.ErrataRecord.id))
-            ).scalar(),
-            "records": (await db.execute(query)).scalars().all(),
-            "current_page": page,
-        }
-    return (await db.execute(query)).scalars().first()
+    return {
+        "total_records": (
+            await db.execute(func.count(models.ErrataRecord.id))
+        ).scalar(),
+        "records": (await db.execute(query)).scalars().all(),
+        "current_page": page,
+    }

@@ -83,10 +83,14 @@ class ErrataRecord(BaseErrataRecord):
 
 
 class ErrataListResponse(BaseModel):
-
     records: List[ErrataRecord]
     total_records: Optional[int]
     current_page: Optional[int]
+
+
+class CompactErrataRecord(BaseModel):
+    id: str
+    updated_date: datetime.date
 
 
 class CreateErrataResponse(BaseModel):
