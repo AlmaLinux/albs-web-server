@@ -13,6 +13,7 @@ class AlbsApiClient:
 
     async def make_request(self, request):
         async with request as response:
+            print(await response.json())
             response.raise_for_status()
             return await response.json()
 
@@ -29,3 +30,4 @@ class AlbsApiClient:
         request = aiohttp.request(
             "get", self.list_oval_records_endpoint, headers=self.auth_headers
         )
+        return []

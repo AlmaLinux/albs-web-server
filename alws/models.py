@@ -702,21 +702,21 @@ class ErrataReference(Base):
         sqlalchemy.ForeignKey('errata_records.id'),
         nullable=False
     )
-    cves = relationship('ErrataCVE')
+    cve = relationship('ErrataCVE')
+    cve_id = sqlalchemy.Column(
+        sqlalchemy.Text,
+        sqlalchemy.ForeignKey('errata_cves.id'),
+        nullable=True
+    )
 
 
 class ErrataCVE(Base):
     __tablename__ = 'errata_cves'
 
     id = sqlalchemy.Column(sqlalchemy.Text, primary_key=True)
-    reference_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('errata_references.id'),
-        nullable=False
-    )
     cvss3 = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    cwe = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    impact = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    cwe = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    impact = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     public = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
@@ -736,6 +736,31 @@ class ErrataPackage(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
+
+
+#class ErrataToALBSPackage(Base):
+#    __tablename__ = 'errata_to_albs_packages'
+#    __table_args__ = (
+#        sqlalchemy.CheckConstraint(
+#            'albs_artifact_id IS NOT NULL '
+#            'OR '
+#            'pulp_href IS NOT NULL',
+#            name='errata_to_albs_package_integrity_check'
+#        ),
+#    )
+#
+#    errata_package_id = sqlalchemy.Column(
+#        sqlalchemy.Text,
+#        sqlalchemy.ForeignKey('errata_packages.id'),
+#        nullable=False
+#    )
+#
+#    albs_artifact_id = sqlalchemy.Column(
+#        sqlalchemy.Integer,
+#        sqlalchemy.ForeignKey('build_artifacts.id'),
+#        nullable=True
+#    )
+#    pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
 
 async def create_tables():

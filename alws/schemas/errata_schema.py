@@ -19,7 +19,7 @@ class BaseErrataReference(BaseModel):
     href: str
     ref_id: str
     title: Optional[str] = None # TODO
-    cves: Optional[List[BaseErrataCVE]] = []
+    cve: Optional[BaseErrataCVE] = None
 
 
 class ErrataReference(BaseErrataReference):

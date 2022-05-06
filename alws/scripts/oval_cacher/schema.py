@@ -58,7 +58,7 @@ class Advisory(BaseModel):
     issued: Issued
     updated: Updated
     cve: Optional[List[str]] = None
-    bugzilla: Optional[List[Bugzilla]] = None
+    bugzilla: Optional[List[Bugzilla]] = []
     affected_cpe_list: List[str]
     from_: str = Field(..., alias="from")
 

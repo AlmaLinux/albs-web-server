@@ -44,7 +44,7 @@ async def mainloop():
     while True:
         processed_errata_ids = set(
             re.sub(r"^AL", "RH", record)
-            for record in await albs_api.list_errata_record_ids()
+            for record in await albs_api.list_oval_records()
         )
         async for item in api.iter_oval_items():
             if item.RHSA in processed_errata_ids:
@@ -56,10 +56,30 @@ async def mainloop():
                 continue
             metadata = oval_info.definition.metadata
             advisory = metadata.advisory
-            cves: Dict[str, CVE] = {}
+            refs = []
             for ref in metadata.reference:
+                dict_ref = {
+                    "href": ref.ref_url,
+                    "ref_id": ref.ref_id,
+                    # title ????
+                }
+                refs.append(dict_ref)
                 if ref.source == "CVE":
-                    cves[ref.ref_id] = await api.get_cve(ref.ref_id)
+                    cve = await api.get_cve(ref.ref_id)
+                    if not cve.cvss3:
+                        continue
+                    impact = "None"
+                    if cve.threat_severity:
+                        impact = cve.threat_severity.lower()
+                    dict_ref["cve"] = {
+                        "id": ref.ref_id,
+                        "cvss3": cve.cvss3.cvss3_scoring_vector,
+                        "cwe": cve.cwe,
+                        "impact": impact,
+                        "public": cve.public_date,
+                    }
+            for ref in advisory.bugzilla:
+                refs.append({"href": ref.href, "ref_id": ref.id})
             payload = {
                 # 'platform': ...
                 "id": item.RHSA,
@@ -80,24 +100,7 @@ async def mainloop():
                 "tests": [test.dict() for test in oval_info.tests],
                 "objects": [obj.dict() for obj in oval_info.objects],
                 "states": [state.dict() for state in oval_info.states],
-                "references": [
-                    {
-                        "href": ref.ref_url,
-                        "ref_id": ref.ref_id,
-                        # title ????
-                        "cve": {
-                            "cvss3": cves[ref.ref_id].cvss3.cvss3_scoring_vector,
-                            "cwe": cves[ref.ref_id].cwe,
-                            "impact": cves[ref.ref_id].threat_severity.lower()
-                            if cves[ref.ref_id].threat_severity
-                            else "None",
-                            "public": cves[ref.ref_id].public_date,
-                        }
-                        if ref.source == "CVE" and cves[ref.ref_id].cvss3
-                        else None,
-                    }
-                    for ref in metadata.reference
-                ],
+                "references": refs,
                 "packages": extract_packages_from_definition(oval_info),
             }
             await albs_api.insert_oval_record(payload)

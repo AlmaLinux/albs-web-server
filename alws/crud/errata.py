@@ -41,22 +41,27 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     )
     items_to_insert.append(db_errata)
     for ref in errata.references:
+        db_cve = None
+        if ref.cve:
+            db_cve = await db.execute(select(models.ErrataCVE).where(models.ErrataCVE.id == ref.cve.id))
+            db_cve = db_cve.scalars().first()
+            if db_cve is None:
+                db_cve = models.ErrataCVE(
+                    id=ref.cve.id,
+                    cvss3=ref.cve.cvss3,
+                    cwe=ref.cve.cwe,
+                    impact=ref.cve.impact,
+                    public=ref.cve.public,
+                )
+                items_to_insert.append(db_cve)
         db_reference = models.ErrataReference(
             href=ref.href,
             ref_id=ref.ref_id,
             title="",  # TODO
+            cve=db_cve
         )
         db_errata.references.append(db_reference)
         items_to_insert.append(db_reference)
-        for cve in ref.cves:
-            db_cve = models.ErrataCVE(
-                cvss3=cve.cvss3,
-                cwe=cve.cwe,
-                impact=cve.impact,
-                public=cve.public,
-            )
-            db_reference.cves.append(db_cve)
-            items_to_insert.append(db_cve)
     for package in errata.packages:
         db_package = models.ErrataPackage(
             name=package.name,
@@ -71,13 +76,15 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         items_to_insert.append(db_package)
     db.add_all(items_to_insert)
     await db.commit()
+    await db.refresh(db_errata)
+    return db_errata
 
 
 async def get_errata_record(db, errata_record_id: str):
     options = [
         selectinload(models.ErrataRecord.packages),
         selectinload(models.ErrataRecord.references).selectinload(
-            models.ErrataReference.cves
+            models.ErrataReference.cve
         ),
     ]
     query = (
@@ -108,7 +115,7 @@ async def list_errata_records(
             [
                 selectinload(models.ErrataRecord.packages),
                 selectinload(models.ErrataRecord.references).selectinload(
-                    models.ErrataReference.cves
+                    models.ErrataReference.cve
                 ),
             ]
         )
@@ -118,13 +125,13 @@ async def list_errata_records(
         .order_by(models.ErrataRecord.updated_date.desc())
     )
     if errata_id:
-        query = query.filter(models.ErrataRecord.id.like(f"%/{errata_id}%"))
+        query = query.filter(models.ErrataRecord.id.like(f"%{errata_id}%"))
     if title:
-        query = query.filter(models.ErrataRecord.title.like(f"%/{title}%"))
+        query = query.filter(models.ErrataRecord.title.like(f"%{title}%"))
     if platform:
         query = query.filter(models.ErrataRecord.platform_id == platform)
     if cve_id:
-        query = query.filter(models.ErrataCVE.id.like(f"%/{cve_id}%"))
+        query = query.filter(models.ErrataCVE.id.like(f"%{cve_id}%"))
     if page:
         query = query.slice(10 * page - 10, 10 * page)
     return {
