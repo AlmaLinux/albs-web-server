@@ -336,6 +336,14 @@ class ReleasePlanner:
             f'{ref_platform.distr_version}'
             for ref_platform in base_platform.reference_platforms
         ]
+        ref_platform_names = []
+        for ref_platform in sorted(
+                base_platform.reference_platforms,
+                key=lambda x: getattr(x, 'priority', 10)):
+            clean_name = get_clean_distr_name(ref_platform.name)
+            if clean_name in ref_platform_names:
+                continue
+            ref_platform_names.append(clean_name)
 
         for repo in base_platform.repos:
             repo_dict = {
@@ -383,10 +391,11 @@ class ReleasePlanner:
             rpm_modules.append(module_info)
             for module_response in module_responses:
                 is_beta = module_response['is_beta']
+                ref_distr = module_response['distribution']['name']
                 for _packages in module_response['artifacts']:
                     for pkg in _packages['packages']:
-                        key = (pkg['name'], pkg['version'],
-                               pkg['arch'], is_beta)
+                        key = (pkg['name'], pkg['version'], pkg['arch'],
+                               ref_distr, is_beta)
                         pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
                             base_dist_name,
                             ref_dist_names,
@@ -395,7 +404,7 @@ class ReleasePlanner:
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
                             second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, is_beta)
+                                          weak_arch, ref_distr, is_beta)
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
@@ -421,9 +430,11 @@ class ReleasePlanner:
         )
         for beholder_response in beholder_responses:
             is_beta = beholder_response['is_beta']
+            ref_distr = module_response['distribution']['name']
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'], is_beta)
+                    key = (pkg['name'], pkg['version'], pkg['arch'],
+                           ref_distr, is_beta)
                     pkg['repositories'] = self._beholder_client.clean_beholder_repo_names(
                         base_dist_name,
                         ref_dist_names,
@@ -432,7 +443,7 @@ class ReleasePlanner:
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
                         second_key = (pkg['name'], pkg['version'],
-                                      weak_arch, is_beta)
+                                      weak_arch, ref_distr, is_beta)
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
@@ -456,11 +467,18 @@ class ReleasePlanner:
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
-            key = (pkg_name, pkg_version, pkg_arch, is_beta)
-            predicted_package = beholder_cache.get(key, [])
-            if not predicted_package:
-                key = (pkg_name, pkg_version, pkg_arch, not is_beta)
+            for ref_name in ref_platform_names:
+                key = (pkg_name, pkg_version, pkg_arch, ref_name, is_beta)
                 predicted_package = beholder_cache.get(key, [])
+                if predicted_package:
+                    break
+            if not predicted_package:
+                for ref_name in ref_platform_names:
+                    key = (pkg_name, pkg_version, pkg_arch,
+                           ref_name, not is_beta)
+                    predicted_package = beholder_cache.get(key, [])
+                    if predicted_package:
+                        break
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
             repositories = []
