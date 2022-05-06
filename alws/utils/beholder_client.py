@@ -20,21 +20,6 @@ class BeholderClient:
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
     @staticmethod
-    def clean_beholder_repo_names(
-        base_dist_name: str,
-        ref_dist_names: typing.List[str],
-        beholder_repos: typing.List[dict],
-    ) -> typing.List[dict]:
-        for repo in beholder_repos:
-            repo_name = repo['name']
-            repo['name'] = next(
-                repo_name.replace(ref_dist_name, base_dist_name)
-                for ref_dist_name in ref_dist_names
-                if repo_name.startswith(ref_dist_name)
-            )
-        return beholder_repos
-
-    @staticmethod
     def create_endpoints(
         platforms_list: typing.List[Platform],
         module_name: str = None,
