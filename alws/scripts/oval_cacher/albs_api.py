@@ -10,6 +10,7 @@ class AlbsApiClient:
         self.auth_headers = {"authorization": f"Bearer {jwt_token}"}
         self.insert_oval_record_endpoint = urllib.parse.urljoin(base_url, "errata/")
         self.list_oval_records_endpoint = urllib.parse.urljoin(base_url, "errata/all/")
+        self.list_platforms_endpoint = urllib.parse.urljoin(base_url, "platforms/")
 
     async def make_request(self, request):
         async with request as response:
@@ -31,3 +32,9 @@ class AlbsApiClient:
             "get", self.list_oval_records_endpoint, headers=self.auth_headers
         )
         return []
+
+    async def list_platforms(self):
+        request = aiohttp.request(
+            "get", self.list_platforms_endpoint, headers=self.auth_headers
+        )
+        return await self.make_request(request)

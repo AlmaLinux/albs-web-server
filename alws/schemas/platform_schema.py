@@ -42,6 +42,8 @@ class Platform(BaseModel):
 
     id: int
     name: str
+    distr_type: str
+    distr_version: str
 
     arch_list: typing.List[str]
     modularity: typing.Optional[typing.Dict]

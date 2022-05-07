@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import enum
 
 import sqlalchemy
 from sqlalchemy.orm import relationship
@@ -688,6 +689,13 @@ class ErrataRecord(Base):
     packages = relationship('ErrataPackage')
 
 
+class ErrataReferenceType(enum.Enum):
+    cve = 'cve'
+    rhsa = 'rhsa'
+    self_ref = 'self'
+    bugzilla = 'bugzilla'
+
+
 class ErrataReference(Base):
     __tablename__ = 'errata_references'
 
@@ -695,8 +703,7 @@ class ErrataReference(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     ref_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    # TODO:
-    # ref_type = sqlalchemy.Column(sqlalchemy.Enum)
+    ref_type = sqlalchemy.Column(sqlalchemy.Enum(ErrataReferenceType), nullable=False)
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey('errata_records.id'),
@@ -736,31 +743,40 @@ class ErrataPackage(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
+    albs_packages = relationship('ErrataToALBSPackage')
 
 
-#class ErrataToALBSPackage(Base):
-#    __tablename__ = 'errata_to_albs_packages'
-#    __table_args__ = (
-#        sqlalchemy.CheckConstraint(
-#            'albs_artifact_id IS NOT NULL '
-#            'OR '
-#            'pulp_href IS NOT NULL',
-#            name='errata_to_albs_package_integrity_check'
-#        ),
-#    )
-#
-#    errata_package_id = sqlalchemy.Column(
-#        sqlalchemy.Text,
-#        sqlalchemy.ForeignKey('errata_packages.id'),
-#        nullable=False
-#    )
-#
-#    albs_artifact_id = sqlalchemy.Column(
-#        sqlalchemy.Integer,
-#        sqlalchemy.ForeignKey('build_artifacts.id'),
-#        nullable=True
-#    )
-#    pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+class ErrataPackageStatus(enum.Enum):
+    proposal = 'proposal'
+    skipped = 'skipped'
+    released = 'released'
+
+
+class ErrataToALBSPackage(Base):
+    __tablename__ = 'errata_to_albs_packages'
+    __table_args___ = (
+        sqlalchemy.CheckConstraint(
+            'albs_artifact_id IS NOT NULL '
+            'OR '
+            'pulp_href IS NOT NULL',
+            name='errata_to_albs_package_integrity_check'
+        ),
+    )
+    
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    errata_package_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('errata_packages.id'),
+        nullable=False
+    )
+
+    albs_artifact_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('build_artifacts.id'),
+        nullable=True
+    )
+    pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
 
 
 async def create_tables():

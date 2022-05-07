@@ -68,6 +68,12 @@ class Advisory(BaseModel):
             return [value]
         return value
 
+    @validator("bugzilla", pre=True)
+    def validator_bugzilla(cls, value):
+        if isinstance(value, str):
+            return [value]
+        return value
+
 
 class Metadata(BaseModel):
     title: str
@@ -89,6 +95,12 @@ class Criteria(BaseModel):
 
     @validator("criteria", pre=True)
     def validator_criteria(cls, value):
+        if isinstance(value, dict):
+            return [value]
+        return value
+
+    @validator("criterion", pre=True)
+    def validator_criterion(cls, value):
         if isinstance(value, dict):
             return [value]
         return value

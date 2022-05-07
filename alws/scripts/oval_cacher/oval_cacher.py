@@ -1,8 +1,7 @@
 import asyncio
 import re
-from typing import Dict
 
-from alws.scripts.oval_cacher.schema import OvalDefinition, CVE
+from alws.scripts.oval_cacher.schema import OvalDefinition
 from alws.scripts.oval_cacher.albs_api import AlbsApiClient
 from alws.scripts.oval_cacher.config import config
 from alws.scripts.oval_cacher.security_api_client import SecurityApiClient
@@ -42,6 +41,12 @@ async def mainloop():
     albs_api = AlbsApiClient(config.albs_api_url, config.albs_jwt_token)
     # TODO: add a lot of logging
     while True:
+        platforms = await albs_api.list_platforms()
+        platform_versions = {}
+        for platform in platforms:
+            if platform["distr_type"] != "rhel":
+                continue
+            platform_versions[platform["distr_version"]] = platform["id"]
         processed_errata_ids = set(
             re.sub(r"^AL", "RH", record)
             for record in await albs_api.list_oval_records()
@@ -50,17 +55,28 @@ async def mainloop():
             if item.RHSA in processed_errata_ids:
                 continue
             oval_info, cvrf = await asyncio.gather(
-                *(api.get_full_oval_info(item), api.get_cvrf(item))
+                api.get_full_oval_info(item), api.get_cvrf(item)
             )
             if oval_info.definition is None:
                 continue
             metadata = oval_info.definition.metadata
+            platform_id = None
+            for platform in metadata.affected.platform:
+                platform_version = re.search(
+                    r"Red Hat Enterprise Linux (\d+)", platform
+                )
+                if not platform_version:
+                    continue
+                platform_id = platform_versions.get(platform_version.groups()[0])
+            if platform_id is None:
+                continue
             advisory = metadata.advisory
             refs = []
             for ref in metadata.reference:
                 dict_ref = {
                     "href": ref.ref_url,
                     "ref_id": ref.ref_id,
+                    "ref_type": ref.source.lower(),
                     # title ????
                 }
                 refs.append(dict_ref)
@@ -79,9 +95,11 @@ async def mainloop():
                         "public": cve.public_date,
                     }
             for ref in advisory.bugzilla:
-                refs.append({"href": ref.href, "ref_id": ref.id})
+                refs.append(
+                    {"href": ref.href, "ref_id": ref.id, "ref_type": "bugzilla"}
+                )
             payload = {
-                # 'platform': ...
+                "platform_id": platform_id,
                 "id": item.RHSA,
                 "issued_date": str(advisory.issued.date),
                 "updated_date": str(advisory.updated.date),

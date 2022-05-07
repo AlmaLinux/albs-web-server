@@ -551,6 +551,22 @@ class PulpClient:
             return (repository_data.get('latest_version_href'),
                     '-debug-' in repository_data['name'])
         return repository_data.get('latest_version_href')
+    
+    async def iter_repo_packages(self, version_href: str, limit: int = 1000, fields=None):
+        payload = {'repository_version': version_href, 'limit': limit}
+        if fields is not None:
+            payload['fields'] = fields
+        response = await self.request(
+            'get', 'pulp/api/v3/content/rpm/packages/', params=payload
+        )
+        for pkg in response['results']:
+            yield pkg
+        while response.get('next'):
+            parsed_next = urllib.parse.urlparse(response.get('next'))
+            next_path = parsed_next.path + '?' + parsed_next.query
+            response = await self.request('get', next_path)
+            for pkg in response['results']:
+                yield pkg
 
     async def get_rpm_publications(
             self, repository_version_href: str = None,
