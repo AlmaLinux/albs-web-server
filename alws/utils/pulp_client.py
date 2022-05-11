@@ -548,8 +548,9 @@ class PulpClient:
                                       for_releases: bool = False):
         repository_data = await self.request('GET', repo_href)
         if for_releases:
-            return (repository_data.get('latest_version_href'),
-                    '-debug-' in repository_data['name'])
+            is_debug = bool(re.search(r'debug(info|source|)',
+                                      repository_data['name']))
+            return repository_data.get('latest_version_href'), is_debug
         return repository_data.get('latest_version_href')
 
     async def get_rpm_publications(
