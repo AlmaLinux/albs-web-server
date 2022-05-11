@@ -32,7 +32,7 @@ class BeholderClient:
              getattr(platform, 'priority', 10))
             for platform in platforms_list
         )
-        if any((module_name, module_stream, module_arch_list)):
+        if module_name and module_stream and module_arch_list:
             endpoints = (
                 (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
                  f'{platform.distr_version}/module/{module_name}/'

@@ -50,7 +50,8 @@ class ReleasePlanner:
         build_tasks: typing.List[int] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
-        packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
+        packages_fields = ['name', 'epoch', 'version',
+                           'release', 'arch', 'pulp_href']
         pulp_packages = []
 
         builds_q = select(models.Build).where(
@@ -72,6 +73,16 @@ class ReleasePlanner:
         for build in build_result.scalars().all():
             is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
+            pulp_artifacts = await asyncio.gather(*(
+                self._pulp_client.get_rpm_package(
+                    rpm.artifact.href, include_fields=packages_fields)
+                for rpm in build_rpms
+                if build_tasks and rpm.artifact.build_task_id in build_tasks
+            ))
+            pulp_artifacts_dict = {
+                artifact_dict.pop('pulp_href'): artifact_dict
+                for artifact_dict in pulp_artifacts
+            }
             for rpm in build_rpms:
                 artifact_task_id = rpm.artifact.build_task_id
                 if build_tasks and artifact_task_id not in build_tasks:
@@ -79,8 +90,7 @@ class ReleasePlanner:
                 artifact_name = rpm.artifact.name
                 if '.src.' in artifact_name:
                     src_rpm_names.append(artifact_name)
-                pkg_info = await self._pulp_client.get_rpm_package(
-                    rpm.artifact.href, include_fields=packages_fields)
+                pkg_info = pulp_artifacts_dict[rpm.artifact.href]
                 pkg_info['is_beta'] = is_beta
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
@@ -318,7 +328,7 @@ class ReleasePlanner:
         added_packages = set()
         prod_repos = []
         self.base_platform = base_platform
-        repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
+        repo_name_regex = re.compile(r'\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)')
 
         pulp_packages, src_rpm_names, pulp_rpm_modules = (
             await self.get_pulp_packages(build_ids, build_tasks=build_tasks))
@@ -451,6 +461,7 @@ class ReleasePlanner:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
             # get package info from beholder cache by reference priority
+            # TODO: need to remove ref_name from keys in beholder_cache and test results
             for ref_name in ref_platform_names:
                 key = (pkg_name, pkg_version, pkg_arch, ref_name, is_beta)
                 predicted_package = beholder_cache.get(key, {})
@@ -465,15 +476,15 @@ class ReleasePlanner:
                     predicted_package = beholder_cache.get(key, {})
                     if predicted_package:
                         break
-            # if we doesn't found info on current step,
-            # then we should try find info from other versions
+            # if we doesn't found info by current version,
+            # then we should try find info by other versions
             if not predicted_package:
                 for ref_name in ref_platform_names:
-                    beholder_keys = (
+                    beholder_keys = [
                         key for key in beholder_cache
                         if pkg_name in key and pkg_arch in key
                         and ref_name in key
-                    )
+                    ]
                     predicted_package = next((
                         beholder_cache[key]
                         for key in beholder_keys
