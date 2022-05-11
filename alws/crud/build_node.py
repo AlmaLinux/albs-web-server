@@ -391,12 +391,14 @@ async def __process_build_task_artifacts(
         multilib_packages = await processor.get_packages(src_rpm)
         if module_index:
             multilib_module_artifacts = await processor.get_module_artifacts()
-            await processor.add_multilib_module_artifacts(
-                prepared_artifacts=multilib_module_artifacts)
             multilib_packages.update({
                 i['name']: i['version'] for i in multilib_module_artifacts
             })
-        await processor.add_multilib_packages(multilib_packages)
+            await processor.add_multilib_packages(multilib_packages)
+            await processor.add_multilib_module_artifacts(
+                prepared_artifacts=multilib_module_artifacts)
+        else:
+            await processor.add_multilib_packages(multilib_packages)
     if build_task.rpm_module and module_index:
         try:
             module_pulp_href, sha256 = await pulp_client.create_module(

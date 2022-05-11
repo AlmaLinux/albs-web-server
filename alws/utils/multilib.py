@@ -230,18 +230,16 @@ class MultilibProcessor:
         # goes into devel module
         module_name = self._build_task.rpm_module.name
         module_stream = self._build_task.rpm_module.stream
-        devel = False
         if self._module_index.has_devel_module() \
                 and 'python' not in module_name:
             module = self._module_index.get_module(
                 f'{module_name}-devel', module_stream)
-            devel = True
         else:
             module = self._module_index.get_module(module_name, module_stream)
         try:
             for rpm in rpm_packages:
                 rpm_package = packages_info[rpm.href]
-                module.add_rpm_artifact(rpm_package, devel=devel)
+                module.add_rpm_artifact(rpm_package, multilib=True)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
 

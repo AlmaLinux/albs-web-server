@@ -230,8 +230,13 @@ class ModuleWrapper:
             for arch in arch_list:
                 component.add_restricted_arch(arch)
 
-    def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False) -> bool:
+    def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False,
+                         multilib: bool = False) -> bool:
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
+
+        if multilib:
+            self._stream.add_rpm_artifact(artifact)
+            return True
 
         if devel and self.name.endswith('-devel'):
             self._stream.add_rpm_artifact(artifact)
