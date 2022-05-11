@@ -456,11 +456,28 @@ class ReleasePlanner:
                 predicted_package = beholder_cache.get(key, {})
                 if predicted_package:
                     break
+            # if we doesn't found info from stable/beta,
+            # we can try to find info by opposite flag
             if not predicted_package:
                 for ref_name in ref_platform_names:
                     key = (pkg_name, pkg_version, pkg_arch,
                            ref_name, not is_beta)
                     predicted_package = beholder_cache.get(key, {})
+                    if predicted_package:
+                        break
+            # if we doesn't found info on current step,
+            # then we should try find info from other versions
+            if not predicted_package:
+                for ref_name in ref_platform_names:
+                    beholder_keys = (
+                        key for key in beholder_cache
+                        if pkg_name in key and pkg_arch in key
+                        and ref_name in key
+                    )
+                    predicted_package = next((
+                        beholder_cache[key]
+                        for key in beholder_keys
+                    ), {})
                     if predicted_package:
                         break
             pkg_info = {'package': package, 'repositories': []}
