@@ -101,6 +101,9 @@ class ReleasePlanner:
                     if task.id == artifact_task_id
                 )
                 pkg_info['task_arch'] = build_task.arch
+                pkg_info['is_multilib'] = False
+                if pkg_info['arch'] == 'i686' and build_task.arch == 'x86_64':
+                    pkg_info['is_multilib'] = True
                 pkg_info['force'] = False
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
