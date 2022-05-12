@@ -36,6 +36,7 @@ class ReleasePlanner:
         self.packages_presence_info = None
         self.latest_repo_versions = None
         self.base_platform = None
+        self.clean_base_dist_name_lower = None
         self.max_list_len = 100  # max elements in list for pulp request
         self._beholder_client = BeholderClient(settings.beholder_host)
         self._pulp_client = PulpClient(
@@ -189,12 +190,26 @@ class ReleasePlanner:
             self.packages_presence_info = defaultdict(list)
             self.pkgs_mapping = {}
             self.repo_data_by_href = {}
-            tasks = []
+            common_repo_name = (f'{self.clean_base_dist_name_lower}-'
+                                f'{self.base_platform.distr_version}')
+            params = {
+                'name__startswith': common_repo_name,
+                'fields': ['pulp_href', 'name', 'latest_version_href'],
+                'limit': 1000,
+            }
+            pulp_repos = await self._pulp_client.get_rpm_repositories(params)
+            pulp_repos = {
+                repo.pop('pulp_href'): repo
+                for repo in pulp_repos
+            }
+            self.latest_repo_versions = []
             for repo in self.base_platform.repos:
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
-                tasks.append(self._pulp_client.get_repo_latest_version(
-                    repo.pulp_href, for_releases=True))
-            self.latest_repo_versions = await asyncio.gather(*tasks)
+                pulp_repo_info = pulp_repos[repo.pulp_href]
+                is_debug = re.search(r'debug(info|source|)',
+                                     pulp_repo_info['name'])
+                self.latest_repo_versions.append((
+                    pulp_repo_info['latest_version_href'], is_debug))
 
         nevra = PackageNevra(
             package['name'],
@@ -281,8 +296,6 @@ class ReleasePlanner:
         rpm_modules: list,
         repos_mapping: dict,
         prod_repos: list,
-        clean_base_dist_name_lower: str,
-        base_platform_distr_version: str,
     ) -> dict:
         packages = []
         added_packages = set()
@@ -294,8 +307,8 @@ class ReleasePlanner:
             await self.prepare_data_for_executing_async_tasks(pkg)
             release_repo = repos_mapping[RepoType(
                 '-'.join((
-                    clean_base_dist_name_lower,
-                    base_platform_distr_version,
+                    self.clean_base_dist_name_lower,
+                    self.base_platform.distr_version,
                     'devel'
                 )),
                 pkg['task_arch'],
@@ -340,7 +353,7 @@ class ReleasePlanner:
         if clean_base_dist_name is None:
             raise ValueError(f'Base distribution name is malformed: '
                              f'{base_platform.name}')
-        clean_base_dist_name_lower = clean_base_dist_name.lower()
+        self.clean_base_dist_name_lower = clean_base_dist_name.lower()
 
         ref_platform_names = []
         for ref_platform in sorted(base_platform.reference_platforms,
@@ -372,8 +385,6 @@ class ReleasePlanner:
                 rpm_modules=rpm_modules,
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
-                clean_base_dist_name_lower=clean_base_dist_name_lower,
-                base_platform_distr_version=base_platform.distr_version,
             )
 
         for module in pulp_rpm_modules:
@@ -415,7 +426,7 @@ class ReleasePlanner:
                 repo_name = repo_name_regex.search(
                     module_repo['name']).groupdict()['name']
                 release_repo_name = '-'.join((
-                    clean_base_dist_name_lower,
+                    self.clean_base_dist_name_lower,
                     base_platform.distr_version,
                     repo_name
                 ))
@@ -451,8 +462,6 @@ class ReleasePlanner:
                 rpm_modules=rpm_modules,
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
-                clean_base_dist_name_lower=clean_base_dist_name_lower,
-                base_platform_distr_version=base_platform.distr_version,
             )
         for package in pulp_packages:
             pkg_name = package['name']
@@ -500,7 +509,7 @@ class ReleasePlanner:
                     repo_name_regex.search(ref_repo_name).groupdict()['name']
                 )
                 release_repo_name = '-'.join((
-                    clean_base_dist_name_lower,
+                    self.clean_base_dist_name_lower,
                     base_platform.distr_version,
                     repo_name
                 ))
@@ -521,7 +530,7 @@ class ReleasePlanner:
             added_packages.add(package['full_name'])
             release_repo = repos_mapping[RepoType(
                 '-'.join((
-                    clean_base_dist_name_lower,
+                    self.clean_base_dist_name_lower,
                     base_platform.distr_version,
                     'devel'
                 )),
