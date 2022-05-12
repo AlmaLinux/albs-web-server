@@ -193,6 +193,9 @@ class ReleasePlanner:
             self.packages_presence_info = defaultdict(list)
             self.pkgs_mapping = {}
             self.repo_data_by_href = {}
+            if self.clean_base_dist_name_lower is None:
+                self.clean_base_dist_name_lower = get_clean_distr_name(
+                    self.base_platform.name).lower()
             common_repo_name = (f'{self.clean_base_dist_name_lower}-'
                                 f'{self.base_platform.distr_version}')
             params = {
