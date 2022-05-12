@@ -523,7 +523,7 @@ class ReleasePlanner:
             distr = beholder_response['distribution']
             is_beta = distr['version'].endswith('-beta')
             distr_name = distr['name']
-            is_devel = beholder_response['name'].endswith('-devel')
+            is_devel = False
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
                     key = (pkg['name'], pkg['version'], pkg['arch'],
@@ -570,6 +570,10 @@ class ReleasePlanner:
                     repo_name_regex=repo_name_regex,
                 )
                 release_repositories.update(repositories)
+            # if we found more than one repo for 32-bit package,
+            # we should ignore multilib from build
+            if package['is_multilib'] and len(release_repositories) > 1:
+                package['is_multilib'] = False
             for item in release_repositories:
                 packages.append({
                     'package': package,
