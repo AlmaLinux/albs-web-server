@@ -37,6 +37,7 @@ class ReleasePlanner:
         self.latest_repo_versions = None
         self.base_platform = None
         self.clean_base_dist_name_lower = None
+        self.multilib_packages = None
         self.max_list_len = 100  # max elements in list for pulp request
         self._beholder_client = BeholderClient(settings.beholder_host)
         self._pulp_client = PulpClient(
@@ -71,6 +72,7 @@ class ReleasePlanner:
         )
         build_result = await self._db.execute(builds_q)
         modules_to_release = defaultdict(list)
+        self.multilib_packages = {}
         for build in build_result.scalars().all():
             is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
@@ -102,9 +104,10 @@ class ReleasePlanner:
                     if task.id == artifact_task_id
                 )
                 pkg_info['task_arch'] = build_task.arch
-                pkg_info['is_multilib'] = False
-                if pkg_info['arch'] == 'i686' and build_task.arch == 'x86_64':
-                    pkg_info['is_multilib'] = True
+                if pkg_info['arch'] == 'i686':
+                    pkg_info['is_multilib'] = False
+                    if build_task.arch == 'x86_64':
+                        self.multilib_packages[rpm.artifact.href] = True
                 pkg_info['force'] = False
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
@@ -206,8 +209,8 @@ class ReleasePlanner:
             for repo in self.base_platform.repos:
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
                 pulp_repo_info = pulp_repos[repo.pulp_href]
-                is_debug = re.search(r'debug(info|source|)',
-                                     pulp_repo_info['name'])
+                is_debug = bool(re.search(r'debug(info|source|)',
+                                          pulp_repo_info['name']))
                 self.latest_repo_versions.append((
                     pulp_repo_info['latest_version_href'], is_debug))
 
@@ -302,6 +305,9 @@ class ReleasePlanner:
         for pkg in pulp_packages:
             full_name = pkg['full_name']
             pkg.pop('is_beta')
+            if pkg['arch'] == 'i686':
+                pkg['is_multilib'] = self.multilib_packages.get(
+                    pkg['artifact_href'], False)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(pkg)
@@ -469,6 +475,9 @@ class ReleasePlanner:
             pkg_arch = package['arch']
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
+            if pkg_arch == 'i686':
+                package['is_multilib'] = self.multilib_packages.get(
+                    package['artifact_href'], False)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
@@ -499,11 +508,18 @@ class ReleasePlanner:
                     break
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
-            repositories = []
             if not predicted_package:
-                continue
-            repositories = predicted_package['repositories']
-            for repo in repositories:
+                release_repo = RepoType(
+                    '-'.join((
+                        self.clean_base_dist_name_lower,
+                        base_platform.distr_version,
+                        'devel'
+                    )),
+                    package['task_arch'],
+                    False
+                )
+                release_repositories.add(release_repo)
+            for repo in predicted_package.get('repositories', []):
                 ref_repo_name = repo['name']
                 repo_name = (
                     repo_name_regex.search(ref_repo_name).groupdict()['name']
@@ -522,25 +538,6 @@ class ReleasePlanner:
                 repos_mapping.get(item) for item in release_repositories
             ]
             added_packages.add(full_name)
-            packages.append(pkg_info)
-
-        for package in pulp_packages:
-            if package['full_name'] in added_packages:
-                continue
-            added_packages.add(package['full_name'])
-            release_repo = repos_mapping[RepoType(
-                '-'.join((
-                    self.clean_base_dist_name_lower,
-                    base_platform.distr_version,
-                    'devel'
-                )),
-                package['task_arch'],
-                False
-            )]
-            pkg_info = {
-                'package': package,
-                'repositories': [release_repo]
-            }
             packages.append(pkg_info)
 
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
