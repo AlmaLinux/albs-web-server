@@ -55,7 +55,6 @@ class BeholderClient:
                     response = await self.get(endpoint)
                 else:
                     response = await self.post(endpoint, data)
-                response['is_beta'] = '-beta' in endpoint
                 response['priority'] = priority
                 yield response
             except Exception:

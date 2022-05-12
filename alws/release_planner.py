@@ -336,6 +336,77 @@ class ReleasePlanner:
             'modules': rpm_modules,
         }
 
+    def find_release_repos(
+        self,
+        pkg_name: str,
+        pkg_version: str,
+        pkg_arch: str,
+        pkg_task_arch: str,
+        is_beta: bool,
+        is_devel: bool,
+        beholder_cache: dict,
+        ref_platform_names: typing.List[str],
+        repo_name_regex: re.Pattern,
+    ) -> typing.Set[RepoType]:
+        # get package info from beholder cache by reference priority
+        # TODO: need to remove ref_name from keys in beholder_cache and test results
+        release_repositories = set()
+        for ref_name in ref_platform_names:
+            key = (pkg_name, pkg_version, pkg_arch,
+                   ref_name, is_beta, is_devel)
+            predicted_package = beholder_cache.get(key, {})
+            if predicted_package:
+                break
+            # if we doesn't found info from stable/beta,
+            # we can try to find info by opposite stable/beta flag
+            key = (pkg_name, pkg_version, pkg_arch,
+                   ref_name, not is_beta, is_devel)
+            predicted_package = beholder_cache.get(key, {})
+            if predicted_package:
+                break
+            # if we doesn't found info by current version,
+            # then we should try find info by other versions
+            beholder_keys = [
+                key for key in beholder_cache
+                if all((
+                    field in key
+                    for field in (pkg_name, pkg_arch, ref_name, is_devel)
+                ))
+            ]
+            predicted_package = next((
+                beholder_cache[key]
+                for key in beholder_keys
+            ), {})
+            if predicted_package:
+                break
+        if not predicted_package and not is_devel:
+            release_repo = RepoType(
+                '-'.join((
+                    self.clean_base_dist_name_lower,
+                    self.base_platform.distr_version,
+                    'devel'
+                )),
+                pkg_task_arch,
+                False
+            )
+            release_repositories.add(release_repo)
+        for repo in predicted_package.get('repositories', []):
+            ref_repo_name = repo['name']
+            repo_name = (
+                repo_name_regex.search(ref_repo_name).groupdict()['name']
+            )
+            release_repo_name = '-'.join((
+                self.clean_base_dist_name_lower,
+                self.base_platform.distr_version,
+                repo_name
+            ))
+            debug = ref_repo_name.endswith('debuginfo')
+            if repo['arch'] == 'src':
+                debug = False
+            release_repo = RepoType(release_repo_name, repo['arch'], debug)
+            release_repositories.add(release_repo)
+        return release_repositories
+
     async def get_release_plan(
         self,
         build_ids: typing.List[int],
@@ -413,16 +484,18 @@ class ReleasePlanner:
             }
             rpm_modules.append(module_info)
             for module_response in module_responses:
-                is_beta = module_response['is_beta']
-                distr_name = module_response['distribution']['name']
+                distr = module_response['distribution']
+                is_beta = distr['version'].endswith('-beta')
+                distr_name = distr['name']
+                is_devel = module_response['name'].endswith('-devel')
                 for _packages in module_response['artifacts']:
                     for pkg in _packages['packages']:
                         key = (pkg['name'], pkg['version'], pkg['arch'],
-                               distr_name, is_beta)
+                               distr_name, is_beta, is_devel)
                         beholder_cache[key] = pkg
                         for weak_arch in strong_arches[pkg['arch']]:
-                            second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, distr_name, is_beta)
+                            second_key = (pkg['name'], pkg['version'], weak_arch,
+                                          distr_name, is_beta, is_devel)
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
@@ -447,16 +520,18 @@ class ReleasePlanner:
             data=src_rpm_names,
         )
         for beholder_response in beholder_responses:
-            is_beta = beholder_response['is_beta']
-            distr_name = beholder_response['distribution']['name']
+            distr = beholder_response['distribution']
+            is_beta = distr['version'].endswith('-beta')
+            distr_name = distr['name']
+            is_devel = beholder_response['name'].endswith('-devel')
             for pkg_list in beholder_response.get('packages', {}):
                 for pkg in pkg_list['packages']:
                     key = (pkg['name'], pkg['version'], pkg['arch'],
-                           distr_name, is_beta)
+                           distr_name, is_beta, is_devel)
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'],
-                                      weak_arch, distr_name, is_beta)
+                        second_key = (pkg['name'], pkg['version'], weak_arch,
+                                      distr_name, is_beta, is_devel)
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
@@ -481,64 +556,26 @@ class ReleasePlanner:
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
-            # get package info from beholder cache by reference priority
-            # TODO: need to remove ref_name from keys in beholder_cache and test results
-            for ref_name in ref_platform_names:
-                key = (pkg_name, pkg_version, pkg_arch, ref_name, is_beta)
-                predicted_package = beholder_cache.get(key, {})
-                if predicted_package:
-                    break
-                # if we doesn't found info from stable/beta,
-                # we can try to find info by opposite stable/beta flag
-                key = (pkg_name, pkg_version, pkg_arch, ref_name, not is_beta)
-                predicted_package = beholder_cache.get(key, {})
-                if predicted_package:
-                    break
-                # if we doesn't found info by current version,
-                # then we should try find info by other versions
-                beholder_keys = [
-                    key for key in beholder_cache
-                    if pkg_name in key and pkg_arch in key and ref_name in key
-                ]
-                predicted_package = next((
-                    beholder_cache[key]
-                    for key in beholder_keys
-                ), {})
-                if predicted_package:
-                    break
-            pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
-            if not predicted_package:
-                release_repo = RepoType(
-                    '-'.join((
-                        self.clean_base_dist_name_lower,
-                        base_platform.distr_version,
-                        'devel'
-                    )),
-                    package['task_arch'],
-                    False
+            for is_devel in (False, True):
+                repositories = self.find_release_repos(
+                    pkg_name=pkg_name,
+                    pkg_version=pkg_version,
+                    pkg_arch=pkg_arch,
+                    pkg_task_arch=package['task_arch'],
+                    is_beta=is_beta,
+                    is_devel=is_devel,
+                    beholder_cache=beholder_cache,
+                    ref_platform_names=ref_platform_names,
+                    repo_name_regex=repo_name_regex,
                 )
-                release_repositories.add(release_repo)
-            for repo in predicted_package.get('repositories', []):
-                ref_repo_name = repo['name']
-                repo_name = (
-                    repo_name_regex.search(ref_repo_name).groupdict()['name']
-                )
-                release_repo_name = '-'.join((
-                    self.clean_base_dist_name_lower,
-                    base_platform.distr_version,
-                    repo_name
-                ))
-                debug = ref_repo_name.endswith('debuginfo')
-                if repo['arch'] == 'src':
-                    debug = False
-                release_repo = RepoType(release_repo_name, repo['arch'], debug)
-                release_repositories.add(release_repo)
-            pkg_info['repositories'] = [
-                repos_mapping.get(item) for item in release_repositories
-            ]
+                release_repositories.update(repositories)
+            for item in release_repositories:
+                packages.append({
+                    'package': package,
+                    'repositories': [repos_mapping.get(item)],
+                })
             added_packages.add(full_name)
-            packages.append(pkg_info)
 
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
             packages)
