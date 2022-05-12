@@ -90,7 +90,7 @@ class ReleasePlanner:
                 artifact_name = rpm.artifact.name
                 if '.src.' in artifact_name:
                     src_rpm_names.append(artifact_name)
-                pkg_info = pulp_artifacts_dict[rpm.artifact.href]
+                pkg_info = copy.deepcopy(pulp_artifacts_dict[rpm.artifact.href])
                 pkg_info['is_beta'] = is_beta
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
@@ -470,30 +470,24 @@ class ReleasePlanner:
                 predicted_package = beholder_cache.get(key, {})
                 if predicted_package:
                     break
-            # if we doesn't found info from stable/beta,
-            # we can try to find info by opposite flag
-            if not predicted_package:
-                for ref_name in ref_platform_names:
-                    key = (pkg_name, pkg_version, pkg_arch,
-                           ref_name, not is_beta)
-                    predicted_package = beholder_cache.get(key, {})
-                    if predicted_package:
-                        break
-            # if we doesn't found info by current version,
-            # then we should try find info by other versions
-            if not predicted_package:
-                for ref_name in ref_platform_names:
-                    beholder_keys = [
-                        key for key in beholder_cache
-                        if pkg_name in key and pkg_arch in key
-                        and ref_name in key
-                    ]
-                    predicted_package = next((
-                        beholder_cache[key]
-                        for key in beholder_keys
-                    ), {})
-                    if predicted_package:
-                        break
+                # if we doesn't found info from stable/beta,
+                # we can try to find info by opposite stable/beta flag
+                key = (pkg_name, pkg_version, pkg_arch, ref_name, not is_beta)
+                predicted_package = beholder_cache.get(key, {})
+                if predicted_package:
+                    break
+                # if we doesn't found info by current version,
+                # then we should try find info by other versions
+                beholder_keys = [
+                    key for key in beholder_cache
+                    if pkg_name in key and pkg_arch in key and ref_name in key
+                ]
+                predicted_package = next((
+                    beholder_cache[key]
+                    for key in beholder_keys
+                ), {})
+                if predicted_package:
+                    break
             pkg_info = {'package': package, 'repositories': []}
             release_repositories = set()
             repositories = []
