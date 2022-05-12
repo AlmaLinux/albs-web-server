@@ -375,14 +375,14 @@ class Exporter:
                                       'expected "%s", got "%s"',
                                       package_path, str(key_ids_lower),
                                       pkg_key_id)
-                wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
+                    wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
 
         if errored_packages or no_signature_packages or wrong_signature_packages:
             if not os.path.exists(self.export_error_file):
                 mode = 'wt'
             else:
                 mode = 'at'
-            lines = []
+            lines = [f'Errors when checking packages in {repository_path}']
             if errored_packages:
                 lines.append('Packages that we cannot get information about:')
                 lines.extend(list(errored_packages))
@@ -391,7 +391,8 @@ class Exporter:
                 lines.extend(list(no_signature_packages))
             if wrong_signature_packages:
                 lines.append('Packages with wrong signature:')
-                lines.extend(wrong_signature_packages)
+                lines.extend(list(wrong_signature_packages))
+            lines.append('\n')
             with open(self.export_error_file, mode=mode) as f:
                 f.write('\n'.join(lines))
 
