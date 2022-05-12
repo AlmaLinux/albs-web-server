@@ -553,9 +553,6 @@ class ReleasePlanner:
             pkg_arch = package['arch']
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
-            if pkg_arch == 'i686':
-                package['is_multilib'] = self.multilib_packages.get(
-                    package['artifact_href'], False)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(package)
@@ -573,10 +570,13 @@ class ReleasePlanner:
                     repo_name_regex=repo_name_regex,
                 )
                 release_repositories.update(repositories)
-            # if we found more than one repo for 32-bit package,
-            # we should ignore multilib from build
-            if package['is_multilib'] and len(release_repositories) > 1:
-                package['is_multilib'] = False
+            if pkg_arch == 'i686':
+                package['is_multilib'] = self.multilib_packages.get(
+                    package['artifact_href'], False)
+                # if we found more than one repo for 32-bit package,
+                # we should ignore multilib from build
+                if package['is_multilib'] and len(release_repositories) > 1:
+                    package['is_multilib'] = False
             for item in release_repositories:
                 packages.append({
                     'package': package,
