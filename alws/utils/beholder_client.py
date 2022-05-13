@@ -78,11 +78,13 @@ class BeholderClient:
             response_distr_name = response['distribution']['name']
             response_distr_ver = response['distribution']['version']
             response['priority'] = next(
-                getattr(platform, 'priority', 10)
-                for platform in platforms_list
-                if platform.name.startswith(response_distr_name)
-                and platform.distr_version == response_distr_ver
+                db_platform.priority for db_platform in platforms_list
+                if db_platform.name.startswith(response_distr_name)
+                and db_platform.distr_version == response_distr_ver
             )
+            # we have priority only in ref platforms
+            if response['priority'] is None:
+                response['priority'] = 10
             responses.append(response)
         return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
