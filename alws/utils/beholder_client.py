@@ -25,19 +25,17 @@ class BeholderClient:
         module_name: str = None,
         module_stream: str = None,
         module_arch_list: typing.List[str] = None,
-    ) -> typing.Generator[None, None, typing.Tuple[str, int]]:
+    ) -> typing.Generator[None, None, str]:
         endpoints = (
-            (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
-             f'{platform.distr_version}/projects/',
-             getattr(platform, 'priority', 10))
+            f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+            f'{platform.distr_version}/projects/'
             for platform in platforms_list
         )
         if module_name and module_stream and module_arch_list:
             endpoints = (
-                (f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
-                 f'{platform.distr_version}/module/{module_name}/'
-                 f'{module_stream}/{module_arch}/',
-                 getattr(platform, 'priority', 10))
+                f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+                f'{platform.distr_version}/module/{module_name}/'
+                f'{module_stream}/{module_arch}/'
                 for platform in platforms_list
                 for module_arch in module_arch_list
             )
@@ -49,13 +47,12 @@ class BeholderClient:
         is_module: bool = False,
         data: typing.Union[dict, list] = None,
     ) -> typing.Generator[dict, None, None]:
-        for endpoint, priority in endpoints:
+        for endpoint in endpoints:
             try:
                 if is_module:
                     response = await self.get(endpoint)
                 else:
                     response = await self.post(endpoint, data)
-                response['priority'] = priority
                 yield response
             except Exception:
                 pass
@@ -69,28 +66,24 @@ class BeholderClient:
         is_module: bool = False,
         data: typing.Union[dict, list] = None,
     ) -> typing.List[dict]:
-        async def _get_responses():
-            return [
-                response
-                async for response in self.iter_endpoints(
-                    endpoints, is_module, data)
-            ]
-
+        platforms_list = platform.reference_platforms + [platform]
         endpoints = self.create_endpoints(
-            platform.reference_platforms,
+            platforms_list,
             module_name,
             module_stream,
             module_arch_list,
         )
-        responses = await _get_responses()
-        if not responses:
-            endpoints = self.create_endpoints(
-                [platform],
-                module_name,
-                module_stream,
-                module_arch_list,
+        responses = []
+        async for response in self.iter_endpoints(endpoints, is_module, data):
+            response_distr_name = response['distribution']['name']
+            response_distr_ver = response['distribution']['version']
+            response['priority'] = next(
+                getattr(platform, 'priority', 10)
+                for platform in platforms_list
+                if platform.name.startswith(response_distr_name)
+                and platform.distr_version == response_distr_ver
             )
-            responses = await _get_responses()
+            responses.append(response)
         return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
     def _get_url(self, endpoint: str) -> str:
