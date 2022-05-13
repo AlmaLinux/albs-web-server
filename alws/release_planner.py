@@ -37,7 +37,6 @@ class ReleasePlanner:
         self.latest_repo_versions = None
         self.base_platform = None
         self.clean_base_dist_name_lower = None
-        self.multilib_packages = None
         self.repo_name_regex = re.compile(
             r'\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)')
         self.max_list_len = 100  # max elements in list for pulp request
@@ -74,7 +73,6 @@ class ReleasePlanner:
         )
         build_result = await self._db.execute(builds_q)
         modules_to_release = defaultdict(list)
-        self.multilib_packages = {}
         for build in build_result.scalars().all():
             is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
@@ -106,8 +104,6 @@ class ReleasePlanner:
                     if task.id == artifact_task_id
                 )
                 pkg_info['task_arch'] = build_task.arch
-                if pkg_info['arch'] == 'i686' and build_task.arch == 'x86_64':
-                    self.multilib_packages[rpm.artifact.href] = True
                 pkg_info['force'] = False
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
@@ -308,9 +304,6 @@ class ReleasePlanner:
         for pkg in pulp_packages:
             full_name = pkg['full_name']
             pkg.pop('is_beta')
-            repo_arch_location = [pkg['arch']]
-            if self.multilib_packages.get(pkg['artifact_href'], False):
-                repo_arch_location.append('x86_64')
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(pkg)
@@ -326,7 +319,7 @@ class ReleasePlanner:
             packages.append({
                 'package': pkg,
                 'repositories': [release_repo],
-                'repo_arch_location': repo_arch_location,
+                'repo_arch_location': [pkg['arch']],
             })
             added_packages.add(full_name)
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
@@ -548,25 +541,26 @@ class ReleasePlanner:
                     beholder_cache=beholder_cache,
                 )
                 release_repositories.update(repositories)
-            repo_arch_location = [pkg_arch]
-            is_multilib = self.multilib_packages.get(
-                package['artifact_href'], False)
-            if is_multilib:
-                repo_arch_location.append('x86_64')
+            pkg_info = {
+                'package': package,
+                'repositories': [],
+                'repo_arch_location': [pkg_arch],
+            }
+            if not release_repositories:
+                packages.append(pkg_info)
+                added_packages.add(full_name)
+                continue
             # for every repository we should add pkg_info
             # for correct package location in UI
             for item in release_repositories:
                 release_repo = repos_mapping.get(item)
-                # if we found more than one repo for 32-bit package,
-                # we should ignore multilib from build
-                if is_multilib and len(release_repositories) > 1:
-                    repo_arch_location = [release_repo['arch']]
-                packages.append({
-                    'package': package,
+                copy_pkg_info = copy.deepcopy(pkg_info)
+                copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
                     'repositories': [release_repo],
-                    'repo_arch_location': repo_arch_location,
+                    'repo_arch_location': [release_repo['arch']],
                 })
+                packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
