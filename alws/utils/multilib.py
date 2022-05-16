@@ -258,7 +258,8 @@ class MultilibProcessor:
             if not artifact['is_multilib']:
                 continue
             for package in db_artifacts:
-                if artifact['name'] in package.name:
+                parsed_package = package.name_as_dict()
+                if artifact['name'] == parsed_package['name']:
                     packages_to_process[artifact['name']] = package
 
         await self.update_module_index(list(packages_to_process.values()))
