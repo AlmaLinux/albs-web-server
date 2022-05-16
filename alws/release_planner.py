@@ -199,8 +199,9 @@ class ReleasePlanner:
             )
             params = {
                 'name__in': ','.join(prod_repo_names),
-                'fields': ','.join(('pulp_href', 'latest_version_href')),
-                'limit': 100,
+                'fields': ','.join(('pulp_href', 'name',
+                                    'latest_version_href')),
+                'limit': 1000,
             }
             pulp_repos = await self._pulp_client.get_rpm_repositories(params)
             pulp_repos = {
@@ -209,8 +210,10 @@ class ReleasePlanner:
             }
             self.latest_repo_versions = []
             for repo in self.base_platform.repos:
+                pulp_repo_info = pulp_repos.get(repo.pulp_href)
+                if pulp_repo_info is None:
+                    continue
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
-                pulp_repo_info = pulp_repos[repo.pulp_href]
                 is_debug = bool(re.search(r'debug(info|source|)',
                                           pulp_repo_info['name']))
                 self.latest_repo_versions.append((
@@ -557,6 +560,9 @@ class ReleasePlanner:
             # for correct package location in UI
             for item in release_repositories:
                 release_repo = repos_mapping.get(item)
+                if release_repo is None:
+                    print(item)
+                    continue
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
