@@ -84,7 +84,7 @@ class BeholderClient:
             )
             # we have priority only in ref platforms
             if response['priority'] is None:
-                response['priority'] = 10
+                response['priority'] = 10  # lowest priority
             responses.append(response)
         return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
