@@ -1,4 +1,5 @@
 import json
+import logging
 import typing
 import urllib.parse
 
@@ -55,7 +56,8 @@ class BeholderClient:
                     response = await self.post(endpoint, data)
                 yield response
             except Exception:
-                pass
+                logging.error('Cannot retrieve beholder info, '
+                              'trying next reference platform')
 
     async def retrieve_responses(
         self,

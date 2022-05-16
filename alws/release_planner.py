@@ -192,12 +192,15 @@ class ReleasePlanner:
             if self.clean_base_dist_name_lower is None:
                 self.clean_base_dist_name_lower = get_clean_distr_name(
                     self.base_platform.name).lower()
-            common_prod_repo_name = (f'{self.clean_base_dist_name_lower}-'
-                                     f'{self.base_platform.distr_version}')
+            pulp_repos = []
+            prod_repo_names = (
+                f'{repo.name}-{repo.arch}'
+                for repo in self.base_platform.repos
+            )
             params = {
-                'name__startswith': common_prod_repo_name,
-                'fields': ['pulp_href', 'name', 'latest_version_href'],
-                'limit': 1000,
+                'name__in': ','.join(prod_repo_names),
+                'fields': ','.join(('pulp_href', 'latest_version_href')),
+                'limit': 100,
             }
             pulp_repos = await self._pulp_client.get_rpm_repositories(params)
             pulp_repos = {
