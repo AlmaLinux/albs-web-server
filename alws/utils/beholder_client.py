@@ -85,8 +85,8 @@ class BeholderClient:
                 and db_platform.distr_version == response_distr_ver
             )
             # we have priority only in ref platforms
-            if response['priority'] is None:
-                response['priority'] = 10  # lowest priority
+            # 10 is lowest priority
+            response['priority'] = response.get('priority') or 10
             responses.append(response)
         return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
