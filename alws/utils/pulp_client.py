@@ -25,12 +25,6 @@ class PulpClient:
         self._auth = aiohttp.BasicAuth(self._username, self._password)
         self._current_transaction = None
 
-    async def get_file_repositories(self, params: dict) -> typing.List[dict]:
-        ENDPOINT = 'pulp/api/v3/repositories/file/file/'
-        result = []
-        response = await self.request('GET', ENDPOINT, json=params)
-        return result
-
     async def iter_repo(self, endpoint: str) -> dict:
         next_page = endpoint
         while True:
@@ -47,7 +41,10 @@ class PulpClient:
                 break
 
     async def create_log_repo(
-            self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
+        self,
+        name: str,
+        distro_path_start: str = 'build_logs',
+    ) -> (str, str):
         ENDPOINT = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
         response = await self.request('POST', ENDPOINT, json=payload)
@@ -105,7 +102,7 @@ class PulpClient:
         if response['count'] == 0:
             return None
         return response['results'][0]
-        
+
     async def get_log_distro(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/distributions/file/file/'
         params = {'name__contains': name}
@@ -232,7 +229,7 @@ class PulpClient:
                 modules_yaml = await response.text()
                 response.raise_for_status()
                 return modules_yaml
-    
+
     def begin(self):
         return self
 
@@ -247,7 +244,7 @@ class PulpClient:
         else:
             await self.commit()
         self._current_transaction = None
-    
+
     async def rollback(self):
         # TODO: write description here, what should be done in rollback in real world
         pass
@@ -270,7 +267,7 @@ class PulpClient:
             self._current_transaction[repo_to] = {'add': set(), 'remove': set()}
         self._current_transaction[repo_to]['add'].update(add or [])
         self._current_transaction[repo_to]['remove'].update(remove or [])
-    
+
     async def _modify_repository(
                 self,
                 repo_to: str,
@@ -635,5 +632,6 @@ class PulpClient:
                     auth=self._auth
             ) as response:
                 response_json = await response.json()
+                # print(response_json)
                 response.raise_for_status()
                 return response_json

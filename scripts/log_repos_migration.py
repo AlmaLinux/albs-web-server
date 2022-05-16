@@ -1,7 +1,6 @@
 import asyncio
 from collections import defaultdict
 import gzip
-from io import BytesIO
 import logging
 import os
 import re
@@ -9,8 +8,13 @@ import sys
 import typing
 import urllib.parse
 
+import django
+# for using pulp models
+django.setup()
+from pulpcore.app.models import Artifact, Content
 from sqlalchemy import select, delete, insert
 from sqlalchemy.orm import selectinload
+from syncer import sync
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -19,7 +23,7 @@ from alws.constants import LOG_REPO_ARCH
 from alws.config import settings
 from alws.database import SyncSession
 from alws.config import settings
-from alws.utils.file_utils import download_file
+from alws.utils.file_utils import download_log
 from alws.utils.pulp_client import PulpClient
 
 
@@ -27,13 +31,12 @@ def get_full_url(endpoint: str) -> str:
     return urllib.parse.urljoin(settings.pulp_host, endpoint)
 
 
-async def compress_old_log(pulp_client: PulpClient, url: str) -> str:
-    host = 'http://localhost:8080'
-    # host = settings.pulp_host
-    temp_log = BytesIO()
-    await download_file(urllib.parse.urljoin(host, url), temp_log)
-    href, _ = await pulp_client.upload_file(gzip.compress(temp_log.read()))
-    return href
+async def compress_old_log(pulp_client: PulpClient,
+                           url: str) -> typing.Tuple[str, str]:
+    content = await download_log(urllib.parse.urljoin(settings.pulp_host, url))
+    compressed_content = gzip.compress(content)
+    artifact_href, _ = await pulp_client.upload_file(compressed_content)
+    return artifact_href
 
 
 async def find_old_log_repos(
@@ -43,13 +46,18 @@ async def find_old_log_repos(
     typing.Dict[str, typing.List[str]],
     typing.Dict[int, typing.List[str]],
 ]:
+    def get_pulp_obj_id(href: str) -> str:
+        return href.split('/')[-2]
+
     fields = ','.join(('name', 'pulp_href', 'latest_version_href'))
     url = get_full_url(f'pulp/api/v3/repositories/file/file/?fields={fields}')
     build_log_repos_mapping = defaultdict(list)
     test_log_repos_by_build_task = defaultdict(list)
     builds_mapping = defaultdict(list)
-    hrefs_to_delete = defaultdict(list)
+    hrefs_to_delete = []
     async for repo in pulp_client.iter_repo(url):
+        files_to_delete = []
+        artifacts_to_delete = []
         repo_name = repo['name']
         is_test = 'test_logs' in repo_name
         build_repo = re.search(r'(\d+)-artifacts-(\d+)$', repo_name)
@@ -59,7 +67,7 @@ async def find_old_log_repos(
         latest_repo_data = await pulp_client.get_latest_repo_present_content(
             repo['latest_version_href'])
         file_repo_href = latest_repo_data.get('file.file', {}).get('href')
-        hrefs_to_delete['repos'].append(repo['pulp_href'])
+        hrefs_to_delete.append(repo['pulp_href'])
         if file_repo_href is None:
             continue
         artifacts_to_add = []
@@ -69,21 +77,30 @@ async def find_old_log_repos(
             full_url = f'pulp/content/build_logs/{repo_name}/{file_name}'
             if is_test:
                 full_url = f'pulp/content/test_logs/{repo_name}/{file_name}'
-            # full_url = get_full_url(url)
-            if artifact['name'].endswith('.log'):
-                tasks.append(compress_old_log(pulp_client, full_url))
-                hrefs_to_delete['logs'].append(artifact['pulp_href'])
+            if file_name.endswith('.log'):
+                new_href = await compress_old_log(pulp_client, full_url)
+                tasks.append(pulp_client.create_file(file_name, new_href))
+                files_to_delete.append(get_pulp_obj_id(artifact['pulp_href']))
+                artifacts_to_delete.append(get_pulp_obj_id(artifact['artifact']))
                 continue
-            artifacts_to_add.append(artifact['pulp_href'])
+            artifacts_to_add.append(artifact['/pulp_href'])
+        Content.objects.filter(pulp_type="file.file",
+                               pk__in={files_to_delete}).delete()
+        # we should iterate by every artifact for removing from filesystem
+        for artifact in Artifact.objects.filter(
+                pk__in={artifacts_to_delete}).iterator():
+            artifact.delete()
         artifacts_to_add.extend(await asyncio.gather(*tasks))
         build_id = None
         build_task_id = None
         if build_repo is not None:
             build_id, build_task_id = build_repo.groups()
+            build_id, build_task_id = int(build_id), int(build_task_id)
             build_log_repos_mapping[build_id].extend(artifacts_to_add)
             builds_mapping[build_id].append(build_task_id)
         else:
             build_task_id, _ = test_repo.groups()
+            build_task_id = int(build_task_id)
             test_log_repos_by_build_task[build_task_id].extend(
                 artifacts_to_add)
     for build_task_id, test_artifacts in test_log_repos_by_build_task.items():
@@ -98,12 +115,14 @@ async def find_old_log_repos(
     return build_log_repos_mapping, hrefs_to_delete, builds_mapping
 
 
-async def delete_old_file_distros(pulp_client: PulpClient) -> list:
+async def delete_old_file_distros(pulp_client: PulpClient,
+                                  old_hrefs: typing.List[str]) -> list:
     url = get_full_url('pulp/api/v3/distributions/file/file/?fields=pulp_href')
-    delete_tasks = (
+    delete_tasks = [
         pulp_client.delete_by_href(distr['pulp_href'], wait_for_result=True)
         async for distr in pulp_client.iter_repo(url)
-    )
+        if distr['repository'] in old_hrefs
+    ]
     return await asyncio.gather(*delete_tasks)
 
 
@@ -158,24 +177,27 @@ async def main():
         'Inserting old build/tests artifacts in new pulp repos is finished')
 
     with SyncSession() as db:
+        logger.info('Start inserting new repos into DB')
         with db.begin():
             repo_ids_to_delete = db.execute(
                 select(models.Repository.id).where(
-                    models.Repository.pulp_href.in_(hrefs_to_delete['repos']),
+                    models.Repository.pulp_href.in_(hrefs_to_delete),
                 ),
             )
             repo_ids_to_delete = repo_ids_to_delete.scalars().all()
-            logger.info('Start inserting new repos into DB')
             db.add_all(new_repos_data.values())
-            db.flush()
+            db.commit()
             insert_values = []
             for build_id, repo in new_repos_data.items():
                 insert_values.append({'build_id': build_id,
                                       'repository_id': repo.id})
+        with db.begin():
+            print(insert_values)
             db.execute(insert(models.BuildRepo), insert_values)
-            db.flush()
-            logger.info('Inserting new repos into DB is finished')
-            logger.info('Start deleting old repos from DB')
+            db.commit()
+        logger.info('Inserting new repos into DB is finished')
+        logger.info('Start deleting old repos from DB')
+        with db.begin():
             test_tasks = db.execute(
                 select(models.TestTask).where(
                     models.TestTask.build_task_id.in_(build_task_ids),
@@ -185,8 +207,9 @@ async def main():
                 new_repo = new_repos_data.get(test_task.build_task.build_id)
                 if new_repo is None:
                     continue
-                test_task.repository_id = new_repo.id
-            db.flush()
+                setattr(test_task, 'repository_id', new_repo.id)
+            db.commit()
+        with db.begin():
             db.execute(
                 delete(models.BuildRepo).where(
                     models.BuildRepo.c.repository_id.in_(repo_ids_to_delete),
@@ -198,15 +221,19 @@ async def main():
                 ),
             )
             db.commit()
-            logger.info('Deleting old repos from DB is completed')
+        logger.info('Deleting old repos from DB is completed')
 
     logger.info('Start deleting old file distros')
-    deleted_file_distros = len(await delete_old_file_distros(pulp_client))
+    deleted_file_distros = len(await delete_old_file_distros(
+        pulp_client, hrefs_to_delete))
     logger.info('Total deleted file distros: %s', deleted_file_distros)
 
     logger.info('Start deleting old file repos and logs')
     delete_tasks = []
-    for key in ('repos', 'logs'):
+    for key in (
+        'repos',
+        # 'logs',
+    ):
         delete_tasks.extend((
             pulp_client.delete_by_href(repo_href, wait_for_result=True)
             for repo_href in hrefs_to_delete[key]
@@ -216,4 +243,4 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    sync(main())
