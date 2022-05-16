@@ -39,7 +39,6 @@ class ReleaseCreate(BaseModel):
     builds: typing.List[int]
     build_tasks: typing.Optional[typing.List[int]]
     platform_id: int
-    reference_platform_id: int
 
 
 class ReleaseUpdate(BaseModel):

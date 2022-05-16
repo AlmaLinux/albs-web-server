@@ -152,6 +152,7 @@ class Platform(Base):
         unique=True,
         index=True
     )
+    priority = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     copy_priority_arches = sqlalchemy.Column(JSONB, nullable=True)
     weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)

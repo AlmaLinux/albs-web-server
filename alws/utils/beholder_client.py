@@ -1,10 +1,13 @@
 import json
+import logging
 import typing
 import urllib.parse
 
 import aiohttp
 
 from alws.constants import REQUEST_TIMEOUT
+from alws.models import Platform
+from alws.utils.parsing import get_clean_distr_name
 
 
 class BeholderClient:
@@ -16,6 +19,76 @@ class BeholderClient:
                 'Authorization': f'Bearer {token}',
             })
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+
+    @staticmethod
+    def create_endpoints(
+        platforms_list: typing.List[Platform],
+        module_name: str = None,
+        module_stream: str = None,
+        module_arch_list: typing.List[str] = None,
+    ) -> typing.Generator[None, None, str]:
+        endpoints = (
+            f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+            f'{platform.distr_version}/projects/'
+            for platform in platforms_list
+        )
+        if module_name and module_stream and module_arch_list:
+            endpoints = (
+                f'/api/v1/distros/{get_clean_distr_name(platform.name)}/'
+                f'{platform.distr_version}/module/{module_name}/'
+                f'{module_stream}/{module_arch}/'
+                for platform in platforms_list
+                for module_arch in module_arch_list
+            )
+        return endpoints
+
+    async def iter_endpoints(
+        self,
+        endpoints: typing.Iterable[str],
+        is_module: bool = False,
+        data: typing.Union[dict, list] = None,
+    ) -> typing.Generator[dict, None, None]:
+        for endpoint in endpoints:
+            try:
+                if is_module:
+                    response = await self.get(endpoint)
+                else:
+                    response = await self.post(endpoint, data)
+                yield response
+            except Exception:
+                logging.error('Cannot retrieve beholder info, '
+                              'trying next reference platform')
+
+    async def retrieve_responses(
+        self,
+        platform: Platform,
+        module_name: str = None,
+        module_stream: str = None,
+        module_arch_list: typing.List[str] = None,
+        is_module: bool = False,
+        data: typing.Union[dict, list] = None,
+    ) -> typing.List[dict]:
+        platforms_list = platform.reference_platforms + [platform]
+        endpoints = self.create_endpoints(
+            platforms_list,
+            module_name,
+            module_stream,
+            module_arch_list,
+        )
+        responses = []
+        async for response in self.iter_endpoints(endpoints, is_module, data):
+            response_distr_name = response['distribution']['name']
+            response_distr_ver = response['distribution']['version']
+            response['priority'] = next(
+                db_platform.priority for db_platform in platforms_list
+                if db_platform.name.startswith(response_distr_name)
+                and db_platform.distr_version == response_distr_ver
+            )
+            # we have priority only in ref platforms
+            # 10 is lowest priority
+            response['priority'] = response.get('priority') or 10
+            responses.append(response)
+        return sorted(responses, key=lambda x: x['priority'], reverse=True)
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)

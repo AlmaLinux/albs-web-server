@@ -29,7 +29,7 @@ async def modify_platform(
         fields_to_update = (
             'type', 'distr_type', 'distr_version', 'arch_list',
             'data', 'modularity', 'is_reference', 'weak_arch_list',
-            'copy_priority_arches',
+            'copy_priority_arches', 'priority',
         )
         for field in fields_to_update:
             value = getattr(platform, field, None)
