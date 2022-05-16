@@ -8,6 +8,7 @@ import sys
 import typing
 import urllib.parse
 
+from asgiref.sync import sync_to_async
 import django
 # for using pulp models
 django.setup()
@@ -27,6 +28,17 @@ from alws.utils.file_utils import download_log
 from alws.utils.pulp_client import PulpClient
 
 
+# we cannot use sync django models/managers inside of async context
+@sync_to_async
+def delete_content(file_hrefs: list, artifact_hrefs: list):
+    Content.objects.filter(pulp_type="file.file",
+                           pk__in=file_hrefs).delete()
+    # we should iterate by every artifact for removing from filesystem
+    for artifact in Artifact.objects.filter(
+            pk__in=artifact_hrefs).iterator():
+        artifact.delete()
+
+
 def get_full_url(endpoint: str) -> str:
     return urllib.parse.urljoin(settings.pulp_host, endpoint)
 
@@ -43,7 +55,7 @@ async def find_old_log_repos(
     pulp_client: PulpClient,
 ) -> typing.Tuple[
     typing.Dict[int, typing.List[str]],
-    typing.Dict[str, typing.List[str]],
+    typing.List[str],
     typing.Dict[int, typing.List[str]],
 ]:
     def get_pulp_obj_id(href: str) -> str:
@@ -67,7 +79,6 @@ async def find_old_log_repos(
         latest_repo_data = await pulp_client.get_latest_repo_present_content(
             repo['latest_version_href'])
         file_repo_href = latest_repo_data.get('file.file', {}).get('href')
-        hrefs_to_delete.append(repo['pulp_href'])
         if file_repo_href is None:
             continue
         artifacts_to_add = []
@@ -81,16 +92,13 @@ async def find_old_log_repos(
                 new_href = await compress_old_log(pulp_client, full_url)
                 tasks.append(pulp_client.create_file(file_name, new_href))
                 files_to_delete.append(get_pulp_obj_id(artifact['pulp_href']))
-                artifacts_to_delete.append(get_pulp_obj_id(artifact['artifact']))
+                artifacts_to_delete.append(
+                    get_pulp_obj_id(artifact['artifact']))
                 continue
-            artifacts_to_add.append(artifact['/pulp_href'])
-        Content.objects.filter(pulp_type="file.file",
-                               pk__in={files_to_delete}).delete()
-        # we should iterate by every artifact for removing from filesystem
-        for artifact in Artifact.objects.filter(
-                pk__in={artifacts_to_delete}).iterator():
-            artifact.delete()
+            artifacts_to_add.append(artifact['pulp_href'])
+        delete_content(files_to_delete, artifacts_to_delete)
         artifacts_to_add.extend(await asyncio.gather(*tasks))
+        hrefs_to_delete.append(repo['pulp_href'])
         build_id = None
         build_task_id = None
         if build_repo is not None:
@@ -117,7 +125,8 @@ async def find_old_log_repos(
 
 async def delete_old_file_distros(pulp_client: PulpClient,
                                   old_hrefs: typing.List[str]) -> list:
-    url = get_full_url('pulp/api/v3/distributions/file/file/?fields=pulp_href')
+    url = get_full_url(
+        'pulp/api/v3/distributions/file/file/?fields=pulp_href,repository')
     delete_tasks = [
         pulp_client.delete_by_href(distr['pulp_href'], wait_for_result=True)
         async for distr in pulp_client.iter_repo(url)
@@ -228,18 +237,12 @@ async def main():
         pulp_client, hrefs_to_delete))
     logger.info('Total deleted file distros: %s', deleted_file_distros)
 
-    logger.info('Start deleting old file repos and logs')
-    delete_tasks = []
-    for key in (
-        'repos',
-        # 'logs',
-    ):
-        delete_tasks.extend((
-            pulp_client.delete_by_href(repo_href, wait_for_result=True)
-            for repo_href in hrefs_to_delete[key]
-        ))
-    await asyncio.gather(*delete_tasks)
-    logger.info('Deleting old file repos and logs is completed')
+    logger.info('Start deleting old file repos')
+    await asyncio.gather(*(
+        pulp_client.delete_by_href(repo_href, wait_for_result=True)
+        for repo_href in hrefs_to_delete
+    ))
+    logger.info('Deleting old file repos is completed')
 
 
 if __name__ == '__main__':
