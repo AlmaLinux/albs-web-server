@@ -111,6 +111,16 @@ class PulpClient:
             return None
         return response['results'][0]
 
+    async def get_rpm_repositories(
+        self,
+        params: dict,
+    ) -> typing.Union[typing.List[dict], None]:
+        endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results']
+
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/repositories/rpm/rpm/'
         params = {'name': name}
@@ -566,13 +576,11 @@ class PulpClient:
         await self.wait_for_task(fse_task['task'])
         return fse_repository_version
 
-    async def get_repo_latest_version(self, repo_href: str,
-                                      for_releases: bool = False):
+    async def get_repo_latest_version(
+        self,
+        repo_href: str,
+    ) -> typing.Union[str, None]:
         repository_data = await self.request('GET', repo_href)
-        if for_releases:
-            is_debug = bool(re.search(r'debug(info|source|)',
-                                      repository_data['name']))
-            return repository_data.get('latest_version_href'), is_debug
         return repository_data.get('latest_version_href')
 
     async def get_rpm_publications(

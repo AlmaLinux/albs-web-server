@@ -217,9 +217,9 @@ class BuildPlanner:
                     mock_modules=mock_options.get('module_enable', []))
                 # TODO: Rework to be able to set enabled modules from UI,
                 #  including ability to disable default modules from template
-                # mock_options['module_enable'] = [
-                #     f'{module.name}:{module.stream}'
-                # ]
+                mock_options['module_enable'] = [
+                    f'{module.name}:{module.stream}'
+                ]
                 mock_options['module_enable'] = [
                     f'{dep_name}:{dep_stream}'
                     for dep_name, dep_stream in module.iter_dependencies()

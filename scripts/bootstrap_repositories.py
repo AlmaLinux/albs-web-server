@@ -11,10 +11,14 @@ import yaml
 from syncer import sync
 
 from alws import database
-from alws.crud import repository as repo_crud
-from alws.crud import platform as pl_crud
+from alws.crud import (
+    platform as pl_crud,
+    platform_flavors as pf_crud,
+    repository as repo_crud,
+)
 from alws.schemas import (
     platform_schema,
+    platform_flavors_schema,
     remote_schema,
     repository_schema
 )
@@ -36,6 +40,9 @@ def parse_args():
     parser.add_argument(
         '-c', '--config', type=str, required=True,
         help='Path to config file with repositories description')
+    parser.add_argument(
+        '-F', '--flavours', action='store_true', default=False,
+        required=False, help='Adds platform flavour data')
     parser.add_argument(
         '-U', '--only_update', action='store_true', default=False,
         required=False, help='Updates platform data in DB',
@@ -132,6 +139,37 @@ async def add_repositories_to_platform(platform_data: dict,
                                         repositories_ids)
 
 
+async def update_flavour(flavour_data: dict):
+    data = platform_flavors_schema.UpdateFlavour(**flavour_data)
+    async with database.Session() as db:
+        await pf_crud.update_flavour(db, data)
+
+
+async def add_platform_flavour(pulp_client: PulpClient, flavour_data: dict):
+    distr_name, distr_ver, beta = flavour_data['name'].split('-')
+    for repo in flavour_data['repositories']:
+        repo_name = (
+            f'{distr_name.lower()}{distr_ver}-{beta}-{distr_name}-{distr_ver}-'
+            f'{repo["arch"]}{"-debug" if repo["debug"] else ""}-dr'
+        )
+        pulp_repo = await pulp_client.get_rpm_repository(repo_name)
+        if pulp_repo:
+            distro = await pulp_client.get_rpm_distro(repo_name)
+            if not distro:
+                distro = await pulp_client.create_rpm_distro(
+                    repo_name, pulp_repo['pulp_href'])
+            repo_url = distro['base_url']
+            repo_href = pulp_repo['pulp_href']
+        else:
+            repo_url, repo_href = await pulp_client.create_rpm_repository(
+                repo_name)
+        repo['url'] = repo_url
+        repo['pulp_href'] = repo_href
+    data = platform_flavors_schema.CreateFlavour(**flavour_data)
+    async with database.Session() as db:
+        await pf_crud.create_flavour(db, data)
+
+
 def main():
     pulp_host = os.environ['PULP_HOST']
     pulp_user = os.environ['PULP_USER']
@@ -150,7 +188,13 @@ def main():
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
     for platform_data in platforms_data:
+        if args.flavours:
+            sync(add_platform_flavour(pulp_client, platform_data))
+            continue
         if args.only_update:
+            if args.flavours:
+                sync(update_flavour(platform_data))
+                continue
             sync(update_platform(platform_data))
             platform_name = platform_data.get('name')
             logger.info(
