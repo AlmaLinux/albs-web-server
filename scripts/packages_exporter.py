@@ -166,6 +166,8 @@ class Exporter:
         file_links = await get_repodata_file_links(repodata_url)
         for link in file_links:
             file_name = os.path.basename(link)
+            if not link.endswith('/'):
+                link += '/'
             await download_file(link, os.path.join(repodata_path, file_name))
 
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
@@ -180,10 +182,22 @@ class Exporter:
             repository_version = exporter['repo_latest_version']
             await self.pulp_client.export_to_filesystem(
                 href, repository_version)
-            repodata_path = os.path.join(export_path, 'repodata')
+            parent_dir = str(Path(export_path).parent)
+            repodata_path = os.path.abspath(os.path.join(
+                parent_dir, 'repodata'))
             repodata_url = urllib.parse.urljoin(
-                exporter['repo_url'], 'repodata')
-            await self.download_repodata(repodata_path, repodata_url)
+                exporter['repo_url'], 'repodata/')
+            try:
+                local['sudo']['chown', '-R',
+                              f'{self.current_user}:{self.current_user}',
+                              f'{parent_dir}'].run()
+                if not os.path.exists(repodata_path):
+                    os.makedirs(repodata_path, exist_ok=True)
+                await self.download_repodata(repodata_path, repodata_url)
+            finally:
+                local['sudo']['chown', '-R',
+                              f'{self.pulp_system_user}:{self.pulp_system_user}',
+                              f'{parent_dir}'].run()
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
