@@ -1,3 +1,5 @@
+import re
+
 import aiohttp
 import argparse
 import asyncio
@@ -22,8 +24,13 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.config import settings
+from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
 from errata_migrator import update_updateinfo
+
+
+KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
+    '~/config/known_subkeys.json'))
 
 
 def parse_args():
@@ -81,6 +88,16 @@ class Exporter:
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
+        self.pulp_system_user = 'pulp'
+        self.current_user = os.getlogin()
+        self.export_error_file = os.path.abspath(
+            os.path.expanduser('~/export.err'))
+        if os.path.exists(self.export_error_file):
+            os.remove(self.export_error_file)
+        self.known_subkeys = {}
+        if os.path.exists(KNOWN_SUBKEYS_CONFIG):
+            with open(KNOWN_SUBKEYS_CONFIG, 'rt') as f:
+                self.known_subkeys = json.load(f)
 
     async def make_request(self, method: str, endpoint: str,
                            params: dict = None, data: dict = None):
@@ -119,6 +136,7 @@ class Exporter:
             )
             repo_exporter_dict = {
                 'repo_id': repo.id,
+                'repo_url': repo.url,
                 'repo_latest_version': repo_latest_version,
                 'exporter_name': exporter_name,
                 'export_path': export_path,
@@ -144,6 +162,14 @@ class Exporter:
         endpoint = 'sign-keys/'
         return await self.make_request('GET', endpoint)
 
+    async def download_repodata(self, repodata_path, repodata_url):
+        file_links = await get_repodata_file_links(repodata_url)
+        for link in file_links:
+            file_name = os.path.basename(link)
+            if not link.endswith('/'):
+                link += '/'
+            await download_file(link, os.path.join(repodata_path, file_name))
+
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
         exported_paths = []
@@ -156,6 +182,21 @@ class Exporter:
             repository_version = exporter['repo_latest_version']
             await self.pulp_client.export_to_filesystem(
                 href, repository_version)
+            parent_dir = str(Path(export_path).parent)
+            repodata_path = os.path.abspath(os.path.join(
+                parent_dir, 'repodata'))
+            repodata_url = urllib.parse.urljoin(
+                exporter['repo_url'], 'repodata/')
+            try:
+                local['sudo']['chown', '-R',
+                              f'{self.current_user}:{self.current_user}',
+                              f'{parent_dir}'].run()
+                os.makedirs(repodata_path, exist_ok=True)
+                await self.download_repodata(repodata_path, repodata_url)
+            finally:
+                local['sudo']['chown', '-R',
+                              f'{self.pulp_system_user}:{self.pulp_system_user}',
+                              f'{parent_dir}'].run()
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
@@ -306,6 +347,80 @@ class Exporter:
                 other_repos[repo.name] = (repo.pulp_href, repo.debug)
         await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
 
+    def check_rpms_signature(self, repository_path: str, sign_keys: list):
+        key_ids_lower = [i.keyid.lower() for i in sign_keys]
+        signature_regex = re.compile(
+            r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>(\()?\w+(\))?)',
+            re.IGNORECASE)
+        errored_packages = set()
+        no_signature_packages = set()
+        wrong_signature_packages = set()
+        for package in os.listdir(repository_path):
+            package_path = os.path.join(repository_path, package)
+            if not package_path.endswith('.rpm'):
+                self.logger.debug('Skipping non-RPM file or directory: %s',
+                                  package_path)
+                continue
+            args = ('rpm', '-qip', package_path)
+            exit_code, out, err = local['sudo'].run(args=args, retcode=None)
+            if exit_code != 0:
+                self.logger.error('Cannot get information about package %s, %s',
+                                  package_path, '\n'.join((out, err)))
+                errored_packages.add(package_path)
+                continue
+            signature_line = None
+            for line in out.split('\n'):
+                line = line.strip()
+                if line.startswith('Signature'):
+                    signature_line = line
+                    break
+            if not signature_line:
+                self.logger.error('No information about package %s signature',
+                                  package_path)
+                continue
+            signature_result = signature_regex.search(signature_line)
+            if not signature_result:
+                self.logger.error('Cannot detect information '
+                                  'about package %s signature', package_path)
+                errored_packages.add(package_path)
+                continue
+            pkg_key_id = signature_result.groupdict().get('key_id', '').lower()
+            if 'none' in pkg_key_id:
+                self.logger.error('Package %s is not signed', package_path)
+                no_signature_packages.add(package_path)
+            elif pkg_key_id not in key_ids_lower:
+                # Check if package is signed with known sub-key
+                signed_with_subkey = False
+                for key, subkeys in self.known_subkeys.items():
+                    if pkg_key_id in subkeys:
+                        signed_with_subkey = True
+                        break
+                if not signed_with_subkey:
+                    self.logger.error('Package %s is signed with wrong key, '
+                                      'expected "%s", got "%s"',
+                                      package_path, str(key_ids_lower),
+                                      pkg_key_id)
+                    wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
+
+        if errored_packages or no_signature_packages or wrong_signature_packages:
+            if not os.path.exists(self.export_error_file):
+                mode = 'wt'
+            else:
+                mode = 'at'
+            lines = [f'Errors when checking packages in {repository_path}']
+            if errored_packages:
+                lines.append('Packages that we cannot get information about:')
+                lines.extend(list(errored_packages))
+            if no_signature_packages:
+                lines.append('Packages without signature:')
+                lines.extend(list(no_signature_packages))
+            if wrong_signature_packages:
+                lines.append('Packages with wrong signature:')
+                lines.extend(list(wrong_signature_packages))
+            lines.append('\n')
+            with open(self.export_error_file, mode=mode) as f:
+                f.write('\n'.join(lines))
+
     async def export_repos_from_pulp(
         self,
         platform_names: typing.List[str] = None,
@@ -330,15 +445,19 @@ class Exporter:
                 models.Platform.is_reference.is_(False),
             )
         query = select(models.Platform).where(
-            where_conditions).options(selectinload(models.Platform.repos))
+            where_conditions).options(
+            selectinload(models.Platform.repos),
+            selectinload(models.Platform.sign_keys)
+        )
         async with database.Session() as db:
             db_platforms = await db.execute(query)
         db_platforms = db_platforms.scalars().all()
 
-        repo_ids_to_export = []
         repos_x86_64 = {}
         repos_ppc64le = {}
+        final_export_paths = []
         for db_platform in db_platforms:
+            repo_ids_to_export = []
             platforms_dict[db_platform.id] = []
             for repo in db_platform.repos:
                 if (repo_ids is not None and repo.id not in repo_ids) or (
@@ -356,12 +475,31 @@ class Exporter:
                 else:
                     platforms_dict[db_platform.id].append(repo.export_path)
                     repo_ids_to_export.append(repo.id)
+            exported_paths = await self.export_repositories(
+                list(set(repo_ids_to_export)))
+            final_export_paths.extend(exported_paths)
+            for repo_path in exported_paths:
+                if not os.path.exists(repo_path):
+                    self.logger.error('Path %s does not exist', repo_path)
+                    continue
+                try:
+                    local['sudo']['chown', '-R',
+                                  f'{self.current_user}:{self.current_user}',
+                                  f'{repo_path}'].run()
+                    # removing files with partial modulemd data
+                    local['find'][repo_path, '-type', 'f', '-name', '*snippet',
+                                  '-exec', 'rm', '-f', '{}', '+'].run()
+                    self.check_rpms_signature(repo_path, db_platform.sign_keys)
+                finally:
+                    local['sudo'][
+                        'chown', '-R',
+                        f'{self.pulp_system_user}:{self.pulp_system_user}',
+                        f'{repo_path}'
+                    ].run()
+            self.logger.info('All repositories exported in following paths:\n%s',
+                             '\n'.join((str(path) for path in exported_paths)))
         await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
-        exported_paths = await self.export_repositories(
-            list(set(repo_ids_to_export)))
-        self.logger.info('All repositories exported in following paths:\n%s',
-                         '\n'.join((str(path) for path in exported_paths)))
-        return exported_paths, platforms_dict
+        return final_export_paths, platforms_dict
 
     async def export_repos_from_release(
         self,
@@ -369,7 +507,6 @@ class Exporter:
     ) -> typing.Tuple[typing.List[str], int]:
         self.logger.info('Start exporting packages from release id=%s',
                          release_id)
-        repo_ids = []
         async with database.Session() as db:
             db_release = await db.execute(
                 select(models.Release).where(models.Release.id == release_id))
@@ -482,19 +619,29 @@ def main():
         path = Path(exp_path)
         repo_path = path.parent
         repodata = repo_path / 'repodata'
-        exporter.regenerate_repo_metadata(repo_path)
-        key_id = key_id_by_platform or None
-        for platform_id, platform_repos in platforms_dict.items():
-            for repo_export_path in platform_repos:
-                if repo_export_path in string_exp_path:
-                    key_id = next((
-                        sign_key['keyid'] for sign_key in db_sign_keys
-                        if sign_key['platform_id'] == platform_id
-                    ), None)
-                    break
-        if 'ppc64le' in exp_path:
-            exporter.update_ppc64le_errata(repodata)
-        sync(exporter.repomd_signer(repodata, key_id))
+        if not os.path.exists(repo_path):
+            continue
+        try:
+            local['sudo']['chown', '-R',
+                          f'{exporter.current_user}:{exporter.current_user}',
+                          f'{repo_path}'].run()
+            exporter.regenerate_repo_metadata(repo_path)
+            key_id = key_id_by_platform or None
+            for platform_id, platform_repos in platforms_dict.items():
+                for repo_export_path in platform_repos:
+                    if repo_export_path in string_exp_path:
+                        key_id = next((
+                            sign_key['keyid'] for sign_key in db_sign_keys
+                            if sign_key['platform_id'] == platform_id
+                        ), None)
+                        break
+            if 'ppc64le' in exp_path:
+                exporter.update_ppc64le_errata(repodata)
+            sync(exporter.repomd_signer(repodata, key_id))
+        finally:
+            local['sudo']['chown', '-R',
+                          f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                          f'{repo_path}'].run()
 
 
 if __name__ == '__main__':
