@@ -77,18 +77,18 @@ class MetadataUploader:
         # we can't associate same packages in modules twice in one repo version
         # need to remove them before creating new modulemd
         await self.pulp.modify_repository(repo_href, remove=modules_to_remove)
-        await self.pulp.create_rpm_publication(repo_href)
         # if we fall during next modifying repository, we can delete this
         # repo version and rollback all changes that makes upload
         new_version_href = await self.pulp.get_repo_latest_version(repo_href)
         try:
             await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
-            await self.pulp.create_rpm_publication(repo_href)
         except Exception:
             await self.pulp.delete_by_href(new_version_href,
                                            wait_for_result=True)
             logging.exception('Cannot restore packages in repo:')
             raise
+        finally:
+            await self.pulp.create_rpm_publication(repo_href)
 
     async def process_uploaded_files(
         self,
