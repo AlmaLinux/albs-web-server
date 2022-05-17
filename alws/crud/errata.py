@@ -166,17 +166,28 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
+    description = re.sub(
+        r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
+        'AlmaLinux',
+        errata.description
+    )
+    # ALSO old id from title, also RHEL from everything
+    title = re.sub(
+        r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
+        'AlmaLinux',
+        errata.title
+    )
     db_errata = models.ErrataRecord(
-        id=errata.id,
+        id=re.sub(r'^RH', 'AL', errata.id),
         platform_id=errata.platform_id,
         summary=None,
         solution=None,
         issued_date=errata.issued_date,
         updated_date=errata.updated_date,
         description=None,
-        original_description=errata.description,
+        original_description=description,
         title=None,
-        original_title=errata.title,
+        original_title=title,
         contact_mail=platform.contact_mail,
         status=errata.status,
         version=errata.version,
