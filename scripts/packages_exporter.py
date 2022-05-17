@@ -24,6 +24,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.config import settings
+from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
 from errata_migrator import update_updateinfo
 
@@ -135,6 +136,7 @@ class Exporter:
             )
             repo_exporter_dict = {
                 'repo_id': repo.id,
+                'repo_url': repo.url,
                 'repo_latest_version': repo_latest_version,
                 'exporter_name': exporter_name,
                 'export_path': export_path,
@@ -160,6 +162,12 @@ class Exporter:
         endpoint = 'sign-keys/'
         return await self.make_request('GET', endpoint)
 
+    async def download_repodata(self, repodata_path, repodata_url):
+        file_links = await get_repodata_file_links(repodata_url)
+        for link in file_links:
+            file_name = os.path.basename(link)
+            await download_file(link, os.path.join(repodata_path, file_name))
+
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
         exported_paths = []
@@ -172,6 +180,10 @@ class Exporter:
             repository_version = exporter['repo_latest_version']
             await self.pulp_client.export_to_filesystem(
                 href, repository_version)
+            repodata_path = os.path.join(export_path, 'repodata')
+            repodata_url = urllib.parse.urljoin(
+                exporter['repo_url'], 'repodata')
+            await self.download_repodata(repodata_path, repodata_url)
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
