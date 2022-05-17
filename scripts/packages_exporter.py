@@ -191,8 +191,7 @@ class Exporter:
                 local['sudo']['chown', '-R',
                               f'{self.current_user}:{self.current_user}',
                               f'{parent_dir}'].run()
-                if not os.path.exists(repodata_path):
-                    os.makedirs(repodata_path, exist_ok=True)
+                os.makedirs(repodata_path, exist_ok=True)
                 await self.download_repodata(repodata_path, repodata_url)
             finally:
                 local['sudo']['chown', '-R',
