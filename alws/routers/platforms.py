@@ -32,9 +32,8 @@ async def modify_platform(
 
 
 @router.get('/', response_model=typing.List[platform_schema.Platform])
-async def get_platforms(db: database.Session = Depends(get_db),
-                        is_reference: bool = False):
-    return await pl_crud.get_platforms(db, is_reference)
+async def get_platforms(db: database.Session = Depends(get_db)):
+    return await pl_crud.get_platforms(db)
 
 
 @router.patch('/{platform_id}/add-repositories',
