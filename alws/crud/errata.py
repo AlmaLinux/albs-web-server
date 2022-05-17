@@ -92,7 +92,7 @@ async def load_platform_packages(platform):
 async def update_errata_record(
     db, update_record: errata_schema.UpdateErrataRequest
 ) -> models.ErrataRecord:
-    record = await get_errata_record(update_record.errata_record_id)
+    record = await get_errata_record(db, update_record.errata_record_id)
     if update_record.title is not None:
         if update_record.title == record.original_title:
             record.title = None
@@ -166,17 +166,16 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
-    description = re.sub(
-        r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
-        'AlmaLinux',
-        errata.description
-    )
-    # ALSO old id from title, also RHEL from everything
-    title = re.sub(
-        r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
-        'AlmaLinux',
-        errata.title
-    )
+    for key in ('description', 'title'):
+        value = getattr(errata, key)
+        value = re.sub(
+            r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
+            'AlmaLinux',
+            value
+        )
+        value = re.sub(r'^RH', 'AL', value)
+        value = re.sub(r'RHEL', 'AlmaLinux', value)
+        setattr(errata, key, value)
     db_errata = models.ErrataRecord(
         id=re.sub(r'^RH', 'AL', errata.id),
         platform_id=errata.platform_id,
@@ -185,9 +184,9 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         issued_date=errata.issued_date,
         updated_date=errata.updated_date,
         description=None,
-        original_description=description,
+        original_description=errata.description,
         title=None,
-        original_title=title,
+        original_title=errata.title,
         contact_mail=platform.contact_mail,
         status=errata.status,
         version=errata.version,
