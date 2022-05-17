@@ -1,10 +1,11 @@
 import io
+import logging
 import re
 import typing
 import urllib.parse
 
 from alws.config import settings
-from alws.utils.ids import get_random_unique_version 
+from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 
@@ -36,9 +37,10 @@ class MetadataUploader:
             'replace': 'true',
         }
         await self.pulp.upload_comps(data)
+        await self.pulp.create_rpm_publication(repo_href)
 
     async def upload_modules(self, repo_href: str,
-                             module_content: str) -> typing.List[str]:
+                             module_content: str) -> None:
         latest_repo_href = await self.pulp.get_repo_latest_version(repo_href)
         latest_repo_data = await self.pulp.get_latest_repo_present_content(
             latest_repo_href)
@@ -76,7 +78,17 @@ class MetadataUploader:
         # need to remove them before creating new modulemd
         await self.pulp.modify_repository(repo_href, remove=modules_to_remove)
         await self.pulp.create_rpm_publication(repo_href)
-        return hrefs_to_add
+        # if we fall during next modifying repository, we can delete this
+        # repo version and rollback all changes that makes upload
+        new_version_href = await self.pulp.get_repo_latest_version(repo_href)
+        try:
+            await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
+            await self.pulp.create_rpm_publication(repo_href)
+        except Exception:
+            await self.pulp.delete_by_href(new_version_href,
+                                           wait_for_result=True)
+            logging.exception('Cannot restore packages in repo:')
+            raise
 
     async def process_uploaded_files(
         self,
@@ -87,20 +99,13 @@ class MetadataUploader:
         repo = await self.pulp.get_rpm_repository_by_params({
             'name__contains': repo_name})
         repo_href = repo['pulp_href']
-        content_to_add = []
-        content_to_remove = []
         updated_metadata = []
         if module_content is not None:
             module_content = await module_content.read()
-            module_to_add = await self.upload_modules(
-                repo_href, module_content.decode())
-            content_to_add.extend(module_to_add)
+            await self.upload_modules(repo_href, module_content.decode())
             updated_metadata.append('modules.yaml')
         if comps_content is not None:
             comps_content = await comps_content.read()
             await self.upload_comps(repo_href, comps_content.decode())
             updated_metadata.append('comps.xml')
-        await self.pulp.modify_repository(repo_href, add=content_to_add,
-                                          remove=content_to_remove)
-        await self.pulp.create_rpm_publication(repo_href)
         return updated_metadata
