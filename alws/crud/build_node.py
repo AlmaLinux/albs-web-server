@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, LOG_REPO_ARCH
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
@@ -117,7 +117,7 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
     log_repo = models.Repository(
         name=repo_name,
         url=repo_url,
-        arch=task.arch,
+        arch=LOG_REPO_ARCH,
         pulp_href=pulp_href,
         type='build_log',
         debug=False
@@ -147,9 +147,7 @@ async def ping_tasks(
 
 async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
     build_tasks = await db.execute(
-        select(models.BuildTask).where(models.BuildTask.id == task_id).options(
-            selectinload(models.BuildTask.platform)
-        )
+        select(models.BuildTask).where(models.BuildTask.id == task_id)
     )
     return build_tasks.scalars().first()
 
@@ -264,27 +262,25 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
     return rpms
 
 
-async def __process_logs(pulp_client: PulpClient, task_id: int,
-                         task_artifacts: list, repositories: list):
-    if not repositories:
+async def __process_logs(
+    pulp_client: PulpClient,
+    task_id: int,
+    task_artifacts: list,
+    repository: typing.Optional[models.Repository]
+):
+    if repository is None:
         logging.error('Log repository is absent, skipping logs processing')
         return
     logs = []
-    str_task_id = str(task_id)
-    repo = [repo for repo in repositories
-            if repo.name.endswith(str_task_id)]
-    if not repo:
-        logging.error('Log repository is absent, skipping logs processing')
-        return
-    repo = repo[0]
+    repo_name = repository.name
     files = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
         results = await asyncio.gather(*files)
     except Exception as e:
-        logging.exception('Cannot create log files for %s', str(repo))
+        logging.exception('Cannot create log files for %s', repo_name)
         raise ArtifactConversionError(
-            f'Cannot create log files for {str(repo)}, error: {str(e)}')
+            f'Cannot create log files for {repo_name}, error: {str(e)}')
 
     hrefs = []
     for href, artifact in results:
@@ -298,12 +294,12 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
         )
         hrefs.append(href)
     try:
-        await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
+        await pulp_client.modify_repository(repository.pulp_href, add=hrefs)
     except Exception as e:
         logging.exception('Cannot add log files to the repository: %s',
-                          str(e))
+                          repo_name)
         raise RepositoryAddError(
-            'Cannot save build log into Pulp repository: %s', str(e))
+            f'Cannot save build log into Pulp repository: {repo_name}')
     return logs
 
 
@@ -348,12 +344,11 @@ async def __process_build_task_artifacts(
                      if item.type == 'build_log']
     rpm_repositories = [repo for repo in repositories
                         if repo.type == 'rpm']
-    log_repositories = [repo for repo in repositories
-                        if repo.type == 'build_log']
+    log_repository = build_task.get_log_repository()
     # Committing logs separately for UI to be able to fetch them
     logging.info('Processing logs')
     logs_entries = await __process_logs(
-        pulp_client, build_task.id, log_artifacts, log_repositories)
+        pulp_client, build_task.id, log_artifacts, log_repository)
     if logs_entries:
         db.add_all(logs_entries)
         await db.flush()

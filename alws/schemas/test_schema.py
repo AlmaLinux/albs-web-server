@@ -13,6 +13,7 @@ class TestTaskResult(BaseModel):
 
 class TestTask(BaseModel):
     id: int
+    build_id: typing.Optional[int]
     package_name: str
     package_version: str
     package_release: typing.Optional[str]
