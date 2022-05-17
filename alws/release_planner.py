@@ -210,9 +210,7 @@ class ReleasePlanner:
             }
             self.latest_repo_versions = []
             for repo in self.base_platform.repos:
-                pulp_repo_info = pulp_repos.get(repo.pulp_href)
-                if pulp_repo_info is None:
-                    continue
+                pulp_repo_info = pulp_repos[repo.pulp_href]
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
                 is_debug = bool(re.search(r'debug(info|source|)',
                                           pulp_repo_info['name']))
@@ -572,9 +570,6 @@ class ReleasePlanner:
             # for correct package location in UI
             for item in release_repositories:
                 release_repo = repos_mapping.get(item)
-                if release_repo is None:
-                    print(item)
-                    continue
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 repo_arch_location = [release_repo['arch']]
                 # we should add i686 arch for correct multilib showing in UI
