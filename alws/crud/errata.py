@@ -305,7 +305,7 @@ async def list_errata_records(
     if page:
         query = query.slice(10 * page - 10, 10 * page)
     return {
-        "total_records": (await db.execute(func.count(query))).scalar(),
+        "total_records": (await db.execute(func.count(models.ErrataRecord.id))).scalar(),
         "records": (await db.execute(query)).scalars().all(),
         "current_page": page,
     }
