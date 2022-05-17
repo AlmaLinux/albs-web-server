@@ -1,5 +1,7 @@
 ---
 - name: AlmaLinux-8
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
   distr_type: rhel
   distr_version: '8'
   test_dist_name: almalinux
@@ -66,76 +68,76 @@
       best: false
       module_platform_id: platform:el8
   repositories:
-    - arch: i686
-      name: almalinux-8-baseos
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/BaseOS/i686/os/
-      export_path: vault/8/BaseOS/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-appstream
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/AppStream/i686/os/
-      export_path: vault/8/AppStream/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-powertools
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/PowerTools/i686/os/
-      export_path: vault/8/PowerTools/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-highavailability
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/i686/os/
-      export_path: vault/8/HighAvailability/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-resilientstorage
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/i686/os/
-      export_path: vault/8/ResilientStorage/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-devel
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/devel/i686/os/
-      export_path: vault/8/devel/i686/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: i686
-      name: almalinux-8-extras
-      type: rpm
-      remote_url: https://repo.almalinux.org/vault/8/extras/i686/os/
-      export_path: vault/8/extras/i686/os/
-      production: true
-      debug: false
-      repository_sync_policy: additive
-      remote_sync_policy: on_demand
-      priority: 10
+    #- arch: i686
+    #  name: almalinux-8-baseos
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/BaseOS/i686/os/
+    #  export_path: vault/8/BaseOS/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-appstream
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/AppStream/i686/os/
+    #  export_path: vault/8/AppStream/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-powertools
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/PowerTools/i686/os/
+    #  export_path: vault/8/PowerTools/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-highavailability
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/HighAvailability/i686/os/
+    #  export_path: vault/8/HighAvailability/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-resilientstorage
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/i686/os/
+    #  export_path: vault/8/ResilientStorage/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-devel
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/devel/i686/os/
+    #  export_path: vault/8/devel/i686/os/
+    #  production: true
+    #  debug: false
+    #  remote_sync_policy: on_demand
+    #  repository_sync_policy: additive
+    #  priority: 10
+    #- arch: i686
+    #  name: almalinux-8-extras
+    #  type: rpm
+    #  remote_url: https://repo.almalinux.org/vault/8/extras/i686/os/
+    #  export_path: vault/8/extras/i686/os/
+    #  production: true
+    #  debug: false
+    #  repository_sync_policy: additive
+    #  remote_sync_policy: on_demand
+    #  priority: 10
     - arch: x86_64
       name: almalinux-8-baseos
       type: rpm
@@ -363,8 +365,8 @@
     - name: almalinux-8-baseos
       arch: src
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/Source/
-      export_path: almalinux/8/BaseOS/Source/
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/Source/
+      export_path: vault/8/BaseOS/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -373,8 +375,8 @@
     - name: almalinux-8-appstream
       arch: src
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/Source/
-      export_path: almalinux/8/AppStream/Source/
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/Source/
+      export_path: vault/8/AppStream/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -383,8 +385,8 @@
     - name: almalinux-8-powertools
       arch: src
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/Source/
-      export_path: almalinux/8/PowerTools/Source/
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/Source/
+      export_path: vault/8/PowerTools/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -393,18 +395,8 @@
     - arch: src
       name: almalinux-8-highavailability
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/Source/
-      export_path: almalinux/8/HighAvailability/Source/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: src
-      name: almalinux-8-highavailability
-      type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/Source/
-      export_path: almalinux/8/HighAvailability/Source/
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/Source/
+      export_path: vault/8/highavailability/source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -413,8 +405,8 @@
     - arch: src
       name: almalinux-8-resilientstorage
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/Source/
-      export_path: almalinux/8/ResilientStorage/Source/
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/Source/
+      export_path: vault/8/ResilientStorage/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -423,8 +415,8 @@
     - arch: src
       name: almalinux-8-devel
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/devel/Source/
-      export_path: almalinux/8/devel/Source/
+      remote_url: https://repo.almalinux.org/vault/8/devel/Source/
+      export_path: vault/8/devel/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -433,8 +425,8 @@
     - arch: src
       name: almalinux-8-extras
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/extras/Source/
-      export_path: almalinux/8/extras/Source/
+      remote_url: https://repo.almalinux.org/vault/8/extras/Source/
+      export_path: vault/8/extras/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -443,8 +435,8 @@
     - name: almalinux-8-baseos-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/x86_64/
-      export_path: almalinux/8/BaseOS/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/debug/x86_64/
+      export_path: vault/8/BaseOS/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -453,8 +445,8 @@
     - name: almalinux-8-appstream-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/x86_64/
-      export_path: almalinux/8/AppStream/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/debug/x86_64/
+      export_path: vault/8/AppStream/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -463,8 +455,8 @@
     - name: almalinux-8-powertools-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/x86_64/
-      export_path: almalinux/8/PowerTools/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/debug/x86_64/
+      export_path: vault/8/PowerTools/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -473,8 +465,8 @@
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/x86_64/
-      export_path: almalinux/8/HighAvailability/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/debug/x86_64/
+      export_path: vault/8/HighAvailability/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -483,8 +475,8 @@
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/x86_64/
-      export_path: almalinux/8/ResilientStorage/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/debug/x86_64/
+      export_path: vault/8/ResilientStorage/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -493,8 +485,8 @@
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/x86_64/
-      export_path: almalinux/8/devel/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/devel/debug/x86_64/
+      export_path: vault/8/devel/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -503,8 +495,8 @@
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/x86_64/
-      export_path: almalinux/8/HighAvailability/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/debug/x86_64/
+      export_path: vault/8/HighAvailability/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -513,8 +505,8 @@
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/x86_64/
-      export_path: almalinux/8/ResilientStorage/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/debug/x86_64/
+      export_path: vault/8/ResilientStorage/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -523,8 +515,8 @@
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/x86_64/
-      export_path: almalinux/8/devel/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/devel/debug/x86_64/
+      export_path: vault/8/devel/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -533,8 +525,8 @@
     - arch: x86_64
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/x86_64/
-      export_path: almalinux/8/extras/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/extras/debug/x86_64/
+      export_path: vault/8/extras/debug/x86_64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -543,8 +535,8 @@
     - name: almalinux-8-baseos-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/aarch64/
-      export_path: almalinux/8/BaseOS/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/debug/aarch64/
+      export_path: vault/8/BaseOS/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -553,8 +545,8 @@
     - name: almalinux-8-appstream-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/aarch64/
-      export_path: almalinux/8/AppStream/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/debug/aarch64/
+      export_path: vault/8/AppStream/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -563,8 +555,8 @@
     - name: almalinux-8-powertools-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/aarch64/
-      export_path: almalinux/8/PowerTools/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/debug/aarch64/
+      export_path: vault/8/PowerTools/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -573,8 +565,8 @@
     - arch: aarch64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/aarch64/
-      export_path: almalinux/8/HighAvailability/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/debug/aarch64/
+      export_path: vault/8/HighAvailability/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -583,8 +575,8 @@
     - arch: aarch64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/aarch64/
-      export_path: almalinux/8/ResilientStorage/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/debug/aarch64/
+      export_path: vault/8/ResilientStorage/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -593,8 +585,8 @@
     - arch: aarch64
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/devel/debug/aarch64/
-      export_path: almalinux/8/devel/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/devel/debug/aarch64/
+      export_path: vault/8/devel/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -603,8 +595,8 @@
     - arch: aarch64
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/aarch64/
-      export_path: almalinux/8/extras/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/extras/debug/aarch64/
+      export_path: vault/8/extras/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -613,8 +605,8 @@
     - name: almalinux-8-baseos-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/BaseOS/debug/ppc64le/
-      export_path: almalinux/8/BaseOS/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/debug/ppc64le/
+      export_path: vault/8/BaseOS/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -623,8 +615,8 @@
     - name: almalinux-8-appstream-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/AppStream/debug/ppc64le/
-      export_path: almalinux/8/AppStream/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/debug/ppc64le/
+      export_path: vault/8/AppStream/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -633,8 +625,8 @@
     - name: almalinux-8-powertools-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/PowerTools/debug/ppc64le/
-      export_path: almalinux/8/PowerTools/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/debug/ppc64le/
+      export_path: vault/8/PowerTools/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -643,8 +635,8 @@
     - arch: ppc64le
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/HighAvailability/debug/ppc64le/
-      export_path: almalinux/8/HighAvailability/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/debug/ppc64le/
+      export_path: vault/8/HighAvailability/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -653,8 +645,8 @@
     - arch: ppc64le
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/ResilientStorage/debug/ppc64le/
-      export_path: almalinux/8/ResilientStorage/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/debug/ppc64le/
+      export_path: vault/8/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -663,8 +655,8 @@
     - arch: ppc64le
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: https://repo.almalinux.org/almalinux/8/extras/debug/ppc64le/
-      export_path: almalinux/8/extras/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/extras/debug/ppc64le/
+      export_path: vault/8/extras/debug/ppc64le/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -672,6 +664,8 @@
       priority: 10
 
 - name: AlmaLinux-9
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
   distr_type: rhel
   distr_version: '9'
   test_dist_name: almalinux

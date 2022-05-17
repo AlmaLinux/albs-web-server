@@ -141,6 +141,8 @@ class Platform(Base):
     __tablename__ = 'platforms'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    copyright = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     distr_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -743,13 +745,14 @@ class ErrataPackage(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    albs_packages = relationship('ErrataToALBSPackage')
+    albs_packages = relationship('ErrataToALBSPackage', back_populates='errata_package')
 
 
 class ErrataPackageStatus(enum.Enum):
     proposal = 'proposal'
     skipped = 'skipped'
     released = 'released'
+    approved = 'approved'
 
 
 class ErrataToALBSPackage(Base):
@@ -769,14 +772,20 @@ class ErrataToALBSPackage(Base):
         sqlalchemy.ForeignKey('errata_packages.id'),
         nullable=False
     )
-
+    errata_package = relationship('ErrataPackage', back_populates='albs_packages')
     albs_artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_artifacts.id'),
         nullable=True
     )
+    build_artifact = relationship('BuildTaskArtifact')
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
+
+    @property
+    def build_id(self):
+        if self.build_artifact:
+            return self.build_artifact.build_task.build_id
 
 
 async def create_tables():

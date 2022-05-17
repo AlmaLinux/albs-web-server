@@ -29,7 +29,7 @@ async def modify_platform(
         fields_to_update = (
             'type', 'distr_type', 'distr_version', 'arch_list',
             'data', 'modularity', 'is_reference', 'weak_arch_list',
-            'copy_priority_arches',
+            'copy_priority_arches', 'copyright', 'contact_mail'
         )
         for field in fields_to_update:
             value = getattr(platform, field, None)
@@ -84,6 +84,8 @@ async def create_platform(
         ) -> models.Platform:
     db_platform = models.Platform(
         name=platform.name,
+        contact_mail=platform.contact_mail,
+        copyright=platform.copyright,
         type=platform.type,
         distr_type=platform.distr_type,
         distr_version=platform.distr_version,

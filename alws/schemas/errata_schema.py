@@ -101,3 +101,21 @@ class CompactErrataRecord(BaseModel):
 
 class CreateErrataResponse(BaseModel):
     ok: bool
+
+
+class ChangeErrataPackageStatusResponse(BaseModel):
+    ok: bool
+    error: Optional[str]
+
+
+class ChangeErrataPackageStatusRequest(BaseModel):
+    errata_record_id: str
+    errata_package_id: int
+    mapping_id: int
+    status: str # TODO: change to enum
+
+
+class UpdateErrataRequest(BaseModel):
+    errata_record_id: str
+    title: Optional[str]
+    description: Optional[str]
