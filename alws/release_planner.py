@@ -175,8 +175,11 @@ class ReleasePlanner:
                 data = (pkg['pulp_href'], repo_id, repo_arch)
                 self.packages_presence_info[full_name].append(data)
 
-    async def prepare_data_for_executing_async_tasks(self,
-                                                     package: dict) -> None:
+    async def prepare_data_for_executing_async_tasks(
+        self,
+        package: dict,
+        is_debug: bool,
+    ) -> None:
         # create collections for checking packages in repos
         if self.pkgs_nevra is None:
             self.pkgs_nevra = {arch: defaultdict(set)
@@ -225,9 +228,7 @@ class ReleasePlanner:
             package['arch']
         )
         self.pkgs_mapping[nevra] = package['full_name']
-        pkg_dict = self.pkgs_nevra
-        if is_debuginfo_rpm(nevra.name):
-            pkg_dict = self.debug_pkgs_nevra
+        pkg_dict = self.debug_pkgs_nevra if is_debug else self.pkgs_nevra
         pkg_dict[nevra.arch]['name'].add(nevra.name)
         pkg_dict[nevra.arch]['epoch'].add(nevra.epoch)
         pkg_dict[nevra.arch]['version'].add(nevra.version)
@@ -310,7 +311,9 @@ class ReleasePlanner:
             pkg.pop('is_beta')
             if full_name in added_packages:
                 continue
-            await self.prepare_data_for_executing_async_tasks(pkg)
+            is_debug = is_debuginfo_rpm(pkg['name'])
+            await self.prepare_data_for_executing_async_tasks(pkg, is_debug)
+            # TODO: need to add devel debuginfo ppc64le repo
             release_repo = repos_mapping[RepoType(
                 '-'.join((
                     self.clean_base_dist_name_lower,
@@ -318,12 +321,15 @@ class ReleasePlanner:
                     'devel'
                 )),
                 pkg['task_arch'],
-                False
+                is_debug,
             )]
+            repo_arch_location = [pkg['arch']]
+            if pkg['arch'] == 'noarch':
+                repo_arch_location = self.base_platform.arch_list
             packages.append({
                 'package': pkg,
                 'repositories': [release_repo],
-                'repo_arch_location': [pkg['arch']],
+                'repo_arch_location': repo_arch_location,
             })
             added_packages.add(full_name)
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
@@ -345,6 +351,7 @@ class ReleasePlanner:
         pkg_task_arch: str,
         is_beta: bool,
         is_devel: bool,
+        is_debug: bool,
         beholder_cache: dict,
     ) -> typing.Set[RepoType]:
         release_repositories = set()
@@ -379,7 +386,7 @@ class ReleasePlanner:
                     'devel'
                 )),
                 pkg_task_arch,
-                False
+                is_debug,
             )
             release_repositories.add(release_repo)
         for repo in predicted_package.get('repositories', []):
@@ -542,9 +549,11 @@ class ReleasePlanner:
             pkg_arch = package['arch']
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
+            is_debug = is_debuginfo_rpm(pkg_name)
             if full_name in added_packages:
                 continue
-            await self.prepare_data_for_executing_async_tasks(package)
+            await self.prepare_data_for_executing_async_tasks(
+                package, is_debug)
             release_repositories = set()
             for is_devel in (False, True):
                 repositories = self.find_release_repos(
@@ -552,15 +561,19 @@ class ReleasePlanner:
                     pkg_version=pkg_version,
                     pkg_arch=pkg_arch,
                     pkg_task_arch=package['task_arch'],
+                    is_debug=is_debug,
                     is_beta=is_beta,
                     is_devel=is_devel,
                     beholder_cache=beholder_cache,
                 )
                 release_repositories.update(repositories)
+            pulp_repo_arch_location = [pkg_arch]
+            if pkg_arch == 'noarch':
+                pulp_repo_arch_location = self.base_platform.arch_list
             pkg_info = {
                 'package': package,
                 'repositories': [],
-                'repo_arch_location': [pkg_arch],
+                'repo_arch_location': pulp_repo_arch_location,
             }
             if not release_repositories:
                 packages.append(pkg_info)
@@ -575,6 +588,8 @@ class ReleasePlanner:
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == 'i686' and 'x86_64' in repo_arch_location:
                     repo_arch_location.append('i686')
+                if pkg_arch == 'noarch':
+                    repo_arch_location = pulp_repo_arch_location
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
                     'repositories': [release_repo],
@@ -616,8 +631,10 @@ class ReleasePlanner:
         # check packages presence in prod repos
         self.base_platform = release.platform
         for pkg_dict in release_plan['packages']:
+            package = pkg_dict['package']
+            is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
-                pkg_dict['package'])
+                package, is_debug)
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
             release_plan['packages'])
         release_plan['packages_from_repos'] = pkgs_from_repos
@@ -764,8 +781,10 @@ class ReleasePlanner:
                 # check packages presence in prod repos
                 self.base_platform = release.platform
                 for pkg_dict in payload.plan['packages']:
+                    package = pkg_dict['package']
+                    is_debug = is_debuginfo_rpm(package['name'])
                     await self.prepare_data_for_executing_async_tasks(
-                        pkg_dict['package'])
+                        package, is_debug)
                 pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
                     payload.plan['packages'])
                 payload.plan['packages_from_repos'] = pkgs_from_repos
