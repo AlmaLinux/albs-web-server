@@ -199,7 +199,7 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         # await pulp_client.remove_artifact(artifact)
         for repo in repos:
             try:
-                await pulp_client.remove_artifact(repo, need_wait_sync=True)
+                await pulp_client.delete_by_href(repo, wait_for_result=True)
             except Exception as err:
                 logging.exception("Cannot delete repo from pulp: %s", err)
         await db.execute(

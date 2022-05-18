@@ -452,12 +452,12 @@ class PulpClient:
             exclude_fields=exclude_fields
         )
 
-    async def remove_artifact(self, artifact_href: str,
-                              need_wait_sync: bool = False):
-        await self.request('DELETE', artifact_href)
-        if need_wait_sync:
-            remove_task = await self.get_distro(artifact_href)
-            return remove_task
+    async def delete_by_href(self, href: str, wait_for_result: bool = False):
+        task = await self.request('DELETE', href)
+        if wait_for_result:
+            result = await self.wait_for_task(task['task'])
+            return result
+        return task
 
     async def create_rpm_remote(self, remote_name: str, remote_url: str,
                                 remote_policy: str = 'on_demand') -> str:
