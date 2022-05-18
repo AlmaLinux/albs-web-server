@@ -313,12 +313,11 @@ class ReleasePlanner:
                 continue
             is_debug = is_debuginfo_rpm(pkg['name'])
             await self.prepare_data_for_executing_async_tasks(pkg, is_debug)
-            # TODO: need to add devel debuginfo ppc64le repo
             release_repo = repos_mapping[RepoType(
                 '-'.join((
                     self.clean_base_dist_name_lower,
                     self.base_platform.distr_version,
-                    'devel'
+                    'devel-debuginfo' if is_debug else 'devel',
                 )),
                 pkg['task_arch'],
                 is_debug,
@@ -383,7 +382,7 @@ class ReleasePlanner:
                 '-'.join((
                     self.clean_base_dist_name_lower,
                     self.base_platform.distr_version,
-                    'devel'
+                    'devel-debuginfo' if is_debug else 'devel',
                 )),
                 pkg_task_arch,
                 is_debug,
