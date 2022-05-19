@@ -786,6 +786,16 @@ class ErrataToALBSPackage(Base):
     def build_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.build_id
+    
+    @property
+    def task_id(self):
+        if self.build_artifact:
+            return self.build_artifact.build_task.id
+    
+    @property
+    def name(self):
+        if self.build_artifact:
+            return self.build_artifact.name
 
 
 async def create_tables():

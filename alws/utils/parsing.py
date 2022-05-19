@@ -54,6 +54,7 @@ def parse_git_ref(pattern: str, git_ref: str):
 def parse_rpm_nevra(rpm_name: str):
     clean_rpm_name = re.sub('.rpm$', '', rpm_name)
     hawkey_nevra = hawkey.split_nevra(clean_rpm_name)
+    return hawkey_nevra
 
 
 def parse_tap_output(text: bytes) -> list:

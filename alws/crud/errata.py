@@ -124,7 +124,8 @@ async def search_for_albs_packages(db, errata_package, prod_repos_cache):
             pulp_href=prod_package["pulp_href"],
             status=models.ErrataPackageStatus.released,
         )
-        errata_package.source_srpm = prod_package["source_srpm"]
+        src_nevra = parse_rpm_nevra(prod_package["source_srpm"])
+        errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
         return items_to_insert
@@ -166,18 +167,16 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
-    for key in ('description', 'title'):
+    for key in ("description", "title"):
         value = getattr(errata, key)
         value = re.sub(
-            r'(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?',
-            'AlmaLinux',
-            value
+            r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?", "AlmaLinux", value
         )
-        value = re.sub(r'^RH', 'AL', value)
-        value = re.sub(r'RHEL', 'AlmaLinux', value)
+        value = re.sub(r"^RH", "AL", value)
+        value = re.sub(r"RHEL", "AlmaLinux", value)
         setattr(errata, key, value)
     db_errata = models.ErrataRecord(
-        id=re.sub(r'^RH', 'AL', errata.id),
+        id=re.sub(r"^RH", "AL", errata.id),
         platform_id=errata.platform_id,
         summary=None,
         solution=None,
@@ -257,7 +256,10 @@ async def create_errata_record(db, errata: BaseErrataRecord):
 
 async def get_errata_record(db, errata_record_id: str):
     options = [
-        selectinload(models.ErrataRecord.packages),
+        selectinload(models.ErrataRecord.packages)
+        .selectinload(models.ErrataPackage.albs_packages)
+        .selectinload(models.ErrataToALBSPackage.build_artifact)
+        .selectinload(models.BuildTaskArtifact.build_task),
         selectinload(models.ErrataRecord.references).selectinload(
             models.ErrataReference.cve
         ),
@@ -288,7 +290,10 @@ async def list_errata_records(
     else:
         options.extend(
             [
-                selectinload(models.ErrataRecord.packages),
+                selectinload(models.ErrataRecord.packages)
+                .selectinload(models.ErrataPackage.albs_packages)
+                .selectinload(models.ErrataToALBSPackage.build_artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
                 selectinload(models.ErrataRecord.references).selectinload(
                     models.ErrataReference.cve
                 ),
@@ -315,7 +320,9 @@ async def list_errata_records(
     if page:
         query = query.slice(10 * page - 10, 10 * page)
     return {
-        "total_records": (await db.execute(func.count(models.ErrataRecord.id))).scalar(),
+        "total_records": (
+            await db.execute(func.count(models.ErrataRecord.id))
+        ).scalar(),
         "records": (await db.execute(query)).scalars().all(),
         "current_page": page,
     }

@@ -46,8 +46,25 @@ class BaseErrataPackage(BaseModel):
         orm_mode = True
 
 
+class AlbsPackage(BaseModel):
+    albs_artifact_id: Optional[int]
+    build_id: Optional[int]
+    task_id: Optional[int]
+    name: Optional[str]
+    status: str
+
+    @validator('status', pre=True)
+    def status_validator(cls, status):
+        return status.value
+
+    class Config:
+        orm_mode = True
+
+
 class ErrataPackage(BaseErrataPackage):
     id: int
+    source_srpm: Optional[str]
+    albs_packages: List[AlbsPackage]
     
     class Config:
         orm_mode = True
