@@ -301,6 +301,10 @@ class ModuleWrapper:
                 for stream in dep.get_buildtime_streams(module):
                     yield module, stream
 
+    def get_nsvca(self) -> str:
+        return (f'{self.name}:{self.stream}:{self.version}:'
+                f'{self.context}:{self.arch}')
+
     def render(self) -> str:
         index = IndexWrapper()
         index.add_module(self)

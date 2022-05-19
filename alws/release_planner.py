@@ -21,7 +21,7 @@ from alws.errors import (
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
 
@@ -502,10 +502,13 @@ class ReleasePlanner:
                     base_platform.distr_version,
                     repo_name
                 ))
+                repo_key = RepoType(release_repo_name, module['arch'], False)
+                prod_repo = repos_mapping[repo_key]
                 module_repo_dict = {
-                    'name': release_repo_name,
-                    'arch': module['arch'],
-                    'debug': False,
+                    'name': repo_key.name,
+                    'arch': repo_key.arch,
+                    'debug': repo_key.debug,
+                    'url': prod_repo['url'],
                 }
                 if module_repo_dict in module_info['repositories']:
                     continue
@@ -614,7 +617,8 @@ class ReleasePlanner:
         }
 
     async def execute_release_plan(self, release: models.Release,
-                                   release_plan: dict) -> None:
+                                   release_plan: dict) -> typing.List[str]:
+        additional_messages = []
         packages_to_repo_layout = {}
         if not release_plan.get('packages') or (
                 not release_plan.get('repositories')):
@@ -678,15 +682,42 @@ class ReleasePlanner:
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     package_href)
 
+        prod_repo_modules_cache = {}
         for module in release_plan.get('modules', []):
             for repository in module['repositories']:
                 repo_name = repository['name']
                 repo_arch = repository['arch']
+                repo_url = repository['url']
+                repo_module_index = prod_repo_modules_cache.get(repo_url)
+                if repo_module_index is None:
+                    template = await self._pulp_client.get_repo_modules_yaml(
+                        repo_url)
+                    repo_module_index = IndexWrapper.from_template(template)
+                    prod_repo_modules_cache[repo_url] = repo_module_index
                 if repo_name not in packages_to_repo_layout:
                     packages_to_repo_layout[repo_name] = {}
                 if repo_arch not in packages_to_repo_layout[repo_name]:
                     packages_to_repo_layout[repo_name][repo_arch] = []
                 module_info = module['module']
+                release_module = ModuleWrapper.from_template(
+                    module_info['template'])
+                release_module_nvsca = release_module.get_nsvca()
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.get_nsvca() == release_module_nvsca
+                ))
+                if module_already_in_repo:
+                    full_repo_name = (
+                        f"{repo_name}-"
+                        f"{'debug-' if repository['debug'] else ''}"
+                        f"{repo_arch}"
+                    )
+                    additional_messages.append(
+                        f'Module {release_module_nvsca} skipped,'
+                        f'module already in "{full_repo_name}" modules.yaml'
+                    )
+                    continue
                 module_pulp_href, _ = await self._pulp_client.create_module(
                     module_info['template'],
                     module_info['name'],
@@ -841,13 +872,15 @@ class ReleasePlanner:
             # for updating plan during executing, we should use deepcopy
             release_plan = copy.deepcopy(release.plan)
             try:
-                await self.execute_release_plan(release, release_plan)
+                release_messages = await self.execute_release_plan(
+                    release, release_plan)
             except (EmptyReleasePlan, MissingRepository,
                     SignError, ReleaseLogicError) as e:
                 message = f'Cannot commit release: {str(e)}'
                 release.status = ReleaseStatus.FAILED
             else:
                 message = 'Successfully committed release'
+                message += '\n'.join(release_messages)
                 release.status = ReleaseStatus.COMPLETED
             release_plan['last_log'] = message
             release.plan = release_plan
