@@ -278,6 +278,7 @@ class ModulePreview(BaseModel):
 async def get_module_data_from_beholder(
     beholder_client: BeholderClient,
     endpoint: str,
+    arch: str,
     devel: bool = False,
 ) -> dict:
     result = {}
@@ -287,8 +288,9 @@ async def get_module_data_from_beholder(
         logging.error('Cannot get module info')
         return result
     result['devel'] = devel
-    result['arch'] = beholder_response['arch']
+    result['arch'] = arch
     result['artifacts'] = beholder_response.get('artifacts', [])
+    logging.info('Beholder result artifacts: %s', str(result['artifacts']))
     return result
 
 
@@ -397,7 +399,6 @@ async def get_module_refs(
     flavors: typing.List[models.PlatformFlavour],
     platform_arches: typing.List[str] = None,
 ) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
-    result = []
     gitea_client = GiteaClient(
         settings.gitea_host,
         logging.getLogger(__name__)
@@ -418,7 +419,6 @@ async def get_module_refs(
         BuildTaskRefType.to_text(task.ref_type)
     )
     devel_ref = task.get_dev_module()
-    devel_template = None
     devel_module = None
     try:
         devel_template = await download_modules_yaml(
@@ -442,19 +442,23 @@ async def get_module_refs(
     if platform_arches is None:
         platform_arches = []
     for arch in platform_arches:
+        request_arch = arch
+        if arch == 'i686':
+            request_arch = 'x86_64'
         endpoint = (
             f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-            f'/module/{module.name}/{module.stream}/{arch}/'
+            f'/module/{module.name}/{module.stream}/{request_arch}/'
         )
         checking_tasks.append(get_module_data_from_beholder(
-            beholder_client, endpoint))
+            beholder_client, endpoint, arch))
         if devel_module is not None:
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                f'/module/{devel_module.name}/{devel_module.stream}/{arch}/'
+                f'/module/{devel_module.name}/{devel_module.stream}/'
+                f'{request_arch}/'
             )
             checking_tasks.append(get_module_data_from_beholder(
-                beholder_client, endpoint, devel=True))
+                beholder_client, endpoint, arch, devel=True))
     beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']

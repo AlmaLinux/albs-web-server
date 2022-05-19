@@ -13,6 +13,7 @@ from alws.constants import BuildTaskStatus
 from alws.errors import ModuleUpdateError
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
+from alws.utils.modularity import IndexWrapper
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
@@ -56,11 +57,12 @@ class MultilibProcessor:
         )
         self._is_multilib_needed = None
 
-    async def __call_beholder(self, endpoint):
+    @staticmethod
+    async def call_beholder(client: BeholderClient, endpoint: str):
         response = {}
         params = {'match': 'closest'}
         try:
-            response = await self._beholder_client.get(endpoint, params=params)
+            response = await client.get(endpoint, params=params)
         except Exception:
             logging.error(
                 "Cannot get multilib packages, trying next reference platform",
@@ -101,12 +103,41 @@ class MultilibProcessor:
         ref_name = get_clean_distr_name(platform.name)
         ref_ver = platform.distr_version
         endpoint = f'api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}'
-        response = await self.__call_beholder(endpoint)
+        response = await self.call_beholder(self._beholder_client, endpoint)
         query = (
             "packages[?arch=='i686']"
             ".{name: name, version: version, repos: repositories}"
         )
         return await self.parse_response(query, response)
+
+    @staticmethod
+    async def get_module_multilib_data(
+            beholder_client: BeholderClient,
+            platform_name: str, platform_version: str, module_name: str,
+            module_stream: str, has_devel: bool = False):
+
+        query = (
+            "artifacts[*].packages[?arch=='i686']"
+            ".{name: name, version: version, repos: repositories}[]"
+        )
+
+        async def get_data(mod_name: str, mod_stream: str) -> typing.List[dict]:
+            endpoint = (f'api/v1/distros/{platform_name}/{platform_version}'
+                        f'/module/{mod_name}/{mod_stream}/x86_64/')
+            response = await MultilibProcessor.call_beholder(
+                beholder_client, endpoint)
+            packages = await MultilibProcessor.parse_response(query, response)
+            return packages
+
+        multilib_packages = await get_data(module_name, module_stream)
+        if has_devel:
+            devel = await get_data(f'{module_name}-devel', module_stream)
+            multilib_packages.extend(devel)
+
+        # Deduplicate packages
+        packages_mapping = {f'{i["name"]}-{i["version"]}': i
+                            for i in multilib_packages}
+        return list(packages_mapping.values())
 
     async def call_for_module_artifacts(self, platform) -> typing.List[dict]:
         if not self._module_index:
@@ -116,26 +147,11 @@ class MultilibProcessor:
         ref_ver = platform.distr_version
         module_name = self._build_task.rpm_module.name
         module_stream = self._build_task.rpm_module.stream
-        endpoint = (f'api/v1/distros/{ref_name}/{ref_ver}/module/'
-                    f'{module_name}/{module_stream}/x86_64/')
-        response = await self.__call_beholder(endpoint)
-        query = (
-            "artifacts[*].packages[?arch=='i686']"
-            ".{name: name, version: version, repos: repositories}[]"
+        result = await self.get_module_multilib_data(
+            self._beholder_client, ref_name, ref_ver, module_name,
+            module_stream, has_devel=self._module_index.has_devel_module()
         )
-        packages = await self.parse_response(query, response)
-        if self._module_index and self._module_index.has_devel_module():
-            module_name = f'{module_name}-devel'
-            endpoint = (f'api/v1/distros/{ref_name}/{ref_ver}/module/'
-                        f'{module_name}/{module_stream}/x86_64/')
-            response = await self.__call_beholder(endpoint)
-            devel_packages = await self.parse_response(query, response)
-            packages += devel_packages
-            # Deduplicate packages
-            packages_mapping = {f'{i["name"]}-{i["version"]}': i
-                                for i in packages}
-            packages = list(packages_mapping.values())
-        return packages
+        return result
 
     async def get_packages(self, src_rpm: str):
         packages = None
@@ -217,7 +233,7 @@ class MultilibProcessor:
                 repo_to=arch_repo.pulp_href, add=pkg_hrefs)
         )
 
-    async def update_module_index(self, rpm_packages: list):
+    async def get_packages_info_from_pulp(self, rpm_packages: list):
         results = await asyncio.gather(
             *(get_rpm_package_info(
                 self._pulp_client, rpm.href,
@@ -225,23 +241,21 @@ class MultilibProcessor:
             ) for rpm in rpm_packages)
         )
 
-        packages_info = dict(results)
-        # If module has devel sibling and it's not Python then multilib
-        # goes into devel module
-        module_name = self._build_task.rpm_module.name
-        module_stream = self._build_task.rpm_module.stream
-        if self._module_index.has_devel_module() \
-                and 'python' not in module_name:
-            module = self._module_index.get_module(
+        return [v for k, v in dict(results).items()]
+
+    @staticmethod
+    async def update_module_index(module_index: IndexWrapper, module_name: str,
+                                  module_stream: str, packages: list):
+        if not packages:
+            return
+        if module_index.has_devel_module() and 'python' not in module_name:
+            module = module_index.get_module(
                 f'{module_name}-devel', module_stream)
         else:
-            module = self._module_index.get_module(module_name, module_stream)
-        try:
-            for rpm in rpm_packages:
-                rpm_package = packages_info[rpm.href]
-                module.add_rpm_artifact(rpm_package, multilib=True)
-        except Exception as e:
-            raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
+            module = module_index.get_module(module_name, module_stream)
+
+        for pkg_info in packages:
+            module.add_rpm_artifact(pkg_info, multilib=True)
 
     async def add_multilib_module_artifacts(
             self, prepared_artifacts: list = None):
@@ -262,4 +276,12 @@ class MultilibProcessor:
                 if artifact['name'] == parsed_package['name']:
                     packages_to_process[artifact['name']] = package
 
-        await self.update_module_index(list(packages_to_process.values()))
+        try:
+            packages = await self.get_packages_info_from_pulp(
+                list(packages_to_process.values()))
+            module_name = self._build_task.rpm_module.name
+            module_stream = self._build_task.rpm_module.stream
+            await self.update_module_index(
+                self._module_index, module_name, module_stream, packages)
+        except Exception as e:
+            raise ModuleUpdateError('Cannot update module: %s', str(e)) from e

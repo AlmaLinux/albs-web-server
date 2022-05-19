@@ -12,14 +12,19 @@ from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
-from alws.utils.pulp_client import PulpClient
-from alws.utils.parsing import parse_git_ref
-from alws.utils.modularity import (
-    ModuleWrapper, calc_dist_macro, IndexWrapper
-)
+from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     GiteaClient,
 )
+from alws.utils.modularity import (
+    calc_dist_macro,
+    IndexWrapper,
+    ModuleWrapper,
+    RpmArtifact,
+)
+from alws.utils.multilib import MultilibProcessor
+from alws.utils.parsing import parse_git_ref
+from alws.utils.pulp_client import PulpClient
 
 
 __all__ = ['BuildPlanner']
@@ -135,16 +140,62 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
-    def remove_force_to_build_artifacts_from_template(
-        self,
-        module: ModuleWrapper,
-        build_task_refs: typing.List[build_schema.BuildTaskRef],
-    ):
-        # if some refs with added artifacts in module template
-        # was enabled to build, we should delete them from template
-        for ref in build_task_refs:
+    @staticmethod
+    async def get_multilib_artifacts(
+            task: build_schema.BuildTaskModuleRef, has_devel: bool = False
+    ) -> typing.List[dict]:
+        beholder_client = BeholderClient(
+            settings.beholder_host, token=settings.beholder_token)
+        major_distr_version = task.module_platform_version.split('.')[0]
+        multilib_artifacts = []
+
+        # FIXME: Hardcoded platform for now, should send actual platform
+        #  in the task ref
+        multilib_packages = await MultilibProcessor.get_module_multilib_data(
+            beholder_client, 'AlmaLinux', major_distr_version,
+            task.module_name, task.module_stream, has_devel=has_devel)
+        multilib_set = {pkg['name'] for pkg in multilib_packages}
+
+        for ref in task.refs:
+            # Skip packages that are scheduled to be built
+            if ref.enabled:
+                continue
             for artifact in ref.added_artifacts:
-                module.remove_rpm_artifact(artifact)
+                parsed_artifact = RpmArtifact.from_str(artifact)
+                if (parsed_artifact.arch == 'i686'
+                        and parsed_artifact.name in multilib_set):
+                    multilib_artifacts.append(parsed_artifact.as_dict())
+
+        return multilib_artifacts
+
+    async def prepare_module_index(
+            self, task: build_schema.BuildTaskModuleRef, task_arch: str
+    ) -> IndexWrapper:
+        allowed_arches = (task_arch, 'src', 'noarch')
+        index = IndexWrapper.from_template(task.modules_yaml)
+
+        for module in index.iter_modules():
+            for ref in task.refs:
+                if ref.enabled:
+                    for artifact in ref.added_artifacts:
+                        module.remove_rpm_artifact(artifact)
+                else:
+                    for artifact in ref.added_artifacts:
+                        parsed_artifact = RpmArtifact.from_str(artifact)
+                        if parsed_artifact.arch in allowed_arches:
+                            module.add_rpm_artifact(parsed_artifact.as_dict())
+                        else:
+                            module.remove_rpm_artifact(artifact)
+
+        if task_arch == 'x86_64':
+            multilib_artifacts = await self.get_multilib_artifacts(
+                task, has_devel=index.has_devel_module())
+            await MultilibProcessor.update_module_index(
+                index, task.module_name, task.module_stream,
+                multilib_artifacts
+            )
+
+        return index
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
@@ -212,7 +263,9 @@ class BuildPlanner:
             if task.module_version:
                 module_version = int(task.module_version)
             for arch in self._request_platforms[platform.name]:
-                module = ModuleWrapper.from_template(module_templates[0])
+                module_index = await self.prepare_module_index(task, arch)
+                module = module_index.get_module(
+                    task.module_name, task.module_stream)
                 module.add_module_dependencies_from_mock_defs(
                     mock_modules=mock_options.get('module_enable', []))
                 # TODO: Rework to be able to set enabled modules from UI,
@@ -220,7 +273,7 @@ class BuildPlanner:
                 mock_options['module_enable'] = [
                     f'{module.name}:{module.stream}'
                 ]
-                mock_options['module_enable'] = [
+                mock_options['module_enable'] += [
                     f'{dep_name}:{dep_stream}'
                     for dep_name, dep_stream in module.iter_dependencies()
                 ]
@@ -230,16 +283,10 @@ class BuildPlanner:
                 module.set_arch_list(
                     self._request_platforms[platform.name]
                 )
-                self.remove_force_to_build_artifacts_from_template(
-                    module, raw_refs)
-                module_index = IndexWrapper()
                 module_index.add_module(module)
-                if len(module_templates) > 1:
-                    devel_module = ModuleWrapper.from_template(
-                        module_templates[1],
-                        module.name + '-devel',
-                        module.stream
-                    )
+                if module_index.has_devel_module():
+                    devel_module = module_index.get_module(
+                        f'{task.module_name}', task.module_stream)
                     devel_module.version = module.version
                     devel_module.context = module.context
                     devel_module.arch = module.arch
@@ -249,9 +296,6 @@ class BuildPlanner:
                     mock_options['module_enable'].append(
                         f'{devel_module.name}:{devel_module.stream}'
                     )
-                    self.remove_force_to_build_artifacts_from_template(
-                        devel_module, raw_refs)
-                    module_index.add_module(devel_module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
                     module.name,
