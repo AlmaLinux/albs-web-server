@@ -684,7 +684,13 @@ class ReleasePlanner:
             for repository in module['repositories']:
                 repo_name = repository['name']
                 repo_arch = repository['arch']
-                repo_url = repository['url']
+                repo_url = repository.get('url')
+                if repo_url is None:
+                    repo_url = next(
+                        repo.url for repo in self.base_platform.repos
+                        if repo.name == repo_name and repo.arch == repo_arch
+                        and repo.debug is False
+                    )
                 repo_module_index = prod_repo_modules_cache.get(repo_url)
                 if repo_module_index is None:
                     template = await self._pulp_client.get_repo_modules_yaml(
