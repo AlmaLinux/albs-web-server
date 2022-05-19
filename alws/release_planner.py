@@ -354,16 +354,12 @@ class ReleasePlanner:
         beholder_cache: dict,
     ) -> typing.Set[RepoType]:
         release_repositories = set()
-        clean_pkg_name = pkg_name
-        if is_debug:
-            clean_pkg_name = clean_debug_name(pkg_name)
-        beholder_key = (clean_pkg_name, pkg_version, pkg_arch,
-                        is_beta, is_devel)
+        beholder_key = (pkg_name, pkg_version, pkg_arch, is_beta, is_devel)
         predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info from stable/beta,
         # we can try to find info by opposite stable/beta flag
         if not predicted_package:
-            beholder_key = (clean_pkg_name, pkg_version, pkg_arch,
+            beholder_key = (pkg_name, pkg_version, pkg_arch,
                             not is_beta, is_devel)
             predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info by current version,
@@ -373,7 +369,7 @@ class ReleasePlanner:
                 beholder_key for beholder_key in beholder_cache
                 if all((
                     field in beholder_key
-                    for field in (clean_pkg_name, pkg_arch, is_devel)
+                    for field in (pkg_name, pkg_arch, is_devel)
                 ))
             ]
             predicted_package = next((
@@ -559,6 +555,10 @@ class ReleasePlanner:
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
             is_debug = is_debuginfo_rpm(pkg_name)
+            # for debug packages, we should take repos info
+            # from non debug packages
+            if is_debug:
+                pkg_name = clean_debug_name(pkg_name)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(
