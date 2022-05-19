@@ -502,11 +502,14 @@ class ReleasePlanner:
                     base_platform.distr_version,
                     repo_name
                 ))
-                module_info['repositories'].append({
+                module_repo_dict = {
                     'name': release_repo_name,
                     'arch': module['arch'],
                     'debug': False,
-                })
+                }
+                if module_repo_dict in module_info['repositories']:
+                    continue
+                module_info['repositories'].append(module_repo_dict)
 
         beholder_responses = await self._beholder_client.retrieve_responses(
             base_platform,
@@ -582,6 +585,9 @@ class ReleasePlanner:
             # for correct package location in UI
             for item in release_repositories:
                 release_repo = repos_mapping.get(item)
+                # in some cases we get repos that we can't match
+                if release_repo is None:
+                    continue
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 repo_arch_location = [release_repo['arch']]
                 # we should add i686 arch for correct multilib showing in UI
