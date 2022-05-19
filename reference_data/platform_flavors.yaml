@@ -43,7 +43,7 @@
     - name: almalinux-8-beta-debuginfo
       arch: i686
       type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-i686-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-i686-debug-dr/
       export_path: almalinux/8.6-beta/debug/i686/
       production: false
       debug: true
@@ -51,7 +51,7 @@
     - name: almalinux-8-beta-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-x86_64-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-x86_64-debug-dr/
       export_path: almalinux/8.6-beta/debug/x86_64/
       production: false
       debug: true
@@ -59,7 +59,7 @@
     - name: almalinux-8-beta-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-aarch64-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-aarch64-debug-dr/
       export_path: almalinux/8.6-beta/debug/aarch64/
       production: false
       debug: true
@@ -67,7 +67,7 @@
     - name: almalinux-8-beta-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-ppc64le-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-beta-AlmaLinux-8-ppc64le-debug-dr/
       export_path: almalinux/8.6-beta/debug/ppc64le/
       production: false
       debug: true
