@@ -215,10 +215,10 @@ class ReleasePlanner:
             for repo in self.base_platform.repos:
                 pulp_repo_info = pulp_repos[repo.pulp_href]
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
-                is_debug = bool(re.search(r'debug(info|source|)',
-                                          pulp_repo_info['name']))
+                repo_is_debug = bool(re.search(r'debug(info|source|)',
+                                               pulp_repo_info['name']))
                 self.latest_repo_versions.append((
-                    pulp_repo_info['latest_version_href'], is_debug))
+                    pulp_repo_info['latest_version_href'], repo_is_debug))
 
         nevra = PackageNevra(
             package['name'],
@@ -666,11 +666,7 @@ class ReleasePlanner:
                 if repo_id in existing_repo_ids and not force_flag:
                     if package['href_from_repo'] is not None:
                         continue
-                    full_repo_name = (
-                        f"{repo_name}-"
-                        f"{'debug-' if repository['debug'] else ''}"
-                        f"{repo_arch}"
-                    )
+                    full_repo_name = f"{repo_name}-{repo_arch}"
                     raise ReleaseLogicError(
                         f'Cannot release {pkg_full_name} in {full_repo_name}, '
                         'package already in repo and force release is disabled'
@@ -683,6 +679,7 @@ class ReleasePlanner:
                     package_href)
 
         prod_repo_modules_cache = {}
+        added_modules = defaultdict(list)
         for module in release_plan.get('modules', []):
             for repository in module['repositories']:
                 repo_name = repository['name']
@@ -702,17 +699,16 @@ class ReleasePlanner:
                 release_module = ModuleWrapper.from_template(
                     module_info['template'])
                 release_module_nvsca = release_module.get_nsvca()
+                full_repo_name = f"{repo_name}-{repo_arch}"
+                # for old module releases that have duplicated repos
+                if release_module_nvsca in added_modules[full_repo_name]:
+                    continue
                 module_already_in_repo = any((
                     prod_module
                     for prod_module in repo_module_index.iter_modules()
                     if prod_module.get_nsvca() == release_module_nvsca
                 ))
                 if module_already_in_repo:
-                    full_repo_name = (
-                        f"{repo_name}-"
-                        f"{'debug-' if repository['debug'] else ''}"
-                        f"{repo_arch}"
-                    )
                     additional_messages.append(
                         f'Module {release_module_nvsca} skipped,'
                         f'module already in "{full_repo_name}" modules.yaml'
@@ -727,6 +723,7 @@ class ReleasePlanner:
                 )
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     module_pulp_href)
+                added_modules[full_repo_name].append(release_module_nvsca)
 
         modify_tasks = []
         publication_tasks = []
@@ -749,6 +746,7 @@ class ReleasePlanner:
                     self._pulp_client.create_rpm_publication(repo.pulp_href))
         await asyncio.gather(*modify_tasks)
         await asyncio.gather(*publication_tasks)
+        return additional_messages
 
     async def create_new_release(
         self,
