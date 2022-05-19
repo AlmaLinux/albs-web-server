@@ -584,12 +584,16 @@ class ReleasePlanner:
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
+            added_noarch_repos = set()
             # for every repository we should add pkg_info
             # for correct package location in UI
             for item in release_repositories:
                 release_repo = repos_mapping.get(item)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
+                    continue
+                release_repo_name = release_repo['name']
+                if release_repo_name in added_noarch_repos:
                     continue
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 repo_arch_location = [release_repo['arch']]
@@ -598,6 +602,7 @@ class ReleasePlanner:
                     repo_arch_location.append('i686')
                 if pkg_arch == 'noarch':
                     repo_arch_location = pulp_repo_arch_location
+                    added_noarch_repos.add(release_repo_name)
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
                     'repositories': [release_repo],
