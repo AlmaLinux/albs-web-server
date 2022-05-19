@@ -20,7 +20,7 @@ from alws.errors import (
 )
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.debuginfo import is_debuginfo_rpm
+from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
@@ -354,12 +354,16 @@ class ReleasePlanner:
         beholder_cache: dict,
     ) -> typing.Set[RepoType]:
         release_repositories = set()
-        beholder_key = (pkg_name, pkg_version, pkg_arch, is_beta, is_devel)
+        clean_pkg_name = pkg_name
+        if is_debug:
+            clean_pkg_name = clean_debug_name(pkg_name)
+        beholder_key = (clean_pkg_name, pkg_version, pkg_arch,
+                        is_beta, is_devel)
         predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info from stable/beta,
         # we can try to find info by opposite stable/beta flag
         if not predicted_package:
-            beholder_key = (pkg_name, pkg_version, pkg_arch,
+            beholder_key = (clean_pkg_name, pkg_version, pkg_arch,
                             not is_beta, is_devel)
             predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info by current version,
@@ -369,7 +373,7 @@ class ReleasePlanner:
                 beholder_key for beholder_key in beholder_cache
                 if all((
                     field in beholder_key
-                    for field in (pkg_name, pkg_arch, is_devel)
+                    for field in (clean_pkg_name, pkg_arch, is_devel)
                 ))
             ]
             predicted_package = next((
