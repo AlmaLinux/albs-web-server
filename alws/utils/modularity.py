@@ -230,22 +230,35 @@ class ModuleWrapper:
             for arch in arch_list:
                 component.add_restricted_arch(arch)
 
-    def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False):
+    def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False,
+                         multilib: bool = False) -> bool:
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
-        if self.is_artifact_filtered(artifact) and self.name.endswith('-devel'):
+
+        if multilib:
             self._stream.add_rpm_artifact(artifact)
-        if devel:
+            return True
+
+        if devel and self.name.endswith('-devel'):
             self._stream.add_rpm_artifact(artifact)
-        if (not self.name.endswith('-devel')
-                and not self.is_artifact_filtered(artifact)):
-            self._stream.add_rpm_artifact(artifact)
+            return True
+
+        if self.is_artifact_filtered(rpm_pkg):
+            if self.name.endswith('-devel'):
+                self._stream.add_rpm_artifact(artifact)
+                return True
+        else:
+            if not self.name.endswith('-devel'):
+                self._stream.add_rpm_artifact(artifact)
+                return True
+
+        return False
 
     def remove_rpm_artifact(self, artifact: str):
         self._stream.remove_rpm_artifact(artifact)
 
-    def is_artifact_filtered(self, artifact: str) -> bool:
+    def is_artifact_filtered(self, artifact: dict) -> bool:
         for filter_name in self._stream.get_rpm_filters():
-            if artifact.startswith(filter_name):
+            if artifact['name'] == filter_name:
                 return True
         return False
 
