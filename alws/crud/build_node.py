@@ -359,10 +359,11 @@ async def __process_build_task_artifacts(
         artifact.name for artifact in task_artifacts
         if artifact.arch == 'src' and artifact.type == 'rpm'
     ), None)
-    if not src_rpm:
-        message = 'No source RPM was sent from build node'
-        logging.error(message)
-        raise SrpmProvisionError(message)
+    # FIXME: Figure out correct way to signal about missing source RPM
+    # if not src_rpm:
+    #     message = 'No source RPM was sent from build node'
+    #     logging.error(message)
+    #     raise SrpmProvisionError(message)
     # Committing logs separately for UI to be able to fetch them
     logging.info('Processing logs')
     logs_entries = await __process_logs(
