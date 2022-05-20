@@ -20,7 +20,7 @@ from alws.errors import (
 )
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.debuginfo import is_debuginfo_rpm
+from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
@@ -555,6 +555,10 @@ class ReleasePlanner:
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
             is_debug = is_debuginfo_rpm(pkg_name)
+            # for debug packages, we should take repos info
+            # from non debug packages
+            if is_debug:
+                pkg_name = clean_debug_name(pkg_name)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(
