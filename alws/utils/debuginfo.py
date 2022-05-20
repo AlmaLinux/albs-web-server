@@ -13,4 +13,4 @@ def is_debuginfo_rpm(name: str) -> bool:
 
 
 def clean_debug_name(name: str) -> str:
-    return re.sub(r'-debug(info|source|)$', '', name)
+    return re.sub(r'-debug(info|source)$', '', name)
