@@ -18,6 +18,9 @@
       - name: '8.5'
         version_prefix: '80500'
         dist_prefix: 'el8.5.0'
+      - name: '8.6'
+        version_prefix: '80600'
+        dist_prefix: 'el8.6.0'
   type: rpm
   arch_list:
     - i686
@@ -33,7 +36,7 @@
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
       vendor: AlmaLinux
     mock:
-      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
         kernel-rpm-macros
@@ -678,8 +681,8 @@
     modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
     packages_git: 'https://git.almalinux.org/rpms/'
     git_tag_prefix:
-      modified: a9-beta
-      non_modified: c9-beta
+      modified: a9
+      non_modified: c9
     versions:
       - name: '9'
         version_prefix: '90000'
@@ -701,7 +704,7 @@
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
       vendor: AlmaLinux
     mock:
-      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config redhat-release which xz sed
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
         kernel-rpm-macros
@@ -797,4 +800,3 @@
       production: false
       debug: false
       priority: 10
-
