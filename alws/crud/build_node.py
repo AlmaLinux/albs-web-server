@@ -16,7 +16,6 @@ from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
     RepositoryAddError,
-    SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
@@ -59,7 +58,7 @@ async def get_available_build_task(
                         models.Build.platform_flavors).selectinload(
                         models.PlatformFlavour.repos),
                     selectinload(models.BuildTask.rpm_module)
-            ).order_by(models.BuildTask.id.asc())
+            ).order_by(models.BuildTask.id)
         )
         db_task = db_task.scalars().first()
         if not db_task:
@@ -225,7 +224,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         )
 
-    if module_index and rpms:
+    if module_index:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
         results = await asyncio.gather(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
@@ -237,25 +236,21 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         if built_srpm_url is not None:
             task_query = select(models.BuildTask.build_id).where(
                 models.BuildTask.id == task_id).scalar_subquery()
-            srpms = [item for item in task_artifacts if item.arch == 'src'
-                     and item.type == 'rpm']
-            if srpms:
-                srpm = srpms[0]
-            else:
-                srpm = None
-            if srpm:
-                srpm_query = select(models.SourceRpm).where(
-                    models.SourceRpm.build_id == task_query).options(
-                    selectinload(models.SourceRpm.artifact)
-                )
-                res = await db.execute(srpm_query)
-                srpms = res.scalars().all()
-                srpm_href = next(
-                    i.artifact.href for i in srpms
-                    if i.artifact.name == srpm.name
-                )
-                srpm_info = await pulp_client.get_rpm_package(
-                    srpm_href, include_fields=pkg_fields)
+            srpm = next(
+                item for item in task_artifacts if item.arch == 'src'
+                and item.type == 'rpm'
+            )
+            srpm_query = select(models.SourceRpm).where(
+                models.SourceRpm.build_id == task_query).options(
+                selectinload(models.SourceRpm.artifact)
+            )
+            res = await db.execute(srpm_query)
+            srpms = res.scalars().all()
+            srpm_href = next(
+                i.artifact.href for i in srpms if i.artifact.name == srpm.name
+            )
+            srpm_info = await pulp_client.get_rpm_package(
+                srpm_href, include_fields=pkg_fields)
         try:
             for module in module_index.iter_modules():
                 for rpm in rpms:
@@ -355,14 +350,6 @@ async def __process_build_task_artifacts(
                         if repo.type == 'rpm']
     log_repositories = [repo for repo in repositories
                         if repo.type == 'build_log']
-    src_rpm = next((
-        artifact.name for artifact in task_artifacts
-        if artifact.arch == 'src' and artifact.type == 'rpm'
-    ), None)
-    if not src_rpm:
-        message = 'No source RPM was sent from build node'
-        logging.error(message)
-        raise SrpmProvisionError(message)
     # Committing logs separately for UI to be able to fetch them
     logging.info('Processing logs')
     logs_entries = await __process_logs(
@@ -377,6 +364,10 @@ async def __process_build_task_artifacts(
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index
     )
+    src_rpm = next((
+        artifact.name for artifact in task_artifacts
+        if artifact.arch == 'src' and artifact.type == 'rpm'
+    ), None)
     multilib_conditions = (
         src_rpm is not None,
         build_task.arch == 'x86_64',
@@ -391,14 +382,12 @@ async def __process_build_task_artifacts(
         multilib_packages = await processor.get_packages(src_rpm)
         if module_index:
             multilib_module_artifacts = await processor.get_module_artifacts()
+            await processor.add_multilib_module_artifacts(
+                prepared_artifacts=multilib_module_artifacts)
             multilib_packages.update({
                 i['name']: i['version'] for i in multilib_module_artifacts
             })
-            await processor.add_multilib_packages(multilib_packages)
-            await processor.add_multilib_module_artifacts(
-                prepared_artifacts=multilib_module_artifacts)
-        else:
-            await processor.add_multilib_packages(multilib_packages)
+        await processor.add_multilib_packages(multilib_packages)
     if build_task.rpm_module and module_index:
         try:
             module_pulp_href, sha256 = await pulp_client.create_module(
@@ -432,7 +421,6 @@ async def __process_build_task_artifacts(
 async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
     uncompleted_tasks_ids = []
     if build_task.status in (BuildTaskStatus.COMPLETED,
-                             BuildTaskStatus.EXCLUDED,
                              BuildTaskStatus.FAILED):
         uncompleted_tasks_ids = await db.execute(
             select(models.BuildTask.id).where(
@@ -470,9 +458,6 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
             ),
         )
         srpm_artifact = srpm_artifact.scalars().first()
-        if not srpm_artifact:
-            logging.error('Cannot find source RPM to insert proper link')
-            return
 
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
             build_task.platform.name,
@@ -544,13 +529,11 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
-    db_srpm_name = None
     srpm = None
     for rpm in rpms_result.scalars().all():
-        if rpm.name.endswith('.src.rpm'):
-            db_srpm_name = rpm.name
-            if build_task.built_srpm_url is not None:
-                continue
+        if rpm.name.endswith('.src.rpm') and (
+                build_task.built_srpm_url is not None):
+            continue
         if rpm.name.endswith('.src.rpm'):
             srpm = models.SourceRpm()
             srpm.artifact = rpm
@@ -562,13 +545,9 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
             binary_rpms.append(binary_rpm)
 
     # retrieve already created instance of model SourceRpm
-    if not srpm and db_srpm_name:
-        srpms = await db.execute(select(
-            models.SourceRpm, models.BuildTaskArtifact).where(
-            models.SourceRpm.build_id == build_task.build_id,
-            models.SourceRpm.artifact_id == models.BuildTaskArtifact.id,
-            models.BuildTaskArtifact.name == db_srpm_name
-        ))
+    if not srpm:
+        srpms = await db.execute(select(models.SourceRpm).where(
+            models.SourceRpm.build_id == build_task.build_id))
         srpm = srpms.scalars().first()
     if srpm:
         if build_task.built_srpm_url is None:
