@@ -359,7 +359,9 @@ async def __process_build_task_artifacts(
         artifact.name for artifact in task_artifacts
         if artifact.arch == 'src' and artifact.type == 'rpm'
     ), None)
-    if not src_rpm:
+    # If we have RPM artifacts but missing source RPM
+    # then we should throw an error
+    if not src_rpm and rpm_artifacts:
         message = 'No source RPM was sent from build node'
         logging.error(message)
         raise SrpmProvisionError(message)
