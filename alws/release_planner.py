@@ -709,7 +709,7 @@ class ReleasePlanner:
                 module_info = module['module']
                 release_module = ModuleWrapper.from_template(
                     module_info['template'])
-                release_module_nvsca = release_module.get_nsvca()
+                release_module_nvsca = release_module.nsvca
                 full_repo_name = f"{repo_name}-{repo_arch}"
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
@@ -717,7 +717,7 @@ class ReleasePlanner:
                 module_already_in_repo = any((
                     prod_module
                     for prod_module in repo_module_index.iter_modules()
-                    if prod_module.get_nsvca() == release_module_nvsca
+                    if prod_module.nsvca == release_module_nvsca
                 ))
                 if module_already_in_repo:
                     additional_messages.append(
