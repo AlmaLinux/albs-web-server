@@ -23,7 +23,7 @@ from alws.utils.modularity import (
     RpmArtifact,
 )
 from alws.utils.multilib import MultilibProcessor
-from alws.utils.parsing import parse_git_ref
+from alws.utils.parsing import get_clean_distr_name, parse_git_ref
 from alws.utils.pulp_client import PulpClient
 
 
@@ -151,7 +151,7 @@ class BuildPlanner:
         # FIXME: Hardcoded platform for now, should send actual platform
         #  in the task ref
         platform = self._platforms[0]
-        platform_name = platform.name,
+        platform_name = get_clean_distr_name(platform.name)
         major_distr_version = platform.distr_version
         multilib_packages = await MultilibProcessor.get_module_multilib_data(
             beholder_client, platform_name, major_distr_version,
