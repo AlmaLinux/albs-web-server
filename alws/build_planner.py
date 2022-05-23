@@ -140,19 +140,21 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
-    @staticmethod
     async def get_multilib_artifacts(
-            task: build_schema.BuildTaskModuleRef, has_devel: bool = False
+            self, task: build_schema.BuildTaskModuleRef,
+            has_devel: bool = False
     ) -> typing.List[dict]:
         beholder_client = BeholderClient(
             settings.beholder_host, token=settings.beholder_token)
-        major_distr_version = task.module_platform_version.split('.')[0]
         multilib_artifacts = []
 
         # FIXME: Hardcoded platform for now, should send actual platform
         #  in the task ref
+        platform = self._platforms[0]
+        platform_name = platform.name,
+        major_distr_version = platform.distr_version
         multilib_packages = await MultilibProcessor.get_module_multilib_data(
-            beholder_client, 'AlmaLinux', major_distr_version,
+            beholder_client, platform_name, major_distr_version,
             task.module_name, task.module_stream, has_devel=has_devel)
         multilib_set = {pkg['name'] for pkg in multilib_packages}
 
@@ -286,7 +288,7 @@ class BuildPlanner:
                 module_index.add_module(module)
                 if module_index.has_devel_module():
                     devel_module = module_index.get_module(
-                        f'{task.module_name}', task.module_stream)
+                        f'{task.module_name}-devel', task.module_stream)
                     devel_module.version = module.version
                     devel_module.context = module.context
                     devel_module.arch = module.arch
