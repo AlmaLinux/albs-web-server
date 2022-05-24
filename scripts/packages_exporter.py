@@ -587,6 +587,43 @@ class Exporter:
             output_file.unlink()
 
 
+def repo_post_processing(exporter: Exporter, repo_path: str,
+                         platforms_dict: dict, db_sign_keys: list,
+                         key_id_by_platform: str = None):
+    path = Path(repo_path)
+    repo_path = path.parent
+    repodata = repo_path / 'repodata'
+    if not os.path.exists(repo_path):
+        return
+
+    result = True
+    try:
+        local['sudo']['chown', '-R',
+                      f'{exporter.current_user}:{exporter.current_user}',
+                      f'{repo_path}'].run()
+        exporter.regenerate_repo_metadata(repo_path)
+        key_id = key_id_by_platform or None
+        for platform_id, platform_repos in platforms_dict.items():
+            for repo_export_path in platform_repos:
+                if repo_export_path in repo_path:
+                    key_id = next((
+                        sign_key['keyid'] for sign_key in db_sign_keys
+                        if sign_key['platform_id'] == platform_id
+                    ), None)
+                    break
+        if '/ppc64le/' in repo_path:
+            exporter.update_ppc64le_errata(repodata)
+        sync(exporter.repomd_signer(repodata, key_id))
+    except Exception:
+        result = False
+    finally:
+        local['sudo']['chown', '-R',
+                      f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                      f'{repo_path}'].run()
+
+    return result
+
+
 def main():
     args = parse_args()
 
@@ -635,34 +672,20 @@ def main():
     except Exception:
         pass
 
-    for exp_path in exported_paths:
-        string_exp_path = str(exp_path)
-        path = Path(exp_path)
-        repo_path = path.parent
-        repodata = repo_path / 'repodata'
-        if not os.path.exists(repo_path):
-            continue
-        try:
-            local['sudo']['chown', '-R',
-                          f'{exporter.current_user}:{exporter.current_user}',
-                          f'{repo_path}'].run()
-            exporter.regenerate_repo_metadata(repo_path)
-            key_id = key_id_by_platform or None
-            for platform_id, platform_repos in platforms_dict.items():
-                for repo_export_path in platform_repos:
-                    if repo_export_path in string_exp_path:
-                        key_id = next((
-                            sign_key['keyid'] for sign_key in db_sign_keys
-                            if sign_key['platform_id'] == platform_id
-                        ), None)
-                        break
-            if 'ppc64le' in exp_path:
-                exporter.update_ppc64le_errata(repodata)
-            sync(exporter.repomd_signer(repodata, key_id))
-        finally:
-            local['sudo']['chown', '-R',
-                          f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                          f'{repo_path}'].run()
+    futures = {}
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for exp_path in exported_paths:
+            future = executor.submit(
+                repo_post_processing, exporter, exp_path, platforms_dict,
+                db_sign_keys, key_id_by_platform=key_id_by_platform)
+            futures[future] = exp_path
+
+        for future in as_completed(futures):
+            exp_path = futures[future]
+            result = future.result()
+            if result is False:
+                exporter.logger.error(
+                    'Post-processing for repository %s is failed', exp_path)
 
 
 if __name__ == '__main__':
