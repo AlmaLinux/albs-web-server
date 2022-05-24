@@ -393,15 +393,14 @@ class ReleasePlanner:
             repo_name = (
                 self.repo_name_regex.search(ref_repo_name).groupdict()['name']
             )
+            if is_debug:
+                repo_name += '-debuginfo'
             release_repo_name = '-'.join((
                 self.clean_base_dist_name_lower,
                 self.base_platform.distr_version,
                 repo_name
             ))
-            debug = ref_repo_name.endswith('debuginfo')
-            if repo['arch'] == 'src':
-                debug = False
-            release_repo = RepoType(release_repo_name, repo['arch'], debug)
+            release_repo = RepoType(release_repo_name, repo['arch'], is_debug)
             release_repositories.add(release_repo)
         return release_repositories
 
