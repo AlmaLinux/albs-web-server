@@ -181,6 +181,7 @@ class Exporter:
             file_name = os.path.basename(link)
             if not link.endswith('/'):
                 link += '/'
+            self.logger.info('Downloading repodata from %s', link)
             await download_file(link, os.path.join(repodata_path, file_name))
 
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
@@ -210,6 +211,8 @@ class Exporter:
                               f'{parent_dir}'].run()
                 os.makedirs(repodata_path, exist_ok=True)
                 await self.download_repodata(repodata_path, repodata_url)
+            except Exception as e:
+                self.logger.error('Cannot download repodata file: %s', str(e))
             finally:
                 local['sudo'][
                     'chown', '-R',
@@ -627,8 +630,8 @@ def main():
         ))
 
     try:
-        local['sudo']['find', '-type', 'f', '-name', '*snippet',
-                      '-exec', 'rm', '-f', '{}', '+'].run()
+        local['sudo']['find', settings.pulp_export_path, '-type', 'f', '-name',
+                      '*snippet', '-exec', 'rm', '-f', '{}', '+'].run()
     except Exception:
         pass
 
