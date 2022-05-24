@@ -1,5 +1,3 @@
-import re
-
 import aiohttp
 import argparse
 import asyncio
@@ -9,11 +7,15 @@ import os
 import sys
 import typing
 import urllib.parse
+from concurrent.futures import as_completed, ThreadPoolExecutor
+from enum import IntEnum
 from pathlib import Path
 
 import jmespath
-from plumbum import local
 import sqlalchemy
+import rpm
+import pgpy
+from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from syncer import sync
@@ -31,6 +33,13 @@ from errata_migrator import update_updateinfo
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
     '~/config/known_subkeys.json'))
+
+
+class SignStatusEnum(IntEnum):
+    SUCCESS = 1
+    READ_ERROR = 2
+    NO_SIGNATURE = 3
+    WRONG_SIGNATURE = 4
 
 
 def parse_args():
@@ -183,6 +192,10 @@ class Exporter:
             await self.pulp_client.export_to_filesystem(
                 href, repository_version)
             parent_dir = str(Path(export_path).parent)
+            if not os.path.exists(parent_dir):
+                self.logger.info('Repository %s directory is absent',
+                                 exporter['exporter_name'])
+                continue
             repodata_path = os.path.abspath(os.path.join(
                 parent_dir, 'repodata'))
             repodata_url = urllib.parse.urljoin(
@@ -194,9 +207,10 @@ class Exporter:
                 os.makedirs(repodata_path, exist_ok=True)
                 await self.download_repodata(repodata_path, repodata_url)
             finally:
-                local['sudo']['chown', '-R',
-                              f'{self.pulp_system_user}:{self.pulp_system_user}',
-                              f'{parent_dir}'].run()
+                local['sudo'][
+                    'chown', '-R',
+                    f'{self.pulp_system_user}:{self.pulp_system_user}',
+                    parent_dir].run()
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
@@ -348,59 +362,62 @@ class Exporter:
         await self.prepare_and_execute_async_tasks(repos_x86_64, other_repos)
 
     def check_rpms_signature(self, repository_path: str, sign_keys: list):
+        self.logger.info('Checking signature for %s repo', repository_path)
+
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
-        signature_regex = re.compile(
-            r'(Signature[\s:]+)(.*Key ID )?(?P<key_id>(\()?\w+(\))?)',
-            re.IGNORECASE)
+        ts = rpm.TransactionSet()
+        ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
+
+        def check(pkg_path: str) -> typing.Tuple[SignStatusEnum, str]:
+            if not os.path.exists(pkg_path):
+                return SignStatusEnum.READ_ERROR, ''
+
+            with open(pkg_path, 'rb') as fd:
+                header = ts.hdrFromFdno(fd)
+                signature = header[rpm.RPMTAG_SIGGPG]
+                if not signature:
+                    signature = header[rpm.RPMTAG_SIGPGP]
+                if not signature:
+                    return SignStatusEnum.NO_SIGNATURE, ''
+
+                pgp_msg = pgpy.PGPMessage.from_blob(signature)
+                for signature in pgp_msg.signatures:
+                    sig = signature.signer.lower()
+                    if sig in key_ids_lower:
+                        return SignStatusEnum.SUCCESS, sig
+                    else:
+                        for key_id in key_ids_lower:
+                            sub_keys = self.known_subkeys.get(key_id, [])
+                            if sig in sub_keys:
+                                return SignStatusEnum.SUCCESS, sig
+
+                return SignStatusEnum.WRONG_SIGNATURE, sig
+
         errored_packages = set()
         no_signature_packages = set()
         wrong_signature_packages = set()
-        for package in os.listdir(repository_path):
-            package_path = os.path.join(repository_path, package)
-            if not package_path.endswith('.rpm'):
-                self.logger.debug('Skipping non-RPM file or directory: %s',
-                                  package_path)
-                continue
-            args = ('rpm', '-qip', package_path)
-            exit_code, out, err = local['sudo'].run(args=args, retcode=None)
-            if exit_code != 0:
-                self.logger.error('Cannot get information about package %s, %s',
-                                  package_path, '\n'.join((out, err)))
-                errored_packages.add(package_path)
-                continue
-            signature_line = None
-            for line in out.split('\n'):
-                line = line.strip()
-                if line.startswith('Signature'):
-                    signature_line = line
-                    break
-            if not signature_line:
-                self.logger.error('No information about package %s signature',
-                                  package_path)
-                continue
-            signature_result = signature_regex.search(signature_line)
-            if not signature_result:
-                self.logger.error('Cannot detect information '
-                                  'about package %s signature', package_path)
-                errored_packages.add(package_path)
-                continue
-            pkg_key_id = signature_result.groupdict().get('key_id', '').lower()
-            if 'none' in pkg_key_id:
-                self.logger.error('Package %s is not signed', package_path)
-                no_signature_packages.add(package_path)
-            elif pkg_key_id not in key_ids_lower:
-                # Check if package is signed with known sub-key
-                signed_with_subkey = False
-                for key, subkeys in self.known_subkeys.items():
-                    if pkg_key_id in subkeys:
-                        signed_with_subkey = True
-                        break
-                if not signed_with_subkey:
-                    self.logger.error('Package %s is signed with wrong key, '
-                                      'expected "%s", got "%s"',
-                                      package_path, str(key_ids_lower),
-                                      pkg_key_id)
-                    wrong_signature_packages.add(f'{package_path} {pkg_key_id}')
+        futures = {}
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+
+            for package in os.listdir(repository_path):
+                package_path = os.path.join(repository_path, package)
+                if not package_path.endswith('.rpm'):
+                    self.logger.debug('Skipping non-RPM file or directory: %s',
+                                      package_path)
+                    continue
+
+                futures[executor.submit(check, package_path)] = package_path
+
+            for future in as_completed(futures):
+                package_path = futures[future]
+                result, pkg_sig = future.result()
+                if result == SignStatusEnum.READ_ERROR:
+                    errored_packages.add(package_path)
+                elif result == SignStatusEnum.NO_SIGNATURE:
+                    no_signature_packages.add(package_path)
+                elif result == SignStatusEnum.WRONG_SIGNATURE:
+                    wrong_signature_packages.add(f'{package_path} {pkg_sig}')
 
         if errored_packages or no_signature_packages or wrong_signature_packages:
             if not os.path.exists(self.export_error_file):
@@ -420,6 +437,8 @@ class Exporter:
             lines.append('\n')
             with open(self.export_error_file, mode=mode) as f:
                 f.write('\n'.join(lines))
+
+        self.logger.info('Signature check is done')
 
     async def export_repos_from_pulp(
         self,
@@ -482,20 +501,7 @@ class Exporter:
                 if not os.path.exists(repo_path):
                     self.logger.error('Path %s does not exist', repo_path)
                     continue
-                try:
-                    local['sudo']['chown', '-R',
-                                  f'{self.current_user}:{self.current_user}',
-                                  f'{repo_path}'].run()
-                    # removing files with partial modulemd data
-                    local['find'][repo_path, '-type', 'f', '-name', '*snippet',
-                                  '-exec', 'rm', '-f', '{}', '+'].run()
-                    self.check_rpms_signature(repo_path, db_platform.sign_keys)
-                finally:
-                    local['sudo'][
-                        'chown', '-R',
-                        f'{self.pulp_system_user}:{self.pulp_system_user}',
-                        f'{repo_path}'
-                    ].run()
+                self.check_rpms_signature(repo_path, db_platform.sign_keys)
             self.logger.info('All repositories exported in following paths:\n%s',
                              '\n'.join((str(path) for path in exported_paths)))
         await self.prepare_and_execute_async_tasks(repos_x86_64, repos_ppc64le)
@@ -535,12 +541,14 @@ class Exporter:
         return exported_paths, db_release.platform_id
 
     async def delete_existing_exporters_from_pulp(self):
+        self.logger.info('Searching for existing exporters')
         deleted_exporters = []
         existing_exporters = await self.pulp_client.list_filesystem_exporters()
         for exporter in existing_exporters:
             await self.pulp_client.delete_filesystem_exporter(
                 exporter['pulp_href'])
             deleted_exporters.append(exporter['name'])
+        self.logger.info('Search for exporters is done')
         if deleted_exporters:
             self.logger.info(
                 'Following exporters, has been deleted from pulp:\n%s',
@@ -613,6 +621,12 @@ def main():
             arches=args.arches,
             repo_ids=repo_ids,
         ))
+
+    try:
+        local['sudo']['find', '-type', 'f', '-name', '*snippet',
+                      '-exec', 'rm', '-f', '{}', '+'].run()
+    except Exception:
+        pass
 
     for exp_path in exported_paths:
         string_exp_path = str(exp_path)
