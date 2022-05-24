@@ -44,20 +44,25 @@ def get_repository(repo_name: str, arch: str) -> models.Repository:
         return repo
 
 
-def wait_for_task(base_url: str, task_href: str, auth: HTTPBasicAuth):
+def wait_for_task(base_url: str, task_href: str, auth: HTTPBasicAuth,
+                  logger: logging.Logger):
     task_url = urljoin(base_url, task_href)
+    logger.info('Waiting for task %s to finish', task_href)
     res = requests.get(task_url, auth=auth).json()
     while res['state'] not in ('failed', 'completed'):
+        logger.debug('Still in progress...')
         time.sleep(3)
         res = requests.get(task_url, auth=auth).json()
+    logger.info('Task %s is finished', task_href)
     return res
 
 
-def publish_repo(base_url: str, repo_href: str, auth: HTTPBasicAuth):
+def publish_repo(base_url: str, repo_href: str, auth: HTTPBasicAuth,
+                 logger: logging.Logger):
     full_url = urljoin(base_url, '/pulp/api/v3/publications/rpm/rpm/')
     task_href = requests.post(
         full_url, json={'repository': repo_href}, auth=auth).json()['task']
-    return wait_for_task(base_url, task_href, auth)
+    return wait_for_task(base_url, task_href, auth, logger)
 
 
 def setup_logging(verbose: bool = False):
@@ -110,6 +115,7 @@ def main():
                     or pkg in pulp_pkg['location_href']:
                 to_remove.append(pulp_pkg['pulp_href'])
     logger.info('List is compiled')
+    logger.debug('Packages to delete: %s', pprint.pformat(to_remove, indent=4))
 
     if not to_remove:
         logger.warning('Nothing to delete, packages %s'
@@ -121,10 +127,10 @@ def main():
     task_href = requests.post(
         modify_url, auth=pulp_auth,
         json={'remove_content_units': to_remove}).json()['task']
-    task_result = wait_for_task(pulp_host, task_href, pulp_auth)
+    task_result = wait_for_task(pulp_host, task_href, pulp_auth, logger)
     if task_result['state'] == 'failed':
         logger.error('Packages deletion failed: %s',
-                     pprint.pformat(task_result))
+                     pprint.pformat(task_result, indent=4))
         return
     logger.info('Packages deletion succeeded')
 
@@ -132,10 +138,11 @@ def main():
     # every other repository will be published automatically upon modification
     if repo.production:
         logger.info('Publishing new repository version')
-        publication_result = publish_repo(pulp_host, repo.pulp_href, pulp_auth)
+        publication_result = publish_repo(pulp_host, repo.pulp_href, pulp_auth,
+                                          logger)
         if publication_result['state'] == 'failed':
             logger.error('Repository publication failed: %s',
-                         pprint.pformat(publication_result))
+                         pprint.pformat(publication_result, indent=4))
             return
         logger.info('Repository is published successfully')
 
