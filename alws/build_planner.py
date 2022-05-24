@@ -140,21 +140,17 @@ class BuildPlanner:
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
 
-    async def get_multilib_artifacts(
-            self, task: build_schema.BuildTaskModuleRef,
+    @staticmethod
+    async def get_platform_multilib_artifacts(
+            beholder_client: BeholderClient,
+            platform_name: str, platform_version: str,
+            task: build_schema.BuildTaskModuleRef,
             has_devel: bool = False
     ) -> typing.List[dict]:
-        beholder_client = BeholderClient(
-            settings.beholder_host, token=settings.beholder_token)
         multilib_artifacts = []
 
-        # FIXME: Hardcoded platform for now, should send actual platform
-        #  in the task ref
-        platform = self._platforms[0]
-        platform_name = get_clean_distr_name(platform.name)
-        major_distr_version = platform.distr_version
         multilib_packages = await MultilibProcessor.get_module_multilib_data(
-            beholder_client, platform_name, major_distr_version,
+            beholder_client, platform_name, platform_version,
             task.module_name, task.module_stream, has_devel=has_devel)
         multilib_set = {pkg['name'] for pkg in multilib_packages}
 
@@ -167,6 +163,23 @@ class BuildPlanner:
                 if (parsed_artifact.arch == 'i686'
                         and parsed_artifact.name in multilib_set):
                     multilib_artifacts.append(parsed_artifact.as_dict())
+
+        return multilib_artifacts
+
+    async def get_multilib_artifacts(
+            self, task: build_schema.BuildTaskModuleRef,
+            has_devel: bool = False
+    ) -> typing.Dict[str, typing.List[dict]]:
+        beholder_client = BeholderClient(
+            settings.beholder_host, token=settings.beholder_token)
+        multilib_artifacts = {}
+
+        for platform in self._platforms:
+            platform_name = get_clean_distr_name(platform.name)
+            multilib_artifacts[platform.name] = \
+                await self.get_platform_multilib_artifacts(
+                    beholder_client, platform_name, platform.distr_version,
+                    task, has_devel=has_devel)
 
         return multilib_artifacts
 
@@ -190,8 +203,11 @@ class BuildPlanner:
                             module.remove_rpm_artifact(artifact)
 
         if task_arch == 'x86_64':
+            # FIXME: For now we have only 1 platform, so pass multilib findings
+            #  accordingly
             multilib_artifacts = await self.get_multilib_artifacts(
                 task, has_devel=index.has_devel_module())
+            multilib_artifacts = multilib_artifacts[self._platforms[0].name]
             await MultilibProcessor.update_module_index(
                 index, task.module_name, task.module_stream,
                 multilib_artifacts
