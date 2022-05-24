@@ -86,7 +86,11 @@ class Exporter:
         only_check_noarch,
         show_differ_packages,
     ):
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            level=logging.INFO,
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
         self.logger = logging.getLogger('packages-exporter')
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
