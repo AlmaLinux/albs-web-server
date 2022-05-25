@@ -179,8 +179,6 @@ class Exporter:
         file_links = await get_repodata_file_links(repodata_url)
         for link in file_links:
             file_name = os.path.basename(link)
-            if not link.endswith('/'):
-                link += '/'
             self.logger.info('Downloading repodata from %s', link)
             await download_file(link, os.path.join(repodata_path, file_name))
 
@@ -206,7 +204,7 @@ class Exporter:
             repodata_url = urllib.parse.urljoin(
                 exporter['repo_url'], 'repodata/')
             try:
-                local['sudo']['chown', '-R',
+                local['sudo']['chown',
                               f'{self.current_user}:{self.current_user}',
                               f'{parent_dir}'].run()
                 os.makedirs(repodata_path, exist_ok=True)
@@ -216,6 +214,10 @@ class Exporter:
             finally:
                 local['sudo'][
                     'chown', '-R',
+                    f'{self.pulp_system_user}:{self.pulp_system_user}',
+                    repodata_path].run()
+                local['sudo'][
+                    'chown',
                     f'{self.pulp_system_user}:{self.pulp_system_user}',
                     parent_dir].run()
         return exported_paths
@@ -598,9 +600,12 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
 
     result = True
     try:
-        local['sudo']['chown', '-R',
+        local['sudo']['chown',
                       f'{exporter.current_user}:{exporter.current_user}',
                       f'{repo_path}'].run()
+        local['sudo']['chown', '-R',
+                      f'{exporter.current_user}:{exporter.current_user}',
+                      f'{repodata}'].run()
         exporter.regenerate_repo_metadata(repo_path)
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
@@ -618,6 +623,9 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
         result = False
     finally:
         local['sudo']['chown', '-R',
+                      f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                      f'{repodata}'].run()
+        local['sudo']['chown',
                       f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                       f'{repo_path}'].run()
 
