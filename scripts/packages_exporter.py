@@ -659,6 +659,11 @@ def main():
             args.distribution))
         return
     sync(exporter.delete_existing_exporters_from_pulp())
+    exporter.logger.info('Fixing permissions before export')
+    local['sudo']['chown', '-R',
+                  f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                  f'{settings.pulp_export_path}'].run()
+    exporter.logger.info('Permissions are fixed')
 
     db_sign_keys = sync(exporter.get_sign_keys())
     if args.release_id:
