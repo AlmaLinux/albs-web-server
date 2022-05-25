@@ -602,8 +602,8 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
                          platforms_dict: dict, db_sign_keys: list,
                          key_id_by_platform: str = None):
     path = Path(repo_path)
-    repo_path = path.parent
-    repodata = repo_path / 'repodata'
+    parent_dir = path.parent
+    repodata = parent_dir / 'repodata'
     if not os.path.exists(repo_path):
         return
 
@@ -611,11 +611,11 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
     try:
         local['sudo']['chown',
                       f'{exporter.current_user}:{exporter.current_user}',
-                      f'{repo_path}'].run()
+                      f'{parent_dir}'].run()
         local['sudo']['chown', '-R',
                       f'{exporter.current_user}:{exporter.current_user}',
                       f'{repodata}'].run()
-        exporter.regenerate_repo_metadata(repo_path)
+        exporter.regenerate_repo_metadata(parent_dir)
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
             for repo_export_path in platform_repos:
@@ -637,7 +637,7 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
                       f'{repodata}'].run()
         local['sudo']['chown',
                       f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                      f'{repo_path}'].run()
+                      f'{parent_dir}'].run()
 
     return result
 
