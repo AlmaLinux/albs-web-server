@@ -598,9 +598,47 @@ class Exporter:
             output_file.unlink()
 
 
-def repo_post_processing(exporter: Exporter, repo_path: str,
-                         platforms_dict: dict, db_sign_keys: list,
-                         key_id_by_platform: str = None):
+async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
+                        platforms_dict: dict, db_sign_keys: list,
+                        key_id_by_platform: str = None):
+
+    repodata_paths = []
+
+    tasks = []
+
+    for repo_path in exported_paths:
+        path = Path(repo_path)
+        parent_dir = path.parent
+        repodata = parent_dir / 'repodata'
+        if not os.path.exists(repo_path):
+            continue
+
+        repodata_paths.append(repodata)
+
+        key_id = key_id_by_platform or None
+        for platform_id, platform_repos in platforms_dict.items():
+            for repo_export_path in platform_repos:
+                if repo_export_path in repo_path:
+                    key_id = next((
+                        sign_key['keyid'] for sign_key in db_sign_keys
+                        if sign_key['platform_id'] == platform_id
+                    ), None)
+                    break
+
+        local['sudo']['chown', '-R',
+                      f'{exporter.current_user}:{exporter.current_user}',
+                      f'{repodata}'].run()
+        tasks.append(exporter.repomd_signer(repodata, key_id))
+
+    await asyncio.gather(*tasks)
+
+    for repodata_path in repodata_paths:
+        local['sudo']['chown', '-R',
+                      f'{exporter.current_user}:{exporter.current_user}',
+                      f'{repodata_path}'].run()
+
+
+def repo_post_processing(exporter: Exporter, repo_path: str):
     path = Path(repo_path)
     parent_dir = path.parent
     repodata = parent_dir / 'repodata'
@@ -616,18 +654,8 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
                       f'{exporter.current_user}:{exporter.current_user}',
                       f'{repodata}'].run()
         exporter.regenerate_repo_metadata(parent_dir)
-        key_id = key_id_by_platform or None
-        for platform_id, platform_repos in platforms_dict.items():
-            for repo_export_path in platform_repos:
-                if repo_export_path in repo_path:
-                    key_id = next((
-                        sign_key['keyid'] for sign_key in db_sign_keys
-                        if sign_key['platform_id'] == platform_id
-                    ), None)
-                    break
         if '/ppc64le/' in repo_path:
             exporter.update_ppc64le_errata(repodata)
-        sync(exporter.repomd_signer(repodata, key_id))
     except Exception as e:
         exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
@@ -668,12 +696,6 @@ def main():
     local['sudo']['chown', '-R',
                   f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                   f'{settings.pulp_export_path}'].run()
-    # Fix Pulp main storage in case previous run failed at some strange point
-    local['sudo']['find', '/srv/pulp_root/pulp/media/artifact/',
-                  '-type', 'f', '-user', exporter.current_user, '-exec',
-                  'chown',
-                  f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                  '{}', '+'].run()
     exporter.logger.info('Permissions are fixed')
 
     db_sign_keys = sync(exporter.get_sign_keys())
@@ -701,9 +723,25 @@ def main():
     except Exception:
         pass
 
-    for exp_path in exported_paths:
-        repo_post_processing(exporter, exp_path, platforms_dict, db_sign_keys,
-                             key_id_by_platform=key_id_by_platform)
+    futures = {}
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for exp_path in exported_paths:
+            futures[executor.submit(
+                repo_post_processing, exporter, exp_path)] = exp_path
+
+        for future in as_completed(futures):
+            repo_path = futures[future]
+            result = future.result()
+            if result:
+                exporter.logger.info('%s post-processing is successful',
+                                     repo_path)
+            else:
+                exporter.logger.error('%s post-processing has failed',
+                                      repo_path)
+
+    sync(sign_repodata(exporter, exported_paths, platforms_dict, db_sign_keys,
+                       key_id_by_platform=key_id_by_platform))
 
 
 if __name__ == '__main__':
