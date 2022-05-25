@@ -355,7 +355,8 @@ class Exporter:
         self.logger.info('Start checking and copying noarch packages in repos')
         await asyncio.gather(*tasks)
 
-    def get_full_repo_name(self, repo: models.Repository) -> str:
+    @staticmethod
+    def get_full_repo_name(repo: models.Repository) -> str:
         return f"{repo.name}-{'debuginfo-' if repo.debug else ''}{repo.arch}"
 
     async def check_noarch_in_user_distribution_repos(self, distr_name: str):
@@ -723,22 +724,12 @@ def main():
     except Exception:
         pass
 
-    futures = {}
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        for exp_path in exported_paths:
-            futures[executor.submit(
-                repo_post_processing, exporter, exp_path)] = exp_path
-
-        for future in as_completed(futures):
-            repo_path = futures[future]
-            result = future.result()
-            if result:
-                exporter.logger.info('%s post-processing is successful',
-                                     repo_path)
-            else:
-                exporter.logger.error('%s post-processing has failed',
-                                      repo_path)
+    for exp_path in exported_paths:
+        result = repo_post_processing(exporter, exp_path)
+        if result:
+            exporter.logger.info('%s post-processing is successful', exp_path)
+        else:
+            exporter.logger.error('%s post-processing has failed', exp_path)
 
     sync(sign_repodata(exporter, exported_paths, platforms_dict, db_sign_keys,
                        key_id_by_platform=key_id_by_platform))
