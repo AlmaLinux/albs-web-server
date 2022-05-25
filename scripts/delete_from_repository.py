@@ -4,17 +4,11 @@ import os
 import pprint
 import sys
 import time
+import typing
 from urllib.parse import urljoin
 
 import requests
 from requests.auth import HTTPBasicAuth
-from sqlalchemy.future import select
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-from alws import models
-from alws.config import settings
-from alws.database import SyncSession
 
 
 PROG_NAME = 'packages-repo-deleter'
@@ -31,17 +25,6 @@ def parse_args(args):
     parser.add_argument('-p', '--packages', nargs='+', required=True, type=str)
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
     return parser.parse_args(args)
-
-
-def get_repository(repo_name: str, arch: str) -> models.Repository:
-    with SyncSession() as session:
-        repo = (session.execute(select(models.Repository)
-                                .where(models.Repository.name == repo_name,
-                                       models.Repository.arch == arch))
-                .scalars().first())
-        if not repo:
-            raise RepositoryNotFound(f'Repository {repo_name} is not found')
-        return repo
 
 
 def wait_for_task(base_url: str, task_href: str, auth: HTTPBasicAuth,
@@ -65,6 +48,16 @@ def publish_repo(base_url: str, repo_href: str, auth: HTTPBasicAuth,
     return wait_for_task(base_url, task_href, auth, logger)
 
 
+def get_repository(base_url: str, repo_name: str, arch: str,
+                   auth: HTTPBasicAuth) -> typing.Optional[dict]:
+    full_url = urljoin(base_url, '/pulp/api/v3/repositories/rpm/rpm/')
+    params = {'name__contains': f'{repo_name}-{arch}'}
+    result = requests.get(full_url, params=params, auth=auth).json()
+    if result['count'] == 0:
+        return None
+    return result['results'][0]
+
+
 def setup_logging(verbose: bool = False):
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
@@ -76,18 +69,18 @@ def main():
     arguments = parse_args(sys.argv[1:])
     setup_logging(verbose=arguments.verbose)
     logger = logging.getLogger(PROG_NAME)
-    pulp_auth = HTTPBasicAuth(
-        settings.pulp_user, settings.pulp_password)
-    pulp_host = settings.pulp_host
+    pulp_host = os.environ['PULP_HOST']
+    pulp_user = os.environ['PULP_USER']
+    pulp_password = os.environ['PULP_PASSWORD']
+    pulp_auth = HTTPBasicAuth(pulp_user, pulp_password)
 
-    repo = get_repository(
-        arguments.repository_name, arguments.architecture)
-    logger.debug('Repository: %s', repo)
-    repo_info = requests.get(
-        urljoin(pulp_host, repo.pulp_href), auth=pulp_auth).json()
+    repo = get_repository(pulp_host, arguments.repository_name,
+                          arguments.architecture, pulp_auth)
+
+    logger.debug('Repository: %s', str(repo))
     # Looking for packages that belong to the latest repository version
     query_params = {
-        'repository_version': repo_info['latest_version_href'],
+        'repository_version': repo['latest_version_href'],
         'fields': ['location_href', 'pulp_href'],
     }
     # Check how many packages is in the repo to get them the in 1 request
@@ -123,7 +116,7 @@ def main():
                        str(arguments.packages))
         return
 
-    modify_url = urljoin(urljoin(pulp_host, repo.pulp_href), 'modify/')
+    modify_url = urljoin(urljoin(pulp_host, repo['pulp_href']), 'modify/')
     task_href = requests.post(
         modify_url, auth=pulp_auth,
         json={'remove_content_units': to_remove}).json()['task']
@@ -136,10 +129,10 @@ def main():
 
     # Production repositories need to be published separately,
     # every other repository will be published automatically upon modification
-    if repo.production:
+    if not repo['autopublish']:
         logger.info('Publishing new repository version')
-        publication_result = publish_repo(pulp_host, repo.pulp_href, pulp_auth,
-                                          logger)
+        publication_result = publish_repo(
+            pulp_host, repo['pulp_href'], pulp_auth, logger)
         if publication_result['state'] == 'failed':
             logger.error('Repository publication failed: %s',
                          pprint.pformat(publication_result, indent=4))
