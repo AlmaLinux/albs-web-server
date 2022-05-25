@@ -624,7 +624,8 @@ def repo_post_processing(exporter: Exporter, repo_path: str,
         if '/ppc64le/' in repo_path:
             exporter.update_ppc64le_errata(repodata)
         sync(exporter.repomd_signer(repodata, key_id))
-    except Exception:
+    except Exception as e:
+        exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
     finally:
         local['sudo']['chown', '-R',
@@ -663,6 +664,12 @@ def main():
     local['sudo']['chown', '-R',
                   f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                   f'{settings.pulp_export_path}'].run()
+    # Fix Pulp main storage in case previous run failed at some strange point
+    local['sudo']['find', '/srv/pulp_root/pulp/media/artifact/',
+                  '-type', 'f', '-user', exporter.current_user, '-exec',
+                  'chown',
+                  f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                  '{}', '+'].run()
     exporter.logger.info('Permissions are fixed')
 
     db_sign_keys = sync(exporter.get_sign_keys())
@@ -690,20 +697,9 @@ def main():
     except Exception:
         pass
 
-    futures = {}
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        for exp_path in exported_paths:
-            future = executor.submit(
-                repo_post_processing, exporter, exp_path, platforms_dict,
-                db_sign_keys, key_id_by_platform=key_id_by_platform)
-            futures[future] = exp_path
-
-        for future in as_completed(futures):
-            exp_path = futures[future]
-            result = future.result()
-            if result is False:
-                exporter.logger.error(
-                    'Post-processing for repository %s is failed', exp_path)
+    for exp_path in exported_paths:
+        repo_post_processing(exporter, exp_path, platforms_dict, db_sign_keys,
+                             key_id_by_platform=key_id_by_platform)
 
 
 if __name__ == '__main__':
