@@ -207,7 +207,12 @@ class Exporter:
                 local['sudo']['chown',
                               f'{self.current_user}:{self.current_user}',
                               f'{parent_dir}'].run()
-                os.makedirs(repodata_path, exist_ok=True)
+                if not os.path.exists(repodata_path):
+                    os.makedirs(repodata_path)
+                else:
+                    local['sudo']['chown', '-R',
+                                  f'{self.current_user}:{self.current_user}',
+                                  f'{repodata_path}'].run()
                 await self.download_repodata(repodata_path, repodata_url)
             except Exception as e:
                 self.logger.error('Cannot download repodata file: %s', str(e))
