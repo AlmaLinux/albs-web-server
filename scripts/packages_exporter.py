@@ -559,9 +559,13 @@ class Exporter:
         deleted_exporters = []
         existing_exporters = await self.pulp_client.list_filesystem_exporters()
         for exporter in existing_exporters:
-            await self.pulp_client.delete_filesystem_exporter(
-                exporter['pulp_href'])
-            deleted_exporters.append(exporter['name'])
+            try:
+                await self.pulp_client.delete_filesystem_exporter(
+                    exporter['pulp_href'])
+                deleted_exporters.append(exporter['name'])
+            except:
+                self.logger.info('Exporter %s does not exist',
+                                 exporter['name'])
         self.logger.info('Search for exporters is done')
         if deleted_exporters:
             self.logger.info(
