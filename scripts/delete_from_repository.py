@@ -54,7 +54,12 @@ def get_repository(base_url: str, repo_name: str, arch: str,
     params = {'name__contains': f'{repo_name}-{arch}'}
     result = requests.get(full_url, params=params, auth=auth).json()
     if result['count'] == 0:
-        return None
+        # Try name without arch
+        params = {'name__contains': repo_name}
+        result = requests.get(full_url, params=params, auth=auth).json()
+        if result['count'] == 0:
+            return None
+        return result['results'][0]
     return result['results'][0]
 
 
@@ -76,6 +81,9 @@ def main():
 
     repo = get_repository(pulp_host, arguments.repository_name,
                           arguments.architecture, pulp_auth)
+    if not repo:
+        logger.error('Repository %s not found', arguments.repository_name)
+        return
 
     logger.debug('Repository: %s', str(repo))
     # Looking for packages that belong to the latest repository version
