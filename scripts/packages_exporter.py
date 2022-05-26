@@ -8,7 +8,6 @@ import sys
 import typing
 import urllib.parse
 from concurrent.futures import as_completed, ThreadPoolExecutor
-from enum import IntEnum
 from pathlib import Path
 
 import jmespath
@@ -26,6 +25,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database
 from alws import models
 from alws.config import settings
+from alws.constants import SignStatusEnum
 from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
 from errata_migrator import update_updateinfo
@@ -33,13 +33,6 @@ from errata_migrator import update_updateinfo
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
     '~/config/known_subkeys.json'))
-
-
-class SignStatusEnum(IntEnum):
-    SUCCESS = 1
-    READ_ERROR = 2
-    NO_SIGNATURE = 3
-    WRONG_SIGNATURE = 4
 
 
 def parse_args():
