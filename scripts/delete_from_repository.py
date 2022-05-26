@@ -51,11 +51,11 @@ def publish_repo(base_url: str, repo_href: str, auth: HTTPBasicAuth,
 def get_repository(base_url: str, repo_name: str, arch: str,
                    auth: HTTPBasicAuth) -> typing.Optional[dict]:
     full_url = urljoin(base_url, '/pulp/api/v3/repositories/rpm/rpm/')
-    params = {'name__contains': f'{repo_name}-{arch}'}
+    params = {'name': f'{repo_name}-{arch}'}
     result = requests.get(full_url, params=params, auth=auth).json()
     if result['count'] == 0:
         # Try name without arch
-        params = {'name__contains': repo_name}
+        params = {'name': repo_name}
         result = requests.get(full_url, params=params, auth=auth).json()
         if result['count'] == 0:
             return None
