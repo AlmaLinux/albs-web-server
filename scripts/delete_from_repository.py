@@ -59,7 +59,7 @@ def get_repository(base_url: str, repo_name: str, arch: str,
         result = requests.get(full_url, params=params, auth=auth).json()
         if result['count'] == 0:
             return None
-        return result['results'][0]
+        return next((i for i in result['results'] if arch in i['name']), None)
     return result['results'][0]
 
 
