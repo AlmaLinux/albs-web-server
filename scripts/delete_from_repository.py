@@ -21,7 +21,6 @@ class RepositoryNotFound(ValueError):
 def parse_args(args):
     parser = argparse.ArgumentParser('packages-repo-deleter')
     parser.add_argument('-r', '--repository-name', required=True, type=str)
-    parser.add_argument('-a', '--architecture', required=True, type=str)
     parser.add_argument('-p', '--packages', nargs='+', required=True, type=str)
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
     return parser.parse_args(args)
@@ -48,18 +47,13 @@ def publish_repo(base_url: str, repo_href: str, auth: HTTPBasicAuth,
     return wait_for_task(base_url, task_href, auth, logger)
 
 
-def get_repository(base_url: str, repo_name: str, arch: str,
+def get_repository(base_url: str, repo_name: str,
                    auth: HTTPBasicAuth) -> typing.Optional[dict]:
     full_url = urljoin(base_url, '/pulp/api/v3/repositories/rpm/rpm/')
-    params = {'name': f'{repo_name}-{arch}'}
+    params = {'name': repo_name}
     result = requests.get(full_url, params=params, auth=auth).json()
     if result['count'] == 0:
-        # Try name without arch
-        params = {'name': repo_name}
-        result = requests.get(full_url, params=params, auth=auth).json()
-        if result['count'] == 0:
-            return None
-        return next((i for i in result['results'] if arch in i['name']), None)
+        return None
     return result['results'][0]
 
 
@@ -79,8 +73,7 @@ def main():
     pulp_password = os.environ['PULP_PASSWORD']
     pulp_auth = HTTPBasicAuth(pulp_user, pulp_password)
 
-    repo = get_repository(pulp_host, arguments.repository_name,
-                          arguments.architecture, pulp_auth)
+    repo = get_repository(pulp_host, arguments.repository_name, pulp_auth)
     if not repo:
         logger.error('Repository %s not found', arguments.repository_name)
         return
