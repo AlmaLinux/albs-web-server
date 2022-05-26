@@ -809,8 +809,8 @@
     - arch: s390x
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/.devel/s390x/os/
-      export_path: almalinux/9/.devel/s390x/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/.devel/s390x/os/
+      export_path: vault/9/.devel/s390x/os/
       production: true
       debug: false
       remote_sync_policy: immediate
@@ -819,8 +819,8 @@
     - arch: x86_64
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/.devel/x86_64/os/
-      export_path: almalinux/9/.devel/x86_64/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/.devel/x86_64/os/
+      export_path: vault/9/.devel/x86_64/os/
       production: true
       debug: false
       remote_sync_policy: immediate
@@ -829,8 +829,8 @@
     - arch: ppc64le
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/.devel/ppc64le/os/
-      export_path: almalinux/9/.devel/ppc64le/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/.devel/ppc64le/os/
+      export_path: vault/9/.devel/ppc64le/os/
       production: true
       debug: false
       remote_sync_policy: immediate
@@ -849,8 +849,18 @@
     - arch: aarch64
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/.devel/aarch64/os/
-      export_path: almalinux/9/.devel/aarch64/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/.devel/aarch64/os/
+      export_path: vault/9/.devel/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: immediate
+      repository_sync_policy: additive
+      priority: 10
+    - arch: src
+      name: almalinux-9-devel
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/9/.devel/Source/
+      export_path: vault/9/.devel/Source/
       production: true
       debug: false
       remote_sync_policy: immediate
