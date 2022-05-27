@@ -744,6 +744,9 @@ class ReleasePlanner:
         publication_tasks = []
         for repository_name, arches in packages_to_repo_layout.items():
             for arch, packages in arches.items():
+                # TODO: we already have all repos in self.base_platform.repos,
+                # we can store them in dict
+                # for example: (repo_name, arch): repo
                 repo_q = select(models.Repository).where(
                     models.Repository.name == repository_name,
                     models.Repository.arch == arch
