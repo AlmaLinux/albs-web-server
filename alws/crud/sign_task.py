@@ -155,6 +155,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     sign_task_payload['packages'] = packages
     return sign_task_payload
 
+
 async def get_sign_task(db, sign_task_id: int) -> models.SignTask:
     sign_tasks = await db.execute(select(models.SignTask).where(
         models.SignTask.id == sign_task_id
@@ -196,6 +197,12 @@ async def complete_sign_task(
         ).options(selectinload(models.SignTask.sign_key)))
         sign_task = sign_tasks.scalars().first()
 
+        if not payload.success:
+            sign_task.status = SignStatus.FAILED
+            sign_task.error_message = payload.error_message
+            db.add(sign_task)
+            return sign_task
+
         if payload.packages:
             sorted_packages = sorted(payload.packages, key=lambda p: p.id)
             dedup_mapping = {p.name: p for p in sorted_packages}
@@ -216,21 +223,30 @@ async def complete_sign_task(
                     db_package = all_rpms_mapping[pkg_id]
                     debug = is_debuginfo_rpm(package.name)
                     repo = repo_mapping[(pkg_arch, debug)]
-                    artifact_info = await pulp_client.get_artifact(
-                        package.href, include_fields=['sha256'])
                     rpm_pkg = await pulp_client.get_rpm_packages(
-                        include_fields=['pulp_href'],
-                        sha256=artifact_info['sha256']
+                        include_fields=['pulp_href', 'sha256'],
+                        sha256=package.sha256
                     )
                     if rpm_pkg:
                         new_pkg_href = rpm_pkg[0]['pulp_href']
+                        sha256 = rpm_pkg[0]['sha256']
                     else:
                         new_pkg_href = await pulp_client.create_rpm_package(
                             package.name, package.href)
+                        package_info = await pulp_client.get_rpm_package(
+                            new_pkg_href, include_fields=['sha256'])
+                        sha256 = package_info['sha256']
                     if new_pkg_href is None:
                         logging.error('Package %s href is missing', str(package))
                         sign_failed = True
                         continue
+                    if not sha256:
+                        logging.error('Package %s sha256 checksum is missing',
+                                      str(package))
+                        sign_failed = True
+                        continue
+                    if sha256 != package.sha256:
+                        logging.error('Package %s checksum differs')
                     if repo.pulp_href not in packages_to_add:
                         packages_to_add[repo.pulp_href] = []
                     packages_to_add[repo.pulp_href].append(new_pkg_href)
@@ -258,6 +274,7 @@ async def complete_sign_task(
         db.add(build)
         if modified_items:
             db.add_all(modified_items)
+        return sign_task
 
 
 async def verify_signed_build(db: Session, build_id: int,
