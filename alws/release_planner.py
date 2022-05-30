@@ -308,6 +308,7 @@ class ReleasePlanner:
         added_packages = set()
         for pkg in pulp_packages:
             full_name = pkg['full_name']
+            pkg_arch = pkg['arch']
             pkg.pop('is_beta')
             if full_name in added_packages:
                 continue
@@ -319,11 +320,11 @@ class ReleasePlanner:
                     self.base_platform.distr_version,
                     'devel-debuginfo' if is_debug else 'devel',
                 )),
-                pkg['task_arch'],
+                pkg_arch if pkg_arch == 'src' else pkg['task_arch'],
                 is_debug,
             )]
-            repo_arch_location = [pkg['arch']]
-            if pkg['arch'] == 'noarch':
+            repo_arch_location = [pkg_arch]
+            if pkg_arch == 'noarch':
                 repo_arch_location = self.base_platform.arch_list
             packages.append({
                 'package': pkg,
@@ -384,7 +385,7 @@ class ReleasePlanner:
                     self.base_platform.distr_version,
                     'devel-debuginfo' if is_debug else 'devel',
                 )),
-                pkg_task_arch,
+                pkg_arch if pkg_arch == 'src' else pkg_task_arch,
                 is_debug,
             )
             release_repositories.add(release_repo)
@@ -743,6 +744,9 @@ class ReleasePlanner:
         publication_tasks = []
         for repository_name, arches in packages_to_repo_layout.items():
             for arch, packages in arches.items():
+                # TODO: we already have all repos in self.base_platform.repos,
+                # we can store them in dict
+                # for example: (repo_name, arch): repo
                 repo_q = select(models.Repository).where(
                     models.Repository.name == repository_name,
                     models.Repository.arch == arch
