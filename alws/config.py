@@ -6,6 +6,7 @@ from pydantic import BaseSettings
 class Settings(BaseSettings):
 
     pulp_host: str = 'http://pulp'
+    pulp_internal_host: str = 'http://pulp'
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'

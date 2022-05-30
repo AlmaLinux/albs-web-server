@@ -186,7 +186,7 @@ async def complete_sign_task(
         repo_mapping = await __get_build_repos(
             db, payload.build_id, build=build)
         pulp_client = PulpClient(
-            settings.pulp_host,
+            settings.pulp_internal_host,
             settings.pulp_user,
             settings.pulp_password
         )

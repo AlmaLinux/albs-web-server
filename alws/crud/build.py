@@ -71,7 +71,7 @@ async def get_builds(
         'fields': ['pulp_href'],
     }
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password,
     )
@@ -184,7 +184,7 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
             repos.append(br.pulp_href)
             repo_ids.append(br.id)
         pulp_client = PulpClient(
-            settings.pulp_host,
+            settings.pulp_internal_host,
             settings.pulp_user,
             settings.pulp_password
         )

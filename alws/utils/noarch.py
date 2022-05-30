@@ -49,7 +49,7 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
         selectinload(models.BuildTask.build).selectinload(models.Build.repos),
     )
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password,
     )

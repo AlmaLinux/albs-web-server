@@ -190,7 +190,7 @@ async def create_repository_remote(
         models.RepositoryRemote.url == payload.url
     )
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )
@@ -240,7 +240,7 @@ async def sync_repo_from_remote(db: Session, repository_id: int,
         remote = select(models.RepositoryRemote).get(payload.remote_id)
 
     pulp_client = PulpClient(
-        settings.pulp_host,
+        settings.pulp_internal_host,
         settings.pulp_user,
         settings.pulp_password
     )

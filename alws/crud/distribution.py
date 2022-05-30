@@ -39,7 +39,7 @@ async def create_distro(
         db_distribution.platforms.extend(distro_platforms)
 
         pulp_client = PulpClient(
-            settings.pulp_host,
+            settings.pulp_internal_host,
             settings.pulp_user,
             settings.pulp_password
         )
@@ -89,8 +89,11 @@ async def add_distributions_after_rebuild(
     db_distros = await db.execute(distr_query)
     db_distros = db_distros.scalars().all()
 
-    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                             settings.pulp_password)
+    pulp_client = PulpClient(
+        settings.pulp_internal_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
 
     for db_distro in db_distros:
         modify = await prepare_repo_modify_dict(
@@ -197,8 +200,11 @@ async def modify_distribution(build_id: int, distribution: str, db: Session,
                             f'as they are not added there'
                 raise DistributionError(error_msg)
 
-    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                             settings.pulp_password)
+    pulp_client = PulpClient(
+        settings.pulp_internal_host,
+        settings.pulp_user,
+        settings.pulp_password
+    )
     modify = await prepare_repo_modify_dict(db_build, db_distro, pulp_client)
     tasks = []
     for key, value in modify.items():
