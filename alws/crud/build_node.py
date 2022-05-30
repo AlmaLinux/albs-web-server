@@ -14,6 +14,7 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.errors import (
     ArtifactConversionError,
+    ArtifactChecksumError,
     ModuleUpdateError,
     RepositoryAddError,
     SrpmProvisionError,
@@ -155,6 +156,18 @@ async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
     return build_tasks.scalars().first()
 
 
+def __verify_checksums(processed_entities: typing.List[typing.Tuple[
+                       str, str, build_node_schema.BuildDoneArtifact]]):
+    checksum_errors = []
+    for _, sha256, artifact in processed_entities:
+        if sha256 != artifact.sha256:
+            checksum_errors.append(
+                f'{str(artifact.name)} has incorrect checksum: '
+                f'reported {artifact.sha256}, Pulp has {sha256}')
+    if checksum_errors:
+        raise ArtifactChecksumError('\n'.join(checksum_errors))
+
+
 async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                          task_arch: str, task_artifacts: list,
                          repositories: list,
@@ -204,6 +217,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         processed_packages.extend(results)
         hrefs = [item[0] for item in results]
+        __verify_checksums(processed_packages)
         try:
             await pulp_client.modify_repository(
                 repo.pulp_href, add=hrefs)
@@ -215,7 +229,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 f'Cannot add RPM packages to the repository {str(repo)}'
             )
 
-    for href, artifact in processed_packages:
+    for href, _, artifact in processed_packages:
         rpms.append(
             models.BuildTaskArtifact(
                 build_task_id=task_id,
@@ -282,17 +296,19 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
         logging.error('Log repository is absent, skipping logs processing')
         return
     repo = repo[0]
-    files = [pulp_client.create_entity(artifact)
+    tasks = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
-        results = await asyncio.gather(*files)
+        results = await asyncio.gather(*tasks)
     except Exception as e:
         logging.exception('Cannot create log files for %s', str(repo))
         raise ArtifactConversionError(
             f'Cannot create log files for {str(repo)}, error: {str(e)}')
 
+    __verify_checksums(results)
+
     hrefs = []
-    for href, artifact in results:
+    for href, _, artifact in results:
         logs.append(
             models.BuildTaskArtifact(
                 build_task_id=task_id,
