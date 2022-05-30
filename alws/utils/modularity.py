@@ -243,7 +243,7 @@ class ModuleWrapper:
             return True
 
         if self.is_artifact_filtered(rpm_pkg):
-            if self.name.endswith('-devel'):
+            if self.name.endswith('-devel') or rpm_pkg['arch'] == 'src':
                 self._stream.add_rpm_artifact(artifact)
                 return True
         else:
