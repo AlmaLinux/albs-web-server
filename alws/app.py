@@ -11,9 +11,10 @@ from alws.test_scheduler import TestTaskScheduler
 
 ROUTERS = [importlib.import_module(f'alws.routers.{module}')
            for module in routers.__all__]
+APP_PREFIX = '/api/v1'
 
 app = FastAPI(
-    prefix='/api/v1/'
+    prefix=APP_PREFIX
 )
 scheduler = None
 terminate_event = threading.Event()
@@ -34,4 +35,6 @@ async def shutdown():
 
 
 for module in ROUTERS:
-    app.include_router(module.router, prefix='/api/v1')
+    app.include_router(module.router, prefix=APP_PREFIX)
+    if getattr(module, 'public_router', None):
+        app.include_router(module.public_router, prefix=APP_PREFIX)
