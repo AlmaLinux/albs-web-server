@@ -216,9 +216,14 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 f'Cannot add RPM packages to the repository {str(repo)}'
             )
     
-    def append_errata_package(_, errata_package, artifact):
+    def append_errata_package(_, errata_package, artifact, rpm_info):
         model = models.ErrataToALBSPackage(
-            status=models.ErrataPackageStatus.proposal
+            status=models.ErrataPackageStatus.proposal,
+            name=rpm_info['name'],
+            version=rpm_info['version'],
+            release=rpm_info['release'],
+            epoch=int(rpm_info['epoch']),
+            arch=rpm_info['arch'],
         )
         model.errata_package = errata_package
         model.build_artifact = artifact
@@ -242,19 +247,21 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         else:
             src_name = rpm_info['name']
         release = clean_release(rpm_info['release'])
+        conditions = [
+            models.ErrataPackage.name == rpm_info['name'],
+            models.ErrataPackage.version == rpm_info['version'],
+            models.ErrataPackage.release.like(f'%{release}%')
+        ]
+        if rpm_info['arch'] != 'noarch':
+            conditions.append(
+                models.ErrataPackage.arch == rpm_info['arch']
+            )
         errata_packages = await db.execute(select(
             models.ErrataPackage
-        ).where(
-            sqlalchemy.and_(
-                models.ErrataPackage.name == rpm_info['name'],
-                models.ErrataPackage.version == rpm_info['version'],
-                models.ErrataPackage.arch == rpm_info['arch'],
-                models.ErrataPackage.release.like(f'%{release}%')
-            )
-        ))
+        ).where(sqlalchemy.and_(*conditions)))
         for errata_package in errata_packages.scalars().all():
             errata_package.source_srpm = src_name
-            await db.run_sync(append_errata_package, errata_package, artifact)
+            await db.run_sync(append_errata_package, errata_package, artifact, rpm_info)
         rpms.append(artifact)
 
     if module_index:

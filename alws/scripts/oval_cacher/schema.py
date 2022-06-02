@@ -70,7 +70,13 @@ class Advisory(BaseModel):
 
     @validator("bugzilla", pre=True)
     def validator_bugzilla(cls, value):
-        if isinstance(value, str):
+        if not isinstance(value, list):
+            return [value]
+        return value
+        
+    @validator("cve", pre=True)
+    def validator_cve(cls, value):
+        if not isinstance(value, list):
             return [value]
         return value
 
@@ -81,6 +87,12 @@ class Metadata(BaseModel):
     reference: List[Reference]
     description: str
     advisory: Advisory
+
+    @validator("reference", pre=True)
+    def validator_reference(cls, value):
+        if not isinstance(value, list):
+            return [value]
+        return value
 
 
 class Criterion(BaseModel):
@@ -321,7 +333,7 @@ class VulnerabilityItem(BaseModel):
     references: References
     release_date: str
     involvements: Involvements
-    product_statuses: ProductStatuses
+    product_statuses: Optional[ProductStatuses]
     remediations: Remediations
     threats: Optional[Threats] = None
     discovery_date: str
@@ -338,7 +350,7 @@ class CVRF(BaseModel):
     document_references: DocumentReferences
     aggregate_severity: str
     document_tracking: DocumentTracking
-    product_tree: ProductTree
+    product_tree: Optional[ProductTree]
     document_publisher: DocumentPublisher
     vulnerability: Optional[List[VulnerabilityItem]] = []
     document_notes: DocumentNotes

@@ -27,8 +27,9 @@ from alws.utils.pulp_client import PulpClient
 
 
 class ReleasePlanner:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, pulp_db: Session):
         self._db = db
+        self._pulp_db = pulp_db
         self.pkgs_mapping = None
         self.repo_data_by_href = None
         self.pkgs_nevra = None
@@ -584,6 +585,25 @@ class ReleasePlanner:
                         f'or doesn\'t have pulp_href field')
                 modify_tasks.append(self._pulp_client.modify_repository(
                     repo.pulp_href, add=packages))
+                #################################
+                for pkg in set(packages):
+                    # TODO:
+                    #   1. First check if errata record was already released.
+                    #   2. If not, check if record already exists in pulp db.
+                    #   3. If not, create new errata record.
+                    #   4. Add packages/modules to errata record.
+                    #   5. Add errata record to repository.
+                    db_pkg_list = await self._db.execute(select(models.BuildTaskArtifact).where(
+                        models.BuildTaskArtifact.href == pkg
+                    ))
+                    db_pkg_list = db_pkg_list.scalars().all()
+                    for db_pkg in db_pkg_list:
+                        errata_pkgs = await self._db.execute(select(models.ErrataToALBSPackage).where(
+                            models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id
+                        ))
+                        for errata_pkg in errata_pkgs.scalars().all():
+                            errata_pkg.status = models.ErrataPackageStatus.released
+                ###################################
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self._pulp_client.create_rpm_publication(repo.pulp_href))

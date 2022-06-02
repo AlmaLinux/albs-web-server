@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - "./volumes/postgresql/data:/var/lib/postgresql/data"
+      - "../volumes/postgresql/data:/var/lib/postgresql/data"
 
   rabbitmq:
     image: rabbitmq:3.8-management
@@ -74,7 +74,7 @@ services:
     volumes:
       - "./alws:/code/alws"
       - "./scripts:/code/scripts"
-      - "./volumes/pulp/exports:/srv/exports"
+      - "../volumes/pulp/exports:/srv/exports"
       - "./reference_data:/code/reference_data"
     command:
         bash -c 'source env/bin/activate &&
@@ -118,6 +118,7 @@ services:
     command: bash -c "npm install && npm run dev"
     volumes:
       - "../albs-frontend:/code"
+      - "../node_modules:/code/node_modules"
     restart: on-failure
     depends_on:
       - web_server
@@ -192,11 +193,11 @@ services:
     ports:
       - 8081:80
     volumes:
-      - "./volumes/pulp/settings:/etc/pulp"
-      - "./volumes/pulp/exports:/srv/exports"
-      - "./volumes/pulp/pulp_storage:/var/lib/pulp"
-      - "./volumes/pulp/pgsql:/var/lib/pgsql"
-      - "./volumes/pulp/containers:/var/lib/containers"
+      - "../volumes/pulp/settings:/etc/pulp"
+      - "../volumes/pulp/exports:/srv/exports"
+      - "../volumes/pulp/pulp_storage:/var/lib/pulp"
+      - "../volumes/pulp/pgsql:/var/lib/pgsql"
+      - "../volumes/pulp/containers:/var/lib/containers"
     devices:
       - "/dev/fuse"
     restart: on-failure

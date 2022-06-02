@@ -93,7 +93,8 @@ async def create_platform(
         data=platform.data,
         arch_list=platform.arch_list,
         is_reference=platform.is_reference,
-        modularity=platform.modularity
+        modularity=platform.modularity,
+        weak_arch_list=platform.weak_arch_list,
     )
     if platform.repos:
         for repo in platform.repos:

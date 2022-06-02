@@ -47,6 +47,7 @@ class BaseErrataPackage(BaseModel):
 
 
 class AlbsPackage(BaseModel):
+    id: int
     albs_artifact_id: Optional[int]
     build_id: Optional[int]
     task_id: Optional[int]
@@ -85,10 +86,11 @@ class BaseErrataRecord(BaseModel):
     definition_version: str
     definition_class: str
     affected_cpe: List[str]
-    criteria: Any    # TODO
-    tests: Any       # TODO
-    objects: Any     # TODO
-    states: Any      # TODO
+    criteria: Any    # TODO: define type
+    tests: Any       # TODO: define type
+    objects: Any     # TODO: define type
+    states: Any      # TODO: define type
+    variables: Any   # TODO: define type
     references: List[BaseErrataReference]
     packages: List[BaseErrataPackage]
 

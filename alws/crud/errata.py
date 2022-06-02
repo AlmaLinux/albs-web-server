@@ -1,6 +1,8 @@
 import re
+import logging
 import pathlib
 import datetime
+import collections
 from typing import Optional, List
 
 import jinja2
@@ -14,6 +16,13 @@ from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.config import settings
+from alws.utils.errata import (
+    debrand_id,
+    debrand_affected_cpe_list,
+    debrand_reference,
+    debrand_comment,
+)
+from alws.utils.pulp_client import PulpClient
 
 
 def clean_release(release):
@@ -21,7 +30,9 @@ def clean_release(release):
     return re.sub(r"\.el\d+.*$", "", release)
 
 
-def errata_records_to_json(db_records: List[models.ErrataRecord]) -> List[dict]:
+def errata_records_to_json(
+    db_records: List[models.ErrataRecord],
+) -> List[dict]:
     response = []
     for db_record in db_records:
         record = {
@@ -30,7 +41,8 @@ def errata_records_to_json(db_records: List[models.ErrataRecord]) -> List[dict]:
             "updated_date": db_record.updated_date,
             "severity": db_record.severity,
             "title": db_record.title or db_record.original_title,
-            "description": db_record.description or db_record.original_description,
+            "description": db_record.description
+            or db_record.original_description,
             # 'type': ... # TODO
             "packages": [],
             "modules": [],
@@ -58,12 +70,318 @@ def errata_record_to_html(record):
     return jinja2.Template(template).render(errata=errata)
 
 
-# TODO: add cache for this
-async def load_platform_packages(platform):
+class CriteriaNode:
+    def __init__(self, criteria, parent):
+        self.criteria = criteria
+        self.parent = parent
+
+    def simplify(self) -> bool:
+        to_remove = []
+        for criteria in self.criteria["criteria"]:
+            criteria_node = CriteriaNode(criteria, self)
+            is_empty = criteria_node.simplify()
+            if is_empty:
+                to_remove.append(criteria)
+        for criteria in to_remove:
+            self.criteria["criteria"].remove(criteria)
+        if (
+            self.parent is not None
+            and len(self.criteria["criterion"]) == 1
+            and len(self.criteria["criteria"]) == 0
+        ):
+            self.parent.criteria["criterion"].append(
+                self.criteria["criterion"].pop()
+            )
+        if (
+            len(self.criteria["criteria"]) == 0
+            and len(self.criteria["criterion"]) == 0
+        ):
+            return True
+        return False
+    
+    def is_old_record(self) -> bool:
+        for criteria in self.criteria["criteria"]:
+            criteria_node = CriteriaNode(criteria, self)
+            if criteria_node.is_old_record():
+                return True
+        for criterion in self.criteria['criterion']:
+            if 'CentOS' in criterion['comment']:
+                return True
+        return False
+
+
+def errata_records_to_oval(
+    records: List[models.ErrataRecord], output_file: str
+):
+    # FIXME: this imports will be held inside this function, since ovallib dependency should
+    #        stay optional for web-server until we release it.
+    from almalinux.liboval.composer import (
+        Composer,
+        get_test_cls_by_tag,
+        get_object_cls_by_tag,
+        get_state_cls_by_tag,
+        get_variable_cls_by_tag,
+    )
+    from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
+    from almalinux.liboval.rpminfo_test import RpminfoTest
+    from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
+    from almalinux.liboval.rpminfo_state import RpminfoState
+    from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
+    from almalinux.liboval.generator import Generator
+    from almalinux.liboval.definition import Definition
+
+    oval = Composer()
+    generator = Generator(
+        product_name="AlmaLinux OS Errata System",
+        product_version="0.0.1",
+        schema_version="5.10",
+        timestamp=datetime.datetime.now(),
+    )
+    oval.generator = generator
+    # TODO: add this info to platform LOL
+    gpg_keys = {
+        "8": "51D6647EC21AD6EA",
+        "9": "D36CB86CB86B3716",
+    }
+    objects = set()
+    links_tracking = set()
+    evra_regex = re.compile(r"(\d+):(.*)-(.*)")
+    for record in records:
+        rhel_evra_mapping = collections.defaultdict(dict)
+        for pkg in record.packages:
+            albs_pkgs = [
+                albs_pkg
+                for albs_pkg in pkg.albs_packages
+                if albs_pkg.status == models.ErrataPackageStatus.released
+            ]
+            if not albs_pkgs:
+                continue
+            for albs_pkg in albs_pkgs:
+                rhel_evra = f"{pkg.epoch}:{pkg.version}-{pkg.release}"
+                albs_pulp_href = albs_pkg.pulp_href
+                if not albs_pulp_href:
+                    albs_pulp_href = albs_pkg.build_artifact.pulp_href
+                albs_evra = (
+                    f"{albs_pkg.epoch}:{albs_pkg.version}-{albs_pkg.release}"
+                )
+                arch = albs_pkg.arch
+                if arch == 'noarch':
+                    arch = pkg.arch
+                rhel_evra_mapping[rhel_evra][arch] = albs_evra
+        if not rhel_evra_mapping:
+            continue
+        criteria_list = record.original_criteria[:]
+        centos_refs = False
+        for criteria in criteria_list:
+            node = CriteriaNode(criteria, None)
+            if node.is_old_record():
+                centos_refs = True
+        while criteria_list:
+            new_criteria_list = []
+            for criteria in criteria_list:
+                new_criteria_list.extend(criteria["criteria"])
+                criterion_list = []
+                criterion_refs = set()
+                for criterion in criteria["criterion"]:
+                    criterion["ref"] = debrand_id(criterion["ref"])
+                    if criterion["ref"] in criterion_refs:
+                        continue
+                    criterion_refs.add(criterion["ref"])
+                    if criterion["comment"] == "Red Hat CoreOS 4 is installed":
+                        continue
+                    criterion["comment"] = debrand_comment(
+                        criterion["comment"], record.platform.distr_version
+                    )
+                    if not centos_refs:
+                        evra = evra_regex.search(criterion["comment"])
+                        if evra:
+                            evra = evra.group()
+                            if evra not in rhel_evra_mapping.keys():
+                                continue
+                            criterion["comment"] = criterion["comment"].replace(
+                                evra,
+                                rhel_evra_mapping[evra][
+                                    next(iter(rhel_evra_mapping[evra].keys()))
+                                ],
+                            )
+                    criterion_list.append(criterion)
+                if len(criterion_list) == 1 and re.search(
+                    r"is signed with AlmaLinux OS",
+                    criterion_list[0]["comment"],
+                ):
+                    criterion_list = []
+                criteria["criterion"] = criterion_list
+                links_tracking.update(
+                    criterion["ref"] for criterion in criterion_list
+                )
+            criteria_list = new_criteria_list
+        for criteria in record.original_criteria:
+            criteria_node = CriteriaNode(criteria, None)
+            criteria_node.simplify()
+        definition = Definition.from_dict(
+            {
+                "id": debrand_id(record.definition_id),
+                "version": record.definition_version,
+                "class": record.definition_class,
+                "metadata": {
+                    "title": record.title
+                    if record.title
+                    else record.original_title,
+                    "description": record.description
+                    if record.description
+                    else record.original_description,
+                    "advisory": {
+                        "from": record.contact_mail,
+                        "severity": record.severity,
+                        "rights": record.rights,
+                        "issued_date": record.issued_date,
+                        "updated_date": record.updated_date,
+                        "affected_cpe_list": debrand_affected_cpe_list(
+                            record.affected_cpe, record.platform.distr_version
+                        ),
+                        "bugzilla": [
+                            {
+                                "id": ref.ref_id,
+                                "href": ref.href,
+                                "title": ref.title,
+                            }
+                            for ref in record.references
+                            if ref.ref_type
+                            == models.ErrataReferenceType.bugzilla
+                        ],
+                        "cves": [
+                            {
+                                "name": ref.ref_id,
+                                "public": datetime.datetime.strptime(
+                                    ref.cve.public[:10], "%Y-%m-%d"
+                                ).date(),
+                                "href": ref.href,
+                                "impact": ref.cve.impact,
+                                "cwe": ref.cve.cwe,
+                                "cvss3": ref.cve.cvss3,
+                            }
+                            for ref in record.references
+                            if ref.ref_type == models.ErrataReferenceType.cve
+                        ],
+                    },
+                    "references": [
+                        debrand_reference(
+                            {
+                                "id": ref.ref_id,
+                                "source": ref.ref_type.value,
+                                "url": ref.href,
+                            },
+                            record.platform.distr_version,
+                        )
+                        for ref in record.references
+                        if ref.ref_type
+                        not in [
+                            models.ErrataReferenceType.cve,
+                            models.ErrataReferenceType.bugzilla,
+                        ]
+                    ],
+                },
+                "criteria": record.original_criteria,
+            }
+        )
+        oval.append_object(definition)
+        for test in record.original_tests:
+            test["id"] = debrand_id(test["id"])
+            if test["id"] in objects:
+                continue
+            if test["id"] not in links_tracking:
+                continue
+            objects.add(test["id"])
+            if get_test_cls_by_tag(test["type"]) in (
+                RpminfoTest,
+                RpmverifyfileTest,
+            ):
+                test["comment"] = debrand_comment(
+                    test["comment"], record.platform.distr_version
+                )
+            test["object_ref"] = debrand_id(test["object_ref"])
+            test["state_ref"] = debrand_id(test["state_ref"])
+            links_tracking.update([test["object_ref"], test["state_ref"]])
+            oval.append_object(
+                get_test_cls_by_tag(test["type"]).from_dict(test)
+            )
+        for obj in record.original_objects:
+            obj["id"] = debrand_id(obj["id"])
+            if obj["id"] in objects:
+                continue
+            if obj["id"] not in links_tracking:
+                continue
+            objects.add(obj["id"])
+            if obj.get("instance_var_ref"):
+                obj["instance_var_ref"] = debrand_id(obj["instance_var_ref"])
+                links_tracking.add(obj["instance_var_ref"])
+            if get_object_cls_by_tag(obj["type"]) == RpmverifyfileObject:
+                if obj["filepath"] == "/etc/redhat-release":
+                    obj["filepath"] = "/etc/almalinux-release"
+            oval.append_object(
+                get_object_cls_by_tag(obj["type"]).from_dict(obj)
+            )
+        for state in record.original_states:
+            state["id"] = debrand_id(state["id"])
+            if state["id"] in objects:
+                continue
+            if state["id"] not in links_tracking:
+                continue
+            if state.get("evr"):
+                if state["evr"] in rhel_evra_mapping:
+                    state["arch"] = "|".join(
+                        rhel_evra_mapping[state["evr"]].keys()
+                    )
+                    state["evr"] = rhel_evra_mapping[state["evr"]][
+                        next(iter(rhel_evra_mapping[state["evr"]].keys()))
+                    ]
+            objects.add(state["id"])
+            state_cls = get_state_cls_by_tag(state["type"])
+            if state_cls == RpminfoState:
+                if not centos_refs:
+                    if state["signature_keyid"]:
+                        state["signature_keyid"] = gpg_keys[
+                            record.platform.distr_version
+                        ].lower()
+            elif state_cls == RpmverifyfileState:
+                if state["name"] == "^redhat-release":
+                    state["name"] = "^almalinux-release"
+            oval.append_object(state_cls.from_dict(state))
+        for var in record.original_variables:
+            var["id"] = debrand_id(var["id"])
+            if var["id"] in objects:
+                continue
+            if var["id"] not in links_tracking:
+                continue
+            objects.add(var["id"])
+            oval.append_object(
+                get_variable_cls_by_tag(var["type"]).from_dict(var)
+            )
+    oval.dump_to_file(output_file)
+
+
+# TODO: remove this before release
+CACHE = {}
+
+async def load_platform_packages(platform: models.Platform):
+    global CACHE
+    if CACHE.get(platform.id):
+        logging.error("Found cache for platform: %s", platform.name)
+        return CACHE[platform.id]
     cache = {}
-    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
+    pulp = PulpClient(
+        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    )
     pkg_fields = ",".join(
-        ["name", "version", "release", "arch", "pulp_href", "rpm_sourcerpm"]
+        [
+            "name",
+            "version",
+            "release",
+            "epoch",
+            "arch",
+            "pulp_href",
+            "rpm_sourcerpm",
+        ]
     )
     for repo in platform.repos:
         if not repo.production:
@@ -81,11 +399,14 @@ async def load_platform_packages(platform):
             )
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
-            if not cache[short_pkg_name].get(pkg["arch"]):
-                cache[short_pkg_name][pkg["arch"]] = []
-            cache[short_pkg_name][pkg["arch"]].append(
-                {"pulp_href": pkg["pulp_href"], "source_srpm": pkg["rpm_sourcerpm"]}
-            )
+            arch_list = [pkg["arch"]]
+            if pkg["arch"] == 'noarch':
+                arch_list = platform.arch_list
+            for arch in arch_list:
+                if not cache[short_pkg_name].get(arch):
+                    cache[short_pkg_name][arch] = []
+                cache[short_pkg_name][arch].append(pkg)
+    CACHE[platform.id] = cache
     return cache
 
 
@@ -123,8 +444,13 @@ async def search_for_albs_packages(db, errata_package, prod_repos_cache):
         mapping = models.ErrataToALBSPackage(
             pulp_href=prod_package["pulp_href"],
             status=models.ErrataPackageStatus.released,
+            name=prod_package["name"],
+            version=prod_package["version"],
+            release=prod_package["release"],
+            epoch=int(prod_package["epoch"]),
+            arch=prod_package["arch"],
         )
-        src_nevra = parse_rpm_nevra(prod_package["source_srpm"])
+        src_nevra = parse_rpm_nevra(prod_package["rpm_sourcerpm"])
         errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
@@ -144,12 +470,26 @@ async def search_for_albs_packages(db, errata_package, prod_repos_cache):
     )
     for package in result.scalars().all():
         pulp_rpm_package = await pulp.get_rpm_package(
-            package.href, include_fields=["arch", "rpm_sourcerpm"]
+            package.href,
+            include_fields=[
+                "name",
+                "version",
+                "release",
+                "epoch",
+                "arch",
+                "rpm_sourcerpm",
+            ],
         )
         if pulp_rpm_package["arch"] != errata_package.arch:
             continue
         mapping = models.ErrataToALBSPackage(
-            albs_artifact_id=package.id, status=models.ErrataPackageStatus.proposal
+            albs_artifact_id=package.id,
+            status=models.ErrataPackageStatus.proposal,
+            name=pulp_rpm_package["name"],
+            version=pulp_rpm_package["version"],
+            release=pulp_rpm_package["release"],
+            epoch=int(pulp_rpm_package["epoch"]),
+            arch=pulp_rpm_package["arch"],
         )
         if errata_package.source_srpm is None:
             nevra = parse_rpm_nevra(pulp_rpm_package["rpm_sourcerpm"])
@@ -170,7 +510,9 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     for key in ("description", "title"):
         value = getattr(errata, key)
         value = re.sub(
-            r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?", "AlmaLinux", value
+            r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?",
+            "AlmaLinux",
+            value,
         )
         value = re.sub(r"^RH", "AL", value)
         value = re.sub(r"RHEL", "AlmaLinux", value)
@@ -205,13 +547,17 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         original_objects=errata.objects,
         states=None,
         original_states=errata.states,
+        variables=None,
+        original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
     for ref in errata.references:
         db_cve = None
         if ref.cve:
             db_cve = await db.execute(
-                select(models.ErrataCVE).where(models.ErrataCVE.id == ref.cve.id)
+                select(models.ErrataCVE).where(
+                    models.ErrataCVE.id == ref.cve.id
+                )
             )
             db_cve = db_cve.scalars().first()
             if db_cve is None:
@@ -299,36 +645,39 @@ async def list_errata_records(
                 ),
             ]
         )
-    query = (
-        select(models.ErrataRecord)
-        .options(*options)
-        .order_by(models.ErrataRecord.updated_date.desc())
-    )
-    if errata_id:
-        query = query.filter(models.ErrataRecord.id.like(f"%{errata_id}%"))
-    if title:
-        query = query.filter(
-            or_(
-                models.ErrataRecord.title.like(f"%{title}%"),
-                models.ErrataRecord.original_title.like(f"%{title}%"),
+    
+    def generate_query(count=False):
+        query = select(func.count(models.ErrataRecord.id))
+        if not count:
+            query = select(models.ErrataRecord).options(*options)
+            query = query.order_by(models.ErrataRecord.updated_date.desc())
+        if errata_id:
+            query = query.filter(models.ErrataRecord.id.like(f"%{errata_id}%"))
+        if title:
+            query = query.filter(
+                or_(
+                    models.ErrataRecord.title.like(f"%{title}%"),
+                    models.ErrataRecord.original_title.like(f"%{title}%"),
+                )
             )
-        )
-    if platform:
-        query = query.filter(models.ErrataRecord.platform_id == platform)
-    if cve_id:
-        query = query.filter(models.ErrataCVE.id.like(f"%{cve_id}%"))
-    if page:
-        query = query.slice(10 * page - 10, 10 * page)
+        if platform:
+            query = query.filter(models.ErrataRecord.platform_id == platform)
+        if cve_id:
+            query = query.filter(models.ErrataRecord.cves.like(f"%{cve_id}%"))
+        if page and not count:
+            query = query.slice(10 * page - 10, 10 * page)
+        return query
+
     return {
         "total_records": (
-            await db.execute(func.count(models.ErrataRecord.id))
+            await db.execute(generate_query(count=True))
         ).scalar(),
-        "records": (await db.execute(query)).scalars().all(),
+        "records": (await db.execute(generate_query())).scalars().all(),
         "current_page": page,
     }
 
 
-async def update_package_status(db, request):
+async def update_package_status(db, request: errata_schema.ChangeErrataPackageStatusRequest):
     async with db.begin():
         errata_record = await db.execute(
             select(models.ErrataRecord)
@@ -345,6 +694,8 @@ async def update_package_status(db, request):
         released_source = None
         packages_by_source = {}
         for errata_pkg in errata_record.packages:
+            if not errata_pkg.source_srpm:
+                continue
             if packages_by_source.get(errata_pkg.source_srpm) is None:
                 packages_by_source[errata_pkg.source_srpm] = {}
             record_mapping = packages_by_source[errata_pkg.source_srpm]
@@ -362,22 +713,13 @@ async def update_package_status(db, request):
                     released_source = errata_pkg.source_srpm
         for build_id, packages in packages_by_source[released_source].items():
             for pkg in packages:
-                if all(
-                    [
-                        build_id != released_build_id,
-                        request.status == models.ErrataPackageStatus.released,
-                    ]
-                ):
-                    if pkg.status == models.ErrataPackageStatus.released:
-                        raise ValueError(
-                            f"There is already released package with same nevra: {pkg}"
-                        )
-                    pkg.status = models.ErrataPackageStatus.skipped
-                if all(
-                    [
-                        build_id == released_build_id,
-                        pkg.errata_package.source_srpm == released_source,
-                    ]
-                ):
+                if pkg.status == models.ErrataPackageStatus.released:
+                    raise ValueError(
+                        f"There is already released package with same source: {pkg}"
+                    )
+                if build_id != released_build_id:
+                    if request.status == models.ErrataPackageStatus.approved.value:
+                        pkg.status = models.ErrataPackageStatus.skipped
+                else:
                     pkg.status = request.status
     return True

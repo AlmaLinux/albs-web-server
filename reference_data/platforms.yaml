@@ -68,76 +68,76 @@
       best: false
       module_platform_id: platform:el8
   repositories:
-    #- arch: i686
-    #  name: almalinux-8-baseos
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/BaseOS/i686/os/
-    #  export_path: vault/8/BaseOS/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-appstream
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/AppStream/i686/os/
-    #  export_path: vault/8/AppStream/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-powertools
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/PowerTools/i686/os/
-    #  export_path: vault/8/PowerTools/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-highavailability
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/HighAvailability/i686/os/
-    #  export_path: vault/8/HighAvailability/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-resilientstorage
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/i686/os/
-    #  export_path: vault/8/ResilientStorage/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-devel
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/devel/i686/os/
-    #  export_path: vault/8/devel/i686/os/
-    #  production: true
-    #  debug: false
-    #  remote_sync_policy: on_demand
-    #  repository_sync_policy: additive
-    #  priority: 10
-    #- arch: i686
-    #  name: almalinux-8-extras
-    #  type: rpm
-    #  remote_url: https://repo.almalinux.org/vault/8/extras/i686/os/
-    #  export_path: vault/8/extras/i686/os/
-    #  production: true
-    #  debug: false
-    #  repository_sync_policy: additive
-    #  remote_sync_policy: on_demand
-    #  priority: 10
+    - arch: i686
+      name: almalinux-8-baseos
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/BaseOS/i686/os/
+      export_path: vault/8/BaseOS/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-appstream
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/AppStream/i686/os/
+      export_path: vault/8/AppStream/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-powertools
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/PowerTools/i686/os/
+      export_path: vault/8/PowerTools/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-highavailability
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/HighAvailability/i686/os/
+      export_path: vault/8/HighAvailability/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-resilientstorage
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/ResilientStorage/i686/os/
+      export_path: vault/8/ResilientStorage/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/devel/i686/os/
+      export_path: vault/8/devel/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-extras
+      type: rpm
+      remote_url: https://repo.almalinux.org/vault/8/extras/i686/os/
+      export_path: vault/8/extras/i686/os/
+      production: true
+      debug: false
+      repository_sync_policy: additive
+      remote_sync_policy: on_demand
+      priority: 10
     - arch: x86_64
       name: almalinux-8-baseos
       type: rpm

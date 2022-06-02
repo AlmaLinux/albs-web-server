@@ -5,6 +5,7 @@ import enum
 import sqlalchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.associationproxy import association_proxy
 
 from alws.constants import ReleaseStatus, SignStatus
 from alws.database import Base, engine
@@ -679,16 +680,20 @@ class ErrataRecord(Base):
     definition_class = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     affected_cpe = sqlalchemy.Column(JSONB, nullable=False, default=[])
     criteria = sqlalchemy.Column(JSONB, nullable=True)
-    original_criteria = sqlalchemy.Column(JSONB, nullable=False)
+    original_criteria = sqlalchemy.Column(JSONB, nullable=True)
     tests = sqlalchemy.Column(JSONB, nullable=True)
-    original_tests = sqlalchemy.Column(JSONB, nullable=False)
+    original_tests = sqlalchemy.Column(JSONB, nullable=True)
     objects = sqlalchemy.Column(JSONB, nullable=True)
-    original_objects = sqlalchemy.Column(JSONB, nullable=False)
+    original_objects = sqlalchemy.Column(JSONB, nullable=True)
     states = sqlalchemy.Column(JSONB, nullable=True)
-    original_states = sqlalchemy.Column(JSONB, nullable=False)
+    original_states = sqlalchemy.Column(JSONB, nullable=True)
+    variables = sqlalchemy.Column(JSONB, nullable=True)
+    original_variables = sqlalchemy.Column(JSONB, nullable=True)
 
     references = relationship('ErrataReference')
     packages = relationship('ErrataPackage')
+
+    cves = association_proxy("references", "cve_id")
 
 
 class ErrataReferenceType(enum.Enum):
@@ -782,6 +787,12 @@ class ErrataToALBSPackage(Base):
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
 
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    release = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    epoch = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+
     @property
     def build_id(self):
         if self.build_artifact:
@@ -792,11 +803,6 @@ class ErrataToALBSPackage(Base):
         if self.build_artifact:
             return self.build_artifact.build_task.id
     
-    @property
-    def name(self):
-        if self.build_artifact:
-            return self.build_artifact.name
-
 
 async def create_tables():
     async with engine.begin() as conn:
