@@ -362,18 +362,14 @@ class IndexWrapper:
             )
         return IndexWrapper(index)
 
-    def get_module(self, name: str, stream: str, version: str = None, context: str = None) -> ModuleWrapper:
+    def get_module(self, name: str, stream: str) -> ModuleWrapper:
         module = self._index.get_module(name)
         if not module:
             raise ModuleNotFoundError(
                 f'Index doesn\'t contain {name}:{stream}'
             )
         for module_stream in module.get_all_streams():
-            if all([
-                module_stream.get_stream_name() == stream,
-                module_stream.get_version() == version,
-                module_stream.get_context() == context,
-            ]):
+            if module_stream.get_stream_name() == stream:
                 return ModuleWrapper(module_stream)
         raise ModuleNotFoundError(f'Index doesn\'t contain {name}:{stream}')
 
