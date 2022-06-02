@@ -9,7 +9,8 @@ from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
 
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
-    db_flavour = models.PlatformFlavour(name=flavour.name)
+    db_flavour = models.PlatformFlavour(name=flavour.name,
+                                        modularity=flavour.modularity)
     for repo in flavour.repositories:
         db_repo = await db.execute(select(models.Repository).where(
             sqlalchemy.and_(
@@ -51,8 +52,8 @@ async def list_flavours(db, ids: List[int] = None) -> List[models.PlatformFlavou
     return flavors.scalars().all()
 
 
-async def find_flavour_by_id(db, id: int):
+async def find_flavour_by_id(db, flavour_id: int):
     db_flavour = await db.execute(select(models.PlatformFlavour).where(
-        models.PlatformFlavour.id == id
+        models.PlatformFlavour.id == flavour_id
     ).options(selectinload(models.PlatformFlavour.repos)))
     return db_flavour.scalars().first()

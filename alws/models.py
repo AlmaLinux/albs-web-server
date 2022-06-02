@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import enum
+import re
 
 import sqlalchemy
 from sqlalchemy.orm import relationship
@@ -156,6 +157,7 @@ class Platform(Base):
         unique=True,
         index=True
     )
+    priority = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
     copy_priority_arches = sqlalchemy.Column(JSONB, nullable=True)
     weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)
@@ -437,6 +439,18 @@ class BuildTaskArtifact(Base):
         nullable=True)
     sign_key = relationship('SignKey',
                             back_populates='build_task_artifacts')
+
+    def name_as_dict(self) -> dict:
+        result = re.search(
+            r'^(?P<name>[\w+-.]+)-'
+            r'(?P<version>\d+?[\w.]*)-'
+            r'(?P<release>\d+?[\w.+]*?)'
+            r'\.(?P<arch>[\w]*)(\.rpm)?$',
+            self.name
+        )
+        if not result:
+            return {}
+        return result.groupdict()
 
 
 class SourceRpm(Base):

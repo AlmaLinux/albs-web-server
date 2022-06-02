@@ -20,8 +20,8 @@ from alws.errors import (
 )
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.debuginfo import is_debuginfo_rpm
-from alws.utils.modularity import IndexWrapper
+from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
+from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
 
@@ -37,6 +37,9 @@ class ReleasePlanner:
         self.packages_presence_info = None
         self.latest_repo_versions = None
         self.base_platform = None
+        self.clean_base_dist_name_lower = None
+        self.repo_name_regex = re.compile(
+            r'\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)')
         self.max_list_len = 100  # max elements in list for pulp request
         self._beholder_client = BeholderClient(settings.beholder_host)
         self._pulp_client = PulpClient(
@@ -51,26 +54,39 @@ class ReleasePlanner:
         build_tasks: typing.List[int] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
-        packages_fields = ['name', 'epoch', 'version', 'release', 'arch']
+        packages_fields = ['name', 'epoch', 'version',
+                           'release', 'arch', 'pulp_href']
         pulp_packages = []
 
         builds_q = select(models.Build).where(
             models.Build.id.in_(build_ids)).options(
-            selectinload(
-                models.Build.source_rpms).selectinload(
-                models.SourceRpm.artifact),
-            selectinload(
-                models.Build.binary_rpms).selectinload(
-                models.BinaryRpm.artifact),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_module
-            ),
-            selectinload(models.Build.repos)
+                selectinload(models.Build.platform_flavors),
+                selectinload(
+                    models.Build.source_rpms).selectinload(
+                    models.SourceRpm.artifact),
+                selectinload(
+                    models.Build.binary_rpms).selectinload(
+                    models.BinaryRpm.artifact),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.rpm_module
+                ),
+                selectinload(models.Build.repos)
         )
         build_result = await self._db.execute(builds_q)
-        modules_to_release = {}
+        modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
+            is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
+            pulp_artifacts = await asyncio.gather(*(
+                self._pulp_client.get_rpm_package(
+                    rpm.artifact.href, include_fields=packages_fields)
+                for rpm in build_rpms
+                if build_tasks and rpm.artifact.build_task_id in build_tasks
+            ))
+            pulp_artifacts = {
+                artifact_dict.pop('pulp_href'): artifact_dict
+                for artifact_dict in pulp_artifacts
+            }
             for rpm in build_rpms:
                 artifact_task_id = rpm.artifact.build_task_id
                 if build_tasks and artifact_task_id not in build_tasks:
@@ -78,8 +94,8 @@ class ReleasePlanner:
                 artifact_name = rpm.artifact.name
                 if '.src.' in artifact_name:
                     src_rpm_names.append(artifact_name)
-                pkg_info = await self._pulp_client.get_rpm_package(
-                    rpm.artifact.href, include_fields=packages_fields)
+                pkg_info = copy.deepcopy(pulp_artifacts[rpm.artifact.href])
+                pkg_info['is_beta'] = is_beta
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
                 pkg_info['href_from_repo'] = None
@@ -111,7 +127,9 @@ class ReleasePlanner:
                         module_repo.url)
                     module_index = IndexWrapper.from_template(template)
                     for module in module_index.iter_modules():
-                        modules_to_release[key] = {
+                        # in some cases we have also devel module in template,
+                        # we should add all modules from template
+                        modules_to_release[key].append({
                             'build_id': build.id,
                             'name': module.name,
                             'stream': module.stream,
@@ -119,8 +137,13 @@ class ReleasePlanner:
                             'context': module.context,
                             'arch': module.arch,
                             'template': module.render()
-                        }
-        return pulp_packages, src_rpm_names, list(modules_to_release.values())
+                        })
+        pulp_rpm_modules = [
+            module_dict
+            for module_list in modules_to_release.values()
+            for module_dict in module_list
+        ]
+        return pulp_packages, src_rpm_names, pulp_rpm_modules
 
     async def check_package_presence_in_repo(
         self,
@@ -153,8 +176,11 @@ class ReleasePlanner:
                 data = (pkg['pulp_href'], repo_id, repo_arch)
                 self.packages_presence_info[full_name].append(data)
 
-    async def prepare_data_for_executing_async_tasks(self,
-                                                     package: dict) -> None:
+    async def prepare_data_for_executing_async_tasks(
+        self,
+        package: dict,
+        is_debug: bool,
+    ) -> None:
         # create collections for checking packages in repos
         if self.pkgs_nevra is None:
             self.pkgs_nevra = {arch: defaultdict(set)
@@ -167,12 +193,33 @@ class ReleasePlanner:
             self.packages_presence_info = defaultdict(list)
             self.pkgs_mapping = {}
             self.repo_data_by_href = {}
-            tasks = []
+            if self.clean_base_dist_name_lower is None:
+                self.clean_base_dist_name_lower = get_clean_distr_name(
+                    self.base_platform.name).lower()
+            pulp_repos = []
+            prod_repo_names = (
+                f'{repo.name}-{repo.arch}'
+                for repo in self.base_platform.repos
+            )
+            params = {
+                'name__in': ','.join(prod_repo_names),
+                'fields': ','.join(('pulp_href', 'name',
+                                    'latest_version_href')),
+                'limit': 1000,
+            }
+            pulp_repos = await self._pulp_client.get_rpm_repositories(params)
+            pulp_repos = {
+                repo.pop('pulp_href'): repo
+                for repo in pulp_repos
+            }
+            self.latest_repo_versions = []
             for repo in self.base_platform.repos:
+                pulp_repo_info = pulp_repos[repo.pulp_href]
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
-                tasks.append(self._pulp_client.get_repo_latest_version(
-                    repo.pulp_href, for_releases=True))
-            self.latest_repo_versions = await asyncio.gather(*tasks)
+                repo_is_debug = bool(re.search(r'debug(info|source|)',
+                                               pulp_repo_info['name']))
+                self.latest_repo_versions.append((
+                    pulp_repo_info['latest_version_href'], repo_is_debug))
 
         nevra = PackageNevra(
             package['name'],
@@ -182,15 +229,16 @@ class ReleasePlanner:
             package['arch']
         )
         self.pkgs_mapping[nevra] = package['full_name']
-        pkg_dict = self.pkgs_nevra
-        if is_debuginfo_rpm(nevra.name):
-            pkg_dict = self.debug_pkgs_nevra
+        pkg_dict = self.debug_pkgs_nevra if is_debug else self.pkgs_nevra
         pkg_dict[nevra.arch]['name'].add(nevra.name)
         pkg_dict[nevra.arch]['epoch'].add(nevra.epoch)
         pkg_dict[nevra.arch]['version'].add(nevra.version)
         pkg_dict[nevra.arch]['release'].add(nevra.release)
 
-    async def prepare_and_execute_async_tasks(self, packages) -> (dict, dict):
+    async def prepare_and_execute_async_tasks(
+        self,
+        packages: typing.List[dict],
+    ) -> typing.Tuple[dict, dict]:
         tasks = []
         packages_from_repos = {}
         for is_debug in (True, False):
@@ -256,28 +304,33 @@ class ReleasePlanner:
         rpm_modules: list,
         repos_mapping: dict,
         prod_repos: list,
-        clean_base_dist_name_lower: str,
-        base_platform_distr_version: str,
     ) -> dict:
         packages = []
         added_packages = set()
         for pkg in pulp_packages:
             full_name = pkg['full_name']
+            pkg_arch = pkg['arch']
+            pkg.pop('is_beta')
             if full_name in added_packages:
                 continue
-            await self.prepare_data_for_executing_async_tasks(pkg)
+            is_debug = is_debuginfo_rpm(pkg['name'])
+            await self.prepare_data_for_executing_async_tasks(pkg, is_debug)
             release_repo = repos_mapping[RepoType(
                 '-'.join((
-                    clean_base_dist_name_lower,
-                    base_platform_distr_version,
-                    'devel'
+                    self.clean_base_dist_name_lower,
+                    self.base_platform.distr_version,
+                    'devel-debuginfo' if is_debug else 'devel',
                 )),
-                pkg['task_arch'],
-                False
+                pkg_arch if pkg_arch == 'src' else pkg['task_arch'],
+                is_debug,
             )]
+            repo_arch_location = [pkg_arch]
+            if pkg_arch == 'noarch':
+                repo_arch_location = self.base_platform.arch_list
             packages.append({
                 'package': pkg,
-                'repositories': [release_repo]
+                'repositories': [release_repo],
+                'repo_arch_location': repo_arch_location,
             })
             added_packages.add(full_name)
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
@@ -291,11 +344,72 @@ class ReleasePlanner:
             'modules': rpm_modules,
         }
 
+    def find_release_repos(
+        self,
+        pkg_name: str,
+        pkg_version: str,
+        pkg_arch: str,
+        pkg_task_arch: str,
+        is_beta: bool,
+        is_devel: bool,
+        is_debug: bool,
+        beholder_cache: dict,
+    ) -> typing.Set[RepoType]:
+        release_repositories = set()
+        beholder_key = (pkg_name, pkg_version, pkg_arch, is_beta, is_devel)
+        predicted_package = beholder_cache.get(beholder_key, {})
+        # if we doesn't found info from stable/beta,
+        # we can try to find info by opposite stable/beta flag
+        if not predicted_package:
+            beholder_key = (pkg_name, pkg_version, pkg_arch,
+                            not is_beta, is_devel)
+            predicted_package = beholder_cache.get(beholder_key, {})
+        # if we doesn't found info by current version,
+        # then we should try find info by other versions
+        if not predicted_package:
+            beholder_keys = [
+                beholder_key for beholder_key in beholder_cache
+                if all((
+                    field in beholder_key
+                    for field in (pkg_name, pkg_arch, is_devel)
+                ))
+            ]
+            predicted_package = next((
+                beholder_cache[beholder_key]
+                for beholder_key in beholder_keys
+            ), {})
+        # if we doesn't found info by devel key, we shouldn't add devel repo
+        if not predicted_package and not is_devel:
+            release_repo = RepoType(
+                '-'.join((
+                    self.clean_base_dist_name_lower,
+                    self.base_platform.distr_version,
+                    'devel-debuginfo' if is_debug else 'devel',
+                )),
+                pkg_arch if pkg_arch == 'src' else pkg_task_arch,
+                is_debug,
+            )
+            release_repositories.add(release_repo)
+        for repo in predicted_package.get('repositories', []):
+            ref_repo_name = repo['name']
+            repo_name = (
+                self.repo_name_regex.search(ref_repo_name).groupdict()['name']
+            )
+            if is_debug:
+                repo_name += '-debuginfo'
+            release_repo_name = '-'.join((
+                self.clean_base_dist_name_lower,
+                self.base_platform.distr_version,
+                repo_name
+            ))
+            release_repo = RepoType(release_repo_name, repo['arch'], is_debug)
+            release_repositories.add(release_repo)
+        return release_repositories
+
     async def get_release_plan(
         self,
         build_ids: typing.List[int],
         base_platform: models.Platform,
-        reference_platform: models.Platform,
         build_tasks: typing.List[int] = None,
     ) -> dict:
         packages = []
@@ -306,7 +420,6 @@ class ReleasePlanner:
         added_packages = set()
         prod_repos = []
         self.base_platform = base_platform
-        repo_name_regex = re.compile(r'\w+-\d-(?P<name>\w+(-\w+)?)')
 
         pulp_packages, src_rpm_names, pulp_rpm_modules = (
             await self.get_pulp_packages(build_ids, build_tasks=build_tasks))
@@ -315,12 +428,7 @@ class ReleasePlanner:
         if clean_base_dist_name is None:
             raise ValueError(f'Base distribution name is malformed: '
                              f'{base_platform.name}')
-        clean_base_dist_name_lower = clean_base_dist_name.lower()
-
-        clean_ref_dist_name = get_clean_distr_name(reference_platform.name)
-        if clean_ref_dist_name is None:
-            raise ValueError(f'Reference distribution name is malformed: '
-                             f'{reference_platform.name}')
+        self.clean_base_dist_name_lower = clean_base_dist_name.lower()
 
         for repo in base_platform.repos:
             repo_dict = {
@@ -343,140 +451,170 @@ class ReleasePlanner:
                 rpm_modules=rpm_modules,
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
-                clean_base_dist_name_lower=clean_base_dist_name_lower,
-                base_platform_distr_version=base_platform.distr_version,
             )
 
         for module in pulp_rpm_modules:
+            module_name = module['name']
+            module_stream = module['stream']
             module_arch_list = [module['arch']]
             for strong_arch, weak_arches in strong_arches.items():
                 if module['arch'] in weak_arches:
                     module_arch_list.append(strong_arch)
-            endpoints = [
-                f'/api/v1/distros/{dist_name}/'
-                f'{reference_platform.distr_version}/module/{module["name"]}/'
-                f'{module["stream"]}/{module_arch}/'
-                for dist_name in [clean_ref_dist_name, base_platform.name]
-                for module_arch in module_arch_list
-            ]
-            module_response = None
-            for endpoint in endpoints:
-                try:
-                    module_response = await self._beholder_client.get(endpoint)
-                except Exception:
-                    pass
+            module_responses = await self._beholder_client.retrieve_responses(
+                base_platform,
+                module_name,
+                module_stream,
+                module_arch_list,
+                is_module=True,
+            )
             module_info = {
                 'module': module,
                 'repositories': []
             }
             rpm_modules.append(module_info)
-            if not module_response:
-                continue
-            for _packages in module_response['artifacts']:
-                for pkg in _packages['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'])
+            for module_response in module_responses:
+                distr = module_response['distribution']
+                is_beta = distr['version'].endswith('-beta')
+                is_devel = module_response['name'].endswith('-devel')
+                for _packages in module_response['artifacts']:
+                    for pkg in _packages['packages']:
+                        key = (pkg['name'], pkg['version'], pkg['arch'],
+                               is_beta, is_devel)
+                        beholder_cache[key] = pkg
+                        for weak_arch in strong_arches[pkg['arch']]:
+                            second_key = (pkg['name'], pkg['version'],
+                                          weak_arch, is_beta, is_devel)
+                            # if we've already found repos
+                            # we don't need to override them
+                            beholder_repos = beholder_cache.get(
+                                second_key, {}).get('repositories', [])
+                            if beholder_repos:
+                                continue
+                            replaced_pkg = copy.deepcopy(pkg)
+                            for repo in replaced_pkg['repositories']:
+                                if repo['arch'] == pkg['arch']:
+                                    repo['arch'] = weak_arch
+                            beholder_cache[second_key] = replaced_pkg
+                module_repo = module_response['repository']
+                repo_name = self.repo_name_regex.search(
+                    module_repo['name']).groupdict()['name']
+                release_repo_name = '-'.join((
+                    self.clean_base_dist_name_lower,
+                    base_platform.distr_version,
+                    repo_name
+                ))
+                repo_key = RepoType(release_repo_name, module['arch'], False)
+                prod_repo = repos_mapping[repo_key]
+                module_repo_dict = {
+                    'name': repo_key.name,
+                    'arch': repo_key.arch,
+                    'debug': repo_key.debug,
+                    'url': prod_repo['url'],
+                }
+                if module_repo_dict in module_info['repositories']:
+                    continue
+                module_info['repositories'].append(module_repo_dict)
+
+        beholder_responses = await self._beholder_client.retrieve_responses(
+            base_platform,
+            data={'source_rpms': src_rpm_names, 'match': 'closest'},
+        )
+        for beholder_response in beholder_responses:
+            distr = beholder_response['distribution']
+            is_beta = distr['version'].endswith('-beta')
+            is_devel = False
+            for pkg_list in beholder_response.get('packages', {}):
+                for pkg in pkg_list['packages']:
+                    key = (pkg['name'], pkg['version'], pkg['arch'],
+                           is_beta, is_devel)
                     beholder_cache[key] = pkg
                     for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'], weak_arch)
+                        second_key = (pkg['name'], pkg['version'], weak_arch,
+                                      is_beta, is_devel)
+                        # if we've already found repos
+                        # we don't need to override them
+                        beholder_repos = beholder_cache.get(
+                            second_key, {}).get('repositories', [])
+                        if beholder_repos:
+                            continue
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
                                 repo['arch'] = weak_arch
                         beholder_cache[second_key] = replaced_pkg
-            module_repo = module_response['repository']
-            repo_name = repo_name_regex.search(
-                module_repo['name']).groupdict()['name']
-            release_repo_name = '-'.join((
-                clean_base_dist_name_lower,
-                base_platform.distr_version,
-                repo_name
-            ))
-            repo_key = RepoType(release_repo_name, module_repo['arch'], False)
-            module_info['repositories'].append({
-                'name': release_repo_name,
-                'arch': module['arch'],
-                'debug': False,
-            })
-
-        endpoint = (f'/api/v1/distros/{clean_ref_dist_name}/'
-                    f'{reference_platform.distr_version}/projects/')
-        beholder_response = await self._beholder_client.post(endpoint,
-                                                             src_rpm_names)
-        for pkg_list in beholder_response.get('packages', {}):
-            for pkg in pkg_list['packages']:
-                key = (pkg['name'], pkg['version'], pkg['arch'])
-                beholder_cache[key] = pkg
-                for weak_arch in strong_arches[pkg['arch']]:
-                    second_key = (pkg['name'], pkg['version'], weak_arch)
-                    replaced_pkg = copy.deepcopy(pkg)
-                    for repo in replaced_pkg['repositories']:
-                        if repo['arch'] == pkg['arch']:
-                            repo['arch'] = weak_arch
-                    beholder_cache[second_key] = replaced_pkg
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
                 rpm_modules=rpm_modules,
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
-                clean_base_dist_name_lower=clean_base_dist_name_lower,
-                base_platform_distr_version=base_platform.distr_version,
             )
         for package in pulp_packages:
             pkg_name = package['name']
             pkg_version = package['version']
             pkg_arch = package['arch']
             full_name = package['full_name']
+            is_beta = package.pop('is_beta')
+            is_debug = is_debuginfo_rpm(pkg_name)
+            # for debug packages, we should take repos info
+            # from non debug packages
+            if is_debug:
+                pkg_name = clean_debug_name(pkg_name)
             if full_name in added_packages:
                 continue
-            await self.prepare_data_for_executing_async_tasks(package)
-            key = (pkg_name, pkg_version, pkg_arch)
-            predicted_package = beholder_cache.get(key, [])
-            pkg_info = {'package': package, 'repositories': []}
+            await self.prepare_data_for_executing_async_tasks(
+                package, is_debug)
             release_repositories = set()
-            repositories = []
-            if not predicted_package:
-                continue
-            repositories = predicted_package['repositories']
-            for repo in repositories:
-                ref_repo_name = repo['name']
-                repo_name = (
-                    repo_name_regex.search(ref_repo_name).groupdict()['name']
+            for is_devel in (False, True):
+                repositories = self.find_release_repos(
+                    pkg_name=pkg_name,
+                    pkg_version=pkg_version,
+                    pkg_arch=pkg_arch,
+                    pkg_task_arch=package['task_arch'],
+                    is_debug=is_debug,
+                    is_beta=is_beta,
+                    is_devel=is_devel,
+                    beholder_cache=beholder_cache,
                 )
-                release_repo_name = '-'.join((
-                    clean_base_dist_name_lower,
-                    base_platform.distr_version,
-                    repo_name
-                ))
-                debug = ref_repo_name.endswith('debuginfo')
-                if repo['arch'] == 'src':
-                    debug = False
-                release_repo = RepoType(release_repo_name, repo['arch'], debug)
-                release_repositories.add(release_repo)
-            pkg_info['repositories'] = [
-                repos_mapping.get(item) for item in release_repositories
-            ]
-            added_packages.add(full_name)
-            packages.append(pkg_info)
-
-        for package in pulp_packages:
-            if package['full_name'] in added_packages:
-                continue
-            added_packages.add(package['full_name'])
-            release_repo = repos_mapping[RepoType(
-                '-'.join((
-                    clean_base_dist_name_lower,
-                    base_platform.distr_version,
-                    'devel'
-                )),
-                package['task_arch'],
-                False
-            )]
+                release_repositories.update(repositories)
+            pulp_repo_arch_location = [pkg_arch]
+            if pkg_arch == 'noarch':
+                pulp_repo_arch_location = self.base_platform.arch_list
             pkg_info = {
                 'package': package,
-                'repositories': [release_repo]
+                'repositories': [],
+                'repo_arch_location': pulp_repo_arch_location,
             }
-            packages.append(pkg_info)
+            if not release_repositories:
+                packages.append(pkg_info)
+                added_packages.add(full_name)
+                continue
+            added_noarch_repos = set()
+            # for every repository we should add pkg_info
+            # for correct package location in UI
+            for item in release_repositories:
+                release_repo = repos_mapping.get(item)
+                # in some cases we get repos that we can't match
+                if release_repo is None:
+                    continue
+                release_repo_name = release_repo['name']
+                if release_repo_name in added_noarch_repos:
+                    continue
+                copy_pkg_info = copy.deepcopy(pkg_info)
+                repo_arch_location = [release_repo['arch']]
+                # we should add i686 arch for correct multilib showing in UI
+                if pkg_arch == 'i686' and 'x86_64' in repo_arch_location:
+                    repo_arch_location.append('i686')
+                if pkg_arch == 'noarch':
+                    repo_arch_location = pulp_repo_arch_location
+                    added_noarch_repos.add(release_repo_name)
+                copy_pkg_info.update({
+                    # TODO: need to send only one repo instead of list
+                    'repositories': [release_repo],
+                    'repo_arch_location': repo_arch_location,
+                })
+                packages.append(copy_pkg_info)
+            added_packages.add(full_name)
 
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
             packages)
@@ -489,13 +627,15 @@ class ReleasePlanner:
         }
 
     async def execute_release_plan(self, release: models.Release,
-                                   release_plan: dict) -> None:
+                                   release_plan: dict) -> typing.List[str]:
+        additional_messages = []
         packages_to_repo_layout = {}
         if not release_plan.get('packages') or (
                 not release_plan.get('repositories')):
-            raise EmptyReleasePlan('Cannot execute plan with empty packages '
-                                    'or repositories: {packages}, {repositories}'
-                                    .format_map(release_plan))
+            raise EmptyReleasePlan(
+                'Cannot execute plan with empty packages or repositories: '
+                '{packages}, {repositories}'.format_map(release_plan)
+            )
         for build_id in release.build_ids:
             try:
                 verified = await sign_task.verify_signed_build(
@@ -510,8 +650,10 @@ class ReleasePlanner:
         # check packages presence in prod repos
         self.base_platform = release.platform
         for pkg_dict in release_plan['packages']:
+            package = pkg_dict['package']
+            is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
-                pkg_dict['package'])
+                package, is_debug)
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
             release_plan['packages'])
         release_plan['packages_from_repos'] = pkgs_from_repos
@@ -534,11 +676,7 @@ class ReleasePlanner:
                 if repo_id in existing_repo_ids and not force_flag:
                     if package['href_from_repo'] is not None:
                         continue
-                    full_repo_name = (
-                        f"{repo_name}-"
-                        f"{'debug-' if repository['debug'] else ''}"
-                        f"{repo_arch}"
-                    )
+                    full_repo_name = f"{repo_name}-{repo_arch}"
                     raise ReleaseLogicError(
                         f'Cannot release {pkg_full_name} in {full_repo_name}, '
                         'package already in repo and force release is disabled'
@@ -550,15 +688,48 @@ class ReleasePlanner:
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     package_href)
 
+        prod_repo_modules_cache = {}
+        added_modules = defaultdict(list)
         for module in release_plan.get('modules', []):
             for repository in module['repositories']:
                 repo_name = repository['name']
                 repo_arch = repository['arch']
+                repo_url = repository.get('url')
+                if repo_url is None:
+                    repo_url = next(
+                        repo.url for repo in self.base_platform.repos
+                        if repo.name == repo_name and repo.arch == repo_arch
+                        and repo.debug is False
+                    )
+                repo_module_index = prod_repo_modules_cache.get(repo_url)
+                if repo_module_index is None:
+                    template = await self._pulp_client.get_repo_modules_yaml(
+                        repo_url)
+                    repo_module_index = IndexWrapper.from_template(template)
+                    prod_repo_modules_cache[repo_url] = repo_module_index
                 if repo_name not in packages_to_repo_layout:
                     packages_to_repo_layout[repo_name] = {}
                 if repo_arch not in packages_to_repo_layout[repo_name]:
                     packages_to_repo_layout[repo_name][repo_arch] = []
                 module_info = module['module']
+                release_module = ModuleWrapper.from_template(
+                    module_info['template'])
+                release_module_nvsca = release_module.nsvca
+                full_repo_name = f"{repo_name}-{repo_arch}"
+                # for old module releases that have duplicated repos
+                if release_module_nvsca in added_modules[full_repo_name]:
+                    continue
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
+                if module_already_in_repo:
+                    additional_messages.append(
+                        f'Module {release_module_nvsca} skipped,'
+                        f'module already in "{full_repo_name}" modules.yaml'
+                    )
+                    continue
                 module_pulp_href, _ = await self._pulp_client.create_module(
                     module_info['template'],
                     module_info['name'],
@@ -568,11 +739,15 @@ class ReleasePlanner:
                 )
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     module_pulp_href)
+                added_modules[full_repo_name].append(release_module_nvsca)
 
         modify_tasks = []
         publication_tasks = []
         for repository_name, arches in packages_to_repo_layout.items():
             for arch, packages in arches.items():
+                # TODO: we already have all repos in self.base_platform.repos,
+                # we can store them in dict
+                # for example: (repo_name, arch): repo
                 repo_q = select(models.Repository).where(
                     models.Repository.name == repository_name,
                     models.Repository.arch == arch
@@ -609,41 +784,35 @@ class ReleasePlanner:
                     self._pulp_client.create_rpm_publication(repo.pulp_href))
         await asyncio.gather(*modify_tasks)
         await asyncio.gather(*publication_tasks)
+        return additional_messages
 
     async def create_new_release(
-                self, user_id: int, payload: release_schema.ReleaseCreate
-            ) -> models.Release:
+        self,
+        user_id: int,
+        payload: release_schema.ReleaseCreate,
+    ) -> models.Release:
         async with self._db.begin():
             user_q = select(models.User).where(models.User.id == user_id)
             user_result = await self._db.execute(user_q)
-            platform_result = await self._db.execute(
+            platform = await self._db.execute(
                 select(models.Platform).where(
-                    models.Platform.id.in_(
-                        (payload.platform_id, payload.reference_platform_id)
-                    )
-                ).options(selectinload(models.Platform.repos.and_(
-                    models.Repository.production.is_(True)
-                )))
+                    models.Platform.id == payload.platform_id,
+                ).options(
+                    selectinload(models.Platform.reference_platforms),
+                    selectinload(models.Platform.repos.and_(
+                        models.Repository.production.is_(True)))
+                ),
             )
-            platforms = platform_result.scalars().all()
-            base_platform = next(item for item in platforms
-                                 if item.id == payload.platform_id)
-            reference_platform = next(
-                item for item in platforms
-                if item.id == payload.reference_platform_id
-            )
-
+            platform = platform.scalars().first()
             user = user_result.scalars().first()
             new_release = models.Release()
             new_release.build_ids = payload.builds
             if getattr(payload, 'build_tasks', None):
                 new_release.build_task_ids = payload.build_tasks
-            new_release.platform = base_platform
-            new_release.reference_platform_id = payload.reference_platform_id
+            new_release.platform = platform
             new_release.plan = await self.get_release_plan(
                 build_ids=payload.builds,
-                base_platform=base_platform,
-                reference_platform=reference_platform,
+                base_platform=platform,
                 build_tasks=payload.build_tasks
             )
             new_release.created_by = user
@@ -659,14 +828,16 @@ class ReleasePlanner:
         return release_res.scalars().first()
 
     async def update_release(
-            self, release_id: int,
-            payload: release_schema.ReleaseUpdate
+        self, release_id: int,
+        payload: release_schema.ReleaseUpdate,
     ) -> models.Release:
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
             ).options(
                 selectinload(models.Release.created_by),
+                selectinload(models.Release.platform).selectinload(
+                    models.Platform.reference_platforms),
                 selectinload(models.Release.platform).selectinload(
                     models.Platform.repos.and_(
                         models.Repository.production.is_(True)
@@ -682,8 +853,10 @@ class ReleasePlanner:
                 # check packages presence in prod repos
                 self.base_platform = release.platform
                 for pkg_dict in payload.plan['packages']:
+                    package = pkg_dict['package']
+                    is_debug = is_debuginfo_rpm(package['name'])
                     await self.prepare_data_for_executing_async_tasks(
-                        pkg_dict['package'])
+                        package, is_debug)
                 pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
                     payload.plan['packages'])
                 payload.plan['packages_from_repos'] = pkgs_from_repos
@@ -695,16 +868,9 @@ class ReleasePlanner:
                 release.build_ids = payload.builds
                 if build_tasks:
                     release.build_task_ids = payload.build_tasks
-                reference_platform = await self._db.execute(
-                    select(models.Platform).where(
-                        models.Platform.id == release.reference_platform_id
-                    )
-                )
-                reference_platform = reference_platform.scalars().first()
                 release.plan = await self.get_release_plan(
                     build_ids=payload.builds,
-                    base_platform=release.platform,
-                    reference_platform=reference_platform,
+                    base_platform=self.base_platform,
                     build_tasks=payload.build_tasks,
                 )
             self._db.add(release)
@@ -712,8 +878,10 @@ class ReleasePlanner:
         await self._db.refresh(release)
         return release
 
-
-    async def commit_release(self, release_id: int) -> (models.Release, str):
+    async def commit_release(
+        self,
+        release_id: int,
+    ) -> typing.Tuple[models.Release, str]:
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
@@ -740,13 +908,15 @@ class ReleasePlanner:
             # for updating plan during executing, we should use deepcopy
             release_plan = copy.deepcopy(release.plan)
             try:
-                await self.execute_release_plan(release, release_plan)
+                release_messages = await self.execute_release_plan(
+                    release, release_plan)
             except (EmptyReleasePlan, MissingRepository,
                     SignError, ReleaseLogicError) as e:
                 message = f'Cannot commit release: {str(e)}'
                 release.status = ReleaseStatus.FAILED
             else:
                 message = 'Successfully committed release'
+                message += '\n'.join(release_messages)
                 release.status = ReleaseStatus.COMPLETED
             release_plan['last_log'] = message
             release.plan = release_plan
