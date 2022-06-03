@@ -91,6 +91,7 @@ class BuildDoneArtifact(BaseModel):
     name: str
     type: typing.Literal['rpm', 'build_log']
     href: str
+    sha256: str
 
     class Config:
         orm_mode = True
