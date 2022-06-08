@@ -26,6 +26,11 @@ router = APIRouter(
     dependencies=[Depends(JWTBearer())]
 )
 
+public_router = APIRouter(
+    prefix='/builds',
+    tags=['builds'],
+)
+
 
 @router.post('/', response_model=build_schema.BuildCreateResponse)
 async def create_build(
@@ -40,7 +45,7 @@ async def create_build(
     )
 
 
-@router.get('/', response_model=typing.Union[
+@public_router.get('/', response_model=typing.Union[
     typing.List[build_schema.Build], build_schema.BuildsResponse])
 async def get_builds_per_page(
     request: Request,
@@ -72,7 +77,7 @@ async def get_module_preview(
     return await build_crud.get_module_preview(platform, flavors, module_request)
 
 
-@router.get('/{build_id}/', response_model=build_schema.Build)
+@public_router.get('/{build_id}/', response_model=build_schema.Build)
 async def get_build(build_id: int, db: database.Session = Depends(get_db)):
     db_build = await build_crud.get_builds(db, build_id)
     if db_build is None:

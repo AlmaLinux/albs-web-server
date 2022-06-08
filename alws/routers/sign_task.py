@@ -19,8 +19,13 @@ router = APIRouter(
     dependencies=[Depends(JWTBearer())]
 )
 
+public_router = APIRouter(
+    prefix='/sign-tasks',
+    tags=['sign-tasks'],
+)
 
-@router.get('/', response_model=typing.List[sign_schema.SignTask])
+
+@public_router.get('/', response_model=typing.List[sign_schema.SignTask])
 async def get_sign_tasks(build_id: int = None,
                          db: database.Session = Depends(get_db)):
     return await sign_task.get_sign_tasks(db, build_id=build_id)

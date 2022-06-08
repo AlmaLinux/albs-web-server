@@ -52,7 +52,6 @@ async def get_user(
 
 @router.get(
     '/all_users',
-    dependencies=[Depends(JWTBearer())],
     response_model=typing.List[user_schema.User],
 )
 async def get_all_users(db: database.Session = Depends(get_db)):

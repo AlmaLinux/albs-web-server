@@ -14,6 +14,11 @@ router = APIRouter(
     dependencies=[Depends(JWTBearer())]
 )
 
+public_router = APIRouter(
+    prefix='/platforms',
+    tags=['platforms'],
+)
+
 
 @router.post('/', response_model=platform_schema.Platform)
 async def create_platform(
@@ -31,7 +36,7 @@ async def modify_platform(
     return await pl_crud.modify_platform(db, platform)
 
 
-@router.get('/', response_model=typing.List[platform_schema.Platform])
+@public_router.get('/', response_model=typing.List[platform_schema.Platform])
 async def get_platforms(db: database.Session = Depends(get_db)):
     return await pl_crud.get_platforms(db)
 

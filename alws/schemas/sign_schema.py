@@ -70,6 +70,7 @@ class SignedRpmInfo(BaseModel):
     type: str
     href: str
     fingerprint: str
+    sha256: str
 
 
 class AvailableSignTask(BaseModel):

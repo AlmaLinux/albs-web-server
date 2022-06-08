@@ -604,7 +604,9 @@ class PulpClient:
         else:
             entity_href = await self.create_file(
                 artifact.name, artifact.href)
-        return entity_href, artifact
+        info = await self.get_artifact(
+            entity_href, include_fields=['sha256'])
+        return entity_href, info['sha256'], artifact
 
     async def wait_for_task(self, task_href: str):
         task = await self.request('GET', task_href)

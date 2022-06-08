@@ -46,6 +46,10 @@ class ArtifactConversionError(Exception):
     pass
 
 
+class ArtifactChecksumError(Exception):
+    pass
+
+
 class SrpmProvisionError(Exception):
     pass
 
