@@ -336,7 +336,7 @@ class VulnerabilityItem(BaseModel):
     product_statuses: Optional[ProductStatuses]
     remediations: Remediations
     threats: Optional[Threats] = None
-    discovery_date: str
+    discovery_date: Optional[str]
     ordinal: str
 
 

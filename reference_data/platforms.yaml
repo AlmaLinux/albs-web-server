@@ -2,6 +2,8 @@
 - name: AlmaLinux-8
   distr_type: rhel
   distr_version: '8'
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux
   reference_platforms:
     - 'CentOSStream8'
@@ -750,7 +752,7 @@
       export_path: almalinux/8/plus/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -760,7 +762,7 @@
       export_path: almalinux/8/plus/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -770,7 +772,7 @@
       export_path: almalinux/8/plus/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -780,7 +782,7 @@
       export_path: vault/8/plus/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -790,7 +792,7 @@
       export_path: vault/8/plus/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -800,7 +802,7 @@
       export_path: vault/8/plus/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -810,7 +812,7 @@
       export_path: vault/8/plus/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -820,7 +822,7 @@
       export_path: vault/8/plus/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -830,13 +832,15 @@
       export_path: vault/8/plus/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
 
 - name: AlmaLinux-9
   distr_type: rhel
   distr_version: '9'
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux
   reference_platforms:
     - 'CentOSStream9'
@@ -903,7 +907,7 @@
       export_path: almalinux/9/.devel/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -913,7 +917,7 @@
       export_path: almalinux/9/.devel/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -923,7 +927,7 @@
       export_path: almalinux/9/.devel/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -933,7 +937,7 @@
       export_path: vault/9/.devel/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -943,7 +947,7 @@
       export_path: almalinux/9/.devel/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -953,7 +957,7 @@
       export_path: vault/9/.devel/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -963,7 +967,7 @@
       export_path: vault/9/.devel/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -973,7 +977,7 @@
       export_path: vault/9/.devel/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -983,7 +987,7 @@
       export_path: vault/9/.devel/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -993,7 +997,7 @@
       export_path: vault/9/.devel/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1003,7 +1007,7 @@
       export_path: vault/9/.devel/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1048,7 +1052,7 @@
       export_path: vault/9/AppStream/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1058,7 +1062,7 @@
       export_path: almalinux/9/AppStream/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1068,7 +1072,7 @@
       export_path: almalinux/9/AppStream/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1078,7 +1082,7 @@
       export_path: almalinux/9/AppStream/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1088,7 +1092,7 @@
       export_path: almalinux/9/AppStream/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1098,7 +1102,7 @@
       export_path: vault/9/AppStream/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1108,7 +1112,7 @@
       export_path: vault/9/AppStream/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1118,7 +1122,7 @@
       export_path: vault/9/AppStream/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1128,7 +1132,7 @@
       export_path: vault/9/AppStream/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1138,7 +1142,7 @@
       export_path: vault/9/AppStream/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1148,7 +1152,7 @@
       export_path: vault/9/AppStream/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1158,7 +1162,7 @@
       export_path: vault/9/BaseOS/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1168,7 +1172,7 @@
       export_path: almalinux/9/BaseOS/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1178,7 +1182,7 @@
       export_path: almalinux/9/BaseOS/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1188,7 +1192,7 @@
       export_path: almalinux/9/BaseOS/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1198,7 +1202,7 @@
       export_path: almalinux/9/BaseOS/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1208,7 +1212,7 @@
       export_path: vault/9/BaseOS/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1218,7 +1222,7 @@
       export_path: vault/9/BaseOS/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1228,7 +1232,7 @@
       export_path: vault/9/BaseOS/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1238,7 +1242,7 @@
       export_path: vault/9/BaseOS/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1248,7 +1252,7 @@
       export_path: vault/9/BaseOS/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1258,7 +1262,7 @@
       export_path: vault/9/BaseOS/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1268,7 +1272,7 @@
       export_path: vault/9/HighAvailability/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1278,7 +1282,7 @@
       export_path: almalinux/9/HighAvailability/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1288,7 +1292,7 @@
       export_path: almalinux/9/HighAvailability/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1298,7 +1302,7 @@
       export_path: almalinux/9/HighAvailability/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1308,7 +1312,7 @@
       export_path: almalinux/9/HighAvailability/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1318,7 +1322,7 @@
       export_path: vault/9/HighAvailability/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1328,7 +1332,7 @@
       export_path: vault/9/HighAvailability/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1338,7 +1342,7 @@
       export_path: vault/9/HighAvailability/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1348,7 +1352,7 @@
       export_path: vault/9/HighAvailability/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1358,7 +1362,7 @@
       export_path: vault/9/HighAvailability/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1368,7 +1372,7 @@
       export_path: vault/9/HighAvailability/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1378,7 +1382,7 @@
       export_path: vault/9/ResilientStorage/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1388,7 +1392,7 @@
       export_path: almalinux/9/ResilientStorage/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1398,7 +1402,7 @@
       export_path: almalinux/9/ResilientStorage/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1408,7 +1412,7 @@
       export_path: almalinux/9/ResilientStorage/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1418,7 +1422,7 @@
       export_path: almalinux/9/ResilientStorage/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1428,7 +1432,7 @@
       export_path: vault/9/ResilientStorage/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1438,7 +1442,7 @@
       export_path: vault/9/ResilientStorage/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1448,7 +1452,7 @@
       export_path: vault/9/ResilientStorage/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1458,7 +1462,7 @@
       export_path: vault/9/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1468,7 +1472,7 @@
       export_path: vault/9/ResilientStorage/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1478,7 +1482,7 @@
       export_path: vault/9/ResilientStorage/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1488,7 +1492,7 @@
       export_path: vault/9/extras/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1498,7 +1502,7 @@
       export_path: almalinux/9/extras/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1508,7 +1512,7 @@
       export_path: almalinux/9/extras/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1518,7 +1522,7 @@
       export_path: almalinux/9/extras/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1528,7 +1532,7 @@
       export_path: almalinux/9/extras/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1538,7 +1542,7 @@
       export_path: vault/9/extras/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1548,7 +1552,7 @@
       export_path: vault/9/extras/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1558,7 +1562,7 @@
       export_path: vault/9/extras/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1568,7 +1572,7 @@
       export_path: vault/9/extras/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1578,7 +1582,7 @@
       export_path: vault/9/extras/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1588,7 +1592,7 @@
       export_path: vault/9/extras/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1598,7 +1602,7 @@
       export_path: vault/9/CRB/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1608,7 +1612,7 @@
       export_path: almalinux/9/CRB/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1618,7 +1622,7 @@
       export_path: almalinux/9/CRB/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1628,7 +1632,7 @@
       export_path: almalinux/9/CRB/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1638,7 +1642,7 @@
       export_path: almalinux/9/CRB/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1648,7 +1652,7 @@
       export_path: vault/9/CRB/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1658,7 +1662,7 @@
       export_path: vault/9/CRB/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1668,7 +1672,7 @@
       export_path: vault/9/CRB/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1678,7 +1682,7 @@
       export_path: vault/9/CRB/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1688,7 +1692,7 @@
       export_path: vault/9/CRB/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1698,7 +1702,7 @@
       export_path: vault/9/CRB/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1708,7 +1712,7 @@
       export_path: almalinux/9/NFV/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1718,7 +1722,7 @@
       export_path: vault/9/NFV/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1728,7 +1732,7 @@
       export_path: vault/9/NFV/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1738,7 +1742,7 @@
       export_path: almalinux/9/RT/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1748,7 +1752,7 @@
       export_path: vault/9/RT/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1758,7 +1762,7 @@
       export_path: vault/9/RT/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1768,7 +1772,7 @@
       export_path: vault/9/SAP/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1778,7 +1782,7 @@
       export_path: almalinux/9/SAP/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1788,7 +1792,7 @@
       export_path: almalinux/9/SAP/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1798,7 +1802,7 @@
       export_path: almalinux/9/SAP/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1808,7 +1812,7 @@
       export_path: almalinux/9/SAP/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1818,7 +1822,7 @@
       export_path: vault/9/SAP/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1828,7 +1832,7 @@
       export_path: vault/9/SAP/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1838,7 +1842,7 @@
       export_path: vault/9/SAP/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1848,7 +1852,7 @@
       export_path: vault/9/SAP/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1858,7 +1862,7 @@
       export_path: vault/9/SAP/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1868,7 +1872,7 @@
       export_path: vault/9/SAP/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1878,7 +1882,7 @@
       export_path: vault/9/SAPHANA/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1888,7 +1892,7 @@
       export_path: almalinux/9/SAPHANA/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1898,7 +1902,7 @@
       export_path: almalinux/9/SAPHANA/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1908,7 +1912,7 @@
       export_path: almalinux/9/SAPHANA/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1918,7 +1922,7 @@
       export_path: almalinux/9/SAPHANA/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -1928,7 +1932,7 @@
       export_path: vault/9/SAPHANA/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -1938,7 +1942,7 @@
       export_path: vault/9/SAPHANA/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -1948,7 +1952,7 @@
       export_path: vault/9/SAPHANA/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1958,7 +1962,7 @@
       export_path: vault/9/SAPHANA/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1968,7 +1972,7 @@
       export_path: vault/9/SAPHANA/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -1978,7 +1982,7 @@
       export_path: vault/9/SAPHANA/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -1988,7 +1992,7 @@
       export_path: almalinux/9/plus/aarch64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -1998,7 +2002,7 @@
       export_path: almalinux/9/plus/ppc64le/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -2008,7 +2012,7 @@
       export_path: almalinux/9/plus/x86_64/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -2018,7 +2022,7 @@
       export_path: almalinux/9/plus/s390x/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -2028,7 +2032,7 @@
       export_path: vault/9/plus/i686/os/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: src
@@ -2038,7 +2042,7 @@
       export_path: vault/9/plus/Source/
       production: true
       debug: false
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: aarch64
@@ -2048,7 +2052,7 @@
       export_path: vault/9/plus/debug/aarch64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: ppc64le
@@ -2058,7 +2062,7 @@
       export_path: vault/9/plus/debug/ppc64le/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: x86_64
@@ -2068,7 +2072,7 @@
       export_path: vault/9/plus/debug/x86_64/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: s390x
@@ -2078,7 +2082,7 @@
       export_path: vault/9/plus/debug/s390x/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
     - arch: i686
@@ -2088,6 +2092,6 @@
       export_path: vault/9/plus/debug/i686/
       production: true
       debug: true
-      remote_sync_policy: immediate
+      remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10

@@ -98,16 +98,24 @@ class CriteriaNode:
         ):
             return True
         return False
-    
+
     def is_old_record(self) -> bool:
         for criteria in self.criteria["criteria"]:
             criteria_node = CriteriaNode(criteria, self)
             if criteria_node.is_old_record():
                 return True
-        for criterion in self.criteria['criterion']:
-            if 'CentOS' in criterion['comment']:
+        for criterion in self.criteria["criterion"]:
+            if "CentOS" in criterion["comment"]:
                 return True
         return False
+
+
+def oval_to_dict() -> dict:
+    from almalinux.liboval.composer import Composer
+
+    return Composer.load_from_file(
+        "/home/avoid/Downloads/alma-test-all.xml"
+    ).as_dict()
 
 
 def errata_records_to_oval(
@@ -146,6 +154,11 @@ def errata_records_to_oval(
     objects = set()
     links_tracking = set()
     evra_regex = re.compile(r"(\d+):(.*)-(.*)")
+    dict_oval = oval_to_dict()
+    old_record_ids = set(
+        definition["metadata"]["title"][:14]
+        for definition in dict_oval["definitions"]
+    )
     for record in records:
         rhel_evra_mapping = collections.defaultdict(dict)
         for pkg in record.packages:
@@ -154,28 +167,23 @@ def errata_records_to_oval(
                 for albs_pkg in pkg.albs_packages
                 if albs_pkg.status == models.ErrataPackageStatus.released
             ]
-            if not albs_pkgs:
-                continue
             for albs_pkg in albs_pkgs:
                 rhel_evra = f"{pkg.epoch}:{pkg.version}-{pkg.release}"
-                albs_pulp_href = albs_pkg.pulp_href
-                if not albs_pulp_href:
-                    albs_pulp_href = albs_pkg.build_artifact.pulp_href
                 albs_evra = (
                     f"{albs_pkg.epoch}:{albs_pkg.version}-{albs_pkg.release}"
                 )
                 arch = albs_pkg.arch
-                if arch == 'noarch':
+                if arch == "noarch":
                     arch = pkg.arch
                 rhel_evra_mapping[rhel_evra][arch] = albs_evra
-        if not rhel_evra_mapping:
+        if not rhel_evra_mapping and record.id not in old_record_ids:
             continue
         criteria_list = record.original_criteria[:]
-        centos_refs = False
-        for criteria in criteria_list:
-            node = CriteriaNode(criteria, None)
-            if node.is_old_record():
-                centos_refs = True
+        centos_refs = record.id in old_record_ids
+        # for criteria in criteria_list:
+        #    node = CriteriaNode(criteria, None)
+        #    if node.is_old_record():
+        #        centos_refs = True
         while criteria_list:
             new_criteria_list = []
             for criteria in criteria_list:
@@ -198,7 +206,9 @@ def errata_records_to_oval(
                             evra = evra.group()
                             if evra not in rhel_evra_mapping.keys():
                                 continue
-                            criterion["comment"] = criterion["comment"].replace(
+                            criterion["comment"] = criterion[
+                                "comment"
+                            ].replace(
                                 evra,
                                 rhel_evra_mapping[evra][
                                     next(iter(rhel_evra_mapping[evra].keys()))
@@ -262,6 +272,7 @@ def errata_records_to_oval(
                             }
                             for ref in record.references
                             if ref.ref_type == models.ErrataReferenceType.cve
+                            and ref.cve
                         ],
                     },
                     "references": [
@@ -300,7 +311,8 @@ def errata_records_to_oval(
                     test["comment"], record.platform.distr_version
                 )
             test["object_ref"] = debrand_id(test["object_ref"])
-            test["state_ref"] = debrand_id(test["state_ref"])
+            if test.get("state_ref"):
+                test["state_ref"] = debrand_id(test["state_ref"])
             links_tracking.update([test["object_ref"], test["state_ref"]])
             oval.append_object(
                 get_test_cls_by_tag(test["type"]).from_dict(test)
@@ -309,7 +321,10 @@ def errata_records_to_oval(
             obj["id"] = debrand_id(obj["id"])
             if obj["id"] in objects:
                 continue
-            if obj["id"] not in links_tracking:
+            if (
+                obj["id"] not in links_tracking
+                and obj["id"] != "oval:org.almalinux.alsa:obj:20191167027"
+            ):
                 continue
             objects.add(obj["id"])
             if obj.get("instance_var_ref"):
@@ -329,9 +344,10 @@ def errata_records_to_oval(
                 continue
             if state.get("evr"):
                 if state["evr"] in rhel_evra_mapping:
-                    state["arch"] = "|".join(
-                        rhel_evra_mapping[state["evr"]].keys()
-                    )
+                    if state['arch']:
+                        state["arch"] = "|".join(
+                            rhel_evra_mapping[state["evr"]].keys()
+                        )
                     state["evr"] = rhel_evra_mapping[state["evr"]][
                         next(iter(rhel_evra_mapping[state["evr"]].keys()))
                     ]
@@ -362,6 +378,7 @@ def errata_records_to_oval(
 
 # TODO: remove this before release
 CACHE = {}
+
 
 async def load_platform_packages(platform: models.Platform):
     global CACHE
@@ -400,7 +417,7 @@ async def load_platform_packages(platform: models.Platform):
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg["arch"]]
-            if pkg["arch"] == 'noarch':
+            if pkg["arch"] == "noarch":
                 arch_list = platform.arch_list
             for arch in arch_list:
                 if not cache[short_pkg_name].get(arch):
@@ -645,7 +662,7 @@ async def list_errata_records(
                 ),
             ]
         )
-    
+
     def generate_query(count=False):
         query = select(func.count(models.ErrataRecord.id))
         if not count:
@@ -677,49 +694,38 @@ async def list_errata_records(
     }
 
 
-async def update_package_status(db, request: errata_schema.ChangeErrataPackageStatusRequest):
+async def update_package_status(
+    db, request: List[errata_schema.ChangeErrataPackageStatusRequest]
+):
     async with db.begin():
-        errata_record = await db.execute(
-            select(models.ErrataRecord)
-            .where(models.ErrataRecord.id == request.errata_record_id)
-            .options(
-                selectinload(models.ErrataRecord.packages)
-                .selectinload(models.ErrataPackage.albs_packages)
-                .selectinload(models.ErrataToALBSPackage.build_artifact)
-                .selectinload(models.BuildTaskArtifact.build_task)
+        for record in request:
+            errata_record = await db.execute(
+                select(models.ErrataRecord)
+                .where(models.ErrataRecord.id == record.errata_record_id)
+                .options(
+                    selectinload(models.ErrataRecord.packages)
+                    .selectinload(models.ErrataPackage.albs_packages)
+                    .selectinload(models.ErrataToALBSPackage.build_artifact)
+                    .selectinload(models.BuildTaskArtifact.build_task)
+                )
             )
-        )
-        errata_record = errata_record.scalars().first()
-        released_build_id = None
-        released_source = None
-        packages_by_source = {}
-        for errata_pkg in errata_record.packages:
-            if not errata_pkg.source_srpm:
-                continue
-            if packages_by_source.get(errata_pkg.source_srpm) is None:
-                packages_by_source[errata_pkg.source_srpm] = {}
-            record_mapping = packages_by_source[errata_pkg.source_srpm]
-            for albs_pkg in errata_pkg.albs_packages:
-                if record_mapping.get(albs_pkg.build_id) is None:
-                    record_mapping[albs_pkg.build_id] = []
-                record_mapping[albs_pkg.build_id].append(albs_pkg)
-                if all(
-                    [
-                        errata_pkg.id == request.errata_package_id,
-                        albs_pkg.id == request.mapping_id,
-                    ]
-                ):
-                    released_build_id = albs_pkg.build_id
-                    released_source = errata_pkg.source_srpm
-        for build_id, packages in packages_by_source[released_source].items():
-            for pkg in packages:
-                if pkg.status == models.ErrataPackageStatus.released:
-                    raise ValueError(
-                        f"There is already released package with same source: {pkg}"
-                    )
-                if build_id != released_build_id:
-                    if request.status == models.ErrataPackageStatus.approved.value:
-                        pkg.status = models.ErrataPackageStatus.skipped
-                else:
-                    pkg.status = request.status
+            errata_record = errata_record.scalars().first()
+            record_approved = (
+                record.status == models.ErrataPackageStatus.approved
+            )
+            for errata_pkg in errata_record.packages:
+                if errata_pkg.source_srpm != record.source:
+                    continue
+                for albs_pkg in errata_pkg.albs_packages:
+                    if albs_pkg.status == models.ErrataPackageStatus.released:
+                        raise ValueError(
+                            f"There is already released package with same source: {albs_pkg}"
+                        )
+                    if (
+                        albs_pkg.build_id != record.build_id
+                        and record_approved
+                    ):
+                        albs_pkg.status = models.ErrataPackageStatus.skipped
+                    if albs_pkg.build_id == record.build_id:
+                        albs_pkg.status = request.status
     return True

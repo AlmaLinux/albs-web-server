@@ -81,7 +81,7 @@ class SecurityApiClient:
         distr_version_to_oval_xml_links = {
             "8": [
                 "https://www.redhat.com/security/data/oval/v2/RHEL8/rhel-8.oval.xml.bz2",
-                # "http://192.168.1.11:8000/alma-test-all.xml.bz2",
+                "http://192.168.1.11:8000/alma-test-all.xml.bz2",
             ],
             "9": [
                 # TODO: replace with v2 stream links

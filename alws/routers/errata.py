@@ -81,10 +81,10 @@ async def list_all_errata_records(
     response_model=errata_schema.ChangeErrataPackageStatusResponse,
 )
 async def update_package_status(
-    package: errata_schema.ChangeErrataPackageStatusRequest,
+    packages: List[errata_schema.ChangeErrataPackageStatusRequest],
     db: database.Session = Depends(get_db),
 ):
     try:
-        return {"ok": bool(await errata_crud.update_package_status(db, package))}
+        return {"ok": bool(await errata_crud.update_package_status(db, packages))}
     except ValueError as e:
         return {"ok": False, "error": e.message}

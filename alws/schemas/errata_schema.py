@@ -3,6 +3,8 @@ from typing import List, Any, Optional
 
 from pydantic import BaseModel, validator
 
+from alws.models import ErrataPackageStatus
+
 
 class BaseErrataCVE(BaseModel):
     id: str
@@ -129,9 +131,9 @@ class ChangeErrataPackageStatusResponse(BaseModel):
 
 class ChangeErrataPackageStatusRequest(BaseModel):
     errata_record_id: str
-    errata_package_id: int
-    mapping_id: int
-    status: str # TODO: change to enum
+    build_id: int
+    source: str
+    status: ErrataPackageStatus
 
 
 class UpdateErrataRequest(BaseModel):
