@@ -259,11 +259,17 @@ def main():
                 logger.info('Synchronization from remote is disabled, skipping')
                 continue
             logger.info('Syncing %s from %s...', repository, remote)
-            sync(pulp_client.sync_rpm_repo_from_remote(
-                repository.pulp_href, remote.pulp_href, sync_policy=repo_sync_policy,
-                wait_for_result=True))
-            sync(pulp_client.create_rpm_publication(repository.pulp_href))
-            logger.info('Repository %s sync is completed', repository)
+            try:
+                sync(pulp_client.sync_rpm_repo_from_remote(
+                    repository.pulp_href, remote.pulp_href,
+                    sync_policy=repo_sync_policy,
+                    wait_for_result=True))
+                sync(pulp_client.create_rpm_publication(repository.pulp_href))
+            except Exception as e:
+                logger.error('Cannot sync repository %s: %s',
+                             str(repository), e)
+            else:
+                logger.info('Repository %s sync is completed', repository)
 
         sync(add_repositories_to_platform(platform_data, repository_ids))
 
