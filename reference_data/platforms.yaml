@@ -2125,7 +2125,7 @@
       arch: aarch64
       type: rpm
       remote_url: https://rsync.repo.almalinux.org/almalinux/9/raspberrypi/aarch64/os/
-      export_path: almalinux/9/raspberrypi/aarch64/
+      export_path: almalinux/9/raspberrypi/aarch64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
