@@ -598,4 +598,8 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
 
     db.add_all(binary_rpms)
     await db.flush()
-    await __update_built_srpm_url(db, build_task)
+    # Only first task in a row could have SRPM url not set.
+    # All other tasks will be either having it already or fast-failed,
+    # so should not call this function anyway.
+    if build_task.built_srpm_url is None:
+        await __update_built_srpm_url(db, build_task)
