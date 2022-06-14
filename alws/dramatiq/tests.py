@@ -24,8 +24,8 @@ async def _complete_test_task(task_id: int, task_result: TestTaskResult):
                 'Cannot set test task "%d" result, marking as failed.'
                 'Error: %s', task_id, str(e))
             await db.rollback()
-        await db.execute(update(TestTask).where(
-            TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
+            await db.execute(update(TestTask).where(
+                TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
 
 
 @dramatiq.actor(max_retries=2, priority=5, time_limit=DRAMATIQ_TASK_TIMEOUT)
