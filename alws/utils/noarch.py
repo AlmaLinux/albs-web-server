@@ -6,7 +6,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
-from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.utils.pulp_client import PulpClient
 
@@ -47,11 +46,6 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
     )).options(
         selectinload(models.BuildTask.artifacts),
         selectinload(models.BuildTask.build).selectinload(models.Build.repos),
-    )
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
     )
     build_tasks = await db.execute(query)
     build_tasks = build_tasks.scalars().all()
