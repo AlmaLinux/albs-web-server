@@ -138,7 +138,6 @@ async def complete_test_task(db: Session, task_id: int,
     task.alts_response = test_result.dict()
     db.add(task)
     db.add_all(logs)
-    await db.flush()
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)
