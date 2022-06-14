@@ -10,7 +10,6 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.config import settings
 from alws.constants import TestTaskStatus
-from alws.database import Session as DBSession
 from alws.schemas import test_schema
 from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
