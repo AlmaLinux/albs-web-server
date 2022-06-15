@@ -820,7 +820,7 @@ class ReleasePlanner:
                             already_released = False
                             for collection in pulp_record.collections:
                                 for package in collection.packages:
-                                    if package.filename == pulp_pkg['location_href']:
+                                    if package.name == pulp_pkg['name']:
                                         already_released = True
                             if already_released:
                                 continue
@@ -837,7 +837,7 @@ class ReleasePlanner:
                                 sum_type=cr.checksum_type('sha256'),
                             ))
                             pulp_record.updated_date = datetime.now().strftime(
-                                '%Y-%m-%d %H:%M:%S UTC'
+                                '%Y-%m-%d %H:%M:%S'
                             )
                 records_to_add = []
                 db_records = await self._db.execute(select(models.ErrataRecord).options(
@@ -857,9 +857,13 @@ class ReleasePlanner:
                     rpm_module = None
                     reboot_suggested = False
                     dict_packages = []
+                    released_names = set()
                     for db_pkg, pulp_pkg, errata_pkg in packages:
                         if errata_pkg.errata_package.reboot_suggested:
                             reboot_suggested = True
+                        if pulp_pkg['name'] in released_names:
+                            continue
+                        released_names.add(pulp_pkg['name'])
                         dict_packages.append({
                             'name': pulp_pkg['name'],
                             'release': pulp_pkg['release'],
@@ -877,7 +881,7 @@ class ReleasePlanner:
                             rpm_module = {
                                 'name': db_module.name,
                                 'stream': db_module.stream,
-                                'version': db_module.version,
+                                'version': int(db_module.version),
                                 'context': db_module.context,
                                 'arch': db_module.arch,
                             }
@@ -886,8 +890,8 @@ class ReleasePlanner:
                     )
                     records_to_add.append({
                         'id': db_record.id,
-                        'updated_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
-                        'issued_date': db_record.issued_date.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                        'updated_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'issued_date': db_record.issued_date.strftime('%Y-%m-%d %H:%M:%S'),
                         'description': db_record.get_description(),
                         'fromstr': db_record.contact_mail,
                         'status': db_record.status,

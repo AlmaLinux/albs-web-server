@@ -546,7 +546,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
     self_ref = models.ErrataReference(
         href=f"https://errata.almalinux.org/{platform.distr_version}/{html_id}.html",
         ref_id=db_errata.id,
-        ref_type='self',
+        ref_type=models.ErrataReferenceType.self_ref,
         title=db_errata.id,
     )
     db_errata.references.append(self_ref)
