@@ -45,6 +45,7 @@ def extract_packages_from_definition(definition: OvalDefinition):
         raw_package["epoch"] = int(epoch)
         raw_package["version"] = version
         raw_package["release"] = release
+        raw_package["reboot_suggested"] = False
         arches = state.arch or "aarch64|ppc64le|s390x|x86_64"
         for arch in arches.split("|"):
             package = raw_package.copy()
@@ -115,7 +116,6 @@ async def mainloop():
                     "href": ref.ref_url,
                     "ref_id": ref.ref_id,
                     "ref_type": ref.source.lower(),
-                    # title ????
                 }
                 refs.append(dict_ref)
                 if ref.source == "CVE":
@@ -177,7 +177,6 @@ async def mainloop():
                 "version": cvrf.document_tracking.version,
                 "severity": item.severity,
                 "rights": advisory.rights,
-                # 'reboot_suggested': ???? (can we generate it, based on updated packages?)
                 "definition_id": oval_info.definition.id,
                 "definition_version": oval_info.definition.version,
                 "definition_class": oval_info.definition.class_,

@@ -684,7 +684,6 @@ class ErrataRecord(Base):
     original_title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    # Maybe integer?
     version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     severity = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     rights = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -708,6 +707,23 @@ class ErrataRecord(Base):
     packages = relationship('ErrataPackage')
 
     cves = association_proxy("references", "cve_id")
+
+    def get_description(self):
+        if self.description:
+            return self.description
+        return self.original_description
+
+    def get_title(self):
+        if self.title:
+            return self.title
+        return self.original_title
+    
+    def get_type(self):
+        return {
+            'BA': 'bugfix',
+            'SA': 'security',
+            'EA': 'enhancement',
+        }[self.id[2:4]]
 
 
 class ErrataReferenceType(enum.Enum):

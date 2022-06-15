@@ -1,5 +1,6 @@
 import io
 import re
+import json
 import asyncio
 import typing
 import urllib.parse
@@ -616,6 +617,34 @@ class PulpClient:
         if task['state'] == 'failed':
             raise Exception(f'Task {str(task)} has failed')
         return task
+    
+    async def list_updateinfo_records(
+                self,
+                id__in: List[str],
+                repository_version: str
+            ):
+        endpoint = 'pulp/api/v3/content/rpm/advisories/'
+        payload = {
+            'id__in': id__in,
+            'repository_version': repository_version,
+        }
+        return (await self.request('GET', endpoint, params=payload))['results']
+
+    async def add_errata_record(self, record: dict, repo_href: str):
+        endpoint = 'pulp/api/v3/content/rpm/advisories/'
+        payload = {
+            'file': io.StringIO(json.dumps(record)),
+            'repository': repo_href,
+        }
+        task = await self.request('POST', endpoint, data=payload)
+        response = await self.wait_for_task(task['task'])
+        return response
+
+    async def add_errata_records(self, records: List[dict], repo_href: str):
+        tasks = []
+        for record in records:
+            tasks.append(self.add_errata_record(record, repo_href))
+        await asyncio.gather(*tasks)
 
     async def request(
         self, method: str, endpoint: str, pure_url: bool = False,

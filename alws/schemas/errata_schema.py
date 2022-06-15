@@ -11,7 +11,7 @@ class BaseErrataCVE(BaseModel):
     cvss3: str
     cwe: Optional[str] = None
     impact: str
-    public: str     # TODO: public is actually a date
+    public: str
 
     class Config:
         orm_mode = True
@@ -21,7 +21,7 @@ class BaseErrataReference(BaseModel):
     href: str
     ref_id: str
     ref_type: str
-    title: Optional[str] = None # TODO
+    title: Optional[str] = None
     cve: Optional[BaseErrataCVE] = None
 
     @validator('ref_type', pre=True)
@@ -42,7 +42,7 @@ class BaseErrataPackage(BaseModel):
     release: str
     epoch: int
     arch: str
-    # reboot_suggested: bool # TODO
+    reboot_suggested: bool
 
     class Config:
         orm_mode = True
@@ -88,11 +88,11 @@ class BaseErrataRecord(BaseModel):
     definition_version: str
     definition_class: str
     affected_cpe: List[str]
-    criteria: Any    # TODO: define type
-    tests: Any       # TODO: define type
-    objects: Any     # TODO: define type
-    states: Any      # TODO: define type
-    variables: Any   # TODO: define type
+    criteria: Any
+    tests: Any
+    objects: Any
+    states: Any
+    variables: Any
     references: List[BaseErrataReference]
     packages: List[BaseErrataPackage]
 

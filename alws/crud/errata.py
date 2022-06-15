@@ -30,46 +30,6 @@ def clean_release(release):
     return re.sub(r"\.el\d+.*$", "", release)
 
 
-def errata_records_to_json(
-    db_records: List[models.ErrataRecord],
-) -> List[dict]:
-    response = []
-    for db_record in db_records:
-        record = {
-            "id": db_record.id,
-            "issued_date": db_record.issued_date,
-            "updated_date": db_record.updated_date,
-            "severity": db_record.severity,
-            "title": db_record.title or db_record.original_title,
-            "description": db_record.description
-            or db_record.original_description,
-            # 'type': ... # TODO
-            "packages": [],
-            "modules": [],
-            "references": [],
-        }
-        for db_pkg in db_record.packages:
-            # TODO: also modules
-            pass
-        for db_ref in db_record.references:
-            record["references"].append(
-                {
-                    "id": db_ref.ref_id,
-                    "type": db_ref.ref_type,
-                    "href": db_ref.href,
-                }
-            )
-        response.append(record)
-    return response
-
-
-def errata_record_to_html(record):
-    template_dir = pathlib.Path(__file__).absolute().parent / "templates"
-    template = (template_dir / "errata_alma_page.j2").read_text()
-    errata = errata_records_to_json(record)
-    return jinja2.Template(template).render(errata=errata)
-
-
 class CriteriaNode:
     def __init__(self, criteria, parent):
         self.criteria = criteria
@@ -146,7 +106,7 @@ def errata_records_to_oval(
         timestamp=datetime.datetime.now(),
     )
     oval.generator = generator
-    # TODO: add this info to platform LOL
+    # TODO: add this info to platform
     gpg_keys = {
         "8": "51D6647EC21AD6EA",
         "9": "D36CB86CB86B3716",
@@ -180,10 +140,6 @@ def errata_records_to_oval(
             continue
         criteria_list = record.original_criteria[:]
         centos_refs = record.id in old_record_ids
-        # for criteria in criteria_list:
-        #    node = CriteriaNode(criteria, None)
-        #    if node.is_old_record():
-        #        centos_refs = True
         while criteria_list:
             new_criteria_list = []
             for criteria in criteria_list:
@@ -376,15 +332,7 @@ def errata_records_to_oval(
     oval.dump_to_file(output_file)
 
 
-# TODO: remove this before release
-CACHE = {}
-
-
 async def load_platform_packages(platform: models.Platform):
-    global CACHE
-    if CACHE.get(platform.id):
-        logging.error("Found cache for platform: %s", platform.name)
-        return CACHE[platform.id]
     cache = {}
     pulp = PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
@@ -423,7 +371,6 @@ async def load_platform_packages(platform: models.Platform):
                 if not cache[short_pkg_name].get(arch):
                     cache[short_pkg_name][arch] = []
                 cache[short_pkg_name][arch].append(pkg)
-    CACHE[platform.id] = cache
     return cache
 
 
@@ -590,11 +537,20 @@ async def create_errata_record(db, errata: BaseErrataRecord):
             href=ref.href,
             ref_id=ref.ref_id,
             ref_type=ref.ref_type,
-            title="",  # TODO
+            title="",
             cve=db_cve,
         )
         db_errata.references.append(db_reference)
         items_to_insert.append(db_reference)
+    html_id = db_errata.id.replace(':', '-')
+    self_ref = models.ErrataReference(
+        href=f"https://errata.almalinux.org/{platform.distr_version}/{html_id}.html",
+        ref_id=db_errata.id,
+        ref_type='self',
+        title=db_errata.id,
+    )
+    db_errata.references.append(self_ref)
+    items_to_insert.append(self_ref)
     prod_repos_cache = await load_platform_packages(platform)
     for package in errata.packages:
         db_package = models.ErrataPackage(
@@ -727,5 +683,5 @@ async def update_package_status(
                     ):
                         albs_pkg.status = models.ErrataPackageStatus.skipped
                     if albs_pkg.build_id == record.build_id:
-                        albs_pkg.status = request.status
+                        albs_pkg.status = record.status
     return True

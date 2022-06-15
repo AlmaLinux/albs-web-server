@@ -28,7 +28,11 @@ from alws.config import settings
 from alws.constants import SignStatusEnum
 from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
-from errata_migrator import update_updateinfo
+from alws.utils.errata import (
+    merge_errata_records, find_metadata, iter_updateinfo,
+    extract_errata_metadata, extract_errata_metadata_modern,
+    merge_errata_records_modern, generate_errata_page
+)
 
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
@@ -573,24 +577,6 @@ class Exporter:
         )
         self.logger.info(stdout)
 
-    def update_ppc64le_errata(self, repodata: Path):
-        output_file = repodata / 'updateinfo.xml'
-        input_repodata = Path(
-            str(repodata).replace('ppc64le', 'x86_64')
-        )
-        input_updateinfo = list(input_repodata.glob('*updateinfo.xml*'))
-        if input_updateinfo:
-            input_updateinfo = input_updateinfo[0]
-            update_updateinfo(
-                str(input_updateinfo),
-                str(repodata),
-                str(output_file)
-            )
-            self.modifyrepo_c[
-                '--mdtype=updateinfo', str(output_file), str(repodata)
-            ].run()
-            output_file.unlink()
-
 
 async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
                         platforms_dict: dict, db_sign_keys: list,
@@ -640,6 +626,8 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
         return
 
     result = True
+    errata_records = []
+    modern_errata_records = {'data': []}
     try:
         local['sudo']['chown',
                       f'{exporter.current_user}:{exporter.current_user}',
@@ -648,8 +636,13 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
                       f'{exporter.current_user}:{exporter.current_user}',
                       f'{repodata}'].run()
         exporter.regenerate_repo_metadata(parent_dir)
-        if '/ppc64le/' in repo_path:
-            exporter.update_ppc64le_errata(repodata)
+        errata_file = find_metadata(str(repodata), 'updateinfo')
+        for record in iter_updateinfo(errata_file):
+            errata_records.append(extract_errata_metadata(record))
+            modern_errata_records = merge_errata_records_modern(
+                modern_errata_records,
+                extract_errata_metadata_modern(record)
+            )
     except Exception as e:
         exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
@@ -661,7 +654,7 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
                       f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                       f'{parent_dir}'].run()
 
-    return result
+    return result, errata_records, modern_errata_records
 
 
 def main():
@@ -717,15 +710,45 @@ def main():
     except Exception:
         pass
 
+    errata_cache = []
+    modern_errata_cache = {'data': []}
     for exp_path in exported_paths:
-        result = repo_post_processing(exporter, exp_path)
+        result, errata_records, modern_errata_records = repo_post_processing(
+            exporter, exp_path, errata_cache
+        )
         if result:
             exporter.logger.info('%s post-processing is successful', exp_path)
         else:
             exporter.logger.error('%s post-processing has failed', exp_path)
+        errata_cache = merge_errata_records(errata_cache, errata_records)
+        modern_errata_cache = merge_errata_records_modern(
+            modern_errata_cache, modern_errata_records
+        )
+    for item in errata_cache:
+        item['issued_date'] = {'$date': int(item['issued_date'].timestamp() * 1000)}
+        item['updated_date'] = {'$date': int(item['updated_date'].timestamp() * 1000)}
 
     sync(sign_repodata(exporter, exported_paths, platforms_dict, db_sign_keys,
                        key_id_by_platform=key_id_by_platform))
+
+    if args.platform_names:
+        exporter.logger.info('Starting export errata.json and oval.xml')
+        errata_export_base_path = os.path.join(settings.pulp_export_path, 'errata')
+        if not os.path.exists(errata_export_base_path):
+            os.mkdir(errata_export_base_path)
+        for platform in args.platform_names:
+            platform_path = os.path.join(errata_export_base_path, platform)
+            if not os.path.exists(platform_path):
+                os.mkdir(platform_path)
+            with open(os.path.join('errata.json'), 'w') as fd:
+                json.dump(errata_cache, fd)
+            with open(os.path.join('errata.full.json'), 'w') as fd:
+                json.dump(modern_errata_cache, fd)
+            html_path = os.path.join(platform_path, 'html')
+            if not os.path.exists(html_path):
+                os.mkdir(html_path)
+            for record in errata_cache:
+                generate_errata_page(record, html_path)
 
 
 if __name__ == '__main__':

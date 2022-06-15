@@ -73,6 +73,7 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
       - "../volumes/pulp/exports:/srv/exports"
       - "./reference_data:/code/reference_data"
@@ -173,6 +174,8 @@ services:
       context: .
       dockerfile: Dockerfile.oval-cacher
     restart: "no"
+    volumes:
+      - "./almalinux:/code/almalinux"
     depends_on:
       - web_server
     command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && PYTHONPATH='.' python alws/scripts/oval_cacher/oval_cacher.py'"

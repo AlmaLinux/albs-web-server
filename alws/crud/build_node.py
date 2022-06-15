@@ -244,7 +244,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         model.build_artifact = artifact
         errata_package.albs_packages.append(model)
 
-    for href, artifact in processed_packages:
+    for href, _, artifact in processed_packages:
         artifact = models.BuildTaskArtifact(
             build_task_id=task_id,
             name=artifact.name,
