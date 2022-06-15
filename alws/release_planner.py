@@ -340,7 +340,10 @@ class ReleasePlanner:
             'repositories': prod_repos,
             'packages_from_repos': pkgs_from_repos,
             'packages_in_repos': pkgs_in_repos,
-            'modules': rpm_modules,
+            'modules': [
+                {'module': module, 'repositories': []}
+                for module in rpm_modules
+            ],
         }
 
     def find_release_repos(
