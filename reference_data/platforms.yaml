@@ -8,7 +8,7 @@
   reference_platforms:
     - 'CentOSStream8'
   modularity:
-    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
+    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a8/modified_packages.yml'
     packages_git: 'https://git.almalinux.org/rpms/'
     git_tag_prefix:
       modified: a8
@@ -375,6 +375,16 @@
       production: false
       debug: false
       priority: 10
+    - name: almalinux-8-raspberrypi
+      arch: aarch64
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/almalinux/8/raspberrypi/aarch64/os/
+      export_path: almalinux/8/raspberrypi/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -450,6 +460,16 @@
       type: rpm
       remote_url: https://repo.almalinux.org/vault/8/extras/Source/
       export_path: vault/8/extras/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-8-raspberrypi
+      arch: src
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/vault/8/raspberrypi/Source/
+      export_path: vault/8/raspberrypi/Source/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -835,6 +855,16 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - name: almalinux-8-raspberrypi-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/vault/8/raspberrypi/debug/aarch64/
+      export_path: vault/8/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
 
 - name: AlmaLinux-9
   distr_type: rhel
@@ -845,11 +875,11 @@
   reference_platforms:
     - 'CentOSStream9'
   modularity:
-    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/main/modified_packages.yml'
+    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a9/modified_packages.yml'
     packages_git: 'https://git.almalinux.org/rpms/'
     git_tag_prefix:
-      modified: a9-beta
-      non_modified: c9-beta
+      modified: a9
+      non_modified: c9
     versions:
       - name: '9'
         version_prefix: '90000'
@@ -2090,6 +2120,36 @@
       type: rpm
       remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/i686/
       export_path: vault/9/plus/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-9-raspberrypi
+      arch: aarch64
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/almalinux/9/raspberrypi/aarch64/os/
+      export_path: almalinux/9/raspberrypi/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-9-raspberrypi
+      arch: src
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/vault/9/raspberrypi/Source/
+      export_path: vault/9/raspberrypi/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - name: almalinux-9-raspberrypi-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
+      export_path: vault/9/raspberrypi/debug/aarch64/
       production: true
       debug: true
       remote_sync_policy: on_demand

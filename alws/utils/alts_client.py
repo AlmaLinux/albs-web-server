@@ -52,7 +52,7 @@ class AltsClient:
                                     timeout=self.__timeout) as response:
                 resp_json = None
                 try:
-                    resp_json = await response.json(content=None)
+                    resp_json = await response.json()
                 except Exception as e:
                     logging.error(
                         'Cannot decode response from test system: %s', str(e)

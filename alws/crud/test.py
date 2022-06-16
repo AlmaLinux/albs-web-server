@@ -103,42 +103,40 @@ async def complete_test_task(db: Session, task_id: int,
     logs = []
     new_hrefs = []
     conv_tasks = []
-    async with db.begin():
-        task = await db.execute(select(models.TestTask).where(
-            models.TestTask.id == task_id,
-        ).options(selectinload(models.TestTask.repository)))
-        task = task.scalars().first()
-        status = TestTaskStatus.COMPLETED
-        for log in test_result.result.get('logs', []):
-            if log.get('href'):
-                conv_tasks.append(__convert_to_file(pulp_client, log))
-            else:
-                logging.error('Log file %s is missing href', str(log))
-                continue
-        results = await asyncio.gather(*conv_tasks)
-        for name, href in results:
-            new_hrefs.append(href)
-            log_record = models.TestTaskArtifact(
-                name=name, href=href, test_task_id=task_id)
-            logs.append(log_record)
+    task = await db.execute(select(models.TestTask).where(
+        models.TestTask.id == task_id,
+    ).options(selectinload(models.TestTask.repository)))
+    task = task.scalars().first()
+    status = TestTaskStatus.COMPLETED
+    for log in test_result.result.get('logs', []):
+        if log.get('href'):
+            conv_tasks.append(__convert_to_file(pulp_client, log))
+        else:
+            logging.error('Log file %s is missing href', str(log))
+            continue
+    results = await asyncio.gather(*conv_tasks)
+    for name, href in results:
+        new_hrefs.append(href)
+        log_record = models.TestTaskArtifact(
+            name=name, href=href, test_task_id=task_id)
+        logs.append(log_record)
 
-        for key, item in test_result.result.items():
-            if key == 'tests':
-                for test_item in item.values():
-                    if not test_item.get('success', False):
-                        status = TestTaskStatus.FAILED
-                        break
-            # Skip logs from processing
-            elif key == 'logs':
-                continue
-            elif not item.get('success', False):
-                status = TestTaskStatus.FAILED
-                break
-        task.status = status
-        task.alts_response = test_result.dict()
-        db.add(task)
-        db.add_all(logs)
-        await db.commit()
+    for key, item in test_result.result.items():
+        if key == 'tests':
+            for test_item in item.values():
+                if not test_item.get('success', False):
+                    status = TestTaskStatus.FAILED
+                    break
+        # Skip logs from processing
+        elif key == 'logs':
+            continue
+        elif not item.get('success', False):
+            status = TestTaskStatus.FAILED
+            break
+    task.status = status
+    task.alts_response = test_result.dict()
+    db.add(task)
+    db.add_all(logs)
     if task.repository:
         await pulp_client.modify_repository(
             task.repository.pulp_href, add=new_hrefs)

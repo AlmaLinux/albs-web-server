@@ -501,9 +501,20 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         )
         uncompleted_tasks_ids = uncompleted_tasks_ids.scalars().all()
 
+    # Check if SRPM exists even if task is failed
+    srpm_artifact = await db.execute(
+        select(models.BuildTaskArtifact).where(
+            models.BuildTaskArtifact.build_task_id == build_task.id,
+            models.BuildTaskArtifact.name.like("%.src.rpm"),
+            models.BuildTaskArtifact.type == 'rpm',
+        ),
+    )
+    srpm_artifact = srpm_artifact.scalars().first()
+
     # if SRPM isn't built in first arch of project,
     # we need to stop building project
-    if build_task.status == BuildTaskStatus.FAILED and uncompleted_tasks_ids:
+    if (not srpm_artifact and build_task.status == BuildTaskStatus.FAILED
+            and uncompleted_tasks_ids):
         update_query = update(models.BuildTask).where(
             models.BuildTask.id.in_(uncompleted_tasks_ids),
         ).values(status=BuildTaskStatus.FAILED)
@@ -514,23 +525,12 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
                 uncompleted_tasks_ids),
         )
         await db.execute(remove_query)
+        return
 
     # if SRPM built we need to download them
     # from pulp repos in next tasks
-    if all((build_task.status == BuildTaskStatus.COMPLETED,
-            uncompleted_tasks_ids,
-            build_task.built_srpm_url is None)):
-        srpm_artifact = await db.execute(
-            select(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.build_task_id == build_task.id,
-                models.BuildTaskArtifact.name.like("%.src.rpm"),
-                models.BuildTaskArtifact.type == 'rpm',
-            ),
-        )
-        srpm_artifact = srpm_artifact.scalars().first()
-        if not srpm_artifact:
-            logging.error('Cannot find source RPM to insert proper link')
-            return
+    if (srpm_artifact and uncompleted_tasks_ids
+            and build_task.built_srpm_url is None):
 
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
             build_task.platform.name,
@@ -638,4 +638,8 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
 
     db.add_all(binary_rpms)
     await db.flush()
-    await __update_built_srpm_url(db, build_task)
+    # Only first task in a row could have SRPM url not set.
+    # All other tasks will be either having it already or fast-failed,
+    # so should not call this function anyway.
+    if build_task.built_srpm_url is None:
+        await __update_built_srpm_url(db, build_task)
