@@ -73,7 +73,7 @@ class Advisory(BaseModel):
         if not isinstance(value, list):
             return [value]
         return value
-        
+
     @validator("cve", pre=True)
     def validator_cve(cls, value):
         if not isinstance(value, list):

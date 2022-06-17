@@ -37,6 +37,14 @@ async def get_errata_record(
     )
 
 
+@router.get("/get_oval_xml/", response_model=str)
+async def get_oval_xml(
+    platform_name: str,
+    db: database.Session = Depends(get_db),
+):
+    return await errata_crud.get_oval_xml(db, platform_name)
+
+
 @router.get("/query/", response_model=errata_schema.ErrataListResponse)
 async def list_errata_records(
     pageNumber: Optional[int] = None,

@@ -157,9 +157,13 @@ async def mainloop():
                             obj = xml_oval["objects"][obj_ref]
                             objects.append(obj)
                             if obj.get("instance_var_ref"):
-                                variables.append(
-                                    xml_oval["variables"][
-                                        obj["instance_var_ref"]
+                                var = xml_oval["variables"][
+                                    obj["instance_var_ref"]
+                                ]
+                                variables.append(var)
+                                objects.append(
+                                    var["arithmetic"]["object_component"][
+                                        "object_ref"
                                     ]
                                 )
                         if test["state_ref"]:
@@ -169,6 +173,7 @@ async def mainloop():
             payload = {
                 "platform_id": platform_id,
                 "id": item.RHSA,
+                "freezed": xml_oval_def["freezed_record"],
                 "issued_date": str(advisory.issued.date),
                 "updated_date": str(advisory.updated.date),
                 "title": metadata.title,
@@ -190,8 +195,10 @@ async def mainloop():
                 "packages": extract_packages_from_definition(oval_info),
             }
             await albs_api.insert_oval_record(payload)
-        log.info("All records cached, sleeping for 10 minutes")
-        await asyncio.sleep(600)
+        log.info(
+            f"All records cached, sleeping for {config.cache_interval} minutes"
+        )
+        await asyncio.sleep(config.cache_interval * 60)
 
 
 if __name__ == "__main__":

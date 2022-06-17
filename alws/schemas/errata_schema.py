@@ -75,6 +75,7 @@ class ErrataPackage(BaseErrataPackage):
 
 class BaseErrataRecord(BaseModel):
     id: str
+    freezed: bool
     platform_id: int
     issued_date: datetime.date
     updated_date: datetime.date

@@ -1,6 +1,4 @@
 import re
-import logging
-import pathlib
 import datetime
 import collections
 from typing import Optional, List
@@ -23,6 +21,27 @@ from alws.utils.errata import (
     debrand_comment,
 )
 from alws.utils.pulp_client import PulpClient
+
+try:
+    # FIXME: ovallib dependency should stay optional
+    #        for web-server until we release it.
+    from almalinux.liboval.composer import (
+        Composer,
+        get_test_cls_by_tag,
+        get_object_cls_by_tag,
+        get_state_cls_by_tag,
+        get_variable_cls_by_tag,
+    )
+    from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
+    from almalinux.liboval.rpminfo_test import RpminfoTest
+    from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
+    from almalinux.liboval.rpminfo_state import RpminfoState
+    from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
+    from almalinux.liboval.generator import Generator
+    from almalinux.liboval.definition import Definition
+    from almalinux.liboval.composer import Composer
+except ImportError:
+    pass
 
 
 def clean_release(release):
@@ -59,45 +78,31 @@ class CriteriaNode:
             return True
         return False
 
-    def is_old_record(self) -> bool:
-        for criteria in self.criteria["criteria"]:
-            criteria_node = CriteriaNode(criteria, self)
-            if criteria_node.is_old_record():
-                return True
-        for criterion in self.criteria["criterion"]:
-            if "CentOS" in criterion["comment"]:
-                return True
-        return False
 
-
-def oval_to_dict() -> dict:
-    from almalinux.liboval.composer import Composer
-
-    return Composer.load_from_file(
-        "/home/avoid/Downloads/alma-test-all.xml"
-    ).as_dict()
-
-
-def errata_records_to_oval(
-    records: List[models.ErrataRecord], output_file: str
-):
-    # FIXME: this imports will be held inside this function, since ovallib dependency should
-    #        stay optional for web-server until we release it.
-    from almalinux.liboval.composer import (
-        Composer,
-        get_test_cls_by_tag,
-        get_object_cls_by_tag,
-        get_state_cls_by_tag,
-        get_variable_cls_by_tag,
+async def get_oval_xml(db, platform_name: str):
+    platform = await db.execute(
+        select(models.Platform).where(models.Platform.name == platform_name)
     )
-    from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
-    from almalinux.liboval.rpminfo_test import RpminfoTest
-    from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
-    from almalinux.liboval.rpminfo_state import RpminfoState
-    from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
-    from almalinux.liboval.generator import Generator
-    from almalinux.liboval.definition import Definition
+    platform: models.Platform = platform.scalars().first()
+    records = (
+        await db.execute(
+            select(models.ErrataRecord)
+            .where(models.ErrataRecord.platform_id == platform.id)
+            .options(
+                selectinload(models.ErrataRecord.packages)
+                .selectinload(models.ErrataPackage.albs_packages)
+                .selectinload(models.ErrataToALBSPackage.build_artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
+                selectinload(models.ErrataRecord.references).selectinload(
+                    models.ErrataReference.cve
+                ),
+            )
+        )
+    ).scalars().all()
+    return errata_records_to_oval(records)
 
+
+def errata_records_to_oval(records: List[models.ErrataRecord]):
     oval = Composer()
     generator = Generator(
         product_name="AlmaLinux OS Errata System",
@@ -114,11 +119,6 @@ def errata_records_to_oval(
     objects = set()
     links_tracking = set()
     evra_regex = re.compile(r"(\d+):(.*)-(.*)")
-    dict_oval = oval_to_dict()
-    old_record_ids = set(
-        definition["metadata"]["title"][:14]
-        for definition in dict_oval["definitions"]
-    )
     for record in records:
         rhel_evra_mapping = collections.defaultdict(dict)
         for pkg in record.packages:
@@ -136,10 +136,9 @@ def errata_records_to_oval(
                 if arch == "noarch":
                     arch = pkg.arch
                 rhel_evra_mapping[rhel_evra][arch] = albs_evra
-        if not rhel_evra_mapping and record.id not in old_record_ids:
+        if not rhel_evra_mapping and not record.freezed:
             continue
         criteria_list = record.original_criteria[:]
-        centos_refs = record.id in old_record_ids
         while criteria_list:
             new_criteria_list = []
             for criteria in criteria_list:
@@ -156,7 +155,7 @@ def errata_records_to_oval(
                     criterion["comment"] = debrand_comment(
                         criterion["comment"], record.platform.distr_version
                     )
-                    if not centos_refs:
+                    if not record.freezed:
                         evra = evra_regex.search(criterion["comment"])
                         if evra:
                             evra = evra.group()
@@ -277,10 +276,7 @@ def errata_records_to_oval(
             obj["id"] = debrand_id(obj["id"])
             if obj["id"] in objects:
                 continue
-            if (
-                obj["id"] not in links_tracking
-                and obj["id"] != "oval:org.almalinux.alsa:obj:20191167027"
-            ):
+            if obj["id"] not in links_tracking:
                 continue
             objects.add(obj["id"])
             if obj.get("instance_var_ref"):
@@ -300,7 +296,7 @@ def errata_records_to_oval(
                 continue
             if state.get("evr"):
                 if state["evr"] in rhel_evra_mapping:
-                    if state['arch']:
+                    if state["arch"]:
                         state["arch"] = "|".join(
                             rhel_evra_mapping[state["evr"]].keys()
                         )
@@ -310,7 +306,7 @@ def errata_records_to_oval(
             objects.add(state["id"])
             state_cls = get_state_cls_by_tag(state["type"])
             if state_cls == RpminfoState:
-                if not centos_refs:
+                if not record.freezed:
                     if state["signature_keyid"]:
                         state["signature_keyid"] = gpg_keys[
                             record.platform.distr_version
@@ -329,7 +325,17 @@ def errata_records_to_oval(
             oval.append_object(
                 get_variable_cls_by_tag(var["type"]).from_dict(var)
             )
-    oval.dump_to_file(output_file)
+            for obj in record.original_objects:
+                if (
+                    obj["id"]
+                    != var["arithmetic"]["object_component"]["object_ref"]
+                ):
+                    continue
+                objects.add(obj["id"])
+                oval.append_object(
+                    get_object_cls_by_tag(obj["type"]).from_dict(obj)
+                )
+    return oval.dump_to_string()
 
 
 async def load_platform_packages(platform: models.Platform):
@@ -483,6 +489,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         setattr(errata, key, value)
     db_errata = models.ErrataRecord(
         id=re.sub(r"^RH", "AL", errata.id),
+        freezed=errata.freezed,
         platform_id=errata.platform_id,
         summary=None,
         solution=None,
@@ -542,7 +549,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         )
         db_errata.references.append(db_reference)
         items_to_insert.append(db_reference)
-    html_id = db_errata.id.replace(':', '-')
+    html_id = db_errata.id.replace(":", "-")
     self_ref = models.ErrataReference(
         href=f"https://errata.almalinux.org/{platform.distr_version}/{html_id}.html",
         ref_id=db_errata.id,

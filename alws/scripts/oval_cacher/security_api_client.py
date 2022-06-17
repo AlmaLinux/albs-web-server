@@ -55,7 +55,9 @@ class SecurityApiClient:
         states = response.pop("states").get("rpminfo_state", [])
         tests = response.pop("tests").get("rpminfo_test", [])
         advisory = definition["metadata"]["advisory"]
-        advisory["affected_cpe_list"] = advisory["affected_cpe_list"].get("cpe", [])
+        advisory["affected_cpe_list"] = advisory["affected_cpe_list"].get(
+            "cpe", []
+        )
         return OvalDefinition(
             objects=objects,
             definition=definition,
@@ -81,9 +83,11 @@ class SecurityApiClient:
         distr_version_to_oval_xml_links = {
             "8": [
                 "https://www.redhat.com/security/data/oval/v2/RHEL8/rhel-8.oval.xml.bz2",
+                "https://repo.almalinux.org/security/oval/org.almalinux.alsa-8.xml.bz2",
             ],
             "9": [
-                "https://www.redhat.com/security/data/oval/com.redhat.rhsa-RHEL9.xml.bz2"
+                "https://www.redhat.com/security/data/oval/com.redhat.rhsa-RHEL9.xml.bz2",
+                "https://repo.almalinux.org/security/oval/org.almalinux.alsa-9.xml.bz2",
             ],
         }
         result = collections.defaultdict(dict)
@@ -92,11 +96,14 @@ class SecurityApiClient:
                 body = await response.content.read()
             dict_oval = oval_to_dict(body)
             for definition in dict_oval["definitions"]:
+                definition["freezed_record"] = bool(
+                    definition["metadata"]["title"].startswith("AL")
+                )
                 definition["metadata"]["title"] = re.sub(
                     "^AL", "RH", definition["metadata"]["title"]
                 )
                 def_id = re.search(
-                    r"^(RH|AL)\w{2}-\d+:\d+", definition["metadata"]["title"]
+                    r"^RH\w{2}-\d+:\d+", definition["metadata"]["title"]
                 ).group()
                 result["definitions"][def_id] = definition
             for key in ("tests", "objects", "states", "variables"):

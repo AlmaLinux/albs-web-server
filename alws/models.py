@@ -676,6 +676,8 @@ class ErrataRecord(Base):
     summary = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     solution = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
+    freezed = sqlalchemy.Column(sqlalchemy.Boolean, nullable=True)
+
     issued_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
     updated_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
