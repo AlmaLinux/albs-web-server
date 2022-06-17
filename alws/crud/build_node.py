@@ -249,27 +249,17 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         # we need to put source RPM in module as well, but it can be skipped
         # because it's built before
         if built_srpm_url is not None:
-            task_query = select(models.BuildTask.build_id).where(
-                models.BuildTask.id == task_id).scalar_subquery()
-            srpms = [item for item in task_artifacts if item.arch == 'src'
-                     and item.type == 'rpm']
-            if srpms:
-                srpm = srpms[0]
-            else:
-                srpm = None
-            if srpm:
-                srpm_query = select(models.SourceRpm).where(
-                    models.SourceRpm.build_id == task_query).options(
-                    selectinload(models.SourceRpm.artifact)
-                )
-                res = await db.execute(srpm_query)
-                srpms = res.scalars().all()
-                srpm_href = next(
-                    i.artifact.href for i in srpms
-                    if i.artifact.name == srpm.name
-                )
+            db_srpm = await db.execute(
+                select(models.BuildTaskArtifact).where(
+                    models.BuildTaskArtifact.build_task_id == task_id,
+                    models.BuildTaskArtifact.name.like('%.src.rpm'),
+                    models.BuildTaskArtifact.type == 'rpm',
+                ),
+            )
+            db_srpm = db_srpm.scalars().first()
+            if db_srpm is not None:
                 srpm_info = await pulp_client.get_rpm_package(
-                    srpm_href, include_fields=pkg_fields)
+                    db_srpm.href, include_fields=pkg_fields)
         try:
             for module in module_index.iter_modules():
                 for rpm in rpms:
@@ -542,7 +532,8 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     return success
 
 
-async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.BuildDone):
+async def build_done(db: Session, pulp: PulpClient,
+                     request: build_node_schema.BuildDone):
     status = BuildTaskStatus.COMPLETED
     if request.status == 'failed':
         status = BuildTaskStatus.FAILED
@@ -565,11 +556,23 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
     db_srpm_name = None
     srpm = None
     for rpm in rpms_result.scalars().all():
+        # if build task is excluded or failed, we don't need to create
+        # SourceRpm and BinaryRpm records, because it's break package releases
+        if status in (BuildTaskStatus.EXCLUDED, BuildTaskStatus.FAILED):
+            continue
         if rpm.name.endswith('.src.rpm'):
             db_srpm_name = rpm.name
-            if build_task.built_srpm_url is not None:
+            # retrieve already created instance of model SourceRpm
+            db_srpm = await db.execute(select(
+                models.SourceRpm, models.BuildTaskArtifact).where(
+                models.SourceRpm.build_id == build_task.build_id,
+                models.SourceRpm.artifact_id == models.BuildTaskArtifact.id,
+                models.BuildTaskArtifact.name == db_srpm_name,
+            ))
+            srpm = db_srpm.scalars().first()
+            if build_task.built_srpm_url is not None and srpm is not None:
                 continue
-        if rpm.name.endswith('.src.rpm'):
+        if rpm.name.endswith('.src.rpm') and srpm is None:
             srpm = models.SourceRpm()
             srpm.artifact = rpm
             srpm.build = build_task.build
@@ -579,15 +582,6 @@ async def build_done(db: Session, pulp: PulpClient, request: build_node_schema.B
             binary_rpm.build = build_task.build
             binary_rpms.append(binary_rpm)
 
-    # retrieve already created instance of model SourceRpm
-    if not srpm and db_srpm_name:
-        srpms = await db.execute(select(
-            models.SourceRpm, models.BuildTaskArtifact).where(
-            models.SourceRpm.build_id == build_task.build_id,
-            models.SourceRpm.artifact_id == models.BuildTaskArtifact.id,
-            models.BuildTaskArtifact.name == db_srpm_name
-        ))
-        srpm = srpms.scalars().first()
     if srpm:
         if build_task.built_srpm_url is None:
             db.add(srpm)

@@ -183,6 +183,14 @@ async def complete_sign_task(
 
         all_rpms = source_rpms + binary_rpms
         all_rpms_mapping = {r.id: r for r in all_rpms}
+        srpms_mapping = defaultdict(list)
+        srpm_hrefs = [srpm.artifact.href for srpm in source_rpms]
+        db_srpm_build_artifacts = await db.execute(
+            select(models.BuildTaskArtifact).where(
+                models.BuildTaskArtifact.href.in_(srpm_hrefs))
+        )
+        for db_srpm_artifact in db_srpm_build_artifacts.scalars().all():
+            srpms_mapping[db_srpm_artifact.href].append(db_srpm_artifact)
         modified_items = []
         repo_mapping = await __get_build_repos(
             db, payload.build_id, build=build)
@@ -250,6 +258,13 @@ async def complete_sign_task(
                     if repo.pulp_href not in packages_to_add:
                         packages_to_add[repo.pulp_href] = []
                     packages_to_add[repo.pulp_href].append(new_pkg_href)
+                    # we should update href and add sign key
+                    # for every srpm in project
+                    db_sprms = srpms_mapping.get(db_package.artifact.href, [])
+                    for db_sprm in db_sprms:
+                        db_sprm.href = new_pkg_href
+                        db_sprm.sign_key = sign_task.sign_key
+                        modified_items.append(db_sprm)
                     db_package.artifact.href = new_pkg_href
                     db_package.artifact.sign_key = sign_task.sign_key
                     modified_items.append(db_package)
