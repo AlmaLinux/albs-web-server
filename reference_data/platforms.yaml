@@ -27,12 +27,14 @@
     - x86_64
     - aarch64
     - ppc64le
+    - s390x
   copy_priority_arches:
     - x86_64
     - aarch64
   weak_arch_list:
     - { name: i686, depends_on: aarch64 }
     - { name: ppc64le, depends_on: aarch64 }
+    - { name: s390x, depends_on: aarch64 }
   data:
     definitions:
       distribution: AlmaLinux
@@ -368,7 +370,7 @@
       priority: 10
     - arch: ppc64le
       name: alma8-ppc64le-javapackages
-      remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/
+      remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/ppc64le/
       type: rpm
       production: false
       debug: false
@@ -862,6 +864,24 @@
       debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-s390x-devel
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/8/devel/s390x/os/
+      production: false
+      priority: 5
+    - arch: s390x
+      name: almalinux-8-s390x-javapackages
+      type: rpm
+      remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/s390x/
+      production: false
+      priority: 5
+    - arch: s390x
+      name: almalinux-8-beta-s390x
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-s390x-bootstrap-AlmaLinux-8-s390x-dr/
+      production: false
       priority: 10
 
 - name: AlmaLinux-9
