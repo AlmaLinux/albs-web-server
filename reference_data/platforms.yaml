@@ -368,13 +368,6 @@
       production: false
       debug: false
       priority: 10
-    - arch: ppc64le
-      name: alma8-ppc64le-javapackages
-      remote_url: https://repo.almalinux.org/development/almalinux/8/javapackages/ppc64le/
-      type: rpm
-      production: false
-      debug: false
-      priority: 10
     - name: almalinux-8-raspberrypi
       arch: aarch64
       type: rpm
