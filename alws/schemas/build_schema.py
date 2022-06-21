@@ -418,26 +418,18 @@ async def get_module_refs(
         task.git_ref,
         BuildTaskRefType.to_text(task.ref_type)
     )
-    devel_ref = task.get_dev_module()
     devel_module = None
-    try:
-        devel_template = await download_modules_yaml(
-            devel_ref.url,
-            devel_ref.git_ref,
-            BuildTaskRefType.to_text(devel_ref.ref_type)
-        )
-        devel_module = ModuleWrapper.from_template(
-            devel_template,
-            name=devel_ref.git_repo_name,
-            stream=devel_ref.module_stream_from_ref()
-        )
-    except ModulesYamlNotFoundError:
-        pass
     module = ModuleWrapper.from_template(
         template,
         name=task.git_repo_name,
         stream=task.module_stream_from_ref()
     )
+    if not module.is_devel:
+        devel_module = ModuleWrapper.from_template(
+            template,
+            name=f'{task.git_repo_name}-devel',
+            stream=task.module_stream_from_ref()
+        )
     checking_tasks = []
     if platform_arches is None:
         platform_arches = []
@@ -445,20 +437,16 @@ async def get_module_refs(
         request_arch = arch
         if arch == 'i686':
             request_arch = 'x86_64'
-        endpoint = (
-            f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-            f'/module/{module.name}/{module.stream}/{request_arch}/'
-        )
-        checking_tasks.append(get_module_data_from_beholder(
-            beholder_client, endpoint, arch))
-        if devel_module is not None:
+        for _module in (module, devel_module):
+            if _module is None:
+                continue
+            module_is_devel = _module.is_devel and devel_module is not None
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                f'/module/{devel_module.name}/{devel_module.stream}/'
-                f'{request_arch}/'
+                f'/module/{_module.name}/{_module.stream}/{request_arch}/'
             )
             checking_tasks.append(get_module_data_from_beholder(
-                beholder_client, endpoint, arch, devel=True))
+                beholder_client, endpoint, arch, devel=module_is_devel))
     beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
