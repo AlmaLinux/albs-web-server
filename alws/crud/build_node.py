@@ -482,7 +482,10 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
 
         # Set the error field for every uncompleted task to describe
         # the reason why they are fast failing
-        fast_fail_msg = f'Fast failed: SRPM build failed in main architecture ({build_task.arch})'
+        fast_fail_msg = f'Fast failed: SRPM build failed in the initial ' \
+                        f'architecture ({build_task.arch}). ' \
+                        f'Please refer to the initial architecture build ' \
+                        f'logs for more information about the failure.'
         update_query = update(models.BuildTask).where(
             models.BuildTask.id.in_(uncompleted_tasks_ids),
         ).values(error=fast_fail_msg)
