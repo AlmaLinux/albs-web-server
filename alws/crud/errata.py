@@ -11,7 +11,7 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
-from alws.utils.parsing import parse_rpm_nevra
+from alws.utils.parsing import parse_rpm_nevra, clean_release
 from alws.utils.pulp_client import PulpClient
 from alws.config import settings
 from alws.utils.errata import (
@@ -42,11 +42,6 @@ try:
     from almalinux.liboval.composer import Composer
 except ImportError:
     pass
-
-
-def clean_release(release):
-    release = re.sub(r"\.module.*$", "", release)
-    return re.sub(r"\.el\d+.*$", "", release)
 
 
 class CriteriaNode:
@@ -218,6 +213,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                             {
                                 "name": ref.ref_id,
                                 "public": datetime.datetime.strptime(
+                                    # year-month-day
                                     ref.cve.public[:10], "%Y-%m-%d"
                                 ).date(),
                                 "href": ref.href,
@@ -343,17 +339,15 @@ async def load_platform_packages(platform: models.Platform):
     pulp = PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    pkg_fields = ",".join(
-        [
-            "name",
-            "version",
-            "release",
-            "epoch",
-            "arch",
-            "pulp_href",
-            "rpm_sourcerpm",
-        ]
-    )
+    pkg_fields = ",".join((
+        "name",
+        "version",
+        "release",
+        "epoch",
+        "arch",
+        "pulp_href",
+        "rpm_sourcerpm",
+    ))
     for repo in platform.repos:
         if not repo.production:
             continue
@@ -567,7 +561,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
             epoch=package.epoch,
             arch=package.arch,
             source_srpm=None,
-            reboot_suggested=False,  # TODO
+            reboot_suggested=False,
         )
         db_errata.packages.append(db_package)
         items_to_insert.append(db_package)

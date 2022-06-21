@@ -721,6 +721,10 @@ class ErrataRecord(Base):
         return self.original_title
     
     def get_type(self):
+        # Gets errata type from last part of errata id
+        # For example, ALBS -> (BA) -> bugfix
+        #              ALSA -> (SA) -> security
+        #              ALEA -> (EA) -> enchancement
         return {
             'BA': 'bugfix',
             'SA': 'security',

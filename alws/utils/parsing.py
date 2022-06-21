@@ -57,6 +57,11 @@ def parse_rpm_nevra(rpm_name: str):
     return hawkey_nevra
 
 
+def clean_release(release):
+    release = re.sub(r"\.module.*$", "", release)
+    return re.sub(r"\.el\d+.*$", "", release)
+
+
 def parse_tap_output(text: bytes) -> list:
     """
     Parses TAP test output and returns list of TAP-formatted entities.
