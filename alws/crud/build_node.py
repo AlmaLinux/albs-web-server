@@ -471,13 +471,21 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
     )
     srpm_artifact = srpm_artifact.scalars().first()
 
-    # if SRPM isn't built in first arch of project,
-    # we need to stop building project
+    # if SRPM isn't built in first arch of project, we need to stop building
+    # the project and fast-fail the uncompleted tasks
     if (not srpm_artifact and build_task.status == BuildTaskStatus.FAILED
             and uncompleted_tasks_ids):
         update_query = update(models.BuildTask).where(
             models.BuildTask.id.in_(uncompleted_tasks_ids),
         ).values(status=BuildTaskStatus.FAILED)
+        await db.execute(update_query)
+
+        # Set the error field for every uncompleted task to describe
+        # the reason why they are fast failing
+        fast_fail_msg = f'Fast failed: SRPM build failed in main architecture ({build_task.arch})'
+        update_query = update(models.BuildTask).where(
+            models.BuildTask.id.in_(uncompleted_tasks_ids),
+        ).values(error=fast_fail_msg)
         await db.execute(update_query)
 
         remove_query = delete(models.BuildTaskDependency).where(
