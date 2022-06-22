@@ -440,6 +440,9 @@ async def get_module_refs(
         for _module in (module, devel_module):
             if _module is None:
                 continue
+            # if module is devel and devel_module is None
+            # we shouldn't mark module as devel, because it will broke logic
+            # for partialy updating modules
             module_is_devel = _module.is_devel and devel_module is not None
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
