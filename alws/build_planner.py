@@ -104,7 +104,7 @@ class BuildPlanner:
         repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
             repo_name)
         modules = self._modules_by_target.get((platform.name, arch), [])
-        if modules:
+        if modules and not is_debug:
             await self._pulp_client.modify_repository(
                 pulp_href, add=[module.pulp_href for module in modules]
             )
