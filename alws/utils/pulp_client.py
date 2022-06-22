@@ -479,6 +479,7 @@ class PulpClient:
             'url': remote_url,
             'policy': remote_policy
         }
+
         await self.request('PATCH', remote_href, data=payload)
         return remote_href
 
@@ -489,13 +490,9 @@ class PulpClient:
         Policy variants: 'additive', 'mirror_complete', 'mirror_content_only'
         """
         endpoint = f'{repo_href}sync/'
-        if sync_policy == 'additive':
-            mirror = False
-        else:
-            mirror = True
         payload = {
             'remote': remote_href,
-            'mirror': mirror
+            'sync_policy': sync_policy
         }
         task = await self.request('POST', endpoint, json=payload)
         if wait_for_result:
