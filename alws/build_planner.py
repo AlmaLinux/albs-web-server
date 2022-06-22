@@ -221,7 +221,7 @@ class BuildPlanner:
                 url=task.url,
                 git_ref=task.git_ref,
                 ref_type=task.ref_type
-            ))
+            ), mock_options=task.mock_options)
             return
 
         if isinstance(task, build_schema.BuildTaskModuleRef):
