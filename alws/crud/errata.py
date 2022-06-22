@@ -116,6 +116,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
     evra_regex = re.compile(r"(\d+):(.*)-(.*)")
     for record in records:
         rhel_evra_mapping = collections.defaultdict(dict)
+        rhel_name_mapping = collections.defaultdict(set)
         for pkg in record.packages:
             albs_pkgs = [
                 albs_pkg
@@ -131,6 +132,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                 if arch == "noarch":
                     arch = pkg.arch
                 rhel_evra_mapping[rhel_evra][arch] = albs_evra
+                rhel_name_mapping[rhel_evra].add(albs_pkg.name)
         if not rhel_evra_mapping and not record.freezed:
             continue
         criteria_list = record.original_criteria[:]
@@ -156,6 +158,11 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                             evra = evra.group()
                             if evra not in rhel_evra_mapping.keys():
                                 continue
+                            package_name = criterion["comment"].split()[0]
+                            if package_name not in rhel_name_mapping[rhel_evra]:
+                                continue
+                            # TODO: Add test mapping here
+                            #       test_id: rhel_evra
                             criterion["comment"] = criterion[
                                 "comment"
                             ].replace(

@@ -162,8 +162,10 @@ async def mainloop():
                                 ]
                                 variables.append(var)
                                 objects.append(
-                                    var["arithmetic"]["object_component"][
-                                        "object_ref"
+                                    xml_oval["objects"][
+                                        var["arithmetic"]["object_component"][
+                                            "object_ref"
+                                        ]
                                     ]
                                 )
                         if test["state_ref"]:
