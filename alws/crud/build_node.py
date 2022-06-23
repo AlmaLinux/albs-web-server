@@ -482,30 +482,30 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
 
     # if SRPM built we need to download them
     # from pulp repos in next tasks
-    if (srpm_artifact and uncompleted_tasks_ids
-            and build_task.built_srpm_url is None):
-
+    if srpm_artifact and build_task.built_srpm_url is None:
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
             build_task.platform.name,
             build_task.build_id,
             srpm_artifact.name[0].lower(),
             srpm_artifact.name,
         )
-        insert_values = [
-            {
-                'build_task_id': task_id,
-                'name': srpm_artifact.name,
-                'type': 'rpm',
-                'href': srpm_artifact.href
-            }
-            for task_id in uncompleted_tasks_ids
-        ]
-
+        # we should update built_srpm_url for reusing SRPM
+        # even if we don't have any uncompleted tasks
         update_query = update(models.BuildTask).where(
             models.BuildTask.ref_id == build_task.ref_id,
         ).values(built_srpm_url=srpm_url)
         await db.execute(update_query)
-        await db.execute(insert(models.BuildTaskArtifact), insert_values)
+        if uncompleted_tasks_ids:
+            insert_values = [
+                {
+                    'build_task_id': task_id,
+                    'name': srpm_artifact.name,
+                    'type': 'rpm',
+                    'href': srpm_artifact.href
+                }
+                for task_id in uncompleted_tasks_ids
+            ]
+            await db.execute(insert(models.BuildTaskArtifact), insert_values)
 
 
 async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
