@@ -297,6 +297,24 @@ class ReleasePlanner:
             packages_from_repos[full_name] = repo_id
         return packages_from_repos, pkgs_in_repos
 
+    def get_devel_repo_key(
+        self,
+        arch: str,
+        is_debug: bool,
+        task_arch: typing.Optional[str] = None,
+        is_module: bool = False,
+    ):
+        repo_name = '-'.join((
+            self.clean_base_dist_name_lower,
+            self.base_platform.distr_version,
+            'devel-debuginfo' if is_debug else 'devel',
+        ))
+        if is_module:
+            repo_arch = arch
+        else:
+            repo_arch = arch if arch == 'src' else task_arch
+        return RepoType(repo_name, repo_arch, is_debug)
+
     async def get_pulp_based_response(
         self,
         pulp_packages: list,
@@ -314,15 +332,9 @@ class ReleasePlanner:
                 continue
             is_debug = is_debuginfo_rpm(pkg['name'])
             await self.prepare_data_for_executing_async_tasks(pkg, is_debug)
-            release_repo = repos_mapping[RepoType(
-                '-'.join((
-                    self.clean_base_dist_name_lower,
-                    self.base_platform.distr_version,
-                    'devel-debuginfo' if is_debug else 'devel',
-                )),
-                pkg_arch if pkg_arch == 'src' else pkg['task_arch'],
-                is_debug,
-            )]
+            devel_repo_key = self.get_devel_repo_key(
+                pkg_arch, is_debug, task_arch=pkg['task_arch'])
+            release_repo = repos_mapping[devel_repo_key]
             repo_arch_location = [pkg_arch]
             if pkg_arch == 'noarch':
                 repo_arch_location = self.base_platform.arch_list
@@ -382,15 +394,8 @@ class ReleasePlanner:
             ), {})
         # if we doesn't found info by devel key, we shouldn't add devel repo
         if not predicted_package and not is_devel:
-            release_repo = RepoType(
-                '-'.join((
-                    self.clean_base_dist_name_lower,
-                    self.base_platform.distr_version,
-                    'devel-debuginfo' if is_debug else 'devel',
-                )),
-                pkg_arch if pkg_arch == 'src' else pkg_task_arch,
-                is_debug,
-            )
+            release_repo = self.get_devel_repo_key(
+                pkg_arch, is_debug, task_arch=pkg_task_arch)
             release_repositories.add(release_repo)
         for repo in predicted_package.get('repositories', []):
             ref_repo_name = repo['name']
@@ -473,6 +478,11 @@ class ReleasePlanner:
                 'module': module,
                 'repositories': []
             }
+            if not module_responses:
+                devel_repo_key = self.get_devel_repo_key(
+                    module['arch'], is_debug=False, is_module=True)
+                module_info['repositories'].append(
+                    repos_mapping[devel_repo_key])
             rpm_modules.append(module_info)
             for module_response in module_responses:
                 distr = module_response['distribution']
@@ -588,6 +598,9 @@ class ReleasePlanner:
                 'repo_arch_location': pulp_repo_arch_location,
             }
             if not release_repositories:
+                devel_repo_key = self.get_devel_repo_key(
+                    pkg_arch, is_debug, task_arch=package['task_arch'])
+                pkg_info['repositories'].append(repos_mapping[devel_repo_key])
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue

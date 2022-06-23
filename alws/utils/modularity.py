@@ -233,21 +233,22 @@ class ModuleWrapper:
     def add_rpm_artifact(self, rpm_pkg: dict, devel: bool = False,
                          multilib: bool = False) -> bool:
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
+        module_is_devel = self.is_devel
 
         if multilib:
             self._stream.add_rpm_artifact(artifact)
             return True
 
-        if devel and self.name.endswith('-devel'):
+        if devel and module_is_devel:
             self._stream.add_rpm_artifact(artifact)
             return True
 
         if self.is_artifact_filtered(rpm_pkg):
-            if self.name.endswith('-devel') or rpm_pkg['arch'] == 'src':
+            if module_is_devel or rpm_pkg['arch'] == 'src':
                 self._stream.add_rpm_artifact(artifact)
                 return True
         else:
-            if not self.name.endswith('-devel'):
+            if not module_is_devel:
                 self._stream.add_rpm_artifact(artifact)
                 return True
 
@@ -314,6 +315,10 @@ class ModuleWrapper:
     @property
     def name(self) -> str:
         return self._stream.get_module_name()
+
+    @property
+    def is_devel(self) -> bool:
+        return self.name.endswith('-devel')
 
     @property
     def stream(self) -> str:
