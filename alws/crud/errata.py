@@ -80,20 +80,24 @@ async def get_oval_xml(db, platform_name: str):
     )
     platform: models.Platform = platform.scalars().first()
     records = (
-        await db.execute(
-            select(models.ErrataRecord)
-            .where(models.ErrataRecord.platform_id == platform.id)
-            .options(
-                selectinload(models.ErrataRecord.packages)
-                .selectinload(models.ErrataPackage.albs_packages)
-                .selectinload(models.ErrataToALBSPackage.build_artifact)
-                .selectinload(models.BuildTaskArtifact.build_task),
-                selectinload(models.ErrataRecord.references).selectinload(
-                    models.ErrataReference.cve
-                ),
+        (
+            await db.execute(
+                select(models.ErrataRecord)
+                .where(models.ErrataRecord.platform_id == platform.id)
+                .options(
+                    selectinload(models.ErrataRecord.packages)
+                    .selectinload(models.ErrataPackage.albs_packages)
+                    .selectinload(models.ErrataToALBSPackage.build_artifact)
+                    .selectinload(models.BuildTaskArtifact.build_task),
+                    selectinload(models.ErrataRecord.references).selectinload(
+                        models.ErrataReference.cve
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return errata_records_to_oval(records)
 
 
@@ -115,6 +119,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
     links_tracking = set()
     evra_regex = re.compile(r"(\d+):(.*)-(.*)")
     for record in records:
+        is_freezed = record.freezed
         rhel_evra_mapping = collections.defaultdict(dict)
         rhel_name_mapping = collections.defaultdict(set)
         for pkg in record.packages:
@@ -133,7 +138,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                     arch = pkg.arch
                 rhel_evra_mapping[rhel_evra][arch] = albs_evra
                 rhel_name_mapping[rhel_evra].add(albs_pkg.name)
-        if not rhel_evra_mapping and not record.freezed:
+        if not rhel_evra_mapping and not is_freezed:
             continue
         criteria_list = record.original_criteria[:]
         while criteria_list:
@@ -152,14 +157,17 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                     criterion["comment"] = debrand_comment(
                         criterion["comment"], record.platform.distr_version
                     )
-                    if not record.freezed:
+                    if not is_freezed:
                         evra = evra_regex.search(criterion["comment"])
                         if evra:
                             evra = evra.group()
                             if evra not in rhel_evra_mapping.keys():
                                 continue
                             package_name = criterion["comment"].split()[0]
-                            if package_name not in rhel_name_mapping[rhel_evra]:
+                            if (
+                                package_name
+                                not in rhel_name_mapping[evra]
+                            ):
                                 continue
                             # TODO: Add test mapping here
                             #       test_id: rhel_evra
@@ -221,7 +229,8 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                                 "name": ref.ref_id,
                                 "public": datetime.datetime.strptime(
                                     # year-month-day
-                                    ref.cve.public[:10], "%Y-%m-%d"
+                                    ref.cve.public[:10],
+                                    "%Y-%m-%d",
                                 ).date(),
                                 "href": ref.href,
                                 "impact": ref.cve.impact,
@@ -309,7 +318,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             objects.add(state["id"])
             state_cls = get_state_cls_by_tag(state["type"])
             if state_cls == RpminfoState:
-                if not record.freezed:
+                if not is_freezed:
                     if state["signature_keyid"]:
                         state["signature_keyid"] = gpg_keys[
                             record.platform.distr_version
@@ -346,15 +355,17 @@ async def load_platform_packages(platform: models.Platform):
     pulp = PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    pkg_fields = ",".join((
-        "name",
-        "version",
-        "release",
-        "epoch",
-        "arch",
-        "pulp_href",
-        "rpm_sourcerpm",
-    ))
+    pkg_fields = ",".join(
+        (
+            "name",
+            "version",
+            "release",
+            "epoch",
+            "arch",
+            "pulp_href",
+            "rpm_sourcerpm",
+        )
+    )
     for repo in platform.repos:
         if not repo.production:
             continue
