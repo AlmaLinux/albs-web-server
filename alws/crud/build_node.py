@@ -444,7 +444,8 @@ async def __process_build_task_artifacts(
     return build_task
 
 
-async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
+async def __update_built_srpm_url(db: Session, build_task: models.BuildTask,
+                                  request: build_node_schema.BuildDone):
     uncompleted_tasks_ids = []
     if build_task.status in (BuildTaskStatus.COMPLETED,
                              BuildTaskStatus.EXCLUDED,
@@ -497,8 +498,8 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
             models.BuildTask.ref_id == build_task.ref_id,
         ).values(
             built_srpm_url=srpm_url,
-            alma_commit_cas_hash=build_task.alma_commit_cas_hash,
-            is_cas_authenticated=build_task.is_cas_authenticated,
+            alma_commit_cas_hash=request.alma_commit_cas_hash,
+            is_cas_authenticated=request.is_cas_authenticated,
         )
         await db.execute(update_query)
         if uncompleted_tasks_ids:
@@ -605,4 +606,4 @@ async def build_done(db: Session, pulp: PulpClient,
     # All other tasks will be either having it already or fast-failed,
     # so should not call this function anyway.
     if build_task.built_srpm_url is None:
-        await __update_built_srpm_url(db, build_task)
+        await __update_built_srpm_url(db, build_task, request)

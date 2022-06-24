@@ -116,6 +116,8 @@ class BuildDone(BaseModel):
     task_id: int
     status: typing.Literal['done', 'failed', 'excluded']
     artifacts: typing.List[BuildDoneArtifact]
+    is_cas_authenticated: bool = False
+    alma_commit_cas_hash: typing.Optional[str]
 
 
 class RequestTask(BaseModel):
