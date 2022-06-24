@@ -36,5 +36,6 @@ class Settings(BaseSettings):
     sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
     sign_server_token: typing.Optional[str]
 
+    logging_level: typing.Optional[str] = 'INFO'
 
 settings = Settings()
