@@ -247,7 +247,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 build_task_id=task_id,
                 name=artifact.name,
                 type=artifact.type,
-                href=href
+                href=href,
+                cas_hash=artifact.cas_hash,
             )
         )
 
@@ -309,7 +310,8 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
                 build_task_id=task_id,
                 name=artifact.name,
                 type=artifact.type,
-                href=href
+                href=href,
+                cas_hash=artifact.cas_hash,
             )
         )
         hrefs.append(href)
@@ -493,7 +495,11 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         # even if we don't have any uncompleted tasks
         update_query = update(models.BuildTask).where(
             models.BuildTask.ref_id == build_task.ref_id,
-        ).values(built_srpm_url=srpm_url)
+        ).values(
+            built_srpm_url=srpm_url,
+            alma_commit_cas_hash=build_task.alma_commit_cas_hash,
+            is_cas_authenticated=build_task.is_cas_authenticated,
+        )
         await db.execute(update_query)
         if uncompleted_tasks_ids:
             insert_values = [

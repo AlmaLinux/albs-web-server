@@ -74,6 +74,7 @@ async def get_task(
     response = {
         'id': task.id,
         'arch': task.arch,
+        'build_id': task.build_id,
         'ref': task.ref,
         'platform': build_node_schema.TaskPlatform.from_orm(task.platform),
         'repositories': [],

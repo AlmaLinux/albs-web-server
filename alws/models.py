@@ -362,6 +362,9 @@ class BuildTask(Base):
         sqlalchemy.Boolean, default=False, nullable=True)
     mock_options = sqlalchemy.Column(JSONB)
     ref = relationship('BuildTaskRef')
+    alma_commit_cas_hash = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    is_cas_authenticated = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True)
     artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
     platform = relationship('Platform')
     build = relationship('Build', back_populates='tasks')
@@ -429,6 +432,7 @@ class BuildTaskArtifact(Base):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     build_task = relationship('BuildTask', back_populates='artifacts')
+    cas_hash = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     sign_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('sign_keys.id',

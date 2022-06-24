@@ -116,6 +116,7 @@ class BuildTaskArtifact(BaseModel):
     name: str
     type: str
     href: str
+    cas_hash: typing.Optional[str]
 
     class Config:
         orm_mode = True
