@@ -163,6 +163,7 @@ class BuildTask(BaseModel):
     rpm_module: typing.Optional[RpmModule]
     artifacts: typing.List[BuildTaskArtifact]
     is_cas_authenticated: typing.Optional[bool]
+    alma_commit_cas_hash: typing.Optional[str]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
