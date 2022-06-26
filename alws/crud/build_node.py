@@ -508,6 +508,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask,
                     'build_task_id': task_id,
                     'name': srpm_artifact.name,
                     'type': 'rpm',
+                    'cas_hash': srpm_artifact.cas_hash,
                     'href': srpm_artifact.href
                 }
                 for task_id in uncompleted_tasks_ids
