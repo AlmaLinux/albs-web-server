@@ -372,14 +372,16 @@ class ReleasePlanner:
     ) -> typing.Set[RepoType]:
         release_repositories = set()
         beholder_key = (pkg_name, pkg_version, pkg_arch, is_beta, is_devel)
-        logging.debug(f'At find_release_repos - beholder_key: {beholder_key}')
+        logging.debug('At find_release_repos - beholder_key: %s',
+                      str(beholder_key))
         predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info from stable/beta,
         # we can try to find info by opposite stable/beta flag
         if not predicted_package:
             beholder_key = (pkg_name, pkg_version, pkg_arch,
                             not is_beta, is_devel)
-            logging.debug(f'Not predicted_package, beholder_key: {beholder_key}')
+            logging.debug('Not predicted_package, beholder_key: %s',
+                          str(beholder_key))
             predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info by current version,
         # then we should try find info by other versions
@@ -391,7 +393,8 @@ class ReleasePlanner:
                     for field in (pkg_name, pkg_arch, is_devel)
                 ))
             ]
-            logging.debug(f'Still not predicted_package, beholder_keys: {beholder_keys}')
+            logging.debug('Still not predicted_package, beholder_keys: %s',
+                          str(beholder_keys))
             predicted_package = next((
                 beholder_cache[beholder_key]
                 for beholder_key in beholder_keys
@@ -558,7 +561,7 @@ class ReleasePlanner:
                             if repo['arch'] == pkg['arch']:
                                 repo['arch'] = weak_arch
                         beholder_cache[second_key] = replaced_pkg
-                        logging.debug(f'beholder_cache: {beholder_cache}')
+                        logging.debug('beholder_cache: %s', str(beholder_cache))
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -795,7 +798,7 @@ class ReleasePlanner:
         async with self._db.begin():
             user_q = select(models.User).where(models.User.id == user_id)
             user_result = await self._db.execute(user_q)
-            logging.info(f'User {user_id} started creating a release')
+            logging.info('User %d is creating a release', user_id)
 
             platform = await self._db.execute(
                 select(models.Platform).where(
@@ -828,14 +831,14 @@ class ReleasePlanner:
             selectinload(models.Release.created_by),
             selectinload(models.Release.platform)
         ))
-        logging.info(f'New release \'{new_release.id}\' successfully created')
+        logging.info('New release %d successfully created', new_release.id)
         return release_res.scalars().first()
 
     async def update_release(
         self, release_id: int,
         payload: release_schema.ReleaseUpdate,
     ) -> models.Release:
-        logging.info(f'Updating release {release_id}')
+        logging.info('Updating release %d', release_id)
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
@@ -881,14 +884,14 @@ class ReleasePlanner:
             self._db.add(release)
             await self._db.commit()
         await self._db.refresh(release)
-        logging.info(f'Successfully updated release {release_id}')
+        logging.info('Successfully updated release %d', release_id)
         return release
 
     async def commit_release(
         self,
         release_id: int,
     ) -> typing.Tuple[models.Release, str]:
-        logging.info(f'Commiting release {release_id}')
+        logging.info('Commiting release %d', release_id)
         async with self._db.begin():
             query = select(models.Release).where(
                 models.Release.id == release_id
@@ -930,5 +933,5 @@ class ReleasePlanner:
             self._db.add(release)
             await self._db.commit()
         await self._db.refresh(release)
-        logging.info(f'Successfully committed release {release_id}')
+        logging.info('Successfully committed release %d', release_id)
         return release, message
