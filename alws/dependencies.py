@@ -26,6 +26,14 @@ async def get_db() -> database.Session:
                 await session.close()
 
 
+def get_pulp_db() -> database.Session:
+    with database.PulpSession() as session:
+        try:
+            yield session
+        finally:
+            session.close()
+
+
 async def get_redis() -> aioredis.Redis:
     client = aioredis.from_url(settings.redis_url)
     try:

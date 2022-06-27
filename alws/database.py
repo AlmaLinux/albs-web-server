@@ -16,11 +16,18 @@ __all__ = ['Base', 'Session', 'engine']
 DATABASE_URL = settings.database_url
 
 engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
-sync_engine = create_engine(settings.sync_database_url,
-                            pool_pre_ping=True, pool_recycle=3600)
+sync_engine = create_engine(
+    settings.sync_database_url, pool_pre_ping=True, pool_recycle=3600
+)
 Base = declarative_base()
 sync_session_factory = sessionmaker(sync_engine, expire_on_commit=False)
 Session = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
 )
 SyncSession = scoped_session(sync_session_factory)
+
+PulpBase = declarative_base()
+pulp_engine = create_engine(settings.pulp_database_url,
+                            pool_pre_ping=True, pool_recycle=3600)
+pulp_session_factory = sessionmaker(pulp_engine, expire_on_commit=False)
+PulpSession = scoped_session(pulp_session_factory)

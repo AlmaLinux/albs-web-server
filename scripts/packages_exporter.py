@@ -1,3 +1,4 @@
+import pwd
 import aiohttp
 import argparse
 import asyncio
@@ -28,7 +29,11 @@ from alws.config import settings
 from alws.constants import SignStatusEnum
 from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
-from errata_migrator import update_updateinfo
+from alws.utils.errata import (
+    merge_errata_records, find_metadata, iter_updateinfo,
+    extract_errata_metadata, extract_errata_metadata_modern,
+    merge_errata_records_modern, generate_errata_page
+)
 
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
@@ -95,7 +100,7 @@ class Exporter:
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
         self.pulp_system_user = 'pulp'
-        self.current_user = os.getlogin()
+        self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
             os.path.expanduser('~/export.err'))
         if os.path.exists(self.export_error_file):
@@ -104,6 +109,10 @@ class Exporter:
         if os.path.exists(KNOWN_SUBKEYS_CONFIG):
             with open(KNOWN_SUBKEYS_CONFIG, 'rt') as f:
                 self.known_subkeys = json.load(f)
+    
+    @staticmethod
+    def get_current_username():
+        return pwd.getpwuid(os.getuid())[0]
 
     async def make_request(self, method: str, endpoint: str,
                            params: dict = None, data: dict = None):
@@ -167,6 +176,12 @@ class Exporter:
     async def get_sign_keys(self):
         endpoint = 'sign-keys/'
         return await self.make_request('GET', endpoint)
+    
+    async def get_oval_xml(self, platform_name: str):
+        endpoint = 'errata/get_oval_xml/'
+        return await self.make_request(
+            'GET', endpoint, params={'platform_name': platform_name}
+        )
 
     async def download_repodata(self, repodata_path, repodata_url):
         file_links = await get_repodata_file_links(repodata_url)
@@ -371,7 +386,6 @@ class Exporter:
 
     def check_rpms_signature(self, repository_path: str, sign_keys: list):
         self.logger.info('Checking signature for %s repo', repository_path)
-
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
         ts = rpm.TransactionSet()
         ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
@@ -573,24 +587,6 @@ class Exporter:
         )
         self.logger.info(stdout)
 
-    def update_ppc64le_errata(self, repodata: Path):
-        output_file = repodata / 'updateinfo.xml'
-        input_repodata = Path(
-            str(repodata).replace('ppc64le', 'x86_64')
-        )
-        input_updateinfo = list(input_repodata.glob('*updateinfo.xml*'))
-        if input_updateinfo:
-            input_updateinfo = input_updateinfo[0]
-            update_updateinfo(
-                str(input_updateinfo),
-                str(repodata),
-                str(output_file)
-            )
-            self.modifyrepo_c[
-                '--mdtype=updateinfo', str(output_file), str(repodata)
-            ].run()
-            output_file.unlink()
-
 
 async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
                         platforms_dict: dict, db_sign_keys: list,
@@ -636,8 +632,10 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
     path = Path(repo_path)
     parent_dir = path.parent
     repodata = parent_dir / 'repodata'
+    errata_records = []
+    modern_errata_records = {'data': []}
     if not os.path.exists(repo_path):
-        return
+        return None, errata_records, modern_errata_records
 
     result = True
     try:
@@ -647,9 +645,18 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
         local['sudo']['chown', '-R',
                       f'{exporter.current_user}:{exporter.current_user}',
                       f'{repodata}'].run()
+        try:
+            errata_file = find_metadata(str(repodata), 'updateinfo')
+        except StopIteration:
+            pass
+        else:
+            for record in iter_updateinfo(errata_file):
+                errata_records.append(extract_errata_metadata(record))
+                modern_errata_records = merge_errata_records_modern(
+                    modern_errata_records,
+                    extract_errata_metadata_modern(record)
+                )
         exporter.regenerate_repo_metadata(parent_dir)
-        if '/ppc64le/' in repo_path:
-            exporter.update_ppc64le_errata(repodata)
     except Exception as e:
         exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
@@ -661,7 +668,7 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
                       f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
                       f'{parent_dir}'].run()
 
-    return result
+    return result, errata_records, modern_errata_records
 
 
 def main():
@@ -717,15 +724,54 @@ def main():
     except Exception:
         pass
 
+    errata_cache = []
+    modern_errata_cache = {'data': []}
     for exp_path in exported_paths:
-        result = repo_post_processing(exporter, exp_path)
+        result, errata_records, modern_errata_records = repo_post_processing(
+            exporter, exp_path
+        )
         if result:
             exporter.logger.info('%s post-processing is successful', exp_path)
         else:
             exporter.logger.error('%s post-processing has failed', exp_path)
+        errata_cache = merge_errata_records(errata_cache, errata_records)
+        modern_errata_cache = merge_errata_records_modern(
+            modern_errata_cache, modern_errata_records
+        )
 
     sync(sign_repodata(exporter, exported_paths, platforms_dict, db_sign_keys,
                        key_id_by_platform=key_id_by_platform))
+
+    if args.platform_names:
+        exporter.logger.info('Starting export errata.json and oval.xml')
+        errata_export_base_path = os.path.join(
+            settings.pulp_export_path, 'errata'
+        )
+        if not os.path.exists(errata_export_base_path):
+            os.mkdir(errata_export_base_path)
+        for platform in args.platform_names:
+            platform_path = os.path.join(errata_export_base_path, platform)
+            if not os.path.exists(platform_path):
+                os.mkdir(platform_path)
+            html_path = os.path.join(platform_path, 'html')
+            if not os.path.exists(html_path):
+                os.mkdir(html_path)
+            for record in errata_cache:
+                generate_errata_page(record, html_path)
+            for item in errata_cache:
+                item['issued_date'] = {
+                    '$date': int(item['issued_date'].timestamp() * 1000)
+                }
+                item['updated_date'] = {
+                    '$date': int(item['updated_date'].timestamp() * 1000)
+                }
+            with open(os.path.join(platform_path, 'errata.json'), 'w') as fd:
+                json.dump(errata_cache, fd)
+            with open(os.path.join(platform_path, 'errata.full.json'), 'w') as fd:
+                json.dump(modern_errata_cache, fd)
+            oval = sync(exporter.get_oval_xml(platform))
+            with open(os.path.join(platform_path, 'oval.xml'), 'w') as fd:
+                fd.write(oval)
 
 
 if __name__ == '__main__':

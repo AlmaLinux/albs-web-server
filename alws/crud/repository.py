@@ -87,10 +87,8 @@ async def create_repository(
         result = await db.execute(query)
         if result.scalars().first():
             raise ValueError('Repository already exists')
-
         repository = models.Repository(**payload.dict())
         db.add(repository)
-        await db.commit()
     await db.refresh(repository)
     return repository
 
