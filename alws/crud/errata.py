@@ -451,17 +451,20 @@ async def search_for_albs_packages(db, errata_package, prod_repos_cache):
         settings.pulp_password,
     )
     for package in result.scalars().all():
-        pulp_rpm_package = await pulp.get_rpm_package(
-            package.href,
-            include_fields=[
-                "name",
-                "version",
-                "release",
-                "epoch",
-                "arch",
-                "rpm_sourcerpm",
-            ],
-        )
+        try:
+            pulp_rpm_package = await pulp.get_rpm_package(
+                package.href,
+                include_fields=[
+                    "name",
+                    "version",
+                    "release",
+                    "epoch",
+                    "arch",
+                    "rpm_sourcerpm",
+                ],
+            )
+        except Exception:
+            continue
         if pulp_rpm_package["arch"] != errata_package.arch:
             continue
         mapping = models.ErrataToALBSPackage(
