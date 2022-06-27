@@ -173,11 +173,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.oval-cacher
-    restart: "no"
     volumes:
       - "./almalinux:/code/almalinux"
     depends_on:
       - web_server
+    restart: on-failure
     command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && PYTHONPATH='.' python alws/scripts/oval_cacher/oval_cacher.py'"
 
   git_cacher:

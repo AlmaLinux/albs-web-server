@@ -534,6 +534,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
+    self_ref_exists = False
     for ref in errata.references:
         db_cve = None
         if ref.cve:
@@ -559,17 +560,20 @@ async def create_errata_record(db, errata: BaseErrataRecord):
             title="",
             cve=db_cve,
         )
+        if ref.ref_type == models.ErrataReferenceType.self_ref.value:
+            self_ref_exists = True
         db_errata.references.append(db_reference)
         items_to_insert.append(db_reference)
     html_id = db_errata.id.replace(":", "-")
-    self_ref = models.ErrataReference(
-        href=f"https://errata.almalinux.org/{platform.distr_version}/{html_id}.html",
-        ref_id=db_errata.id,
-        ref_type=models.ErrataReferenceType.self_ref,
-        title=db_errata.id,
-    )
-    db_errata.references.append(self_ref)
-    items_to_insert.append(self_ref)
+    if not self_ref_exists:
+        self_ref = models.ErrataReference(
+            href=f"https://errata.almalinux.org/{platform.distr_version}/{html_id}.html",
+            ref_id=db_errata.id,
+            ref_type=models.ErrataReferenceType.self_ref,
+            title=db_errata.id,
+        )
+        db_errata.references.append(self_ref)
+        items_to_insert.append(self_ref)
     prod_repos_cache = await load_platform_packages(platform)
     for package in errata.packages:
         db_package = models.ErrataPackage(
