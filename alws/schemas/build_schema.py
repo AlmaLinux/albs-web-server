@@ -33,6 +33,7 @@ class BuildTaskRef(BaseModel):
     url: str
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[int]
+    git_commit_hash: typing.Optional[str]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_module: typing.Optional[bool] = False
     enabled: bool = True

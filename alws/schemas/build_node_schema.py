@@ -23,6 +23,7 @@ class TaskRef(BaseModel):
     url: str
     git_ref: typing.Optional[str]
     ref_type: int
+    git_commit_hash: typing.Optional[str]
 
     class Config:
         orm_mode = True
@@ -75,6 +76,7 @@ class Task(BaseModel):
     platform: TaskPlatform
     created_by: TaskCreatedBy
     alma_commit_cas_hash: typing.Optional[str]
+    srpm_hash: typing.Optional[str]
     is_cas_authenticated: bool = False
     is_secure_boot: typing.Optional[bool] = False
     repositories: typing.List[TaskRepo]
@@ -118,6 +120,7 @@ class BuildDone(BaseModel):
     artifacts: typing.List[BuildDoneArtifact]
     is_cas_authenticated: bool = False
     alma_commit_cas_hash: typing.Optional[str]
+    git_commit_hash: typing.Optional[str]
 
 
 class RequestTask(BaseModel):

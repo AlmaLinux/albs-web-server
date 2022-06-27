@@ -397,6 +397,7 @@ class BuildTaskRef(Base):
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
     ref_type = sqlalchemy.Column(sqlalchemy.Integer)
+    git_commit_hash = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
 
 
 class RpmModule(Base):

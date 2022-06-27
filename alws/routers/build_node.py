@@ -68,9 +68,15 @@ async def get_task(
         return
     # generate full url to builted SRPM for using less memory in database
     built_srpm_url = task.built_srpm_url
+    srpm_hash = None
     if built_srpm_url is not None:
         built_srpm_url = "{}/pulp/content/builds/{}".format(
             settings.pulp_host, task.built_srpm_url)
+        srpm_hash = next(
+            artifact.cas_hash
+            for artifact in task.artifacts
+            if artifact.name.endswith('.src.rpm')
+        )
     response = {
         'id': task.id,
         'arch': task.arch,
@@ -80,6 +86,8 @@ async def get_task(
         'repositories': [],
         'built_srpm_url': built_srpm_url,
         'is_secure_boot': task.is_secure_boot,
+        'alma_commit_cas_hash': task.alma_commit_cas_hash,
+        'srpm_hash': srpm_hash,
         'created_by': {
             'name': task.build.user.username,
             'email': task.build.user.email

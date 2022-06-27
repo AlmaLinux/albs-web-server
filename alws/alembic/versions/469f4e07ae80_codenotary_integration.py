@@ -21,6 +21,7 @@ def upgrade():
     op.add_column('build_artifacts', sa.Column('cas_hash', sa.Text(), nullable=True))
     op.add_column('build_tasks', sa.Column('alma_commit_cas_hash', sa.Text(), nullable=True))
     op.add_column('build_tasks', sa.Column('is_cas_authenticated', sa.Boolean(), nullable=True))
+    op.add_column('build_task_refs', sa.Column('git_commit_hash', sa.Text(), nullable=True))
     # ### end Alembic commands ###
 
 
@@ -29,4 +30,5 @@ def downgrade():
     op.drop_column('build_tasks', 'is_cas_authenticated')
     op.drop_column('build_tasks', 'alma_commit_cas_hash')
     op.drop_column('build_artifacts', 'cas_hash')
+    op.drop_column('build_task_refs', 'git_commit_hash')
     # ### end Alembic commands ###
