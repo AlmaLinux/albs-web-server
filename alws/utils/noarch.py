@@ -31,9 +31,10 @@ async def get_noarch_packages(
     debug_noarch_packages = {}
     for artifact in db_artifacts:
         if '-debuginfo-' in artifact.name or '-debugsource-' in artifact.name:
-            debug_noarch_packages[artifact.name] = artifact.href
+            debug_noarch_packages[artifact.name] = (artifact.href,
+                                                    artifact.cas_hash)
             continue
-        noarch_packages[artifact.name] = artifact.href
+        noarch_packages[artifact.name] = (artifact.href, artifact.cas_hash)
 
     return noarch_packages, debug_noarch_packages
 
@@ -79,18 +80,24 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
         for artifact in task.artifacts:
             if artifact.name in noarch:
                 hrefs_to_delete.append(artifact.href)
-                artifact.href = noarch.pop(artifact.name)
+                href, cas_hash = noarch.pop(artifact.name)
+                artifact.href = href
+                artifact.cas_hash = cas_hash
             if artifact.name in debug_noarch:
                 debug_hrefs_to_delete.append(artifact.href)
-                artifact.href = debug_noarch.pop(artifact.name)
+                href, cas_hash = debug_noarch.pop(artifact.name)
+                artifact.href = href
+                artifact.cas_hash = cas_hash
 
         artifacts_to_create = {**noarch, **debug_noarch}
-        for name, href in artifacts_to_create.items():
+        for name, values in artifacts_to_create.items():
+            href, cas_hash = values
             artifact = models.BuildTaskArtifact(
                 build_task_id=task.id,
                 name=name,
                 type='rpm',
                 href=href,
+                cas_hash=cas_hash,
             )
             new_noarch_artifacts.append(artifact)
             if task.id != build_task.id:
