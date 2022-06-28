@@ -1,5 +1,4 @@
 import copy
-import logging
 import typing
 
 import sqlalchemy
@@ -126,13 +125,9 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
     await db.flush()
 
     for repo_href, content_dict in repos_to_update.items():
-        try:
-            await pulp_client.modify_repository(
-                repo_to=repo_href,
-                add=content_dict['add'],
-                remove=content_dict['remove'],
-            )
-        except Exception:
-            logging.exception('add=%s, remove=%s', content_dict['add'], content_dict['remove'])
-            raise
+        await pulp_client.modify_repository(
+            repo_to=repo_href,
+            add=content_dict['add'],
+            remove=content_dict['remove'],
+        )
     return new_binary_rpms
