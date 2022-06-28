@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
+from alws.crud.errata import clean_release
 from alws.errors import (
     ArtifactConversionError,
     ArtifactChecksumError,
@@ -23,6 +24,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
+from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
 
@@ -241,17 +243,55 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             raise RepositoryAddError(
                 f'Cannot add RPM packages to the repository {str(repo)}'
             )
+    
+    def append_errata_package(_, errata_package, artifact, rpm_info):
+        model = models.ErrataToALBSPackage(
+            status=models.ErrataPackageStatus.proposal,
+            name=rpm_info['name'],
+            version=rpm_info['version'],
+            release=rpm_info['release'],
+            epoch=int(rpm_info['epoch']),
+            arch=rpm_info['arch'],
+        )
+        model.errata_package = errata_package
+        model.build_artifact = artifact
+        errata_package.albs_packages.append(model)
 
     for href, _, artifact in processed_packages:
-        rpms.append(
-            models.BuildTaskArtifact(
-                build_task_id=task_id,
-                name=artifact.name,
-                type=artifact.type,
-                href=href,
-                cas_hash=artifact.cas_hash,
-            )
+        artifact = models.BuildTaskArtifact(
+            build_task_id=task_id,
+            name=artifact.name,
+            type=artifact.type,
+            href=href,
+            cas_hash=artifact.cas_hash,
         )
+        # TODO: for modules info will be taken twice, we should reconsider this
+        pkg_fields = ['epoch', 'name', 'version', 'release', 'arch',
+                      'rpm_sourcerpm']
+        _, rpm_info = await get_rpm_package_info(
+            pulp_client, artifact.href, include_fields=pkg_fields
+        )
+        if rpm_info['arch'] != 'src':
+            src_name = parse_rpm_nevra(rpm_info['rpm_sourcerpm']).name
+        else:
+            src_name = rpm_info['name']
+        release = clean_release(rpm_info['release'])
+        conditions = [
+            models.ErrataPackage.name == rpm_info['name'],
+            models.ErrataPackage.version == rpm_info['version'],
+            models.ErrataPackage.release.like(f'%{release}%')
+        ]
+        if rpm_info['arch'] != 'noarch':
+            conditions.append(
+                models.ErrataPackage.arch == rpm_info['arch']
+            )
+        errata_packages = await db.execute(select(
+            models.ErrataPackage
+        ).where(sqlalchemy.and_(*conditions)))
+        for errata_package in errata_packages.scalars().all():
+            errata_package.source_srpm = src_name
+            await db.run_sync(append_errata_package, errata_package, artifact, rpm_info)
+        rpms.append(artifact)
 
     if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']

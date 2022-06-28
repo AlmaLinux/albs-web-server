@@ -11,6 +11,8 @@ __all__ = ['PlatformCreate', 'Platform']
 class PlatformModify(BaseModel):
 
     name: str
+    contact_mail: typing.Optional[str]
+    copyright: typing.Optional[str]
     type: typing.Optional[typing.Literal['rpm', 'deb']] = None
     distr_type: typing.Optional[str] = None
     distr_version: typing.Optional[str] = None
@@ -28,6 +30,8 @@ class PlatformModify(BaseModel):
 class PlatformCreate(BaseModel):
 
     name: str
+    contact_mail: typing.Optional[str]
+    copyright: typing.Optional[str]
     type: typing.Literal['rpm', 'deb']
     distr_type: str
     distr_version: str
@@ -39,12 +43,15 @@ class PlatformCreate(BaseModel):
     data: typing.Optional[typing.Dict[str, typing.Any]]
     modularity: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_reference: typing.Optional[bool] = False
+    weak_arch_list: typing.Optional[typing.List[typing.Dict]] = None
 
 
 class Platform(BaseModel):
 
     id: int
     name: str
+    distr_type: str
+    distr_version: str
 
     arch_list: typing.List[str]
     modularity: typing.Optional[typing.Dict]

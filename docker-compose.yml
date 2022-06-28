@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - "./volumes/postgresql/data:/var/lib/postgresql/data"
+      - "../volumes/postgresql/data:/var/lib/postgresql/data"
 
   rabbitmq:
     image: rabbitmq:3.8-management
@@ -73,8 +73,9 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
-      - "./volumes/pulp/exports:/srv/exports"
+      - "../volumes/pulp/exports:/srv/exports"
       - "./reference_data:/code/reference_data"
     command:
         bash -c 'source env/bin/activate &&
@@ -118,6 +119,7 @@ services:
     command: bash -c "npm install && npm run dev"
     volumes:
       - "../albs-frontend:/code"
+      - "../node_modules:/code/node_modules"
     restart: on-failure
     depends_on:
       - web_server
@@ -164,6 +166,20 @@ services:
     depends_on:
       - mosquitto
 
+  oval_cacher:
+    image: albs-oval-cacher:latest
+    env_file:
+      - vars.env
+    build:
+      context: .
+      dockerfile: Dockerfile.oval-cacher
+    volumes:
+      - "./almalinux:/code/almalinux"
+    depends_on:
+      - web_server
+    restart: on-failure
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && PYTHONPATH='.' python alws/scripts/oval_cacher/oval_cacher.py'"
+
   git_cacher:
     image: albs-git-cacher:latest
     env_file:
@@ -180,14 +196,18 @@ services:
     ports:
       - 8081:80
     volumes:
-      - "./volumes/pulp/settings:/etc/pulp"
-      - "./volumes/pulp/exports:/srv/exports"
-      - "./volumes/pulp/pulp_storage:/var/lib/pulp"
-      - "./volumes/pulp/pgsql:/var/lib/pgsql"
-      - "./volumes/pulp/containers:/var/lib/containers"
+      - "../volumes/pulp/settings:/etc/pulp"
+      - "../volumes/pulp/exports:/srv/exports"
+      - "../volumes/pulp/pulp_storage:/var/lib/pulp"
+      - "../volumes/pulp/pgsql:/var/lib/pgsql"
+      - "../volumes/pulp/containers:/var/lib/containers"
     devices:
       - "/dev/fuse"
     restart: on-failure
+    #  echo "listen_addresses = '*'" >> /var/lib/pgsql/data/postgresql.conf &&
+    #  echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
+    #  echo "host all all ::/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
+    #  runuser postgres -c 'echo "ALTER USER postgres WITH PASSWORD '"'"'password'"'"';" | /usr/bin/psql'
 
   mosquitto:
     image: eclipse-mosquitto:2.0
