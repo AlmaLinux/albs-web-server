@@ -1,4 +1,5 @@
 import copy
+import logging
 import typing
 
 import sqlalchemy
@@ -63,8 +64,8 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
 
     repos_to_update = {}
     new_noarch_artifacts = []
-    hrefs_to_add = list(noarch_packages.values())
-    debug_hrefs_to_add = list(debug_noarch_packages.values())
+    hrefs_to_add = [href for href, _ in noarch_packages.values()]
+    debug_hrefs_to_add = [href for href, _ in debug_noarch_packages.values()]
 
     for task in build_tasks:
         if task.status in (BuildTaskStatus.FAILED,
@@ -125,9 +126,13 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
     await db.flush()
 
     for repo_href, content_dict in repos_to_update.items():
-        await pulp_client.modify_repository(
-            repo_to=repo_href,
-            add=content_dict['add'],
-            remove=content_dict['remove'],
-        )
+        try:
+            await pulp_client.modify_repository(
+                repo_to=repo_href,
+                add=content_dict['add'],
+                remove=content_dict['remove'],
+            )
+        except Exception:
+            logging.exception('add=%s, remove=%s', content_dict['add'], content_dict['remove'])
+            raise
     return new_binary_rpms
