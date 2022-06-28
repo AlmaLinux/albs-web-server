@@ -1,7 +1,7 @@
 """codenotary integration
 
 Revision ID: 469f4e07ae80
-Revises: 0854c43a70db
+Revises: cb0a65b84b4c
 Create Date: 2022-06-24 14:33:53.654230
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '469f4e07ae80'
-down_revision = '0854c43a70db'
+down_revision = 'cb0a65b84b4c'
 branch_labels = None
 depends_on = None
 
