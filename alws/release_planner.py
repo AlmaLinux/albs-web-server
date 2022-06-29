@@ -375,7 +375,6 @@ class ReleasePlanner:
         pkg_name: str,
         pkg_version: str,
         pkg_arch: str,
-        pkg_task_arch: str,
         is_beta: bool,
         is_devel: bool,
         is_debug: bool,
@@ -404,17 +403,13 @@ class ReleasePlanner:
                 beholder_cache[beholder_key]
                 for beholder_key in beholder_keys
             ), {})
-        # if we doesn't found info by devel key, we shouldn't add devel repo
-        if not predicted_package and not is_devel:
-            release_repo = self.get_devel_repo_key(
-                pkg_arch, is_debug, task_arch=pkg_task_arch)
-            release_repositories.add(release_repo)
         for repo in predicted_package.get('repositories', []):
             ref_repo_name = repo['name']
             repo_name = (
                 self.repo_name_regex.search(ref_repo_name).groupdict()['name']
             )
-            if is_debug:
+            # in cases if we try to find debug repos by non debug name
+            if is_debug and not repo_name.endswith('debuginfo'):
                 repo_name += '-debuginfo'
             release_repo_name = '-'.join((
                 self.clean_base_dist_name_lower,
@@ -580,10 +575,6 @@ class ReleasePlanner:
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
             is_debug = is_debuginfo_rpm(pkg_name)
-            # for debug packages, we should take repos info
-            # from non debug packages
-            if is_debug:
-                pkg_name = clean_debug_name(pkg_name)
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(
@@ -594,12 +585,23 @@ class ReleasePlanner:
                     pkg_name=pkg_name,
                     pkg_version=pkg_version,
                     pkg_arch=pkg_arch,
-                    pkg_task_arch=package['task_arch'],
                     is_debug=is_debug,
                     is_beta=is_beta,
                     is_devel=is_devel,
                     beholder_cache=beholder_cache,
                 )
+                # if we doesn't found repos for debug package, we can try to
+                # find repos by same package name but without debug suffix
+                if not repositories and is_debug:
+                    repositories = self.find_release_repos(
+                        pkg_name=clean_debug_name(pkg_name),
+                        pkg_version=pkg_version,
+                        pkg_arch=pkg_arch,
+                        is_debug=is_debug,
+                        is_beta=is_beta,
+                        is_devel=is_devel,
+                        beholder_cache=beholder_cache,
+                    )
                 release_repositories.update(repositories)
             pulp_repo_arch_location = [pkg_arch]
             if pkg_arch == 'noarch':
