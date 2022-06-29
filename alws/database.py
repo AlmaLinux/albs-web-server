@@ -1,6 +1,8 @@
 # -*- mode:python; coding:utf-8; -*-
 # author: Vyacheslav Potoropin <vpotoropin@almalinux.org>
 # created: 2021-06-22
+from typing import AsyncGenerator
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -24,3 +26,8 @@ Session = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
 )
 SyncSession = scoped_session(sync_session_factory)
+
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with Session() as session:
+        yield session

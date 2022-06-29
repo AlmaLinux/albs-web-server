@@ -1,4 +1,7 @@
 fastapi[all]==0.75.0
+fastapi-users[all]==10.1.1
+fastapi-users-db-sqlalchemy==4.0.3
+httpx-oauth==0.7.0
 uvicorn==0.15.0
 asyncpg==0.25.0
 psycopg2-binary==2.9.3
@@ -7,7 +10,7 @@ SQLAlchemy==1.4.35
 aiohttp==3.8.1
 aiofiles==0.8.0
 aioredis==2.0.1
-PyJWT==2.3.0
+# PyJWT==2.3.0
 alembic==1.7.7
 pytest==6.2.5
 jmespath==0.10.0

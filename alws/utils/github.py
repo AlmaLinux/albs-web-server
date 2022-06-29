@@ -1,4 +1,22 @@
 import aiohttp
+from httpx_oauth.clients.github import GitHubOAuth2
+
+
+def get_github_oauth_client(
+        client_id: str,
+        client_secret: str,
+        scopes=(
+            'user:email',
+            'read:org',
+        ),
+) -> GitHubOAuth2:
+    github_oauth_client = GitHubOAuth2(
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=scopes,
+        name='albs-github-client'
+    )
+    return github_oauth_client
 
 
 async def get_user_github_token(
