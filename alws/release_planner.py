@@ -819,7 +819,9 @@ class ReleasePlanner:
                 with self._pulp_db.begin():
                     for record in errata_records:
                         record_uuid = uuid.UUID(record['pulp_href'].split('/')[-2])
-                        packages = updateinfo_mapping.pop(record['id'])
+                        packages = updateinfo_mapping.pop(record['id'], None)
+                        if not packages:
+                            continue
                         pulp_record = self._pulp_db.execute(
                             select(UpdateRecord).where(
                                 UpdateRecord.content_ptr_id == record_uuid
