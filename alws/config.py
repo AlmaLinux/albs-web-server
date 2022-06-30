@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
+    cas_api_key: typing.Optional[str]
+    cas_signer_id: typing.Optional[str]
+
     rabbitmq_default_user: str = 'test-system'
     rabbitmq_default_pass: str = 'test-system'
     rabbitmq_default_host: str = 'rabbitmq'
@@ -37,6 +40,10 @@ class Settings(BaseSettings):
 
     sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
     sign_server_token: typing.Optional[str]
+
+    @property
+    def codenotary_enabled(self) -> bool:
+        return bool(self.cas_api_key) and bool(self.cas_signer_id)
 
 
 settings = Settings()

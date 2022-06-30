@@ -6,9 +6,10 @@ import uuid
 from datetime import datetime
 from collections import defaultdict
 
+from cas_wrapper import CasWrapper
+import createrepo_c as cr
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
-import createrepo_c as cr
 
 from alws import models
 from alws.config import settings
@@ -56,8 +57,14 @@ class ReleasePlanner:
         self._pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,
-            settings.pulp_password
+            settings.pulp_password,
         )
+        self.codenotary_enabled = settings.codenotary_enabled
+        if self.codenotary_enabled:
+            self._cas_wrapper = CasWrapper(
+                settings.cas_api_key,
+                settings.cas_signer_id,
+            )
 
     async def get_pulp_packages(
         self,
@@ -65,8 +72,15 @@ class ReleasePlanner:
         build_tasks: typing.List[int] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
-        packages_fields = ['name', 'epoch', 'version',
-                           'release', 'arch', 'pulp_href']
+        packages_fields = [
+            'name',
+            'epoch',
+            'version',
+            'release',
+            'arch',
+            'pulp_href',
+            'sha256',
+        ]
         pulp_packages = []
 
         builds_q = select(models.Build).where(
@@ -109,6 +123,7 @@ class ReleasePlanner:
                 pkg_info['is_beta'] = is_beta
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
+                pkg_info['cas_hash'] = rpm.artifact.cas_hash
                 pkg_info['href_from_repo'] = None
                 pkg_info['full_name'] = artifact_name
                 build_task = next(
@@ -117,6 +132,7 @@ class ReleasePlanner:
                 )
                 pkg_info['task_arch'] = build_task.arch
                 pkg_info['force'] = False
+                pkg_info['force_not_notarized'] = False
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
                 if task.rpm_module and task.id in build_tasks:
@@ -653,9 +669,16 @@ class ReleasePlanner:
             'repositories': prod_repos,
         }
 
+    async def authenticate_package(self, package_checksum: str):
+        is_authenticated = self._cas_wrapper.authenticate_artifact(
+            package_checksum, use_hash=True)
+        return package_checksum, is_authenticated
+
     async def execute_release_plan(self, release: models.Release,
                                    release_plan: dict) -> typing.List[str]:
         additional_messages = []
+        authenticate_tasks = []
+        packages_mapping = {}
         packages_to_repo_layout = {}
         if not release_plan.get('packages') or (
                 not release_plan.get('repositories')):
@@ -681,15 +704,29 @@ class ReleasePlanner:
             is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
                 package, is_debug)
+            authenticate_tasks.append(
+                self.authenticate_package(package['sha256']))
         pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
             release_plan['packages'])
         release_plan['packages_from_repos'] = pkgs_from_repos
         release_plan['packages_in_repos'] = pkgs_in_repos
+        if self.codenotary_enabled:
+            packages_mapping = dict(await asyncio.gather(*authenticate_tasks))
 
         for package_dict in release_plan['packages']:
             package = package_dict['package']
             pkg_full_name = package['full_name']
             force_flag = package.get('force', False)
+            force_not_notarized = package.get('force_not_notarized', False)
+            if (
+                self.codenotary_enabled
+                and not packages_mapping[package['sha256']]
+                and not force_not_notarized
+            ):
+                raise ReleaseLogicError(
+                    f'Cannot release {pkg_full_name}, '
+                    'package is not authenticated by CAS'
+                )
             existing_repo_ids = pkgs_in_repos.get(pkg_full_name, ())
             package_href = package['href_from_repo']
             # if force release is enabled for package,
