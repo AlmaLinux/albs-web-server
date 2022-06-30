@@ -561,7 +561,6 @@ class ReleasePlanner:
                             if repo['arch'] == pkg['arch']:
                                 repo['arch'] = weak_arch
                         beholder_cache[second_key] = replaced_pkg
-                        logging.debug('beholder_cache: %s', str(beholder_cache))
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -569,6 +568,7 @@ class ReleasePlanner:
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
             )
+        logging.debug('beholder_cache: %s', str(beholder_cache))
         for package in pulp_packages:
             pkg_name = package['name']
             pkg_version = package['version']
