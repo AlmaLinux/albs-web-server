@@ -860,6 +860,106 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: i686
+      name: almalinux-8-nfv
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/NFV/i686/os/
+      export_path: almalinux/8/NFV/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-nfv-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/NFV/debug/i686/
+      export_path: vault/8/NFV/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-nfv
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/NFV/x86_64/os/
+      export_path: almalinux/8/NFV/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: src
+      name: almalinux-8-nfv
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/NFV/Source/
+      export_path: vault/8/NFV/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-nfv-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/NFV/debug/x86_64/
+      export_path: vault/8/NFV/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-rt
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/RT/i686/os/
+      export_path: almalinux/8/RT/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-rt-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/RT/debug/i686/
+      export_path: vault/8/RT/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-rt
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/RT/x86_64/os/
+      export_path: almalinux/8/RT/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: src
+      name: almalinux-8-rt
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/RT/Source/
+      export_path: vault/8/RT/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-rt-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/RT/debug/x86_64/
+      export_path: vault/8/RT/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: s390x
       name: almalinux-8-s390x-devel
       type: rpm
@@ -1751,6 +1851,26 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: i686
+      name: almalinux-9-nfv
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/9/NFV/i686/os/
+      export_path: almalinux/9/NFV/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-9-nfv-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/9/NFV/debug/i686/
+      export_path: vault/9/NFV/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: x86_64
       name: almalinux-9-nfv
       type: rpm
@@ -1776,6 +1896,26 @@
       type: rpm
       remote_url: http://rsync.repo.almalinux.org/vault/9/NFV/debug/x86_64/
       export_path: vault/9/NFV/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-9-rt
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/9/RT/i686/os/
+      export_path: almalinux/9/RT/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-9-rt-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/9/RT/debug/i686/
+      export_path: vault/9/RT/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
