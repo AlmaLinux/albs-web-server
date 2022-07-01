@@ -48,5 +48,4 @@ class ReleaseUpdate(BaseModel):
 
 
 class ReleaseCommitResult(BaseModel):
-    release: Release
     message: str

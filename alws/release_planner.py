@@ -1101,7 +1101,6 @@ class ReleasePlanner:
             for build in builds_result.scalars().all():
                 build.release = release
                 self._db.add(build)
-            release.status = ReleaseStatus.IN_PROGRESS
             # for updating plan during executing, we should use deepcopy
             release_plan = copy.deepcopy(release.plan)
             try:
