@@ -941,7 +941,7 @@
       repository_sync_policy: additive
       priority: 10
     - arch: src
-      name: almalinux-9-rt
+      name: almalinux-8-rt
       type: rpm
       remote_url: http://rsync.repo.almalinux.org/vault/8/RT/Source/
       export_path: vault/8/RT/Source/
