@@ -33,6 +33,7 @@ class BuildTaskRef(BaseModel):
     url: str
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[int]
+    git_commit_hash: typing.Optional[str]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_module: typing.Optional[bool] = False
     enabled: bool = True
@@ -116,6 +117,7 @@ class BuildTaskArtifact(BaseModel):
     name: str
     type: str
     href: str
+    cas_hash: typing.Optional[str]
 
     class Config:
         orm_mode = True
@@ -161,6 +163,8 @@ class BuildTask(BaseModel):
     ref: BuildTaskRef
     rpm_module: typing.Optional[RpmModule]
     artifacts: typing.List[BuildTaskArtifact]
+    is_cas_authenticated: typing.Optional[bool]
+    alma_commit_cas_hash: typing.Optional[str]
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
