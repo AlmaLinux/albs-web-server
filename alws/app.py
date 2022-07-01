@@ -5,6 +5,11 @@ import threading
 
 from fastapi import FastAPI
 
+from alws.config import settings
+
+import logging
+logging.basicConfig(level=settings.logging_level)
+
 from alws import routers
 from alws.test_scheduler import TestTaskScheduler
 
