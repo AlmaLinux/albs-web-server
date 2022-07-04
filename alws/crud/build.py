@@ -9,7 +9,8 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.errors import DataNotFoundError
+from alws.errors import DataNotFoundError, PermissionDenied
+from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
 from alws.dramatiq import start_build
@@ -18,10 +19,34 @@ from alws.dramatiq import start_build
 async def create_build(
             db: Session,
             build: build_schema.BuildCreate,
-            user_id: int
+            user_id: int,
         ) -> models.Build:
+
+    product = (await db.execute(select(models.Product).where(
+        models.Product.id == build.product_id).options(
+        selectinload(models.Product.team).selectinload(
+            models.Team.roles).selectinload(models.UserRole.actions),
+        selectinload(
+            models.Product.roles).selectinload(models.UserRole.actions)
+    ))).scalars().first()
+    if not product:
+        raise ValueError(f'Cannot find product with id {build.product_id}')
+
+    user = (await db.execute(select(models.User).where(
+        models.User.id == user_id).options(
+        selectinload(models.User.roles).selectinload(models.UserRole.actions)
+    ))).scalars().first()
+    if not user:
+        raise ValueError(f'Cannot find user with id {user_id}')
+
+    if not can_perform(product, user, 'create_build'):
+        raise PermissionDenied(
+            f'User has no permissions '
+            f'to create build for the product "{product.name}"'
+        )
+
     db_build = models.Build(
-        user_id=user_id,
+        owner_id=user_id,
         mock_options=build.mock_options
     )
     if build.platform_flavors:
@@ -55,7 +80,7 @@ async def get_builds(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.platform),
         selectinload(models.Build.tasks).selectinload(models.BuildTask.ref),
-        selectinload(models.Build.user),
+        selectinload(models.Build.owner),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.artifacts),
         selectinload(models.Build.linked_builds),
@@ -86,7 +111,7 @@ async def get_builds(
                 f'%/{search_params.project}%'))
         if search_params.created_by is not None:
             query = query.filter(
-                models.Build.user_id == search_params.created_by)
+                models.Build.owner_id == search_params.created_by)
         if search_params.ref is not None:
             query = query.filter(sqlalchemy.or_(
                 models.BuildTaskRef.url.like(f'%{search_params.ref}%'),
