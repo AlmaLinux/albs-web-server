@@ -359,7 +359,7 @@ class BuildPlanner:
         parsed_dist_macro = None
         if ref.git_ref is not None:
             parsed_dist_macro = parse_git_ref(r'(el[\d]+_[\d]+)', ref.git_ref)
-        if mock_options is None:
+        if not mock_options:
             mock_options = {'definitions': {}}
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:

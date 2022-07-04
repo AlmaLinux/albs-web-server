@@ -2,6 +2,8 @@ import re
 import typing
 from tap import parser
 
+import hawkey
+
 from alws.constants import TestCaseStatus
 
 
@@ -47,6 +49,17 @@ def parse_git_ref(pattern: str, git_ref: str):
         return match.groups()[-1]
     else:
         return
+    
+
+def parse_rpm_nevra(rpm_name: str):
+    clean_rpm_name = re.sub('.rpm$', '', rpm_name)
+    hawkey_nevra = hawkey.split_nevra(clean_rpm_name)
+    return hawkey_nevra
+
+
+def clean_release(release):
+    release = re.sub(r"\.module.*$", "", release)
+    return re.sub(r"\.el\d+.*$", "", release)
 
 
 def parse_tap_output(text: bytes) -> list:

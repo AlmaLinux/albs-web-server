@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
+    pulp_database_url: str = 'postgresql+psycopg2://postgres:password@pulp/pulp'
+
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
@@ -36,5 +38,6 @@ class Settings(BaseSettings):
     sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
     sign_server_token: typing.Optional[str]
 
+    logging_level: typing.Optional[str] = 'INFO'
 
 settings = Settings()

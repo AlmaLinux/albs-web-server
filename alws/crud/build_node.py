@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
+from alws.crud.errata import clean_release
 from alws.errors import (
     ArtifactConversionError,
     ArtifactChecksumError,
@@ -23,6 +24,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
+from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
 
@@ -59,6 +61,7 @@ async def get_available_build_task(
                     selectinload(models.BuildTask.build).selectinload(
                         models.Build.platform_flavors).selectinload(
                         models.PlatformFlavour.repos),
+                    selectinload(models.BuildTask.artifacts),
                     selectinload(models.BuildTask.rpm_module)
             ).order_by(models.BuildTask.id.asc())
         )
@@ -240,16 +243,55 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             raise RepositoryAddError(
                 f'Cannot add RPM packages to the repository {str(repo)}'
             )
+    
+    def append_errata_package(_, errata_package, artifact, rpm_info):
+        model = models.ErrataToALBSPackage(
+            status=models.ErrataPackageStatus.proposal,
+            name=rpm_info['name'],
+            version=rpm_info['version'],
+            release=rpm_info['release'],
+            epoch=int(rpm_info['epoch']),
+            arch=rpm_info['arch'],
+        )
+        model.errata_package = errata_package
+        model.build_artifact = artifact
+        errata_package.albs_packages.append(model)
 
     for href, _, artifact in processed_packages:
-        rpms.append(
-            models.BuildTaskArtifact(
-                build_task_id=task_id,
-                name=artifact.name,
-                type=artifact.type,
-                href=href
-            )
+        artifact = models.BuildTaskArtifact(
+            build_task_id=task_id,
+            name=artifact.name,
+            type=artifact.type,
+            href=href,
+            cas_hash=artifact.cas_hash,
         )
+        # TODO: for modules info will be taken twice, we should reconsider this
+        pkg_fields = ['epoch', 'name', 'version', 'release', 'arch',
+                      'rpm_sourcerpm']
+        _, rpm_info = await get_rpm_package_info(
+            pulp_client, artifact.href, include_fields=pkg_fields
+        )
+        if rpm_info['arch'] != 'src':
+            src_name = parse_rpm_nevra(rpm_info['rpm_sourcerpm']).name
+        else:
+            src_name = rpm_info['name']
+        release = clean_release(rpm_info['release'])
+        conditions = [
+            models.ErrataPackage.name == rpm_info['name'],
+            models.ErrataPackage.version == rpm_info['version'],
+            models.ErrataPackage.release.like(f'%{release}%')
+        ]
+        if rpm_info['arch'] != 'noarch':
+            conditions.append(
+                models.ErrataPackage.arch == rpm_info['arch']
+            )
+        errata_packages = await db.execute(select(
+            models.ErrataPackage
+        ).where(sqlalchemy.and_(*conditions)))
+        for errata_package in errata_packages.scalars().all():
+            errata_package.source_srpm = src_name
+            await db.run_sync(append_errata_package, errata_package, artifact, rpm_info)
+        rpms.append(artifact)
 
     if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
@@ -309,7 +351,8 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
                 build_task_id=task_id,
                 name=artifact.name,
                 type=artifact.type,
-                href=href
+                href=href,
+                cas_hash=artifact.cas_hash,
             )
         )
         hrefs.append(href)
@@ -324,15 +367,20 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
 
 
 async def __process_build_task_artifacts(
-        db: Session, pulp_client: PulpClient, task_id: int,
-        task_artifacts: list,
-        status: BuildTaskStatus):
+    db: Session,
+    pulp_client: PulpClient,
+    task_id: int,
+    task_artifacts: list,
+    status: BuildTaskStatus,
+    git_commit_hash: typing.Optional[str],
+):
     build_tasks = await db.execute(
         select(models.BuildTask).where(
             models.BuildTask.id == task_id).with_for_update().options(
             selectinload(models.BuildTask.platform).selectinload(
                 models.Platform.reference_platforms),
             selectinload(models.BuildTask.rpm_module),
+            selectinload(models.BuildTask.ref),
             selectinload(models.BuildTask.build).selectinload(
                 models.Build.repos
             ),
@@ -344,6 +392,8 @@ async def __process_build_task_artifacts(
     query = select(models.Repository).join(models.BuildRepo).where(
         models.BuildRepo.c.build_id == build_task.build_id)
     repositories = list((await db.execute(query)).scalars().all())
+    if git_commit_hash:
+        build_task.ref.git_commit_hash = git_commit_hash
     if build_task.rpm_module:
         module_repo = next(
             build_repo for build_repo in repositories
@@ -442,7 +492,8 @@ async def __process_build_task_artifacts(
     return build_task
 
 
-async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
+async def __update_built_srpm_url(db: Session, build_task: models.BuildTask,
+                                  request: build_node_schema.BuildDone):
     uncompleted_tasks_ids = []
     if build_task.status in (BuildTaskStatus.COMPLETED,
                              BuildTaskStatus.EXCLUDED,
@@ -493,7 +544,11 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
         # even if we don't have any uncompleted tasks
         update_query = update(models.BuildTask).where(
             models.BuildTask.ref_id == build_task.ref_id,
-        ).values(built_srpm_url=srpm_url)
+        ).values(
+            built_srpm_url=srpm_url,
+            alma_commit_cas_hash=request.alma_commit_cas_hash,
+            is_cas_authenticated=request.is_cas_authenticated,
+        )
         await db.execute(update_query)
         if uncompleted_tasks_ids:
             insert_values = [
@@ -501,6 +556,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask):
                     'build_task_id': task_id,
                     'name': srpm_artifact.name,
                     'type': 'rpm',
+                    'cas_hash': srpm_artifact.cas_hash,
                     'href': srpm_artifact.href
                 }
                 for task_id in uncompleted_tasks_ids
@@ -544,7 +600,13 @@ async def build_done(db: Session, pulp: PulpClient,
         status = BuildTaskStatus.EXCLUDED
 
     build_task = await __process_build_task_artifacts(
-        db, pulp, request.task_id, request.artifacts, status)
+        db,
+        pulp,
+        request.task_id,
+        request.artifacts,
+        status,
+        request.git_commit_hash,
+    )
 
     await db.execute(
         update(models.BuildTask).where(
@@ -599,4 +661,4 @@ async def build_done(db: Session, pulp: PulpClient,
     # All other tasks will be either having it already or fast-failed,
     # so should not call this function anyway.
     if build_task.built_srpm_url is None:
-        await __update_built_srpm_url(db, build_task)
+        await __update_built_srpm_url(db, build_task, request)

@@ -1,5 +1,6 @@
 import io
 import re
+import json
 import asyncio
 import typing
 import urllib.parse
@@ -557,6 +558,22 @@ class PulpClient:
     ) -> typing.Union[str, None]:
         repository_data = await self.request('GET', repo_href)
         return repository_data.get('latest_version_href')
+    
+    async def iter_repo_packages(self, version_href: str, limit: int = 1000, fields=None):
+        payload = {'repository_version': version_href, 'limit': limit}
+        if fields is not None:
+            payload['fields'] = fields
+        response = await self.request(
+            'get', 'pulp/api/v3/content/rpm/packages/', params=payload
+        )
+        for pkg in response['results']:
+            yield pkg
+        while response.get('next'):
+            parsed_next = urllib.parse.urlparse(response.get('next'))
+            next_path = parsed_next.path + '?' + parsed_next.query
+            response = await self.request('get', next_path)
+            for pkg in response['results']:
+                yield pkg
 
     async def get_rpm_publications(
             self, repository_version_href: str = None,
@@ -597,6 +614,34 @@ class PulpClient:
         if task['state'] == 'failed':
             raise Exception(f'Task {str(task)} has failed')
         return task
+    
+    async def list_updateinfo_records(
+                self,
+                id__in: List[str],
+                repository_version: str
+            ):
+        endpoint = 'pulp/api/v3/content/rpm/advisories/'
+        payload = {
+            'id__in': id__in,
+            'repository_version': repository_version,
+        }
+        return (await self.request('GET', endpoint, params=payload))['results']
+
+    async def add_errata_record(self, record: dict, repo_href: str):
+        endpoint = 'pulp/api/v3/content/rpm/advisories/'
+        payload = {
+            'file': io.StringIO(json.dumps(record)),
+            'repository': repo_href,
+        }
+        task = await self.request('POST', endpoint, data=payload)
+        response = await self.wait_for_task(task['task'])
+        return response
+
+    async def add_errata_records(self, records: List[dict], repo_href: str):
+        tasks = []
+        for record in records:
+            tasks.append(self.add_errata_record(record, repo_href))
+        await asyncio.gather(*tasks)
 
     async def request(
         self, method: str, endpoint: str, pure_url: bool = False,

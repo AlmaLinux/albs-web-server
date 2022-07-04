@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta content="text/html; charset="UTF-8">
+    <title>{{ errata['updateinfo_id'] }}</title>
+    <link rel="stylesheet" href="misc/static/foundation.min.css">
+    <link rel="stylesheet" href="misc/static/images-style.css">
+    <link rel="shortcut icon" type="image/png" href="misc/static/hero-img.png">
+    <script src="misc/static/jquery.js" type="text/javascript"></script>
+    <script src="misc/static/foundation.min.js" type="text/javascript"></script>
+    <script>
+      $(function () {
+        $(document).foundation();
+      });
+    </script>
+</head>
+
+<body>
+<div class="expanded row header" style="border-bottom: 1px solid lightgrey;">
+    <div class="row expanded">
+        <div class="small-12 columns text-center" style="display: inline-block;">
+            <ul class="no-bullet header-container">
+                <li>
+                    <img class="header-logo" src="misc/static/almalinux-logo.png" alt="AlmaLinux"></li>
+                <li>
+            </ul>
+        </div>
+
+    </div>
+</div>
+
+
+<div class="tabs-content" data-tabs-content="images-tabs">
+
+    <div class="tabs-panel row is-active">
+        <div class="row card">
+            <div class="medium-12 columns card-header">
+                <h5>[{{ errata['updateinfo_id'] }}] {{ errata['title'] }}</h5>
+            </div>
+            <div class="medium-12 columns card-body">
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Type:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        {{ errata['type'] | lower }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Severity:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        {{ errata['severity'] | lower }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Release date:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        {{ errata['updated_date'].strftime('%Y-%m-%d') }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Description:</strong>
+                    </div>
+                    <div style="white-space: pre-wrap; vertical-align: top;"
+                         class="medium-9 columns description">{{ errata['description'] }}</div>
+                </div>
+                {% if errata['references'] %}
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>References:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        <!-- TODO: insert "issued date" here -->
+                        <ul style="list-style: none; margin: 0;">
+                            {% for ref in errata['references'] %}
+                            <li>
+                                <a href="{{ ref['href'] }}">{{ ref['title'] }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Updated packages:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        <ul style="list-style: none; margin-left: 0;"
+                            class="package_list">
+                            {% for pkg in errata['pkglist']['packages'] %}
+                            <li name="{{ pkg['name']}}"
+                                version="{{ pkg['version']}}"
+                                epoch="{{ pkg['epoch']}}"
+                                release="{{ pkg['release']}}"
+                                arch="{{ pkg['arch']}}">
+                                {{ pkg['filename'] }}<br/>
+                                <span class="checksum">
+                                    {{ pkg['checksum'] }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="medium-3 columns text-left">
+                        <strong>Notes:</strong>
+                    </div>
+                    <div class="medium-9 columns">
+                        This page is generated automatically from <a href="https://www.redhat.com/security/data/oval/v2/">Red Hat security data</a> and has not been checked for errors. For clarification or corrections please contact the <a href="mailto:packager@almalinux.org">AlmaLinux Packaging Team</a>.
+                    </div>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

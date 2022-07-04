@@ -7,6 +7,11 @@ import uuid
 from fastapi import FastAPI
 from fastapi_users import FastAPIUsers
 
+from alws.config import settings
+
+import logging
+logging.basicConfig(level=settings.logging_level)
+
 from alws import routers
 from alws.auth_backend import auth_backend
 from alws.config import settings

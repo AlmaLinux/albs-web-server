@@ -132,6 +132,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             {
                 'id': src_rpm.id,
                 'name': src_rpm.artifact.name,
+                'cas_hash': src_rpm.artifact.cas_hash,
                 'arch': 'src',
                 'type': 'rpm',
                 'download_url': __get_package_url(
@@ -146,6 +147,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             {
                 'id': binary_rpm.id,
                 'name': binary_rpm.artifact.name,
+                'cas_hash': src_rpm.artifact.cas_hash,
                 'arch': binary_rpm.artifact.build_task.arch,
                 'type': 'rpm',
                 'download_url': __get_package_url(
@@ -267,6 +269,7 @@ async def complete_sign_task(
                         modified_items.append(db_sprm)
                     db_package.artifact.href = new_pkg_href
                     db_package.artifact.sign_key = sign_task.sign_key
+                    db_package.artifact.cas_hash = package.cas_hash
                     modified_items.append(db_package)
                     modified_items.append(db_package.artifact)
 
