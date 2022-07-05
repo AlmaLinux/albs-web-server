@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends
 
 from alws import database
 from alws.crud import products
-from alws.dependencies import get_db
+from alws.dependencies import get_db, JWTBearer
 from alws.schemas import product_schema
 
 
 router = APIRouter(
     prefix='/products',
-    tags=['products']
+    tags=['products'],
+    dependencies=[Depends(JWTBearer())]
 )
 
 

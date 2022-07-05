@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends
 
 from alws import database
 from alws.crud import teams
-from alws.dependencies import get_db
+from alws.dependencies import get_db, JWTBearer
 from alws.schemas import team_schema
 
 
 router = APIRouter(
     prefix='/teams',
-    tags=['teams']
+    tags=['teams'],
+    dependencies=[Depends(JWTBearer())]
 )
 
 
