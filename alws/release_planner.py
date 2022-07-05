@@ -1024,14 +1024,14 @@ class ReleasePlanner:
                 base_platform=platform,
                 build_tasks=payload.build_tasks
             )
-            new_release.created_by = user
+            new_release.owner = user
             self._db.add(new_release)
             await self._db.commit()
 
         await self._db.refresh(new_release)
         release_res = await self._db.execute(select(models.Release).where(
             models.Release.id == new_release.id).options(
-            selectinload(models.Release.created_by),
+            selectinload(models.Release.owner),
             selectinload(models.Release.platform)
         ))
         logging.info('New release %d successfully created', new_release.id)
