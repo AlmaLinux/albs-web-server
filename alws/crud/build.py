@@ -27,7 +27,8 @@ async def create_build(
         selectinload(models.Product.team).selectinload(
             models.Team.roles).selectinload(models.UserRole.actions),
         selectinload(
-            models.Product.roles).selectinload(models.UserRole.actions)
+            models.Product.roles).selectinload(models.UserRole.actions),
+        selectinload(models.Product.owner),
     ))).scalars().first()
     if not product:
         raise ValueError(f'Cannot find product with id {build.product_id}')
