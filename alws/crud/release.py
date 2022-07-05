@@ -11,7 +11,7 @@ async def get_releases(page_number: typing.Optional[int],
                        db: Session
 ) -> typing.List[models.Release]:
     query = select(models.Release).options(
-        selectinload(models.Release.created_by),
+        selectinload(models.Release.owner),
         selectinload(models.Release.platform),
     ).order_by(models.Release.id.desc())
     if page_number:
