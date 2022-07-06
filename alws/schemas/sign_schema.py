@@ -61,6 +61,7 @@ class SignRpmInfo(BaseModel):
     arch: typing.Optional[str]
     type: str
     download_url: str
+    cas_hash: typing.Optional[str]
 
 
 class SignedRpmInfo(BaseModel):
@@ -71,6 +72,7 @@ class SignedRpmInfo(BaseModel):
     href: str
     fingerprint: str
     sha256: str
+    cas_hash: str
 
 
 class AvailableSignTask(BaseModel):
