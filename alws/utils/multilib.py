@@ -211,6 +211,7 @@ class MultilibProcessor:
                         name=artifact.name,
                         type=artifact.type,
                         href=href,
+                        cas_hash=artifact.cas_hash,
                     ))
                     if is_debuginfo_rpm(artifact_name):
                         debug_pkg_hrefs.append(href)
