@@ -4,11 +4,11 @@ import itertools
 from fastapi import APIRouter, Depends, Response, status
 from dramatiq import pipeline
 
-from alws import database
-from alws import dramatiq
+from alws import database, dramatiq
+from alws.auth import get_current_user
 from alws.config import settings
 from alws.crud import build_node
-from alws.dependencies import get_db, JWTBearer
+from alws.dependencies import get_db
 from alws.schemas import build_node_schema
 from alws.constants import BuildTaskStatus
 
@@ -16,7 +16,7 @@ from alws.constants import BuildTaskStatus
 router = APIRouter(
     prefix='/build_node',
     tags=['builds'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

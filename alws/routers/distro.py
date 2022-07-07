@@ -2,9 +2,10 @@ import typing
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 
-from alws.dependencies import get_db, JWTBearer
 from alws import database
+from alws.auth import get_current_user
 from alws.crud import distribution as distro_crud
+from alws.dependencies import get_db
 from alws.schemas import distro_schema
 from alws.errors import DistributionError
 
@@ -12,7 +13,7 @@ app = FastAPI()
 router = APIRouter(
     prefix='/distro',
     tags=['distro'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

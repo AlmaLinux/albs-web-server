@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     github_client: str
     github_client_secret: str
 
+    passwords_secret: str
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 

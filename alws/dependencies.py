@@ -9,7 +9,12 @@ from alws.config import settings
 from alws.utils.jwt_utils import decode_JWT_token
 
 
-__all__ = ['get_db', 'JWTBearer']
+__all__ = [
+    'JWTBearer',
+    'get_db',
+    'get_pulp_db',
+    'get_redis',
+]
 
 
 # Usually PostgreSQL supports up to 100 concurrent connections,

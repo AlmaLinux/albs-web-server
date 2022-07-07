@@ -8,14 +8,15 @@ from fastapi import (
     status,
 )
 
-from alws import database
+from alws import database, models
+from alws.auth import get_current_user
 from alws.crud import (
     build as build_crud,
     build_node,
     platform as platform_crud,
     platform_flavors as flavors_crud
 )
-from alws.dependencies import get_db, JWTBearer
+from alws.dependencies import get_db
 from alws.errors import DataNotFoundError
 from alws.schemas import build_schema
 
@@ -23,7 +24,7 @@ from alws.schemas import build_schema
 router = APIRouter(
     prefix='/builds',
     tags=['builds'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 public_router = APIRouter(
@@ -35,13 +36,15 @@ public_router = APIRouter(
 @router.post('/', response_model=build_schema.BuildCreateResponse)
 async def create_build(
             build: build_schema.BuildCreate,
-            user: dict = Depends(JWTBearer()),
+            user_data: models.User = Depends(get_current_user),
             db: database.Session = Depends(get_db)
         ):
+    # `get_current_user returns tuple of user record and token,
+    # so to address user record we need to pick first item in `user_data`
     return await build_crud.create_build(
         db,
         build,
-        user['identity']['user_id']
+        user_data[0].id
     )
 
 

@@ -1,22 +1,27 @@
 import asyncio
 
 import importlib
+import logging
 import threading
 
 from fastapi import FastAPI
 
-from alws.config import settings
-
-import logging
-logging.basicConfig(level=settings.logging_level)
-
 from alws import routers
+from alws.auth import AuthRoutes
+from alws.auth.backend import CookieBackend, JWTBackend
+from alws.auth.oauth.github import get_github_oauth_client
+from alws.auth.schemas import UserRead
+from alws.config import settings
 from alws.test_scheduler import TestTaskScheduler
 
+
+logging.basicConfig(level=settings.logging_level)
 
 ROUTERS = [importlib.import_module(f'alws.routers.{module}')
            for module in routers.__all__]
 APP_PREFIX = '/api/v1'
+AUTH_PREFIX = APP_PREFIX + '/auth'
+AUTH_TAG = 'auth'
 
 app = FastAPI(
     prefix=APP_PREFIX
@@ -43,3 +48,32 @@ for module in ROUTERS:
     app.include_router(module.router, prefix=APP_PREFIX)
     if getattr(module, 'public_router', None):
         app.include_router(module.public_router, prefix=APP_PREFIX)
+
+github_client = get_github_oauth_client(
+    settings.github_client, settings.github_client_secret)
+
+app.include_router(
+    AuthRoutes.get_auth_router(JWTBackend, requires_verification=True),
+    prefix=AUTH_PREFIX + '/jwt',
+    tags=[AUTH_TAG],
+)
+app.include_router(
+    AuthRoutes.get_oauth_router(
+        github_client,
+        JWTBackend,
+        settings.passwords_secret,
+        associate_by_email=True
+    ),
+    prefix=AUTH_PREFIX + '/github',
+    tags=[AUTH_TAG],
+)
+app.include_router(
+    AuthRoutes.get_oauth_associate_router(
+        github_client,
+        UserRead,
+        settings.passwords_secret,
+        requires_verification=False
+    ),
+    prefix=AUTH_PREFIX + '/associate/github',
+    tags=[AUTH_TAG],
+)
