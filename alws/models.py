@@ -728,7 +728,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     __tablename__ = 'users'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
+    username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     first_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     last_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     hashed_password: str = sqlalchemy.Column(

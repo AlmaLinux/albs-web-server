@@ -16,6 +16,7 @@ __all__ = [
 
 
 SCOPES = [
+    'read:user',
     'user:email',
     'read:org'
 ]
