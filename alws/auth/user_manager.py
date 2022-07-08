@@ -11,8 +11,8 @@ __all__ = [
 
 
 class UserManager(IntegerIDMixin, BaseUserManager):
-    reset_password_token_secret = settings.passwords_secret
-    verification_token_secret = settings.passwords_secret
+    reset_password_token_secret = settings.jwt_secret
+    verification_token_secret = settings.jwt_secret
 
 
 async def get_user_manager(
