@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from alws import routers
 from alws.auth import AuthRoutes
-from alws.auth.backend import CookieBackend, JWTBackend
+from alws.auth.backend import CookieBackend
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
@@ -33,6 +33,7 @@ graceful_terminate_event = threading.Event()
 
 @app.on_event('startup')
 async def startup():
+    print(settings.database_url)
     global scheduler, terminate_event, graceful_terminate_event
     scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
     asyncio.create_task(scheduler.run())
@@ -53,15 +54,10 @@ github_client = get_github_oauth_client(
     settings.github_client, settings.github_client_secret)
 
 app.include_router(
-    AuthRoutes.get_auth_router(JWTBackend, requires_verification=True),
-    prefix=AUTH_PREFIX + '/jwt',
-    tags=[AUTH_TAG],
-)
-app.include_router(
     AuthRoutes.get_oauth_router(
         github_client,
-        JWTBackend,
-        settings.passwords_secret,
+        CookieBackend,
+        settings.jwt_secret,
         associate_by_email=True
     ),
     prefix=AUTH_PREFIX + '/github',
@@ -71,7 +67,7 @@ app.include_router(
     AuthRoutes.get_oauth_associate_router(
         github_client,
         UserRead,
-        settings.passwords_secret,
+        settings.jwt_secret,
         requires_verification=False
     ),
     prefix=AUTH_PREFIX + '/associate/github',
