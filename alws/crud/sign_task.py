@@ -266,6 +266,7 @@ async def complete_sign_task(
                     for db_sprm in db_sprms:
                         db_sprm.href = new_pkg_href
                         db_sprm.sign_key = sign_task.sign_key
+                        db_sprm.cas_hash = package.cas_hash
                         modified_items.append(db_sprm)
                     db_package.artifact.href = new_pkg_href
                     db_package.artifact.sign_key = sign_task.sign_key
