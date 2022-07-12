@@ -147,7 +147,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             {
                 'id': binary_rpm.id,
                 'name': binary_rpm.artifact.name,
-                'cas_hash': src_rpm.artifact.cas_hash,
+                'cas_hash': binary_rpm.artifact.cas_hash,
                 'arch': binary_rpm.artifact.build_task.arch,
                 'type': 'rpm',
                 'download_url': __get_package_url(

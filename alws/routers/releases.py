@@ -1,5 +1,6 @@
 import typing
 
+from sqlalchemy import update
 from fastapi import APIRouter, Depends
 
 from alws import database
@@ -7,6 +8,9 @@ from alws.crud import release as r_crud
 from alws.dependencies import get_db, get_pulp_db, JWTBearer
 from alws.schemas import release_schema
 from alws.release_planner import ReleasePlanner
+from alws.dramatiq import execute_release_plan
+from alws import models
+from alws.constants import ReleaseStatus
 
 
 router = APIRouter(
@@ -48,10 +52,14 @@ async def update_release(release_id: int,
 
 @router.post('/{release_id}/commit/',
              response_model=release_schema.ReleaseCommitResult)
-async def commit_release(release_id: int,
-                         db: database.Session = Depends(get_db),
-                         pulp_db: database.Session = Depends(get_pulp_db),
-                         ):
-    release_planner = ReleasePlanner(db, pulp_db)
-    release, message = await release_planner.commit_release(release_id)
-    return {'release': release, 'message': message}
+async def commit_release(
+    release_id: int,
+    db: database.Session = Depends(get_db),
+):
+    # it's ugly hack for updating release status before execution in background
+    async with db.begin():
+        await db.execute(update(models.Release).where(
+            models.Release.id == release_id,
+        ).values(status=ReleaseStatus.IN_PROGRESS))
+    execute_release_plan.send(release_id)
+    return {'message': 'Release plan execution has been started'}
