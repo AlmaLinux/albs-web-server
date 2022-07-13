@@ -33,7 +33,6 @@ graceful_terminate_event = threading.Event()
 
 @app.on_event('startup')
 async def startup():
-    print(settings.database_url)
     global scheduler, terminate_event, graceful_terminate_event
     scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
     asyncio.create_task(scheduler.run())

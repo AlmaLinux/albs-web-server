@@ -65,7 +65,8 @@ async def main():
         existing_users = (await db.execute(
             select(models.User).options(
                 selectinload(models.User.teams),
-                selectinload(models.User.roles)
+                selectinload(models.User.roles),
+                selectinload(models.User.oauth_accounts)
             ))).scalars().all()
         existing_sign_keys = (await db.execute(
             select(models.SignKey).options(
