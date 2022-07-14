@@ -143,6 +143,7 @@ async def get_module_preview(
         module_name=module_request.ref.git_repo_name,
         module_stream=module_request.ref.module_stream_from_ref(),
         modules_yaml='\n'.join(modules),
+        git_ref=module_request.ref.git_ref,
     )
 
 

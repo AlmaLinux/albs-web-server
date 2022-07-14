@@ -279,6 +279,7 @@ class ModulePreview(BaseModel):
     modules_yaml: str
     module_name: str
     module_stream: str
+    git_ref: typing.Optional[str]
 
 
 async def get_module_data_from_beholder(

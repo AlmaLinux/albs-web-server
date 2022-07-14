@@ -72,7 +72,7 @@ class SignedRpmInfo(BaseModel):
     href: str
     fingerprint: str
     sha256: str
-    cas_hash: str
+    cas_hash: typing.Optional[str]
 
 
 class AvailableSignTask(BaseModel):
