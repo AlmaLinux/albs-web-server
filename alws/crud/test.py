@@ -16,14 +16,12 @@ from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
 
-
 async def create_test_tasks(db: Session, build_task_id: int):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
         settings.pulp_password
     )
-
     async with db.begin():
         build_task_query = await db.execute(
             select(models.BuildTask).where(
