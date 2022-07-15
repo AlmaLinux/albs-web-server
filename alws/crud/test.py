@@ -9,54 +9,12 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.constants import TestTaskStatus, BuildTaskStatus
-from alws.dependencies import get_db
+from alws.constants import TestTaskStatus
 from alws.schemas import test_schema
 from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
-
-async def _check_build_and_completed_tasks(db, build_id: int):
-    logging.warning('## at _check_build_and_completed_tasks')
-    completed_tasks = await db.execute(
-        select(func.count()).select_from(models.BuildTask).where(
-            models.BuildTask.build_id == build_id
-        ).filter(models.BuildTask.status.in_([
-                BuildTaskStatus.COMPLETED,
-                BuildTaskStatus.FAILED,
-                BuildTaskStatus.EXCLUDED,
-        ]))
-    )
-    completed_tasks = completed_tasks.scalar()
-    logging.warning('## completed_tasks: %d', completed_tasks)
-
-    build_tasks = await db.execute(
-        select(func.count()).select_from(models.BuildTask).where(
-            models.BuildTask.build_id == build_id
-        )
-    )
-    build_tasks = build_tasks.scalar()
-    logging.warning('## build_tasks: %d', build_tasks)
-
-    return completed_tasks==build_tasks
-
-
-async def _all_build_tasks_completed(build_task_id: int):
-    async for db in get_db():
-        logging.warning('## at _all_build_tasks_completed')
-
-        build_id = await db.execute(select(models.BuildTask.build_id).where(
-            models.BuildTask.id == build_task_id
-        ))
-        build_id = build_id.first()[0]
-        logging.warning('## build_id = %d', build_id)
-
-        all_completed = await _check_build_and_completed_tasks(db, build_id)
-        while not all_completed:
-            logging.warning('## not all_completed - keep trying')
-            await asyncio.sleep(30)
-            all_completed = await _check_build_and_completed_tasks(db, build_id)
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
@@ -65,10 +23,6 @@ async def create_test_tasks(db: Session, build_task_id: int):
         settings.pulp_user,
         settings.pulp_password
     )
-
-    # Wait until all build tasks are completed before creating test tasks
-    await _all_build_tasks_completed(build_task_id)
-    logging.warning('## all tasks are complete - let it create test tasks')
 
     async with db.begin():
         build_task_query = await db.execute(
