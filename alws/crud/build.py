@@ -48,7 +48,8 @@ async def create_build(
 
     db_build = models.Build(
         owner_id=user_id,
-        mock_options=build.mock_options
+        mock_options=build.mock_options,
+        team_id=product.team_id,
     )
     if build.platform_flavors:
         flavors = await db.execute(select(models.PlatformFlavour).where(
