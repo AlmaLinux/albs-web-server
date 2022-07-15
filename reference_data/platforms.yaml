@@ -863,7 +863,7 @@
     - arch: i686
       name: almalinux-8-nfv
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/8/NFV/i686/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/8/NFV/i686/os/
       export_path: vault/8/NFV/i686/os/
       production: true
       debug: false
@@ -913,7 +913,7 @@
     - arch: i686
       name: almalinux-8-rt
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/8/RT/i686/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/8/RT/i686/os/
       export_path: vault/8/RT/i686/os/
       production: true
       debug: false
@@ -1854,7 +1854,7 @@
     - arch: i686
       name: almalinux-9-nfv
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/NFV/i686/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/NFV/i686/os/
       export_path: vault/9/NFV/i686/os/
       production: true
       debug: false
@@ -1904,7 +1904,7 @@
     - arch: i686
       name: almalinux-9-rt
       type: rpm
-      remote_url: http://rsync.repo.almalinux.org/almalinux/9/RT/i686/os/
+      remote_url: http://rsync.repo.almalinux.org/vault/9/RT/i686/os/
       export_path: vault/9/RT/i686/os/
       production: true
       debug: false
