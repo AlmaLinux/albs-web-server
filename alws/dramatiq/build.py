@@ -111,7 +111,7 @@ async def _all_build_tasks_completed(db: Session, build_task_id: int) -> bool:
 
         all_completed = await _check_build_and_completed_tasks(db, build_id, platform_id)
         while not all_completed:
-            logging.debug('BuildTask %d is waiting for other build tasks to complete')
+            logging.debug('BuildTask %d is waiting for other build tasks to complete', build_task_id)
             await asyncio.sleep(30)
             all_completed = await _check_build_and_completed_tasks(db, build_id, platform_id)
         return all_completed
