@@ -68,3 +68,7 @@ class ModuleUpdateError(Exception):
 
 class RepositoryAddError(Exception):
     pass
+
+
+class PermissionDenied(Exception):
+    pass

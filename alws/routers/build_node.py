@@ -89,8 +89,8 @@ async def get_task(
         'alma_commit_cas_hash': task.alma_commit_cas_hash,
         'srpm_hash': srpm_hash,
         'created_by': {
-            'name': task.build.user.username,
-            'email': task.build.user.email
+            'name': task.build.owner.username,
+            'email': task.build.owner.email
         }
     }
     for repo in itertools.chain(task.platform.repos, task.build.repos):

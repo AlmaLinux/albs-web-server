@@ -4,15 +4,94 @@ import enum
 import re
 
 import sqlalchemy
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declared_attr, declarative_mixin
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
 
-from alws.constants import ReleaseStatus, SignStatus
+from alws.constants import (
+    Permissions,
+    PermissionTriad,
+    ReleaseStatus,
+    SignStatus,
+)
 from alws.database import Base, engine
 
 
-__all__ = ['Platform', 'Build', 'BuildTask', 'Distribution']
+__all__ = [
+    'Build',
+    'BuildTask',
+    'Distribution',
+    'Platform',
+    'SignKey',
+    'SignTask',
+    'User',
+    'UserAction',
+    'UserRole',
+    'Team',
+]
+
+
+@declarative_mixin
+class TeamMixin:
+
+    @declared_attr
+    def team_id(cls):
+        # FIXME: Change nullable to False after owner population
+        return sqlalchemy.Column(
+            sqlalchemy.Integer, sqlalchemy.ForeignKey(
+                'teams.id', name=f'{cls.__tablename__}_team_id_fkey'),
+            nullable=True)
+
+    @declared_attr
+    def team(cls):
+        return relationship('Team')
+
+
+@declarative_mixin
+class PermissionsMixin:
+
+    @declared_attr
+    def owner_id(cls):
+        # FIXME: Change nullable to False after owner population
+        return sqlalchemy.Column(
+            sqlalchemy.Integer, sqlalchemy.ForeignKey(
+                'users.id', name=f'{cls.__tablename__}_owner_id_fkey'),
+            nullable=True)
+
+    @declared_attr
+    def owner(cls):
+        return relationship('User')
+
+    permissions = sqlalchemy.Column(sqlalchemy.Integer, nullable=False,
+                                    default=764)
+
+    @property
+    def permissions_triad(self):
+        self.validate_permissions(self.permissions)
+        perms_str = str(self.permissions)
+        owner = int(perms_str[0])
+        group = int(perms_str[1])
+        other = int(perms_str[2])
+        return PermissionTriad(
+            Permissions(owner),
+            Permissions(group),
+            Permissions(other),
+        )
+
+    @staticmethod
+    def validate_permissions(permissions: int):
+        if len(str(permissions)) != 3:
+            raise ValueError(
+                'Incorrect permissions set, should be a string of 3 digits')
+        test = permissions
+        while test > 0:
+            # We check that each digit in permissions
+            # isn't greater than 7 (octal numbers).
+            # This way we ensure our permissions will be correct.
+            if test % 10 > 7:
+                raise ValueError('Incorrect permissions representation')
+            test //= 10
+        return permissions
 
 
 PlatformRepo = sqlalchemy.Table(
@@ -138,7 +217,7 @@ ReferencePlatforms = sqlalchemy.Table(
 )
 
 
-class Platform(Base):
+class Platform(PermissionsMixin, Base):
 
     __tablename__ = 'platforms'
 
@@ -174,7 +253,7 @@ class Platform(Base):
     sign_keys = relationship('SignKey', back_populates='platform')
 
 
-class Distribution(Base):
+class Distribution(PermissionsMixin, TeamMixin, Base):
 
     __tablename__ = 'distributions'
 
@@ -197,7 +276,7 @@ class CustomRepoRepr(Base):
         return f'{self.__class__.__name__}: {self.name} {self.arch} {self.url}'
 
 
-class Repository(CustomRepoRepr):
+class Repository(CustomRepoRepr, PermissionsMixin):
 
     __tablename__ = 'repositories'
     __table_args__ = (
@@ -222,7 +301,7 @@ class Repository(CustomRepoRepr):
 class RepositoryRemote(CustomRepoRepr):
     __tablename__ = 'repository_remotes'
     __tableargs__ = [
-        sqlalchemy.UniqueConstraint('name', 'arch', 'url')
+        sqlalchemy.UniqueConstraint('name', 'arch', 'url', name='repo_remote_uix')
     ]
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -268,16 +347,11 @@ BuildDependency = sqlalchemy.Table(
 )
 
 
-class Build(Base):
+class Build(PermissionsMixin, TeamMixin, Base):
 
     __tablename__ = 'builds'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    user_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('users.id'),
-        nullable=False
-    )
     created_at = sqlalchemy.Column(
         sqlalchemy.DateTime,
         nullable=False,
@@ -288,7 +362,6 @@ class Build(Base):
     sign_tasks = relationship('SignTask', back_populates='build',
                               order_by='SignTask.id')
     repos = relationship('Repository', secondary=BuildRepo)
-    user = relationship('User')
     linked_builds = relationship(
         'Build',
         secondary=BuildDependency,
@@ -502,6 +575,116 @@ class BinaryRpm(Base):
     source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
 
 
+class UserAction(Base):
+
+    __tablename__ = 'user_actions'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.String(100), unique=True)
+    description = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
+
+
+ActionRoleMapping = sqlalchemy.Table(
+    'action_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'action_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_actions.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+
+class UserRole(Base):
+
+    __tablename__ = 'user_roles'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.String(100), unique=True)
+    actions = relationship(
+        'UserAction', secondary=ActionRoleMapping
+    )
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self.id} {self.name}'
+
+
+UserRoleMapping = sqlalchemy.Table(
+    'user_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'user_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('users.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+ProductRoleMapping = sqlalchemy.Table(
+    'product_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('products.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+TeamRoleMapping = sqlalchemy.Table(
+    'team_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'team_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('teams.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+TeamUserMapping = sqlalchemy.Table(
+    'team_user_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'team_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('teams.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'user_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('users.id'),
+        primary_key=True
+    )
+)
+
+
 class User(Base):
 
     __tablename__ = 'users'
@@ -511,6 +694,38 @@ class User(Base):
     email = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     jwt_token = sqlalchemy.Column(sqlalchemy.TEXT)
     github_token = sqlalchemy.Column(sqlalchemy.TEXT)
+    roles = relationship(
+        'UserRole', secondary=UserRoleMapping
+    )
+    teams = relationship(
+        'Team', secondary=TeamUserMapping, back_populates='members'
+    )
+
+
+class Team(PermissionsMixin, Base):
+    __tablename__ = 'teams'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    members = relationship(
+        'User', secondary=TeamUserMapping, back_populates='teams'
+    )
+    products = relationship('Product', back_populates='team')
+    roles = relationship(
+        'UserRole', secondary=TeamRoleMapping
+    )
+
+
+class Product(PermissionsMixin, TeamMixin, Base):
+
+    __tablename__ = 'products'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    team = relationship('Team', back_populates='products')
+    roles = relationship(
+        'UserRole', secondary=ProductRoleMapping
+    )
 
 
 class TestTask(Base):
@@ -554,7 +769,7 @@ class TestTaskArtifact(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
-class Release(Base):
+class Release(PermissionsMixin, Base):
     __tablename__ = 'build_releases'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -573,19 +788,31 @@ class Release(Base):
     )
     platform = relationship('Platform')
     plan = sqlalchemy.Column(JSONB, nullable=True)
-    created_by_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('users.id'),
-        nullable=False
-    )
     status = sqlalchemy.Column(
         sqlalchemy.Integer,
         default=ReleaseStatus.SCHEDULED
     )
-    created_by = relationship('User')
 
 
-class SignKey(Base):
+SignKeyRoleMapping = sqlalchemy.Table(
+    'sign_key_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'sign_key_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('sign_keys.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+
+class SignKey(PermissionsMixin, Base):
     __tablename__ = 'sign_keys'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -604,6 +831,9 @@ class SignKey(Base):
     platform = relationship('Platform', back_populates='sign_keys')
     build_task_artifacts = relationship('BuildTaskArtifact',
                                         back_populates='sign_key')
+    roles = relationship(
+        'UserRole', secondary=SignKeyRoleMapping
+    )
 
 
 class SignTask(Base):
@@ -659,7 +889,7 @@ class RepoExporter(Base):
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
-class PlatformFlavour(Base):
+class PlatformFlavour(PermissionsMixin, Base):
     __tablename__ = 'platform_flavours'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)

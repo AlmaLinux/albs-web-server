@@ -98,6 +98,7 @@ class BuildCreate(BaseModel):
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     platform_flavors: typing.Optional[typing.List[int]] = None
     is_secure_boot: bool = False
+    product_id: int
 
 
 class BuildPlatform(BaseModel):
@@ -234,7 +235,7 @@ class Build(BaseModel):
     id: int
     created_at: datetime.datetime
     tasks: typing.List[BuildTask]
-    user: BuildUser
+    owner: BuildUser
     sign_tasks: typing.List[BuildSignTask]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]

@@ -54,7 +54,7 @@ async def get_available_build_task(
                     selectinload(models.BuildTask.platform).selectinload(
                         models.Platform.repos),
                     selectinload(models.BuildTask.build).selectinload(
-                        models.Build.user),
+                        models.Build.owner),
                     selectinload(models.BuildTask.build).selectinload(
                         models.Build.linked_builds).selectinload(
                         models.Build.repos),
