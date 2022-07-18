@@ -18,9 +18,7 @@ ROUTERS = [importlib.import_module(f'alws.routers.{module}')
            for module in routers.__all__]
 APP_PREFIX = '/api/v1'
 
-app = FastAPI(
-    prefix=APP_PREFIX
-)
+app = FastAPI()
 scheduler = None
 terminate_event = threading.Event()
 graceful_terminate_event = threading.Event()
@@ -40,6 +38,9 @@ async def shutdown():
 
 
 for module in ROUTERS:
+    if getattr(module, 'copr_router', None):
+        app.include_router(module.copr_router)
+        continue
     app.include_router(module.router, prefix=APP_PREFIX)
     if getattr(module, 'public_router', None):
         app.include_router(module.public_router, prefix=APP_PREFIX)

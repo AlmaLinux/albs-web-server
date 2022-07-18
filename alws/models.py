@@ -185,6 +185,7 @@ class Distribution(Base):
         unique=True,
         index=True
     )
+    # description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     platforms = relationship('Platform', secondary=PlatformDependency)
     repositories = relationship('Repository', secondary=DistributionRepositories)
     builds = relationship('Build', secondary=DistributionBuilds)

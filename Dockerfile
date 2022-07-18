@@ -1,7 +1,7 @@
 FROM fedora:34
 
 RUN curl https://packages.codenotary.org/codenotary.repo -o /etc/yum.repos.d/codenotary.repo
-RUN mkdir -p /code && \
+RUN mkdir -p /code && mkdir -p /etc/dnf/plugins/copr.d &&\
     yum update -y && \
     yum install --enablerepo="codenotary-repo" cas python3-virtualenv python39 libmodulemd python3-libmodulemd \
                 python3-libmodulemd1 modulemd-tools python-gobject git -y && \
@@ -12,5 +12,6 @@ RUN cd /code && virtualenv -p python3.9 --system-site-packages env && source env
     && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY alws /code/alws
 COPY tests /code/tests
+COPY almalinux.conf /etc/dnf/plugins/copr.d/
 WORKDIR /code
 CMD ["/bin/bash", "-c", "source env/bin/activate && uvicorn --workers 4 --host 0.0.0.0 alws.app:app"]
