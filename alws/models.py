@@ -2,15 +2,27 @@ import asyncio
 import datetime
 import enum
 import re
+from typing import List
 
 import sqlalchemy
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
+from fastapi_users.db import (
+    SQLAlchemyBaseUserTableUUID,
+    SQLAlchemyUserDatabase,
+    SQLAlchemyBaseOAuthAccountTableUUID,
+)
+from fastapi_users_db_sqlalchemy.access_token import (
+    SQLAlchemyAccessTokenDatabase,
+    SQLAlchemyBaseAccessTokenTableUUID,
+)
+
 
 from alws.constants import ReleaseStatus, SignStatus
-from alws.database import Base, engine
-
+from alws.database import Base, engine, get_async_session
 
 __all__ = ['Platform', 'Build', 'BuildTask', 'Distribution']
 
@@ -502,6 +514,34 @@ class BinaryRpm(Base):
     source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
 
 
+class AccessToken(SQLAlchemyBaseAccessTokenTableUUID, Base):
+    pass
+
+
+class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+    pass
+
+
+class FastAPIUser(SQLAlchemyBaseUserTableUUID, Base):
+    __tablename__ = 'user'
+
+    oauth_accounts: List[OAuthAccount] = relationship(
+        "OAuthAccount",
+        lazy="joined",
+    )
+    pass
+
+
+async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+    yield SQLAlchemyUserDatabase(session, FastAPIUser, OAuthAccount)
+
+
+async def get_access_token_db(
+    session: AsyncSession = Depends(get_async_session),
+):
+    yield SQLAlchemyAccessTokenDatabase(session, AccessToken)
+
+
 class User(Base):
 
     __tablename__ = 'users'
@@ -668,7 +708,7 @@ class PlatformFlavour(Base):
     repos = relationship('Repository', secondary=FlavourRepo)
 
 
-# Errata/OVAL related tables 
+# Errata/OVAL related tables
 class ErrataRecord(Base):
     __tablename__ = 'errata_records'
 
@@ -725,7 +765,7 @@ class ErrataRecord(Base):
         if self.title:
             return self.title
         return self.original_title
-    
+
     def get_type(self):
         # Gets errata type from last part of errata id
         # For example, ALBS -> (BA) -> bugfix
@@ -812,7 +852,7 @@ class ErrataToALBSPackage(Base):
             name='errata_to_albs_package_integrity_check'
         ),
     )
-    
+
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_package_id = sqlalchemy.Column(
         sqlalchemy.Integer,
@@ -839,12 +879,12 @@ class ErrataToALBSPackage(Base):
     def build_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.build_id
-    
+
     @property
     def task_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.id
-    
+
 
 async def create_tables():
     async with engine.begin() as conn:
