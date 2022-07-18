@@ -68,10 +68,14 @@ class PermissionsMixin:
     @property
     def permissions_triad(self):
         self.validate_permissions(self.permissions)
+        perms_str = str(self.permissions)
+        owner = int(perms_str[0])
+        group = int(perms_str[1])
+        other = int(perms_str[2])
         return PermissionTriad(
-            Permissions(self.permissions // 100),
-            Permissions(self.permissions // 10 % 10),
-            Permissions(self.permissions % 10),
+            Permissions(owner),
+            Permissions(group),
+            Permissions(other),
         )
 
     @staticmethod
@@ -81,6 +85,9 @@ class PermissionsMixin:
                 'Incorrect permissions set, should be a string of 3 digits')
         test = permissions
         while test > 0:
+            # We check that each digit in permissions
+            # isn't greater than 7 (octal numbers).
+            # This way we ensure our permissions will be correct.
             if test % 10 > 7:
                 raise ValueError('Incorrect permissions representation')
             test //= 10
@@ -299,7 +306,7 @@ class RepositoryRemote(CustomRepoRepr):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
