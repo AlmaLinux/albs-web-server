@@ -135,10 +135,10 @@ async def remove_product(
         raise Exception(f"Product={product_id} doesn't exist")
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    # await asyncio.gather(*(
-    #     pulp_client.delete_by_href(product_repo.pulp_href)
-    #     for product_repo in db_product.repositories
-    # ))
+    await asyncio.gather(*(
+        pulp_client.delete_by_href(product_repo.pulp_href)
+        for product_repo in db_product.repositories
+    ))
     await db.delete(db_product)
     await db.commit()
 

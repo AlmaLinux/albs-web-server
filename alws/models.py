@@ -722,14 +722,20 @@ ProductRepositories = sqlalchemy.Table(
     sqlalchemy.Column(
         'product_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('products.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_repositories_products_id',
+        ),
+        primary_key=True,
     ),
     sqlalchemy.Column(
         'repository_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey(
+            'repositories.id',
+            name='fk_product_repositories_repositories_id',
+        ),
+        primary_key=True,
     )
 )
 
@@ -740,14 +746,22 @@ ProductBuilds = sqlalchemy.Table(
     sqlalchemy.Column(
         'product_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('products.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_packages_products_id',
+            ondelete='CASCADE',
+        ),
+        primary_key=True,
     ),
     sqlalchemy.Column(
         'build_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey(
+            'builds.id',
+            name='fk_product_packages_builds_id',
+            ondelete='CASCADE',
+        ),
+        primary_key=True,
     )
 )
 
@@ -762,8 +776,17 @@ class Product(PermissionsMixin, TeamMixin, Base):
     roles = relationship(
         'UserRole', secondary=ProductRoleMapping
     )
-    repositories = relationship('Repository', secondary=ProductRepositories)
-    builds = relationship('Build', secondary=ProductBuilds)
+    repositories = relationship(
+        'Repository',
+        secondary=ProductRepositories,
+        cascade='all, delete',
+    )
+    builds = relationship(
+        'Build',
+        secondary=ProductBuilds,
+        cascade='all, delete',
+        passive_deletes=True,
+    )
 
 
 class TestTask(Base):

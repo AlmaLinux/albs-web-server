@@ -1,8 +1,8 @@
-"""
+"""Added builds and repos for Product
 
-Revision ID: 20c61e4269ef
+Revision ID: 1f68a6981a68
 Revises: fad009ddf89a
-Create Date: 2022-07-18 16:19:54.227739
+Create Date: 2022-07-19 15:12:56.315536
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '20c61e4269ef'
+revision = '1f68a6981a68'
 down_revision = 'fad009ddf89a'
 branch_labels = None
 depends_on = None
@@ -21,15 +21,15 @@ def upgrade():
     op.create_table('product_repositories',
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.Column('repository_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.ForeignKeyConstraint(['repository_id'], ['repositories.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], name='fk_product_repositories_products_id'),
+    sa.ForeignKeyConstraint(['repository_id'], ['repositories.id'], name='fk_product_repositories_repositories_id'),
     sa.PrimaryKeyConstraint('product_id', 'repository_id')
     )
     op.create_table('product_packages',
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.Column('build_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['build_id'], ['builds.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['build_id'], ['builds.id'], name='fk_product_packages_builds_id', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], name='fk_product_packages_products_id', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('product_id', 'build_id')
     )
     op.alter_column('build_releases', 'owner_id',
