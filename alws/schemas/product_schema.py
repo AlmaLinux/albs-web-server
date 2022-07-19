@@ -19,6 +19,9 @@ class ProductCreate(BaseModel):
 class ProductBuild(BaseModel):
     id: int
 
+    class Config:
+        orm_mode = True
+
 
 class Product(BaseModel):
     id: int
