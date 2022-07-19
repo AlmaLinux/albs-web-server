@@ -26,6 +26,10 @@ class EmptyReleasePlan(ValueError):
     pass
 
 
+class ProductError(Exception):
+    pass
+
+
 class MissingRepository(ValueError):
     pass
 

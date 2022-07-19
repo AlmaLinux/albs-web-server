@@ -716,6 +716,42 @@ class Team(PermissionsMixin, Base):
     )
 
 
+ProductRepositories = sqlalchemy.Table(
+    'product_repositories',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('products.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'repository_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('repositories.id'),
+        primary_key=True
+    )
+)
+
+
+ProductBuilds = sqlalchemy.Table(
+    'product_packages',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('products.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('builds.id'),
+        primary_key=True
+    )
+)
+
+
 class Product(PermissionsMixin, TeamMixin, Base):
 
     __tablename__ = 'products'
@@ -726,6 +762,8 @@ class Product(PermissionsMixin, TeamMixin, Base):
     roles = relationship(
         'UserRole', secondary=ProductRoleMapping
     )
+    repositories = relationship('Repository', secondary=ProductRepositories)
+    builds = relationship('Build', secondary=ProductBuilds)
 
 
 class TestTask(Base):
