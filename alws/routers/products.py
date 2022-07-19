@@ -34,7 +34,9 @@ async def create_product(
     product: product_schema.ProductCreate,
     db: database.Session = Depends(get_db)
 ):
-    db_product = await products.create_product(db, product)
+    async with db.begin():
+        db_product = await products.create_product(db, product)
+        await db.commit()
     return product_schema.Product(id=db_product.id, name=db_product.name)
 
 

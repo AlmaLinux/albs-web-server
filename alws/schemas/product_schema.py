@@ -2,6 +2,7 @@ import typing
 
 from pydantic import BaseModel
 
+from alws.schemas.platform_schema import Platform
 from alws.schemas.repository_schema import Repository
 from alws.schemas.team_schema import Team
 from alws.schemas.user_schema import User
@@ -13,7 +14,7 @@ class ProductCreate(BaseModel):
     name: str
     team_id: int
     owner_id: int
-    product_arches: typing.List[str] = []
+    platforms: typing.List[Platform] = []
 
 
 class ProductBuild(BaseModel):

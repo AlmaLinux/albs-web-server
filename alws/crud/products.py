@@ -24,12 +24,13 @@ __all__ = [
 async def create_product_repo(
     pulp_client: PulpClient,
     product_name: str,
+    platform_name: str,
     arch: str,
     is_debug: bool,
 ) -> typing.Tuple[str, str, str, str, bool]:
 
     debug_suffix = '-debug' if is_debug else ''
-    repo_name = f'{product_name}-{arch}{debug_suffix}-dr'
+    repo_name = f'{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
     repo_url, repo_href = await pulp_client.create_build_rpm_repo(repo_name)
     return repo_name, repo_url, arch, repo_href, is_debug
 
@@ -42,6 +43,7 @@ async def create_product(
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     items_to_insert = []
+    repo_tasks = []
     test_team_id = (await db.execute(select(models.Team.id).where(
         models.Team.id == payload.team_id))).scalars().first()
     if not test_team_id:
@@ -56,18 +58,23 @@ async def create_product(
         models.Product.name == payload.name))).scalars().first()
     if product:
         return product
+
     payload_dict = payload.dict()
-    product_arches = payload_dict.pop('product_arches')
+    product_platforms = payload_dict.pop('platforms')
     product = models.Product(**payload_dict)
     items_to_insert.append(product)
-    repo_tasks = [
-        create_product_repo(pulp_client, product.name, arch, is_debug)
-        for arch in set(product_arches)
-        for is_debug in (True, False)
-    ]
-    repo_tasks.append(
-        create_product_repo(pulp_client, product.name, 'src', False))
+    for platform in product_platforms:
+        platform_name = platform['name']
+        repo_tasks = [
+            create_product_repo(pulp_client, product.name,
+                                platform_name, arch, is_debug)
+            for arch in platform['arch_list']
+            for is_debug in (True, False)
+        ]
+        repo_tasks.append(create_product_repo(
+            pulp_client, product.name, platform_name, 'src', False))
     task_results = await asyncio.gather(*repo_tasks)
+
     for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
         repo = models.Repository(
             name=repo_name,
@@ -76,11 +83,13 @@ async def create_product(
             pulp_href=pulp_href,
             type=arch,
             debug=is_debug,
+            production=True,
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)
+
     db.add_all(items_to_insert)
-    await db.commit()
+    await db.flush()
     await db.refresh(product)
     return product
 
@@ -115,26 +124,23 @@ async def remove_product(
     product_id: int,
 ):
 
-    db_product = await db.execute(
+    db_product = (await db.execute(
         select(models.Product).where(
             models.Product.id == product_id,
         ).options(
             selectinload(models.Product.repositories),
         ),
-    )
+    )).scalars().first()
     if not db_product:
         raise Exception(f"Product={product_id} doesn't exist")
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    await asyncio.gather(*(
-        pulp_client.delete_by_href(product_repo.pulp_href)
-        for product_repo in db_product.repositories
-    ))
-    await db.execute(
-        delete(models.Product).where(
-            models.Product.id == product_id,
-        ),
-    )
+    # await asyncio.gather(*(
+    #     pulp_client.delete_by_href(product_repo.pulp_href)
+    #     for product_repo in db_product.repositories
+    # ))
+    await db.delete(db_product)
+    await db.commit()
 
 
 async def get_existing_packages(
