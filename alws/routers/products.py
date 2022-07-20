@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get('/', response_model=typing.Union[
     typing.List[product_schema.Product], product_schema.ProductResponse])
 async def get_products(
-    pageNumber: int,
+    pageNumber: int = None,
     db: database.Session = Depends(get_db),
 ):
     return await products.get_products(db, page_number=pageNumber)
