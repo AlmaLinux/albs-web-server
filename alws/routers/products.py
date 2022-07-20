@@ -21,7 +21,8 @@ router = APIRouter(
 )
 
 
-@router.get('/', response_model=typing.List[product_schema.Product])
+@router.get('/', response_model=typing.Union[
+    typing.List[product_schema.Product], product_schema.ProductResponse])
 async def get_products(
     pageNumber: int,
     db: database.Session = Depends(get_db),
@@ -57,9 +58,9 @@ async def get_product(
 @router.post('/add/{build_id}/{product}/',
              response_model=typing.Dict[str, bool])
 async def add_to_product(
-        product: str,
-        build_id: int,
-        db: database.Session = Depends(get_db)
+    product: str,
+    build_id: int,
+    db: database.Session = Depends(get_db)
 ):
     try:
         await products.modify_product(
@@ -73,9 +74,9 @@ async def add_to_product(
 @router.post('/remove/{build_id}/{product}/',
              response_model=typing.Dict[str, bool])
 async def remove_from_product(
-        product: str,
-        build_id: int,
-        db: database.Session = Depends(get_db)
+    product: str,
+    build_id: int,
+    db: database.Session = Depends(get_db)
 ):
     try:
         await products.modify_product(

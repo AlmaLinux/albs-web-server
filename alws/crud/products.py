@@ -5,6 +5,7 @@ import typing
 from sqlalchemy import delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
@@ -113,6 +114,13 @@ async def get_products(
     )
     if page_number:
         query = query.slice(10 * page_number - 10, 10 * page_number)
+        return {
+            'products': (await db.execute(query)).scalars().all(),
+            'total_products': (
+                await db.execute(select(func.count(models.Product.id)))
+            ).scalar(),
+            'current_page': page_number,
+        }
     if product_id:
         query = query.where(models.Product.id == product_id)
         return (await db.execute(query)).scalars().first()

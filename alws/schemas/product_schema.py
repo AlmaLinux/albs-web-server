@@ -34,3 +34,9 @@ class Product(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class ProductResponse(BaseModel):
+    products: typing.List[Product]
+    total_products: typing.Optional[int]
+    current_page: typing.Optional[int]
