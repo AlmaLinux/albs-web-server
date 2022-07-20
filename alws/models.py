@@ -766,12 +766,40 @@ ProductBuilds = sqlalchemy.Table(
 )
 
 
+ProductPlatforms = sqlalchemy.Table(
+    'product_platforms',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_platforms_products_id',
+            ondelete='CASCADE',
+        ),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'platforms.id',
+            name='fk_product_platforms_platforms_id',
+            ondelete='CASCADE',
+        ),
+        primary_key=True
+    )
+)
+
+
 class Product(PermissionsMixin, TeamMixin, Base):
 
     __tablename__ = 'products'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    title = sqlalchemy.Column(sqlalchemy.String(100), nullable=False)
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     team = relationship('Team', back_populates='products')
     roles = relationship(
         'UserRole', secondary=ProductRoleMapping
@@ -780,6 +808,12 @@ class Product(PermissionsMixin, TeamMixin, Base):
         'Repository',
         secondary=ProductRepositories,
         cascade='all, delete',
+    )
+    platforms = relationship(
+        'Platform',
+        secondary=ProductPlatforms,
+        cascade='all, delete',
+        passive_deletes=True,
     )
     builds = relationship(
         'Build',

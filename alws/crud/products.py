@@ -60,18 +60,24 @@ async def create_product(
     if product:
         return product
 
-    payload_dict = payload.dict()
-    product_platforms = payload_dict.pop('platforms')
-    product = models.Product(**payload_dict)
+    product = models.Product(**payload.dict())
+    product.platforms = (await db.execute(
+        select(models.Platform).where(
+            models.Platform.name.in_([
+                platform.name
+                for platform in payload.platforms
+            ]),
+        ),
+    )).scalars().all()
     items_to_insert.append(product)
-    for platform in product_platforms:
-        platform_name = platform['name']
-        repo_tasks = [
+    for platform in product.platforms:
+        platform_name = platform.name
+        repo_tasks.extend((
             create_product_repo(pulp_client, product.name,
                                 platform_name, arch, is_debug)
-            for arch in platform['arch_list']
+            for arch in platform.arch_list
             for is_debug in (True, False)
-        ]
+        ))
         repo_tasks.append(create_product_repo(
             pulp_client, product.name, platform_name, 'src', False))
     task_results = await asyncio.gather(*repo_tasks)
@@ -104,9 +110,12 @@ async def get_products(
     models.Product,
 ]:
 
-    query = select(models.Product).options(
+    query = select(models.Product).order_by(
+        models.Product.id.desc(),
+    ).options(
         selectinload(models.Product.builds),
         selectinload(models.Product.owner),
+        selectinload(models.Product.platforms),
         selectinload(models.Product.repositories),
         selectinload(models.Product.team).selectinload(models.Team.members),
         selectinload(models.Product.team).selectinload(models.Team.owner),

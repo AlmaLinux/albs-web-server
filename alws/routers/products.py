@@ -38,7 +38,7 @@ async def create_product(
     async with db.begin():
         db_product = await products.create_product(db, product)
         await db.commit()
-    return product_schema.Product(id=db_product.id, name=db_product.name)
+    return await products.get_products(db, product_id=db_product.id)
 
 
 @router.get('/{product_id}/', response_model=product_schema.Product)

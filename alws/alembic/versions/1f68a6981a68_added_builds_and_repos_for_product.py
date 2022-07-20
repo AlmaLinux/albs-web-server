@@ -32,6 +32,13 @@ def upgrade():
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], name='fk_product_packages_products_id', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('product_id', 'build_id')
     )
+    op.create_table('product_platforms',
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('platform_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['platform_id'], ['platforms.id'], name='fk_product_platforms_platforms_id', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], name='fk_product_platforms_products_id', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('product_id', 'platform_id')
+    )
     op.alter_column('build_releases', 'owner_id',
                existing_type=sa.INTEGER(),
                nullable=True)
@@ -47,6 +54,9 @@ def upgrade():
     op.alter_column('teams', 'owner_id',
                existing_type=sa.INTEGER(),
                nullable=True)
+    # FIXME: Change nullable to False after Product population
+    op.add_column('products', sa.Column('title', sa.String(length=100), nullable=True))
+    op.add_column('products', sa.Column('description', sa.Text(), nullable=True))
     # ### end Alembic commands ###
 
 
@@ -69,4 +79,7 @@ def downgrade():
                nullable=False)
     op.drop_table('product_packages')
     op.drop_table('product_repositories')
+    op.drop_table('product_platforms')
+    op.drop_column('products', 'description')
+    op.drop_column('products', 'title')
     # ### end Alembic commands ###

@@ -14,6 +14,8 @@ class ProductCreate(BaseModel):
     name: str
     team_id: int
     owner_id: int
+    title: str
+    description: typing.Optional[str]
     platforms: typing.List[Platform] = []
 
 
@@ -27,10 +29,11 @@ class ProductBuild(BaseModel):
 class Product(BaseModel):
     id: int
     name: str
-    builds: typing.Optional[typing.List[ProductBuild]] = []
-    repositories: typing.Optional[typing.List[Repository]] = []
-    owner: typing.Optional[User]
-    team: typing.Optional[Team]
+    builds: typing.List[ProductBuild] = []
+    repositories: typing.List[Repository] = []
+    platforms: typing.List[Platform] = []
+    owner: User
+    team: Team
 
     class Config:
         orm_mode = True
