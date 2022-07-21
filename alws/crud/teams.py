@@ -1,5 +1,8 @@
+import typing
+
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.expression import func
 
 from alws.crud.actions import ensure_all_actions_exist
 from alws.database import Session
@@ -9,6 +12,7 @@ from alws.models import (
     UserAction,
     UserRole,
 )
+from alws.schemas import team_schema
 from alws.perms.roles import (
     Contributor,
     Manager,
@@ -59,17 +63,20 @@ async def create_team_roles(session: Session, team_name: str):
     return new_roles + existing_roles
 
 
-async def create_team(session: Session, team_name: str, user_id: int) -> Team:
+async def create_team(
+    session: Session,
+    payload: team_schema.TeamCreate,
+) -> Team:
     owner = (await session.execute(select(User).where(
-        User.id == user_id).options(
-        selectinload(User.roles)
+        User.id == payload.user_id).options(
+            selectinload(User.roles)
     ))).scalars().first()
 
     if not owner:
-        raise ValueError(f'Unknown user ID: {user_id}')
+        raise ValueError(f'Unknown user ID: {payload.user_id}')
 
     existing_team = (await session.execute(select(Team).where(
-        Team.name == team_name).options(
+        Team.name == payload.team_name).options(
         selectinload(Team.roles),
         selectinload(Team.owner),
         selectinload(Team.members),
@@ -78,10 +85,10 @@ async def create_team(session: Session, team_name: str, user_id: int) -> Team:
     if existing_team:
         return existing_team
 
-    team_roles = await create_team_roles(session, team_name)
+    team_roles = await create_team_roles(session, payload.team_name)
     manager_role = [r for r in team_roles if 'manager' in r.name][0]
 
-    new_team = Team(name=team_name)
+    new_team = Team(name=payload.team_name)
     new_team.owner = owner
     new_team.roles = team_roles
     new_team.members = [owner]
@@ -95,9 +102,60 @@ async def create_team(session: Session, team_name: str, user_id: int) -> Team:
     return new_team
 
 
-async def get_teams(session: Session):
-    return (await session.execute(select(Team).options(
+async def get_teams(
+    session: Session,
+    page_number: int = None,
+    team_id: int = None,
+) -> typing.Union[typing.List[Team], Team]:
+    query = select(Team).order_by(Team.id.desc()).options(
         selectinload(Team.members),
         selectinload(Team.owner),
-        selectinload(Team.roles)
-    ))).scalars().all()
+        selectinload(Team.roles),
+    )
+    if page_number:
+        query = query.slice(10 * page_number - 10, 10 * page_number)
+        return {
+            'teams': (await session.execute(query)).scalars().all(),
+            'total_teams': (
+                await session.execute(select(func.count(Team.id)))
+            ).scalar(),
+            'current_page': page_number,
+        }
+    if team_id:
+        query = query.where(Team.id == team_id)
+        return (await session.execute(query)).scalars().first()
+    return (await session.execute(query)).scalars().all()
+
+
+async def update_members(
+    session: Session,
+    payload: team_schema.TeamMembersUpdate,
+    team_id: int,
+) -> Team:
+    if payload.modification not in ('add', 'remove'):
+        raise Exception
+    db_team = (await session.execute(
+        select(Team).where(Team.id == team_id).options(
+            selectinload(Team.members),
+            selectinload(Team.owner),
+        ),
+    )).scalars().first()
+    if not db_team:
+        raise Exception
+    db_users = await session.execute(
+        select(User).where(User.id.in_((
+            user.id for user in payload.members_to_update
+        ))),
+    )
+    db_users = db_users.scalars().all()
+    for db_user in db_users:
+        if payload.modification == 'remove':
+            if db_user not in db_team.members:
+                raise Exception
+            db_team.members.remove(db_user)
+            continue
+        db_team.members.append(db_user)
+    session.add(db_team)
+    await session.commit()
+    await session.refresh(db_team)
+    return db_team
