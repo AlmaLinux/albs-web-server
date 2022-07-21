@@ -206,13 +206,13 @@ async def prepare_repo_modify_dict(
     pulp_client: PulpClient,
 ) -> typing.Dict[str, typing.List[str]]:
 
-    dist_repo_mapping = {(repo.arch, repo.debug): repo
-                         for repo in db_product.repositories}
+    product_repo_mapping = {(repo.arch, repo.debug): repo
+                            for repo in db_product.repositories}
     modify = defaultdict(list)
     build_repos = [repo for repo in db_build.repos if repo.type == 'rpm']
     tasks = []
     for repo in build_repos:
-        dist_repo = dist_repo_mapping.get((repo.arch, repo.debug))
+        dist_repo = product_repo_mapping.get((repo.arch, repo.debug))
         tasks.append(get_packages_to_add(pulp_client, repo, dist_repo))
 
     results = await asyncio.gather(*tasks)
@@ -222,8 +222,8 @@ async def prepare_repo_modify_dict(
         if task.status != BuildTaskStatus.COMPLETED:
             continue
         if task.rpm_module:
-            distro_repo = dist_repo_mapping.get((task.arch, False))
-            modify[distro_repo.pulp_href].append(task.rpm_module.pulp_href)
+            product_repo = product_repo_mapping.get((task.arch, False))
+            modify[product_repo.pulp_href].append(task.rpm_module.pulp_href)
 
     return modify
 
@@ -287,7 +287,7 @@ async def modify_product(
     else:
         remove_query = models.Build.id.__eq__(build_id)
         await db.execute(
-            delete(models.DistributionBuilds).where(remove_query)
+            delete(models.ProductBuilds).where(remove_query)
         )
     db.add(db_product)
     try:
