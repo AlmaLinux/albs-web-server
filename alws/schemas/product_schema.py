@@ -29,6 +29,8 @@ class ProductBuild(BaseModel):
 class Product(BaseModel):
     id: int
     name: str
+    title: str
+    description: typing.Optional[str]
     builds: typing.List[ProductBuild] = []
     repositories: typing.List[Repository] = []
     platforms: typing.List[Platform] = []
