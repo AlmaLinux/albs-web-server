@@ -25,9 +25,11 @@ router = APIRouter(
     typing.List[product_schema.Product], product_schema.ProductResponse])
 async def get_products(
     pageNumber: int = None,
+    search_string: str = None,
     db: database.Session = Depends(get_db),
 ):
-    return await products.get_products(db, page_number=pageNumber)
+    return await products.get_products(
+        db, page_number=pageNumber, search_string=search_string)
 
 
 @router.post('/', response_model=product_schema.Product)

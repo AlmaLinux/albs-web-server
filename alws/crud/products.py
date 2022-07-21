@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 import typing
 
-from sqlalchemy import delete
+from sqlalchemy import delete, or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
@@ -103,6 +103,7 @@ async def create_product(
 
 async def get_products(
     db: Session,
+    search_string: str = None,
     page_number: int = None,
     product_id: int = None,
 ) -> typing.Union[
@@ -121,6 +122,11 @@ async def get_products(
         selectinload(models.Product.team).selectinload(models.Team.owner),
         selectinload(models.Product.team).selectinload(models.Team.roles),
     )
+    if search_string:
+        query = query.filter(or_(
+            models.Product.name.like(f'%{search_string}%'),
+            models.Product.title.like(f'%{search_string}%'),
+        ))
     if page_number:
         query = query.slice(10 * page_number - 10, 10 * page_number)
         return {
