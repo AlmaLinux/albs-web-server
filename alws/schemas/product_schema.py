@@ -29,7 +29,7 @@ class ProductBuild(BaseModel):
 class Product(BaseModel):
     id: int
     name: str
-    title: str
+    title: typing.Optional[str]
     description: typing.Optional[str]
     builds: typing.List[ProductBuild] = []
     repositories: typing.List[Repository] = []
