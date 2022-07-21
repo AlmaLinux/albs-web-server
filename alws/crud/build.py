@@ -109,8 +109,17 @@ async def get_builds(
         query = query.where(models.Build.id == build_id)
     if search_params is not None:
         if search_params.project is not None:
-            query = query.filter(models.BuildTaskRef.url.like(
-                f'%/{search_params.project}.git'))
+            project_name = search_params.project
+            project_query = query.filter(sqlalchemy.or_(
+                models.BuildTaskRef.url.like(f'%/{project_name}.git'),
+                models.BuildTaskRef.url.like(f'%/{project_name}%.src.rpm'),
+                models.BuildTaskRef.url.like(f'%/rpms/{project_name}%.git'),
+            ))
+            if not (await db.execute(project_query)).scalars().all():
+                project_query = query.filter(
+                    models.BuildTaskRef.url.like(f'%/{project_name}%'),
+                )
+            query = project_query
         if search_params.created_by is not None:
             query = query.filter(
                 models.Build.owner_id == search_params.created_by)
