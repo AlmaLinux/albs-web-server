@@ -110,7 +110,7 @@ async def get_builds(
     if search_params is not None:
         if search_params.project is not None:
             query = query.filter(models.BuildTaskRef.url.like(
-                f'%/{search_params.project}%'))
+                f'%/{search_params.project}.git'))
         if search_params.created_by is not None:
             query = query.filter(
                 models.Build.owner_id == search_params.created_by)
