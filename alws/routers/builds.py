@@ -39,8 +39,6 @@ async def create_build(
             user: models.User = Depends(get_current_user),
             db: database.Session = Depends(get_db)
         ):
-    # `get_current_user returns tuple of user record and token,
-    # so to address user record we need to pick first item in `user_data`
     try:
         return await build_crud.create_build(db, build, user.id)
     except PermissionDenied:
