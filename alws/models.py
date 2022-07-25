@@ -733,6 +733,8 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     last_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     hashed_password: str = sqlalchemy.Column(
         sqlalchemy.String(length=1024), nullable=True)
+    is_active: bool = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=False)
     roles = relationship(
         'UserRole', secondary=UserRoleMapping
     )

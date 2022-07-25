@@ -1,7 +1,9 @@
+import typing
+
 from pydantic import BaseModel
 
 
-__all__ = ['User', 'LoginGithub']
+__all__ = ['User', 'LoginGithub', 'UserOpResult']
 
 
 class LoginGithub(BaseModel):
@@ -28,3 +30,8 @@ class User(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class UserOpResult(BaseModel):
+    success: bool
+    message: typing.Optional[str] = None
