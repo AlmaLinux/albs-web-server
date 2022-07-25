@@ -4,7 +4,6 @@ import re
 import urllib
 from io import BytesIO
 
-from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
@@ -22,10 +21,10 @@ async def create_test_tasks_for_build_id(db: Session, build_id: int):
         ## We get all build_tasks with the same build_id
         ## and whose status is COMPLETED
         build_task_ids = (await db.execute(
-            select(models.BuildTask.id).where(and_(
+            select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id,
                 models.BuildTask.status == BuildTaskStatus.COMPLETED
-            ))
+            )
         )).scalars().all()
 
     for build_task_id in build_task_ids:

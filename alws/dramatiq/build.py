@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Any
 
 import dramatiq
-from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
@@ -97,14 +96,14 @@ async def _check_build_and_completed_tasks(
         )).scalar()
 
         completed_tasks = (await db.execute(
-            select(func.count()).select_from(models.BuildTask).where(and_(
+            select(func.count()).select_from(models.BuildTask).where(
                 models.BuildTask.build_id == build_id,
                 models.BuildTask.status.in_([
                     BuildTaskStatus.COMPLETED,
                     BuildTaskStatus.FAILED,
                     BuildTaskStatus.EXCLUDED,
                 ])
-            ))
+            )
         )).scalar()
 
         return completed_tasks==build_tasks
