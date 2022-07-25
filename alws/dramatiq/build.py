@@ -60,12 +60,15 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 async def _build_done(request: build_node_schema.BuildDone):
     async for db in get_db():
         success = await build_node_crud.safe_build_done(db, request)
-        # Wait until all build tasks of the same build_id and platform_id
-        # are completed before keep going
+        # We don't want to create the test tasks until all build tasks
+        # of the same build_id are completed.
+        # The last completed task will trigger the creation of the test tasks
+        # of the same build.
         all_build_tasks_completed = await _all_build_tasks_completed(db, request.task_id)
 
         if success and request.status == 'done' and all_build_tasks_completed:
-            await test.create_test_tasks(db, request.task_id)
+            build_id = await _get_build_id(db, request.task_id)
+            await test.create_test_tasks_for_build_id(db, build_id)
 
 
 async def _create_log_repo(task_id: int):
@@ -73,49 +76,44 @@ async def _create_log_repo(task_id: int):
         task = await build_node_crud.get_build_task(db, task_id)
         await build_node_crud.create_build_log_repo(db, task)
 
+
+async def _get_build_id(db: Session, build_task_id: int) -> int:
+    async with db.begin():
+        build_id = (await db.execute(select(models.BuildTask.build_id).where(
+            models.BuildTask.id == build_task_id
+        ))).scalars().first()
+        return build_id
+
+
 async def _check_build_and_completed_tasks(
             db: Session,
-            build_id: int,
-            platform_id: int
+            build_id: int
         ) -> bool:
-    build_tasks = (await db.execute(
-        select(func.count()).select_from(models.BuildTask).where(and_(
-            models.BuildTask.build_id == build_id,
-            models.BuildTask.platform_id == platform_id
-        ))
-    )).scalar()
+    async with db.begin():
+        build_tasks = (await db.execute(
+            select(func.count()).select_from(models.BuildTask).where(
+                models.BuildTask.build_id == build_id
+            )
+        )).scalar()
 
-    completed_tasks = (await db.execute(
-        select(func.count()).select_from(models.BuildTask).where(and_(
-            models.BuildTask.build_id == build_id,
-            models.BuildTask.platform_id == platform_id,
-            models.BuildTask.status.in_([
-                BuildTaskStatus.COMPLETED,
-                BuildTaskStatus.FAILED,
-                BuildTaskStatus.EXCLUDED,
-            ])
-        ))
-    )).scalar()
+        completed_tasks = (await db.execute(
+            select(func.count()).select_from(models.BuildTask).where(and_(
+                models.BuildTask.build_id == build_id,
+                models.BuildTask.status.in_([
+                    BuildTaskStatus.COMPLETED,
+                    BuildTaskStatus.FAILED,
+                    BuildTaskStatus.EXCLUDED,
+                ])
+            ))
+        )).scalar()
 
-    return completed_tasks==build_tasks
+        return completed_tasks==build_tasks
 
 
 async def _all_build_tasks_completed(db: Session, build_task_id: int) -> bool:
-    async with db.begin():
-        build_id, platform_id = (await db.execute(select(
-            models.BuildTask.build_id,
-            models.BuildTask.platform_id,
-        ).where(
-            models.BuildTask.id == build_task_id
-        ))).first()
-
-        all_completed = await _check_build_and_completed_tasks(db, build_id, platform_id)
-        while not all_completed:
-            logging.debug('BuildTask %d is waiting for other build tasks to complete', build_task_id)
-            await asyncio.sleep(30)
-            all_completed = await _check_build_and_completed_tasks(db, build_id, platform_id)
-        return all_completed
-
+    build_id = await _get_build_id(db, build_task_id)
+    all_completed = await _check_build_and_completed_tasks(db, build_id)
+    return all_completed
 
 
 @dramatiq.actor(
