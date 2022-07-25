@@ -822,6 +822,10 @@ class Product(PermissionsMixin, TeamMixin, Base):
         passive_deletes=True,
     )
 
+    @property
+    def full_name(self) -> str:
+        return f'{self.name}/{self.owner.username}'
+
 
 class TestTask(Base):
 

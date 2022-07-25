@@ -159,3 +159,7 @@ async def update_members(
     await session.commit()
     await session.refresh(db_team)
     return db_team
+
+
+async def remove_team(db: Session, team_id: int):
+    raise NotImplementedError

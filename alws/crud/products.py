@@ -14,26 +14,14 @@ from alws.database import Session
 from alws.errors import ProductError
 from alws.schemas.product_schema import ProductCreate
 from alws.utils.pulp_client import PulpClient
-
+from alws.utils.copr import create_product_repo
 
 __all__ = [
     'create_product',
     'get_products',
+    'modify_product',
+    'remove_product',
 ]
-
-
-async def create_product_repo(
-    pulp_client: PulpClient,
-    product_name: str,
-    platform_name: str,
-    arch: str,
-    is_debug: bool,
-) -> typing.Tuple[str, str, str, str, bool]:
-
-    debug_suffix = '-debug' if is_debug else ''
-    repo_name = f'{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
-    repo_url, repo_href = await pulp_client.create_build_rpm_repo(repo_name)
-    return repo_name, repo_url, arch, repo_href, is_debug
 
 
 async def create_product(
@@ -45,14 +33,14 @@ async def create_product(
                              settings.pulp_password)
     items_to_insert = []
     repo_tasks = []
-    test_team_id = (await db.execute(select(models.Team.id).where(
+    team_id = (await db.execute(select(models.Team.id).where(
         models.Team.id == payload.team_id))).scalars().first()
-    if not test_team_id:
+    if not team_id:
         raise ValueError(f'Incorrect team ID: {payload.team_id}')
 
-    test_owner_id = (await db.execute(select(models.User.id).where(
+    owner = (await db.execute(select(models.User).where(
         models.User.id == payload.owner_id))).scalars().first()
-    if not test_owner_id:
+    if not owner:
         raise ValueError(f'Incorrect owner ID: {payload.owner_id}')
 
     product = (await db.execute(select(models.Product).where(
@@ -71,15 +59,16 @@ async def create_product(
     )).scalars().all()
     items_to_insert.append(product)
     for platform in product.platforms:
-        platform_name = platform.name
+        platform_name = platform.name.lower()
         repo_tasks.extend((
-            create_product_repo(pulp_client, product.name,
+            create_product_repo(pulp_client, product.name, owner.username,
                                 platform_name, arch, is_debug)
             for arch in platform.arch_list
             for is_debug in (True, False)
         ))
         repo_tasks.append(create_product_repo(
-            pulp_client, product.name, platform_name, 'src', False))
+            pulp_client, product.name, owner.username,
+            platform_name, 'src', False))
     task_results = await asyncio.gather(*repo_tasks)
 
     for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
