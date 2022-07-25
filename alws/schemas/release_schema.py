@@ -21,7 +21,7 @@ class Release(BaseModel):
     build_task_ids: typing.Optional[typing.List[int]] = \
         Field(default_factory=list)
     plan: typing.Optional[typing.Dict[str, typing.Any]]
-    created_by: User
+    owner: User
     platform: Platform
 
     class Config:

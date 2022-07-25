@@ -3,14 +3,46 @@ import re
 import typing
 from collections import namedtuple
 
+from dataclasses import dataclass
 
-__all__ = ['BuildTaskStatus', 'ReleaseStatus', 'TestTaskStatus',
-           'BuildTaskRefType', 'SignStatus', 'RepoType', 'ExportStatus',
-           'debuginfo_regex', 'REQUEST_TIMEOUT', 'DRAMATIQ_TASK_TIMEOUT']
+
+__all__ = [
+    'DEFAULT_PRODUCT',
+    'DEFAULT_TEAM',
+    'DRAMATIQ_TASK_TIMEOUT',
+    'REQUEST_TIMEOUT',
+    'SYSTEM_USER_NAME',
+    'BuildTaskStatus',
+    'BuildTaskRefType',
+    'ExportStatus',
+    'Permissions',
+    'PermissionTriad',
+    'ReleaseStatus',
+    'RepoType',
+    'SignStatus',
+    'TestTaskStatus',
+    'debuginfo_regex',
+]
 
 
 REQUEST_TIMEOUT = 60  # 1 minute
 DRAMATIQ_TASK_TIMEOUT = 36000000  # 10 hours in milliseconds
+SYSTEM_USER_NAME = 'base_user'
+DEFAULT_PRODUCT = 'AlmaLinux'
+DEFAULT_TEAM = 'almalinux'
+
+
+class Permissions(enum.IntFlag):
+    DELETE = 1
+    WRITE = 2
+    READ = 4
+
+
+@dataclass
+class PermissionTriad:
+    owner: Permissions
+    group: Permissions
+    other: Permissions
 
 
 class BuildTaskStatus(enum.IntEnum):
