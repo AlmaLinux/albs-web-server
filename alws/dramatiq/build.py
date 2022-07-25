@@ -6,7 +6,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
 
-import asyncio
 from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
 from alws.crud import build_node as build_node_crud, platform_flavors, test
