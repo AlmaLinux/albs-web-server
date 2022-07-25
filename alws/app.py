@@ -38,9 +38,17 @@ async def shutdown():
 
 
 for module in ROUTERS:
-    if getattr(module, 'copr_router', None):
-        app.include_router(module.copr_router)
-        continue
-    app.include_router(module.router, prefix=APP_PREFIX)
-    if getattr(module, 'public_router', None):
-        app.include_router(module.public_router, prefix=APP_PREFIX)
+    for router_type in (
+        'router',
+        'public_router',
+        'copr_router',
+    ):
+        router = getattr(module, router_type, None)
+        if not router:
+            continue
+        router_params = {'router': router, 'prefix': APP_PREFIX}
+        # for correct working COPR features,
+        # we don't need prefix for this router
+        if router_type == 'copr_router':
+            router_params.pop('prefix')
+        app.include_router(**router_params)

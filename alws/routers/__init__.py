@@ -3,6 +3,7 @@ __all__ = [
     'builds',
     'coprs',
     'distro',
+    'docs',
     'platforms',
     'products',
     'projects',
