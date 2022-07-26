@@ -4,7 +4,8 @@ import importlib
 import logging
 import threading
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from alws import routers
 from alws.auth import AuthRoutes
@@ -12,6 +13,7 @@ from alws.auth.backend import CookieBackend
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
+from alws.errors import PermissionDenied
 from alws.test_scheduler import TestTaskScheduler
 
 
@@ -29,6 +31,15 @@ terminate_event = threading.Event()
 graceful_terminate_event = threading.Event()
 
 
+@app.middleware('http')
+async def permissions_middleware(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except PermissionDenied as e:
+        return JSONResponse(content={'message': str(e)}, status_code=401)
+
+
 @app.on_event('startup')
 async def startup():
     global scheduler, terminate_event, graceful_terminate_event
@@ -40,7 +51,6 @@ async def startup():
 async def shutdown():
     global terminate_event
     terminate_event.set()
-
 
 for module in ROUTERS:
     for router_type in (

@@ -17,17 +17,26 @@ from alws.perms.roles import (
     Contributor,
     Manager,
     Observer,
-    PlatformMaintainer,
     ProductMaintainer,
     Signer,
 )
 from alws.schemas import team_schema
 
 
+__all__ = [
+    'create_team_roles',
+    'get_team_role_name',
+    'get_teams',
+]
+
+
+def get_team_role_name(team_name: str, role_name: str):
+    return f'{team_name}_{role_name}'
+
+
 async def create_team_roles(session: Session, team_name: str):
-    required_roles = (Contributor, Manager, Observer, PlatformMaintainer,
-                      ProductMaintainer, Signer)
-    new_role_names = [f'{team_name}_{role.name}'
+    required_roles = (Contributor, Manager, Observer, ProductMaintainer, Signer)
+    new_role_names = [get_team_role_name(team_name, role.name)
                       for role in required_roles]
 
     existing_roles = (await session.execute(select(UserRole).where(
