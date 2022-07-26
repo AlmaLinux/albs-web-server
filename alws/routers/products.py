@@ -38,7 +38,13 @@ async def create_product(
     db: database.Session = Depends(get_db)
 ):
     async with db.begin():
-        db_product = await products.create_product(db, product)
+        try:
+            db_product = await products.create_product(db, product)
+        except ProductError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            )
         await db.commit()
     return await products.get_products(db, product_id=db_product.id)
 

@@ -36,17 +36,17 @@ async def create_product(
     team_id = (await db.execute(select(models.Team.id).where(
         models.Team.id == payload.team_id))).scalars().first()
     if not team_id:
-        raise ValueError(f'Incorrect team ID: {payload.team_id}')
+        raise ProductError(f'Incorrect team ID: {payload.team_id}')
 
     owner = (await db.execute(select(models.User).where(
         models.User.id == payload.owner_id))).scalars().first()
     if not owner:
-        raise ValueError(f'Incorrect owner ID: {payload.owner_id}')
+        raise ProductError(f'Incorrect owner ID: {payload.owner_id}')
 
     product = (await db.execute(select(models.Product).where(
         models.Product.name == payload.name))).scalars().first()
     if product:
-        return product
+        raise ProductError(f'Product with name={payload.name} already exist')
 
     product = models.Product(**payload.dict())
     product.platforms = (await db.execute(
@@ -100,35 +100,44 @@ async def get_products(
     models.Product,
 ]:
 
-    query = select(models.Product).order_by(
-        models.Product.id.desc(),
-    ).options(
-        selectinload(models.Product.builds),
-        selectinload(models.Product.owner),
-        selectinload(models.Product.platforms),
-        selectinload(models.Product.repositories),
-        selectinload(models.Product.team).selectinload(models.Team.members),
-        selectinload(models.Product.team).selectinload(models.Team.owner),
-        selectinload(models.Product.team).selectinload(models.Team.roles),
-    )
-    if search_string:
-        query = query.filter(or_(
-            models.Product.name.like(f'%{search_string}%'),
-            models.Product.title.like(f'%{search_string}%'),
-        ))
+    def generate_query(count=False):
+        query = select(models.Product).order_by(
+            models.Product.id.desc(),
+        ).options(
+            selectinload(models.Product.builds),
+            selectinload(models.Product.owner),
+            selectinload(models.Product.platforms),
+            selectinload(models.Product.repositories),
+            selectinload(models.Product.team).selectinload(models.Team.owner),
+            selectinload(models.Product.team).selectinload(models.Team.roles),
+            selectinload(models.Product.team).selectinload(
+                models.Team.members),
+            selectinload(models.Product.team).selectinload(
+                models.Team.products),
+        )
+        if count:
+            query = select(func.count(models.Product.id))
+        if search_string:
+            query = query.filter(or_(
+                models.Product.name.like(f'%{search_string}%'),
+                models.Product.title.like(f'%{search_string}%'),
+            ))
+        if page_number and not count:
+            query = query.slice(10 * page_number - 10, 10 * page_number)
+        return query
+
     if page_number:
-        query = query.slice(10 * page_number - 10, 10 * page_number)
         return {
-            'products': (await db.execute(query)).scalars().all(),
+            'products': (await db.execute(generate_query())).scalars().all(),
             'total_products': (
-                await db.execute(select(func.count(models.Product.id)))
+                await db.execute(generate_query(count=True))
             ).scalar(),
             'current_page': page_number,
         }
     if product_id:
-        query = query.where(models.Product.id == product_id)
+        query = generate_query().where(models.Product.id == product_id)
         return (await db.execute(query)).scalars().first()
-    return (await db.execute(query)).scalars().all()
+    return (await db.execute(generate_query())).scalars().all()
 
 
 async def remove_product(
