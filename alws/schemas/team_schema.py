@@ -14,11 +14,20 @@ class TeamCreate(BaseModel):
     user_id: int
 
 
+class TeamProduct(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 class Team(BaseModel):
     id: int
     name: str
     members: typing.Optional[typing.List[User]]
     owner: typing.Optional[User]
+    products: typing.List[TeamProduct] = []
     roles: typing.Optional[typing.List[Role]]
 
     class Config:

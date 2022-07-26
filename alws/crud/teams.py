@@ -111,6 +111,7 @@ async def get_teams(
         selectinload(Team.members),
         selectinload(Team.owner),
         selectinload(Team.roles),
+        selectinload(Team.products),
     )
     if page_number:
         query = query.slice(10 * page_number - 10, 10 * page_number)
@@ -161,5 +162,10 @@ async def update_members(
     return db_team
 
 
-async def remove_team(db: Session, team_id: int):
-    raise NotImplementedError
+async def remove_team(
+    db: Session,
+    team_id: int,
+):
+    db_team = await get_teams(db, team_id=team_id)
+    await db.delete(db_team)
+    await db.commit()
