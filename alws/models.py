@@ -265,7 +265,8 @@ class Distribution(PermissionsMixin, TeamMixin, Base):
         index=True
     )
     platforms = relationship('Platform', secondary=PlatformDependency)
-    repositories = relationship('Repository', secondary=DistributionRepositories)
+    repositories = relationship('Repository',
+                                secondary=DistributionRepositories)
     builds = relationship('Build', secondary=DistributionBuilds)
 
 
@@ -301,7 +302,8 @@ class Repository(CustomRepoRepr, PermissionsMixin):
 class RepositoryRemote(CustomRepoRepr):
     __tablename__ = 'repository_remotes'
     __tableargs__ = [
-        sqlalchemy.UniqueConstraint('name', 'arch', 'url', name='repo_remote_uix')
+        sqlalchemy.UniqueConstraint('name', 'arch', 'url',
+                                    name='repo_remote_uix')
     ]
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -622,13 +624,21 @@ UserRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'user_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('users.id'),
+        sqlalchemy.ForeignKey(
+            'users.id',
+            ondelete='CASCADE',
+            name='fk_user_role_mapping_user_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_user_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -708,11 +718,16 @@ class Team(PermissionsMixin, Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     members = relationship(
-        'User', secondary=TeamUserMapping, back_populates='teams'
+        'User',
+        secondary=TeamUserMapping,
+        back_populates='teams'
     )
     products = relationship('Product', back_populates='team')
     roles = relationship(
-        'UserRole', secondary=TeamRoleMapping
+        'UserRole',
+        secondary=TeamRoleMapping,
+        cascade='all, delete',
+        # passive_deletes=True,
     )
 
 
@@ -798,7 +813,8 @@ class Product(PermissionsMixin, TeamMixin, Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
-    title = sqlalchemy.Column(sqlalchemy.String(100), nullable=False)
+    # FIXME: change nullable to False after population
+    title = sqlalchemy.Column(sqlalchemy.String(100), nullable=True)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     team = relationship('Team', back_populates='products')
     roles = relationship(
@@ -997,7 +1013,7 @@ class PlatformFlavour(PermissionsMixin, Base):
     repos = relationship('Repository', secondary=FlavourRepo)
 
 
-# Errata/OVAL related tables 
+# Errata/OVAL related tables
 class ErrataRecord(Base):
     __tablename__ = 'errata_records'
 
@@ -1054,7 +1070,7 @@ class ErrataRecord(Base):
         if self.title:
             return self.title
         return self.original_title
-    
+
     def get_type(self):
         # Gets errata type from last part of errata id
         # For example, ALBS -> (BA) -> bugfix
@@ -1081,7 +1097,8 @@ class ErrataReference(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     ref_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    ref_type = sqlalchemy.Column(sqlalchemy.Enum(ErrataReferenceType), nullable=False)
+    ref_type = sqlalchemy.Column(sqlalchemy.Enum(ErrataReferenceType),
+                                 nullable=False)
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey('errata_records.id'),
@@ -1121,7 +1138,8 @@ class ErrataPackage(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    albs_packages = relationship('ErrataToALBSPackage', back_populates='errata_package')
+    albs_packages = relationship('ErrataToALBSPackage',
+                                 back_populates='errata_package')
 
 
 class ErrataPackageStatus(enum.Enum):
@@ -1141,14 +1159,15 @@ class ErrataToALBSPackage(Base):
             name='errata_to_albs_package_integrity_check'
         ),
     )
-    
+
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_package_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('errata_packages.id'),
         nullable=False
     )
-    errata_package = relationship('ErrataPackage', back_populates='albs_packages')
+    errata_package = relationship('ErrataPackage',
+                                  back_populates='albs_packages')
     albs_artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_artifacts.id'),
@@ -1156,7 +1175,8 @@ class ErrataToALBSPackage(Base):
     )
     build_artifact = relationship('BuildTaskArtifact')
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus),
+                               nullable=False)
 
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1168,12 +1188,12 @@ class ErrataToALBSPackage(Base):
     def build_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.build_id
-    
+
     @property
     def task_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.id
-    
+
 
 async def create_tables():
     async with engine.begin() as conn:

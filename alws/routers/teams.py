@@ -1,6 +1,6 @@
 import typing
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from alws import database
 from alws.crud import teams
@@ -49,3 +49,11 @@ async def create_team(
 ):
     db_team = await teams.create_team(db, payload)
     return await teams.get_teams(db, team_id=db_team.id)
+
+
+@router.delete('/{team_id}/remove/', status_code=status.HTTP_202_ACCEPTED)
+async def remove_team(
+    team_id: int,
+    db: database.Session = Depends(get_db)
+):
+    return await teams.remove_team(db, team_id)

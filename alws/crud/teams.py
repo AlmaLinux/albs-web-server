@@ -107,25 +107,32 @@ async def get_teams(
     page_number: int = None,
     team_id: int = None,
 ) -> typing.Union[typing.List[Team], Team]:
-    query = select(Team).order_by(Team.id.desc()).options(
-        selectinload(Team.members),
-        selectinload(Team.owner),
-        selectinload(Team.roles),
-        selectinload(Team.products),
-    )
+
+    def generate_query(count=False):
+        query = select(Team).order_by(Team.id.desc()).options(
+            selectinload(Team.members),
+            selectinload(Team.owner),
+            selectinload(Team.roles),
+            selectinload(Team.products),
+        )
+        if count:
+            query = select(func.count(Team.id))
+        if page_number and not count:
+            query = query.slice(10 * page_number - 10, 10 * page_number)
+        return query
+
     if page_number:
-        query = query.slice(10 * page_number - 10, 10 * page_number)
         return {
-            'teams': (await session.execute(query)).scalars().all(),
+            'teams': (await session.execute(generate_query())).scalars().all(),
             'total_teams': (
-                await session.execute(select(func.count(Team.id)))
+                await session.execute(generate_query(count=True))
             ).scalar(),
             'current_page': page_number,
         }
     if team_id:
-        query = query.where(Team.id == team_id)
+        query = generate_query().where(Team.id == team_id)
         return (await session.execute(query)).scalars().first()
-    return (await session.execute(query)).scalars().all()
+    return (await session.execute(generate_query())).scalars().all()
 
 
 async def update_members(
@@ -162,10 +169,7 @@ async def update_members(
     return db_team
 
 
-async def remove_team(
-    db: Session,
-    team_id: int,
-):
+async def remove_team(db: Session, team_id: int):
     db_team = await get_teams(db, team_id=team_id)
     await db.delete(db_team)
     await db.commit()
