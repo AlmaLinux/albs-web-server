@@ -1,5 +1,6 @@
 import typing
 
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -25,3 +26,13 @@ async def get_all_users(db: Session) -> typing.List[models.User]:
     db_users = await db.execute(select(models.User).options(
         selectinload(models.User.oauth_accounts)))
     return db_users.scalars().all()
+
+
+async def activate_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_verified=True, is_active=True))
+
+
+async def deactivate_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_verified=False, is_active=False))

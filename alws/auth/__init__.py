@@ -6,6 +6,7 @@ from alws.auth.user_manager import get_user_manager
 
 __all__ = [
     'AuthRoutes',
+    'get_current_superuser',
     'get_current_user',
 ]
 
@@ -16,3 +17,5 @@ AuthRoutes = FastAPIUsers(
 )
 
 get_current_user = AuthRoutes.current_user(active=True, verified=True)
+get_current_superuser = AuthRoutes.current_user(
+    active=True, verified=True, superuser=True)
