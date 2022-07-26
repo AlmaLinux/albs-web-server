@@ -15,6 +15,7 @@ __all__ = [
     'BuildTaskStatus',
     'BuildTaskRefType',
     'ExportStatus',
+    'PackageNevra',
     'Permissions',
     'PermissionTriad',
     'ReleaseStatus',

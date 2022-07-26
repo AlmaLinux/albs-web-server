@@ -226,6 +226,24 @@ ReferencePlatforms = sqlalchemy.Table(
 )
 
 
+PlatformRoleMapping = sqlalchemy.Table(
+    'platform_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('user_roles.id'),
+        primary_key=True
+    )
+)
+
+
 class Platform(PermissionsMixin, Base):
 
     __tablename__ = 'platforms'
@@ -260,6 +278,9 @@ class Platform(PermissionsMixin, Base):
     )
     repos = relationship('Repository', secondary=PlatformRepo)
     sign_keys = relationship('SignKey', back_populates='platform')
+    roles = relationship(
+        'UserRole', secondary=PlatformRoleMapping
+    )
 
 
 class Distribution(PermissionsMixin, TeamMixin, Base):
@@ -811,7 +832,7 @@ class TestTaskArtifact(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
-class Release(PermissionsMixin, Base):
+class Release(PermissionsMixin, TeamMixin, Base):
     __tablename__ = 'build_releases'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)

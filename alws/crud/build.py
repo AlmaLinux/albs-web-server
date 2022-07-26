@@ -10,6 +10,7 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.config import settings
 from alws.errors import DataNotFoundError, PermissionDenied
+from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
@@ -40,7 +41,7 @@ async def create_build(
     if not user:
         raise ValueError(f'Cannot find user with id {user_id}')
 
-    if not can_perform(product, user, 'create_build'):
+    if not can_perform(product, user, actions.CreateBuild.name):
         raise PermissionDenied(
             f'User has no permissions '
             f'to create build for the product "{product.name}"'

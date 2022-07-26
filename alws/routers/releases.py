@@ -10,7 +10,6 @@ from alws.dependencies import get_db, get_pulp_db
 from alws.schemas import release_schema
 from alws.release_planner import ReleasePlanner
 from alws.dramatiq import execute_release_plan
-from alws import models
 from alws.constants import ReleaseStatus
 
 
@@ -45,9 +44,10 @@ async def update_release(release_id: int,
                          payload: release_schema.ReleaseUpdate,
                          db: database.Session = Depends(get_db),
                          pulp_db: database.Session = Depends(get_pulp_db),
+                         user: models.User = Depends(get_current_user),
                          ):
     release_planner = ReleasePlanner(db, pulp_db)
-    return await release_planner.update_release(release_id, payload)
+    return await release_planner.update_release(release_id, payload, user.id)
 
 
 @router.post('/{release_id}/commit/',
@@ -55,11 +55,12 @@ async def update_release(release_id: int,
 async def commit_release(
     release_id: int,
     db: database.Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
 ):
     # it's ugly hack for updating release status before execution in background
     async with db.begin():
         await db.execute(update(models.Release).where(
             models.Release.id == release_id,
         ).values(status=ReleaseStatus.IN_PROGRESS))
-    execute_release_plan.send(release_id)
+    execute_release_plan.send(release_id, user.id)
     return {'message': 'Release plan execution has been started'}

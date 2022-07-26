@@ -15,6 +15,7 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
     action_mask = ActionsMaskMapping[action]
 
     # Need to find intersection between user and object groups
+    print(obj.team)
     if not hasattr(obj, 'roles') and not hasattr(obj, 'team'):
         raise ValueError('Cannot detect object roles')
     obj_roles = []

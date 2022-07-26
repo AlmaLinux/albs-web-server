@@ -13,7 +13,14 @@ from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
 from alws.database import Session
-from alws.errors import BuildAlreadySignedError, DataNotFoundError, SignError
+from alws.errors import (
+    BuildAlreadySignedError,
+    DataNotFoundError,
+    PermissionDenied,
+    SignError
+)
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
@@ -47,13 +54,20 @@ async def get_sign_tasks(db: Session, build_id: int = None) \
     return result.scalars().all()
 
 
-async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate) \
+async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
+                           user_id: int) \
         -> models.SignTask:
     async with db.begin():
+        user = (await db.execute(select(models.User).where(
+            models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(models.UserRole.actions)
+        ))).scalars().first()
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
                 selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms)
+                selectinload(models.Build.binary_rpms),
+                selectinload(models.Build.team).selectinload(
+                    models.Team.roles).selectinload(models.UserRole.actions),
         ))
         build = builds.scalars().first()
         if not build:
@@ -66,12 +80,23 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate) \
             raise ValueError(
                 f'No built packages in build with ID {payload.build_id}')
         sign_keys = await db.execute(select(models.SignKey).where(
-            models.SignKey.id == payload.sign_key_id))
+            models.SignKey.id == payload.sign_key_id).options(
+            selectinload(models.SignKey.roles).selectinload(
+                models.UserRole.actions)
+        ))
         sign_key = sign_keys.scalars().first()
 
         if not sign_key:
             raise DataNotFoundError(
                 f'Sign key with ID {payload.sign_key_id} does not exist')
+
+        if not can_perform(build, user, actions.SignBuild.name):
+            raise PermissionDenied('User does not have permissions to sign '
+                                   'this build')
+        if not can_perform(sign_key, user, actions.UseSignKey.name):
+            raise PermissionDenied('User does not have permissions to use '
+                                   'this sign key')
+
         sign_task = models.SignTask(
             status=SignStatus.IDLE,
             build_id=payload.build_id,
