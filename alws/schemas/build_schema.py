@@ -201,7 +201,7 @@ class BuildSearch(BaseModel):
         ))
 
 
-class BuildUser(BaseModel):
+class BuildOwner(BaseModel):
 
     id: int
     username: str
@@ -235,7 +235,7 @@ class Build(BaseModel):
     id: int
     created_at: datetime.datetime
     tasks: typing.List[BuildTask]
-    owner: BuildUser
+    owner: BuildOwner
     sign_tasks: typing.List[BuildSignTask]
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
