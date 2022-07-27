@@ -1,10 +1,16 @@
 import typing
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
 
 from alws import database
 from alws.crud import teams
 from alws.dependencies import get_db, JWTBearer
+from alws.errors import TeamError
 from alws.schemas import team_schema
 
 
@@ -38,7 +44,13 @@ async def update_members(
     payload: team_schema.TeamMembersUpdate,
     db: database.Session = Depends(get_db),
 ):
-    db_team = await teams.update_members(db, payload, team_id)
+    try:
+        db_team = await teams.update_members(db, payload, team_id)
+    except TeamError as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     return await teams.get_teams(db, team_id=db_team.id)
 
 
@@ -47,7 +59,13 @@ async def create_team(
     payload: team_schema.TeamCreate,
     db: database.Session = Depends(get_db),
 ):
-    db_team = await teams.create_team(db, payload)
+    try:
+        db_team = await teams.create_team(db, payload)
+    except TeamError as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     return await teams.get_teams(db, team_id=db_team.id)
 
 
@@ -56,4 +74,10 @@ async def remove_team(
     team_id: int,
     db: database.Session = Depends(get_db)
 ):
-    return await teams.remove_team(db, team_id)
+    try:
+        await teams.remove_team(db, team_id)
+    except TeamError as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )

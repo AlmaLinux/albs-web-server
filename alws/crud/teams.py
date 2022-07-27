@@ -6,13 +6,13 @@ from sqlalchemy.sql.expression import func
 
 from alws.crud.actions import ensure_all_actions_exist
 from alws.database import Session
+from alws.errors import TeamError
 from alws.models import (
     Team,
     User,
     UserAction,
     UserRole,
 )
-from alws.schemas import team_schema
 from alws.perms.roles import (
     Contributor,
     Manager,
@@ -21,6 +21,7 @@ from alws.perms.roles import (
     ProductMaintainer,
     Signer,
 )
+from alws.schemas import team_schema
 
 
 async def create_team_roles(session: Session, team_name: str):
@@ -73,7 +74,7 @@ async def create_team(
     ))).scalars().first()
 
     if not owner:
-        raise ValueError(f'Unknown user ID: {payload.user_id}')
+        raise TeamError(f'Unknown user ID: {payload.user_id}')
 
     existing_team = (await session.execute(select(Team).where(
         Team.name == payload.team_name).options(
@@ -83,7 +84,7 @@ async def create_team(
     ))).scalars().first()
 
     if existing_team:
-        return existing_team
+        raise TeamError(f'Team={payload.team_name} already exist')
 
     team_roles = await create_team_roles(session, payload.team_name)
     manager_role = [r for r in team_roles if 'manager' in r.name][0]
@@ -140,30 +141,41 @@ async def update_members(
     payload: team_schema.TeamMembersUpdate,
     team_id: int,
 ) -> Team:
+    items_to_update = []
     if payload.modification not in ('add', 'remove'):
-        raise Exception
+        raise TeamError(f'Unknown modification: {payload.modification}')
     db_team = (await session.execute(
         select(Team).where(Team.id == team_id).options(
             selectinload(Team.members),
             selectinload(Team.owner),
+            selectinload(Team.roles),
         ),
     )).scalars().first()
     if not db_team:
-        raise Exception
+        raise TeamError(f'Team={team_id} doesn`t exist')
     db_users = await session.execute(
         select(User).where(User.id.in_((
             user.id for user in payload.members_to_update
-        ))),
+        ))).options(selectinload(User.roles)),
     )
-    db_users = db_users.scalars().all()
-    for db_user in db_users:
-        if payload.modification == 'remove':
-            if db_user not in db_team.members:
-                raise Exception
-            db_team.members.remove(db_user)
-            continue
-        db_team.members.append(db_user)
-    session.add(db_team)
+    db_contributor_team_role = next(
+        role for role in db_team.roles
+        if Contributor.name in role.name
+    )
+    operation = 'append' if payload.modification == 'add' else 'remove'
+    db_team_members_update = getattr(db_team.members, operation)
+    for db_user in db_users.scalars().all():
+        if operation == 'remove' and db_user not in db_team.members:
+            raise TeamError(
+                f'Cannot remove user={db_user.id} from team,'
+                ' user not in team members'
+            )
+        db_user_role_update = getattr(db_user.roles, operation)
+        db_team_members_update(db_user)
+        db_user_role_update(db_contributor_team_role)
+        items_to_update.append(db_user)
+    items_to_update.append(db_team)
+    session.add_all(items_to_update)
     await session.commit()
     await session.refresh(db_team)
     return db_team
@@ -171,5 +183,7 @@ async def update_members(
 
 async def remove_team(db: Session, team_id: int):
     db_team = await get_teams(db, team_id=team_id)
+    if not db_team:
+        raise TeamError(f'Team={team_id} doesn`t exist')
     await db.delete(db_team)
     await db.commit()

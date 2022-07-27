@@ -20,7 +20,6 @@ from alws.database import Base, engine
 __all__ = [
     'Build',
     'BuildTask',
-    'Distribution',
     'Platform',
     'SignKey',
     'SignTask',
@@ -145,6 +144,7 @@ BuildPlatformFlavour = sqlalchemy.Table(
     )
 )
 
+# FIXME: delete after Product population
 PlatformDependency = sqlalchemy.Table(
     'platform_dependency',
     Base.metadata,
@@ -163,6 +163,7 @@ PlatformDependency = sqlalchemy.Table(
 )
 
 
+# FIXME: delete after Product population
 DistributionRepositories = sqlalchemy.Table(
     'distribution_repositories',
     Base.metadata,
@@ -181,6 +182,7 @@ DistributionRepositories = sqlalchemy.Table(
 )
 
 
+# FIXME: delete after Product population
 DistributionBuilds = sqlalchemy.Table(
     'distribution_packages',
     Base.metadata,
@@ -253,6 +255,7 @@ class Platform(PermissionsMixin, Base):
     sign_keys = relationship('SignKey', back_populates='platform')
 
 
+# FIXME: delete after Product population
 class Distribution(PermissionsMixin, TeamMixin, Base):
 
     __tablename__ = 'distributions'
@@ -592,13 +595,21 @@ ActionRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'action_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_actions.id'),
+        sqlalchemy.ForeignKey(
+            'user_actions.id',
+            ondelete='CASCADE',
+            name='fk_action_role_mapping_action_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_action_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -649,13 +660,21 @@ ProductRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'product_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('products.id'),
+        sqlalchemy.ForeignKey(
+            'products.id',
+            ondelete='CASCADE',
+            name='fk_product_role_mapping_product_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_product_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -666,13 +685,21 @@ TeamRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'team_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('teams.id'),
+        sqlalchemy.ForeignKey(
+            'teams.id',
+            ondelete='CASCADE',
+            name='fk_team_role_mapping_team_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_team_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -727,7 +754,6 @@ class Team(PermissionsMixin, Base):
         'UserRole',
         secondary=TeamRoleMapping,
         cascade='all, delete',
-        # passive_deletes=True,
     )
 
 
@@ -915,13 +941,21 @@ SignKeyRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'sign_key_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
+        sqlalchemy.ForeignKey(
+            'sign_keys.id',
+            ondelete='CASCADE',
+            name='fk_sign_key_role_mapping_sign_key_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_sign_key_role_mapping_role_id'
+        ),
         primary_key=True
     )
 )

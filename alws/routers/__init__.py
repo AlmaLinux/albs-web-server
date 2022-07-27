@@ -2,7 +2,6 @@ __all__ = [
     'build_node',
     'builds',
     'coprs',
-    'distro',
     'docs',
     'platforms',
     'products',
