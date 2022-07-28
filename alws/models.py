@@ -987,13 +987,21 @@ class ErrataReference(Base):
     )
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_records.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey(
+            'errata_records.id',
+            name='errata_reference_errata_record_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=False
     )
     cve = relationship('ErrataCVE', cascade="all, delete")
     cve_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_cves.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey(
+            'errata_cves.id',
+            name='errata_reference_cve_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=True
     )
 
@@ -1014,7 +1022,11 @@ class ErrataPackage(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_records.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey(
+            'errata_records.id',
+            name='errata_package_errata_record_id_fk',
+            ondelete='CASCADE'
+        ),
         nullable=False
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1052,7 +1064,11 @@ class ErrataToALBSPackage(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_package_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('errata_packages.id', ondelete='CASCADE'),
+        sqlalchemy.ForeignKey(
+            'errata_packages.id',
+            name='errata_to_albs_package_errata_package_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=False
     )
     errata_package = relationship('ErrataPackage', back_populates='albs_packages')

@@ -30,7 +30,7 @@ def upgrade():
         type_="foreignkey",
     )
     op.create_foreign_key(
-        None,
+        "errata_package_errata_record_id_fk",
         "errata_packages",
         "errata_records",
         ["errata_record_id"],
@@ -48,7 +48,7 @@ def upgrade():
         type_="foreignkey",
     )
     op.create_foreign_key(
-        None,
+        "errata_reference_cve_id_fk",
         "errata_references",
         "errata_cves",
         ["cve_id"],
@@ -56,7 +56,7 @@ def upgrade():
         ondelete="CASCADE",
     )
     op.create_foreign_key(
-        None,
+        "errata_reference_errata_record_id_fk",
         "errata_references",
         "errata_records",
         ["errata_record_id"],
@@ -69,7 +69,7 @@ def upgrade():
         type_="foreignkey",
     )
     op.create_foreign_key(
-        None,
+        "errata_to_albs_package_errata_package_id_fk",
         "errata_to_albs_packages",
         "errata_packages",
         ["errata_package_id"],
@@ -99,7 +99,11 @@ def downgrade():
     op.alter_column(
         "products", "owner_id", existing_type=sa.INTEGER(), nullable=False
     )
-    op.drop_constraint(None, "errata_to_albs_packages", type_="foreignkey")
+    op.drop_constraint(
+        "errata_to_albs_package_errata_package_id_fk",
+        "errata_to_albs_packages",
+        type_="foreignkey"
+    )
     op.create_foreign_key(
         "errata_to_albs_packages_errata_package_id_fkey",
         "errata_to_albs_packages",
@@ -107,8 +111,16 @@ def downgrade():
         ["errata_package_id"],
         ["id"],
     )
-    op.drop_constraint(None, "errata_references", type_="foreignkey")
-    op.drop_constraint(None, "errata_references", type_="foreignkey")
+    op.drop_constraint(
+        "errata_reference_cve_id_fk",
+        "errata_references",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        "errata_reference_errata_record_id_fk",
+        "errata_references",
+        type_="foreignkey",
+    )
     op.create_foreign_key(
         "errata_references_errata_record_id_fkey",
         "errata_references",
@@ -123,7 +135,11 @@ def downgrade():
         ["cve_id"],
         ["id"],
     )
-    op.drop_constraint(None, "errata_packages", type_="foreignkey")
+    op.drop_constraint(
+        "errata_package_errata_record_id_fk",
+        "errata_packages",
+        type_="foreignkey"
+    )
     op.create_foreign_key(
         "errata_packages_errata_record_id_fkey",
         "errata_packages",
