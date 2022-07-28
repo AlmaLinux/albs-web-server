@@ -1,12 +1,14 @@
+import asyncio
 import re
 import datetime
 import collections
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import jinja2
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.expression import func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
 from alws.schemas import errata_schema
@@ -20,7 +22,6 @@ from alws.utils.errata import (
     debrand_reference,
     debrand_comment,
 )
-from alws.utils.pulp_client import PulpClient
 
 try:
     # FIXME: ovallib dependency should stay optional
@@ -39,9 +40,14 @@ try:
     from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
     from almalinux.liboval.generator import Generator
     from almalinux.liboval.definition import Definition
-    from almalinux.liboval.composer import Composer
 except ImportError:
     pass
+
+
+ERRATA_SOLUTION = """For details on how to apply this update, \
+which includes the changes described in this advisory, refer to:
+
+https://access.redhat.com/articles/11258"""
 
 
 class CriteriaNode:
@@ -164,10 +170,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                             if evra not in rhel_evra_mapping.keys():
                                 continue
                             package_name = criterion["comment"].split()[0]
-                            if (
-                                package_name
-                                not in rhel_name_mapping[evra]
-                            ):
+                            if package_name not in rhel_name_mapping[evra]:
                                 continue
                             # TODO: Add test mapping here
                             #       test_id: rhel_evra
@@ -246,7 +249,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                         debrand_reference(
                             {
                                 "id": ref.ref_id,
-                                "source": ref.ref_type.value,
+                                "source": ref.ref_type.value.upper(),
                                 "url": ref.href,
                             },
                             record.platform.distr_version,
@@ -254,7 +257,6 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                         for ref in record.references
                         if ref.ref_type
                         not in [
-                            models.ErrataReferenceType.cve,
                             models.ErrataReferenceType.bugzilla,
                         ]
                     ],
@@ -711,3 +713,185 @@ async def update_package_status(
                     if albs_pkg.build_id == record.build_id:
                         albs_pkg.status = record.status
     return True
+
+
+async def release_errata_packages(
+    db,
+    pulp_client: PulpClient,
+    record: models.ErrataRecord,
+    packages: List[models.ErrataToALBSPackage],
+    platform: models.Platform,
+    repo_href: str,
+):
+    repo = await pulp_client.get_by_href(repo_href)
+    released_record = await pulp_client.list_updateinfo_records(
+        id__in=[record.id],
+        repository_version=repo['latest_version_href'],
+    )
+    if released_record:
+        # Errata record was already released to corresponding repo
+        return
+    repo_stage = repo["name"].split("-")[-2]
+    arch = repo["name"].split("-")[-1]
+    platform_version = platform.modularity["versions"][-1]
+    platform_version = platform_version["name"].replace(".", "_")
+    rpm_module = None
+    reboot_suggested = False
+    dict_packages = []
+    released_names = set()
+    for errata_pkg in packages:
+        pulp_pkg = await pulp_client.get_by_href(errata_pkg.get_pulp_href())
+        query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
+        if errata_pkg.albs_artifact_id is not None:
+            query = models.BuildTaskArtifact.id == errata_pkg.albs_artifact_id
+        db_pkg = await db.execute(
+            select(models.BuildTaskArtifact)
+            .where(query)
+            .options(
+                selectinload(models.BuildTaskArtifact.build_task).selectinload(
+                    models.BuildTask.rpm_module
+                )
+            )
+        )
+        db_pkg = db_pkg.scalars().first()
+        if errata_pkg.errata_package.reboot_suggested:
+            reboot_suggested = True
+        if pulp_pkg["name"] in released_names:
+            continue
+        released_names.add(pulp_pkg["name"])
+        dict_packages.append(
+            {
+                "name": pulp_pkg["name"],
+                "release": pulp_pkg["release"],
+                "version": pulp_pkg["version"],
+                "epoch": pulp_pkg["epoch"],
+                "arch": pulp_pkg["arch"],
+                "filename": pulp_pkg["location_href"],
+                "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
+                "src": pulp_pkg["rpm_sourcerpm"],
+                "sum": pulp_pkg["sha256"],
+                "sum_type": "sha256",
+            }
+        )
+        db_module = db_pkg.build_task.rpm_module
+        if db_module is not None:
+            rpm_module = {
+                "name": db_module.name,
+                "stream": db_module.stream,
+                "version": int(db_module.version),
+                "context": db_module.context,
+                "arch": db_module.arch,
+            }
+    collection_name = (
+        f"{platform.name.lower()}-for-{arch}-{repo_stage}-"
+        f"rpms__{platform_version}_default"
+    )
+    # default title looks like this:
+    # ALSA-2022:5564: kernel security and enhancement update (Important)
+    #
+    # We're trying to remove ALSA-... and (Important) part from it.
+    default_summary = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', record.get_title())
+    default_summary = re.sub(r'\s+\(.*\)$', '', default_summary)
+    pulp_record = {
+        "id": record.id,
+        "updated_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "issued_date": record.issued_date.strftime("%Y-%m-%d %H:%M:%S"),
+        "description": record.get_description(),
+        "fromstr": record.contact_mail,
+        "status": record.status,
+        "title": record.get_title(),
+        "summary": record.summary or default_summary,
+        "version": record.version,
+        "type": record.get_type(),
+        "severity": record.severity,
+        "solution": record.solution or ERRATA_SOLUTION,
+        "release": "0",
+        "rights": record.rights,
+        "pushcount": "1",
+        "pkglist": [
+            {
+                "name": collection_name,
+                "short": collection_name,
+                "module": rpm_module,
+                "packages": dict_packages,
+            }
+        ],
+        "references": [
+            {
+                "href": ref.href,
+                "id": ref.ref_id,
+                "title": ref.title,
+                "type": ref.ref_type.value,
+            }
+            for ref in record.references
+        ],
+        "reboot_suggested": reboot_suggested,
+    }
+    await pulp_client.add_errata_record(pulp_record, repo_href)
+    await pulp_client.create_rpm_publication(repo_href)
+
+
+async def _load_platform_packages(
+    pulp: PulpClient, platform: models.Platform
+) -> Dict[str, List[str]]:
+    cache: Dict[str, List[str]] = {}
+    pkg_fields = ",".join(("pulp_href",))
+
+    async def _callback(pulp_href: str):
+        latest_version = await pulp.get_repo_latest_version(pulp_href)
+        async for pkg in pulp.iter_repo_packages(
+            latest_version, limit=25000, fields=pkg_fields
+        ):
+            key = pkg["pulp_href"]
+            if not cache.get(key):
+                cache[key] = []
+            cache[key].append(pulp_href)
+
+    tasks = []
+    for repo in platform.repos:
+        if not repo.production:
+            continue
+        tasks.append(_callback(repo.pulp_href))
+    await asyncio.gather(*tasks)
+    return cache
+
+
+async def release_errata_record(
+    db: AsyncSession, pulp: PulpClient, record_id: str
+):
+    db_record = await db.execute(
+        select(models.ErrataRecord)
+        .where(models.ErrataRecord.id == record_id)
+        .options(
+            selectinload(models.ErrataRecord.references),
+            selectinload(models.ErrataRecord.packages).selectinload(
+                models.ErrataPackage.albs_packages
+            ),
+            selectinload(models.ErrataRecord.platform).selectinload(
+                models.Platform.repos
+            ),
+        )
+    )
+    db_record: models.ErrataRecord = db_record.scalars().first()
+    pulp_packages = await _load_platform_packages(
+        pulp, db_record.platform
+    )
+    repo_mapping = collections.defaultdict(list)
+    for package in db_record.packages:
+        for albs_package in package.albs_packages:
+            if albs_package.status != models.ErrataPackageStatus.released:
+                continue
+            if pulp_packages.get(albs_package.pulp_href):
+                for repo in pulp_packages[albs_package.pulp_href]:
+                    repo_mapping[repo].append(albs_package)
+    tasks = []
+    for repo_href, packages in repo_mapping.items():
+        tasks.append(release_errata_packages(
+            db,
+            pulp,
+            db_record,
+            packages,
+            db_record.platform,
+            repo_href,
+        ))
+    await asyncio.gather(*tasks)

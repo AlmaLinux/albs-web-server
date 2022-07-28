@@ -6,9 +6,11 @@ from fastapi import (
 )
 
 from alws import database
+from alws.config import settings
 from alws.dependencies import get_db, JWTBearer
 from alws.schemas import errata_schema
 from alws.crud import errata as errata_crud
+from alws.utils.pulp_client import PulpClient
 
 router = APIRouter(
     prefix="/errata", tags=["errata"], dependencies=[Depends(JWTBearer())]
@@ -96,3 +98,21 @@ async def update_package_status(
         return {"ok": bool(await errata_crud.update_package_status(db, packages))}
     except ValueError as e:
         return {"ok": False, "error": e.message}
+
+
+@router.post(
+    '/release_record/{record_id}/',
+    response_model=errata_schema.ReleaseErrataRecordResponse,
+)
+async def release_errata_record(
+    record_id: str,
+    db: database.Session = Depends(get_db),
+):
+    pulp = PulpClient(
+        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    )
+    try:
+        await errata_crud.release_errata_record(db, pulp, record_id)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
