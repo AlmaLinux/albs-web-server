@@ -1,50 +1,10 @@
 import typing
 
+from sqlalchemy import update
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from alws import models
-from alws.config import settings
-from alws.schemas import user_schema
-from alws.utils.github import get_user_github_token, get_github_user_info
-from alws.utils.jwt_utils import generate_JWT_token
-
-
-async def github_login(
-            db: Session,
-            user: user_schema.LoginGithub
-        ) -> models.User:
-    async with db.begin():
-        github_user_token = await get_user_github_token(
-            user.code,
-            settings.github_client,
-            settings.github_client_secret
-        )
-        github_info = await get_github_user_info(github_user_token)
-        if not any(item for item in github_info['organizations']
-                   if item['login'] == 'AlmaLinux'):
-            return
-        new_user = models.User(
-            username=github_info['login'],
-            email=github_info['email']
-        )
-        query = models.User.username == new_user.username
-        db_user = await db.execute(select(models.User).where(
-            query).with_for_update())
-        db_user = db_user.scalars().first()
-        if not db_user:
-            db.add(new_user)
-            db_user = new_user
-            await db.flush()
-        db_user.github_token = github_user_token
-        db_user.jwt_token = generate_JWT_token(
-            {'user_id': db_user.id},
-            settings.jwt_secret,
-            settings.jwt_algorithm
-        )
-        await db.commit()
-    await db.refresh(db_user)
-    return db_user
 
 
 async def get_user(
@@ -63,5 +23,16 @@ async def get_user(
 
 
 async def get_all_users(db: Session) -> typing.List[models.User]:
-    db_users = await db.execute(select(models.User))
+    db_users = await db.execute(select(models.User).options(
+        selectinload(models.User.oauth_accounts)))
     return db_users.scalars().all()
+
+
+async def activate_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_verified=True, is_active=True))
+
+
+async def deactivate_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_verified=False, is_active=False))

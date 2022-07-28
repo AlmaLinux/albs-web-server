@@ -2,14 +2,14 @@ import typing
 
 from fastapi import APIRouter, Depends, UploadFile, Form
 
-from alws.dependencies import JWTBearer
+from alws.auth import get_current_user
 from alws.utils.uploader import MetadataUploader
 
 
 router = APIRouter(
     prefix='/uploads',
     tags=['uploads'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

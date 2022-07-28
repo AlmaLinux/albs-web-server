@@ -3,14 +3,15 @@ from typing import List
 from fastapi import APIRouter, Depends
 from alws import database
 
-from alws.dependencies import get_db, JWTBearer
+from alws.auth import get_current_user
+from alws.dependencies import get_db
 from alws.schemas import platform_flavors_schema as pf_schema
 from alws.crud import platform_flavors as pf_crud
 
 router = APIRouter(
     prefix='/platform_flavors',
     tags=['platform_flavors'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

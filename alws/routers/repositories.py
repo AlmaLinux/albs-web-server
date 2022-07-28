@@ -3,8 +3,9 @@ import typing
 from fastapi import APIRouter, Depends
 
 from alws import database
+from alws.auth import get_current_user
 from alws.crud import repository
-from alws.dependencies import get_db, JWTBearer
+from alws.dependencies import get_db
 from alws.utils.exporter import fs_export_repository
 from alws.schemas import repository_schema
 
@@ -12,7 +13,7 @@ from alws.schemas import repository_schema
 router = APIRouter(
     prefix='/repositories',
     tags=['repositories'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

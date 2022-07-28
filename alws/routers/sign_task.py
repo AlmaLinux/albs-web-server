@@ -4,11 +4,12 @@ import typing
 import datetime
 
 import aioredis
-from fastapi import APIRouter, Depends, Query, WebSocket
+from fastapi import APIRouter, Depends, WebSocket
 
 from alws import database
+from alws.auth import get_current_user
 from alws.crud import sign_task
-from alws.dependencies import get_db, get_redis, JWTBearer
+from alws.dependencies import get_db, get_redis
 from alws import dramatiq
 from alws.schemas import sign_schema
 
@@ -16,7 +17,7 @@ from alws.schemas import sign_schema
 router = APIRouter(
     prefix='/sign-tasks',
     tags=['sign-tasks'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 public_router = APIRouter(

@@ -8,22 +8,23 @@ from fastapi import (
     status,
 )
 
-from alws import database
+from alws import database, models
+from alws.auth import get_current_user
 from alws.crud import (
     build as build_crud,
     build_node,
     platform as platform_crud,
     platform_flavors as flavors_crud
 )
-from alws.dependencies import get_db, JWTBearer
-from alws.errors import DataNotFoundError
+from alws.dependencies import get_db
+from alws.errors import DataNotFoundError, PermissionDenied
 from alws.schemas import build_schema
 
 
 router = APIRouter(
     prefix='/builds',
     tags=['builds'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 public_router = APIRouter(
@@ -35,14 +36,16 @@ public_router = APIRouter(
 @router.post('/', response_model=build_schema.BuildCreateResponse)
 async def create_build(
             build: build_schema.BuildCreate,
-            user: dict = Depends(JWTBearer()),
+            user: models.User = Depends(get_current_user),
             db: database.Session = Depends(get_db)
         ):
-    return await build_crud.create_build(
-        db,
-        build,
-        user['identity']['user_id']
-    )
+    try:
+        return await build_crud.create_build(db, build, user.id)
+    except PermissionDenied:
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='User has no permissions to create build'
+        )
 
 
 @public_router.get('/', response_model=typing.Union[

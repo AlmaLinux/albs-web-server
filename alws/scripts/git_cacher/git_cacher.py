@@ -9,7 +9,7 @@ import pydantic
 from alws.utils.gitea import GiteaClient
 
 
-__all__ = ['load_redis_cache', 'save_redis_cache']
+__all__ = ['Config', 'load_redis_cache', 'save_redis_cache']
 
 
 class Config(pydantic.BaseSettings):

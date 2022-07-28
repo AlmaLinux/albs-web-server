@@ -27,8 +27,11 @@ def slice_list(source_list: list,
 
 def clean_module_tag(tag: str):
     clean_tag = re.sub(r'\.alma.*$', '', tag)
-    raw_part = re.search(r'\.module.*', clean_tag).group()
-    latest = re.search(r'\.\d*$', raw_part)
+    latest = None
+    raw_res = re.search(r'\.module.*', clean_tag)
+    if raw_res:
+        raw_part = raw_res.group()
+        latest = re.search(r'\.\d*$', raw_part)
     result = re.sub(r'\.module.*', '', clean_tag)
     if latest is not None:
         result += latest.group()

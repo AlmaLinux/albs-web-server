@@ -3,9 +3,10 @@ import typing
 from sqlalchemy import update
 from fastapi import APIRouter, Depends
 
-from alws import database
+from alws import database, models
+from alws.auth import get_current_user
 from alws.crud import release as r_crud
-from alws.dependencies import get_db, get_pulp_db, JWTBearer
+from alws.dependencies import get_db, get_pulp_db
 from alws.schemas import release_schema
 from alws.release_planner import ReleasePlanner
 from alws.dramatiq import execute_release_plan
@@ -16,7 +17,7 @@ from alws.constants import ReleaseStatus
 router = APIRouter(
     prefix='/releases',
     tags=['releases'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 
@@ -33,10 +34,9 @@ async def get_releases(pageNumber: int = None,
 async def create_new_release(payload: release_schema.ReleaseCreate,
                              db: database.Session = Depends(get_db),
                              pulp_db: database.Session = Depends(get_pulp_db),
-                             user: dict = Depends(JWTBearer())):
+                             user: models.User = Depends(get_current_user)):
     release_planner = ReleasePlanner(db, pulp_db)
-    release = await release_planner.create_new_release(
-        user['identity']['user_id'], payload)
+    release = await release_planner.create_new_release(user.id, payload)
     return release
 
 
