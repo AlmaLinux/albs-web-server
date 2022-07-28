@@ -141,3 +141,8 @@ class UpdateErrataRequest(BaseModel):
     errata_record_id: str
     title: Optional[str]
     description: Optional[str]
+
+
+class ReleaseErrataRecordResponse(BaseModel):
+    ok: bool
+    error: Optional[str]

@@ -614,7 +614,7 @@ class PulpClient:
         if task['state'] == 'failed':
             raise Exception(f'Task {str(task)} has failed')
         return task
-    
+
     async def list_updateinfo_records(
                 self,
                 id__in: List[str],
