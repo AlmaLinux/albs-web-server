@@ -345,6 +345,8 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                     != var["arithmetic"]["object_component"]["object_ref"]
                 ):
                     continue
+                if obj["id"] in objects:
+                    continue
                 objects.add(obj["id"])
                 oval.append_object(
                     get_object_cls_by_tag(obj["type"]).from_dict(obj)
