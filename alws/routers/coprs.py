@@ -10,6 +10,7 @@ from alws import models
 from alws.dependencies import get_db
 from alws.utils.copr import (
     generate_repo_config,
+    get_clean_copr_chroot,
     make_copr_plugin_response,
 )
 
@@ -61,6 +62,7 @@ async def get_dnf_repo_config(
 ):
     full_name = f'{ownername}/{name}'
     chroot = f'{platform}-{arch}'
+    clean_chroot = get_clean_copr_chroot(chroot)
     db_product = await db.execute(
         select(models.Product).where(and_(
             models.Product.name == name,
@@ -74,8 +76,8 @@ async def get_dnf_repo_config(
     if not db_product:
         return f'Copr dir {full_name} doesn`t exist'
     for product_repo in db_product.repositories:
-        if product_repo.debug:
+        if product_repo.debug or arch != product_repo.arch:
             continue
-        if chroot in product_repo.name:
+        if product_repo.name.endswith(clean_chroot):
             return generate_repo_config(product_repo, ownername)
     return f'Chroot {chroot} doesn`t exist in {full_name}'

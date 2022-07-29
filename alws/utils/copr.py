@@ -8,7 +8,7 @@ from alws.utils.pulp_client import PulpClient
 __all__ = [
     'create_product_repo',
     'generate_repo_config',
-    'get_platform_name_for_copr_plugin',
+    'get_clean_copr_chroot',
     'make_copr_plugin_response',
 ]
 
@@ -54,11 +54,11 @@ def make_copr_plugin_response(
     return result
 
 
-def get_platform_name_for_copr_plugin(platform_name: str) -> str:
+def get_clean_copr_chroot(copr_chroot: str) -> str:
     # for "AlmaLinux" distribution dnf COPR plugin use "EPEL" distribution
-    if 'almalinux' in platform_name:
-        platform_name = platform_name.replace('almalinux', 'epel')
-    return platform_name
+    if 'epel' in copr_chroot:
+        copr_chroot = copr_chroot.replace('epel', 'almalinux')
+    return copr_chroot
 
 
 async def create_product_repo(
@@ -71,7 +71,6 @@ async def create_product_repo(
 ) -> typing.Tuple[str, str, str, str, bool]:
 
     debug_suffix = '-debug' if is_debug else ''
-    platform_name = get_platform_name_for_copr_plugin(platform_name)
     repo_name = (
         f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}'
     )
