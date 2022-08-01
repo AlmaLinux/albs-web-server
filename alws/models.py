@@ -386,6 +386,13 @@ class Build(PermissionsMixin, TeamMixin, Base):
     platform_flavors = relationship(
         'PlatformFlavour', secondary=BuildPlatformFlavour
     )
+    products = relationship(
+        'Product',
+        secondary='product_packages',
+        back_populates='builds',
+        cascade='all, delete',
+        passive_deletes=True,
+    )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                nullable=True)
@@ -860,6 +867,7 @@ class Product(PermissionsMixin, TeamMixin, Base):
     builds = relationship(
         'Build',
         secondary=ProductBuilds,
+        back_populates='products',
         cascade='all, delete',
         passive_deletes=True,
     )
