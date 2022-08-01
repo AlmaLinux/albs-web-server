@@ -1,4 +1,5 @@
 import typing
+import urllib.parse
 
 from pydantic import BaseSettings
 
@@ -44,10 +45,16 @@ class Settings(BaseSettings):
     logging_level: typing.Optional[str] = 'INFO'
 
     frontend_baseurl: str = 'http://localhost:8080'
+    github_callback_endpoint: str = 'api/v1/auth/github/callback'
 
     @property
     def codenotary_enabled(self) -> bool:
         return bool(self.cas_api_key) and bool(self.cas_signer_id)
+
+    @property
+    def github_callback_url(self) -> str:
+        return urllib.parse.urljoin(
+            settings.frontend_baseurl, settings.github_callback_endpoint)
 
 
 settings = Settings()

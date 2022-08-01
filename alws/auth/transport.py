@@ -76,18 +76,15 @@ class RedirectCookieTransport(CookieTransport):
 def get_cookie_transport(
         cookie_max_age: int = 86400, cookie_name: str = 'albs'):
     cookie_secure = True
-    cookie_httponly = True
     parsed_url = urlparse(settings.frontend_baseurl)
     if parsed_url.scheme == 'http':
         cookie_secure = False
-    if 'localhost' in parsed_url.netloc:
-        cookie_httponly = False
 
     return RedirectCookieTransport(
         cookie_max_age=cookie_max_age,
         cookie_name=cookie_name,
         cookie_secure=cookie_secure,
-        cookie_httponly=cookie_httponly,
+        cookie_httponly=False,
     )
 
 
