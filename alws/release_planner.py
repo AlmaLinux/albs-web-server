@@ -33,13 +33,6 @@ from alws.pulp_models import UpdateRecord, UpdatePackage, UpdateCollection
 from alws.crud.errata import release_errata_packages
 
 
-ERRATA_SOLUTION = """For details on how to apply this update, \
-which includes the changes described in this advisory, refer to:
-
-https://access.redhat.com/articles/11258"""
-ERRATA_SUMMARY = 'An update for {} is now available for AlmaLinux {}.'
-
-
 class ReleasePlanner:
     def __init__(self, db: Session, pulp_db: Session):
         self._db = db
