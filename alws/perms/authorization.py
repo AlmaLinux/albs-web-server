@@ -9,9 +9,8 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
         raise ValueError(f'Cannot detect if user can perform action: '
                          f'{action} is missing in mapping')
 
-    # FIXME: Enable after migration to fastapi-users
-    # if user.superuser:
-    #     return True
+    if user.is_superuser:
+        return True
 
     action_mask = ActionsMaskMapping[action]
 

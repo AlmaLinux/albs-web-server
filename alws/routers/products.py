@@ -3,15 +3,16 @@ import typing
 from fastapi import APIRouter, Depends
 
 from alws import database
+from alws.auth import get_current_user
 from alws.crud import products
-from alws.dependencies import get_db, JWTBearer
+from alws.dependencies import get_db
 from alws.schemas import product_schema
 
 
 router = APIRouter(
     prefix='/products',
     tags=['products'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 
