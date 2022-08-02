@@ -344,6 +344,30 @@ class ReleasePlanner:
             repo_arch = arch if arch == 'src' else task_arch
         return RepoType(repo_name, repo_arch, is_debug)
 
+    def get_devel_repo(
+        self,
+        arch: str,
+        is_debug: bool,
+        repos_mapping: dict,
+        task_arch: typing.Optional[str] = None,
+        is_module: bool = False,
+    ) -> typing.Optional[dict]:
+
+        devel_repo_key = self.get_devel_repo_key(
+            arch,
+            is_debug,
+            task_arch=task_arch,
+            is_module=is_module,
+        )
+        devel_repo = repos_mapping.get(devel_repo_key)
+        if devel_repo is None:
+            logging.debug(
+                "Cannot find devel repo for %s by key: %s",
+                "module" if is_module else "package",
+                devel_repo_key,
+            )
+        return devel_repo
+
     async def get_pulp_based_response(
         self,
         pulp_packages: list,
@@ -353,23 +377,30 @@ class ReleasePlanner:
     ) -> dict:
         packages = []
         added_packages = set()
-        for pkg in pulp_packages:
-            full_name = pkg['full_name']
-            pkg_arch = pkg['arch']
-            pkg.pop('is_beta')
+        for package in pulp_packages:
+            package_repositories = []
+            full_name = package['full_name']
+            package_arch = package['arch']
+            package.pop('is_beta')
+            is_debug = is_debuginfo_rpm(package['name'])
             if full_name in added_packages:
                 continue
-            is_debug = is_debuginfo_rpm(pkg['name'])
-            await self.prepare_data_for_executing_async_tasks(pkg, is_debug)
-            devel_repo_key = self.get_devel_repo_key(
-                pkg_arch, is_debug, task_arch=pkg['task_arch'])
-            release_repo = repos_mapping[devel_repo_key]
-            repo_arch_location = [pkg_arch]
-            if pkg_arch == 'noarch':
+            await self.prepare_data_for_executing_async_tasks(
+                package, is_debug)
+            devel_repo = self.get_devel_repo(
+                arch=package_arch,
+                is_debug=is_debug,
+                repos_mapping=repos_mapping,
+                task_arch=package['task_arch'],
+            )
+            if devel_repo is not None:
+                package_repositories.append(devel_repo)
+            repo_arch_location = [package_arch]
+            if package_arch == 'noarch':
                 repo_arch_location = self.base_platform.arch_list
             packages.append({
-                'package': pkg,
-                'repositories': [release_repo],
+                'package': package,
+                'repositories': package_repositories,
                 'repo_arch_location': repo_arch_location,
             })
             added_packages.add(full_name)
@@ -510,10 +541,13 @@ class ReleasePlanner:
                 'repositories': []
             }
             if not module_responses:
-                devel_repo_key = self.get_devel_repo_key(
-                    module['arch'], is_debug=False, is_module=True)
-                devel_repo = repos_mapping.get(devel_repo_key)
-                if devel_repo:
+                devel_repo = self.get_devel_repo(
+                    arch=module['arch'],
+                    is_debug=False,
+                    repos_mapping=repos_mapping,
+                    is_module=True,
+                )
+                if devel_repo is not None:
                     module_info['repositories'].append(devel_repo)
             rpm_modules.append(module_info)
             for module_response in module_responses:
@@ -549,7 +583,11 @@ class ReleasePlanner:
                 ))
                 repo_key = RepoType(release_repo_name, module['arch'], False)
                 prod_repo = repos_mapping.get(repo_key)
-                if not prod_repo:
+                if prod_repo is None:
+                    logging.debug(
+                        "Cannot find prod repo for module by key: %s",
+                        repo_key,
+                    )
                     continue
                 module_repo_dict = {
                     'name': repo_key.name,
@@ -640,19 +678,28 @@ class ReleasePlanner:
                 'repo_arch_location': pulp_repo_arch_location,
             }
             if not release_repositories:
-                devel_repo_key = self.get_devel_repo_key(
-                    pkg_arch, is_debug, task_arch=package['task_arch'])
-                pkg_info['repositories'].append(repos_mapping[devel_repo_key])
+                devel_repo = self.get_devel_repo(
+                    arch=pkg_arch,
+                    is_debug=is_debug,
+                    repos_mapping=repos_mapping,
+                    task_arch=package['task_arch'],
+                )
+                if devel_repo is not None:
+                    pkg_info['repositories'].append(devel_repo)
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
             added_noarch_repos = set()
             # for every repository we should add pkg_info
             # for correct package location in UI
-            for item in release_repositories:
-                release_repo = repos_mapping.get(item)
+            for release_repo_key in release_repositories:
+                release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
+                    logging.debug(
+                        "Cannot find prod repo for package by key: %s",
+                        release_repo_key,
+                    )
                     continue
                 release_repo_name = release_repo['name']
                 if release_repo_name in added_noarch_repos:
