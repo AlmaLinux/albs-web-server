@@ -744,34 +744,45 @@ def main():
 
     if args.platform_names:
         exporter.logger.info('Starting export errata.json and oval.xml')
-        errata_export_base_path = os.path.join(
-            settings.pulp_export_path, 'errata'
-        )
-        if not os.path.exists(errata_export_base_path):
-            os.mkdir(errata_export_base_path)
-        for platform in args.platform_names:
-            platform_path = os.path.join(errata_export_base_path, platform)
-            if not os.path.exists(platform_path):
-                os.mkdir(platform_path)
-            html_path = os.path.join(platform_path, 'html')
-            if not os.path.exists(html_path):
-                os.mkdir(html_path)
-            for record in errata_cache:
-                generate_errata_page(record, html_path)
-            for item in errata_cache:
-                item['issued_date'] = {
-                    '$date': int(item['issued_date'].timestamp() * 1000)
-                }
-                item['updated_date'] = {
-                    '$date': int(item['updated_date'].timestamp() * 1000)
-                }
-            with open(os.path.join(platform_path, 'errata.json'), 'w') as fd:
-                json.dump(errata_cache, fd)
-            with open(os.path.join(platform_path, 'errata.full.json'), 'w') as fd:
-                json.dump(modern_errata_cache, fd)
-            oval = sync(exporter.get_oval_xml(platform))
-            with open(os.path.join(platform_path, 'oval.xml'), 'w') as fd:
-                fd.write(oval)
+        errata_export_base_path = None
+        try:
+            local['sudo']['chown', '-R',
+                          f'{exporter.current_user}:{exporter.current_user}',
+                          f'{settings.pulp_export_path}'].run()
+            errata_export_base_path = os.path.join(
+                settings.pulp_export_path, 'errata'
+            )
+            if not os.path.exists(errata_export_base_path):
+                os.mkdir(errata_export_base_path)
+            for platform in args.platform_names:
+                platform_path = os.path.join(errata_export_base_path, platform)
+                if not os.path.exists(platform_path):
+                    os.mkdir(platform_path)
+                html_path = os.path.join(platform_path, 'html')
+                if not os.path.exists(html_path):
+                    os.mkdir(html_path)
+                for record in errata_cache:
+                    generate_errata_page(record, html_path)
+                for item in errata_cache:
+                    item['issued_date'] = {
+                        '$date': int(item['issued_date'].timestamp() * 1000)
+                    }
+                    item['updated_date'] = {
+                        '$date': int(item['updated_date'].timestamp() * 1000)
+                    }
+                with open(os.path.join(platform_path, 'errata.json'), 'w') as fd:
+                    json.dump(errata_cache, fd)
+                with open(os.path.join(platform_path, 'errata.full.json'), 'w') as fd:
+                    json.dump(modern_errata_cache, fd)
+                oval = sync(exporter.get_oval_xml(platform))
+                with open(os.path.join(platform_path, 'oval.xml'), 'w') as fd:
+                    fd.write(oval)
+        finally:
+            if errata_export_base_path:
+                local['sudo'][
+                    'chown', '-R',
+                    f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
+                    errata_export_base_path].run()
 
 
 if __name__ == '__main__':

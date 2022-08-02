@@ -6,12 +6,13 @@ from fastapi import (
 )
 
 from alws import database
-from alws.dependencies import get_db, JWTBearer
+from alws.auth import get_current_user
+from alws.dependencies import get_db
 from alws.schemas import errata_schema
 from alws.crud import errata as errata_crud
 
 router = APIRouter(
-    prefix="/errata", tags=["errata"], dependencies=[Depends(JWTBearer())]
+    prefix="/errata", tags=["errata"], dependencies=[Depends(get_current_user)]
 )
 
 

@@ -3,18 +3,19 @@ import typing
 from fastapi import APIRouter, Depends
 import aioredis
 
-from alws.dependencies import get_redis, JWTBearer
+from alws.auth import get_current_user
+from alws.dependencies import get_redis
 from alws.schemas import project_schema
 from alws.scripts.git_cacher.git_cacher import (
-        Config as Cacher_config,
-        load_redis_cache
+    Config as Cacher_config,
+    load_redis_cache
 )
 
 
 router = APIRouter(
     prefix='/projects',
     tags=['projects'],
-    dependencies=[Depends(JWTBearer())]
+    dependencies=[Depends(get_current_user)]
 )
 
 

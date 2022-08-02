@@ -4,6 +4,13 @@ import enum
 import re
 
 import sqlalchemy
+from fastapi_users.db import (
+    SQLAlchemyBaseUserTable,
+    SQLAlchemyBaseOAuthAccountTable,
+)
+from fastapi_users_db_sqlalchemy.access_token import (
+    SQLAlchemyBaseAccessTokenTable,
+)
 from sqlalchemy.orm import relationship, declared_attr, declarative_mixin
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -24,7 +31,9 @@ __all__ = [
     'SignKey',
     'SignTask',
     'User',
+    'UserAccessToken',
     'UserAction',
+    'UserOauthAccount',
     'UserRole',
     'Team',
 ]
@@ -729,21 +738,54 @@ TeamUserMapping = sqlalchemy.Table(
 )
 
 
-class User(Base):
+class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
+    __tablename__ = 'user_oauth_accounts'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+
+    @declared_attr
+    def user_id(cls):
+        return sqlalchemy.Column(
+            sqlalchemy.Integer,
+            sqlalchemy.ForeignKey("users.id", ondelete="cascade"),
+            nullable=False
+        )
+
+
+class UserAccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
+    __tablename__ = 'user_access_tokens'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True,
+                           autoincrement=True)
+
+    @declared_attr
+    def user_id(cls):
+        return sqlalchemy.Column(
+            sqlalchemy.Integer,
+            sqlalchemy.ForeignKey("users.id", ondelete="cascade"),
+            nullable=False
+        )
+
+
+class User(SQLAlchemyBaseUserTable[int], Base):
 
     __tablename__ = 'users'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
-    email = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
-    jwt_token = sqlalchemy.Column(sqlalchemy.TEXT)
-    github_token = sqlalchemy.Column(sqlalchemy.TEXT)
+    username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
+    first_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
+    last_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
+    hashed_password: str = sqlalchemy.Column(
+        sqlalchemy.String(length=1024), nullable=True)
+    is_active: bool = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=False)
     roles = relationship(
         'UserRole', secondary=UserRoleMapping
     )
     teams = relationship(
         'Team', secondary=TeamUserMapping, back_populates='members'
     )
+    oauth_accounts = relationship('UserOauthAccount', lazy='joined')
 
 
 class Team(PermissionsMixin, Base):

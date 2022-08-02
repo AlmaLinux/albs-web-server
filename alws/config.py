@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     logging_level: typing.Optional[str] = 'INFO'
 
+    frontend_baseurl: str = 'http://localhost:8080'
+
     @property
     def codenotary_enabled(self) -> bool:
         return bool(self.cas_api_key) and bool(self.cas_signer_id)
