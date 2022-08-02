@@ -17,6 +17,7 @@ class TeamCreate(BaseModel):
 class TeamProduct(BaseModel):
     id: int
     name: str
+    title: str
 
     class Config:
         orm_mode = True
