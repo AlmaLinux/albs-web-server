@@ -149,6 +149,7 @@ async def remove_product(
         select(models.Product).where(
             models.Product.id == product_id,
         ).options(
+            selectinload(models.Product.owner),
             selectinload(models.Product.repositories),
         ),
     )).scalars().first()
@@ -156,10 +157,18 @@ async def remove_product(
         raise Exception(f"Product={product_id} doesn't exist")
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    await asyncio.gather(*(
-        pulp_client.delete_by_href(product_repo.pulp_href)
-        for product_repo in db_product.repositories
-    ))
+    delete_tasks = []
+    all_product_distros = await pulp_client.get_rpm_distros(
+        include_fields=["pulp_href"],
+        **{"name__startswith": db_product.pulp_base_distro_name},
+    )
+    for product_repo in db_product.repositories:
+        delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
+    for product_distro in all_product_distros:
+        delete_tasks.append(
+            pulp_client.delete_by_href(product_distro["pulp_href"]),
+        )
+    await asyncio.gather(*delete_tasks)
     await db.delete(db_product)
     await db.commit()
 

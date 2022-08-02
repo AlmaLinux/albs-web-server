@@ -918,6 +918,10 @@ class Product(PermissionsMixin, TeamMixin, Base):
     def full_name(self) -> str:
         return f'{self.name}/{self.owner.username}'
 
+    @property
+    def pulp_base_distro_name(self) -> str:
+        return f'{self.owner.username}-{self.name}'
+
 
 class TestTask(Base):
 

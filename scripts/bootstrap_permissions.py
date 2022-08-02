@@ -53,12 +53,6 @@ async def main():
         await db.execute(update(models.Build).where(
             models.Build.team_id.is_(None),
         ).values(team_id=alma_team.id))
-        await db.execute(update(models.Distribution).where(
-            models.Distribution.owner_id.is_(None),
-        ).values(owner_id=system_user.id))
-        await db.execute(update(models.Distribution).where(
-            models.Distribution.team_id.is_(None),
-        ).values(team_id=alma_team.id))
         await db.execute(update(models.Platform).where(
             models.Platform.owner_id.is_(None),
         ).values(owner_id=system_user.id))
