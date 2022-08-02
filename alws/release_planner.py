@@ -381,10 +381,7 @@ class ReleasePlanner:
             'repositories': prod_repos,
             'packages_from_repos': pkgs_from_repos,
             'packages_in_repos': pkgs_in_repos,
-            'modules': [
-                {'module': module, 'repositories': []}
-                for module in rpm_modules
-            ],
+            'modules': rpm_modules,
         }
 
     def find_release_repos(
@@ -483,6 +480,10 @@ class ReleasePlanner:
             strong_arches[weak_arch['depends_on']].append(weak_arch['name'])
 
         if not settings.package_beholder_enabled:
+            rpm_modules = [
+                {'module': module, 'repositories': []}
+                for module in rpm_modules
+            ]
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
                 rpm_modules=rpm_modules,
@@ -511,8 +512,9 @@ class ReleasePlanner:
             if not module_responses:
                 devel_repo_key = self.get_devel_repo_key(
                     module['arch'], is_debug=False, is_module=True)
-                module_info['repositories'].append(
-                    repos_mapping[devel_repo_key])
+                devel_repo = repos_mapping.get(devel_repo_key)
+                if devel_repo:
+                    module_info['repositories'].append(devel_repo)
             rpm_modules.append(module_info)
             for module_response in module_responses:
                 distr = module_response['distribution']
@@ -546,7 +548,9 @@ class ReleasePlanner:
                     repo_name
                 ))
                 repo_key = RepoType(release_repo_name, module['arch'], False)
-                prod_repo = repos_mapping[repo_key]
+                prod_repo = repos_mapping.get(repo_key)
+                if not prod_repo:
+                    continue
                 module_repo_dict = {
                     'name': repo_key.name,
                     'arch': repo_key.arch,
