@@ -1,7 +1,7 @@
 """Added builds and repos for Product
 
 Revision ID: 1f68a6981a68
-Revises: fad009ddf89a
+Revises: 761f4aae2712
 Create Date: 2022-07-19 15:12:56.315536
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '1f68a6981a68'
-down_revision = 'fad009ddf89a'
+down_revision = '761f4aae2712'
 branch_labels = None
 depends_on = None
 
@@ -67,10 +67,10 @@ def downgrade():
                nullable=False)
     op.alter_column('products', 'team_id',
                existing_type=sa.INTEGER(),
-               nullable=False)
+               nullable=True)
     op.alter_column('products', 'owner_id',
                existing_type=sa.INTEGER(),
-               nullable=False)
+               nullable=True)
     op.alter_column('builds', 'owner_id',
                existing_type=sa.INTEGER(),
                nullable=False)
