@@ -17,7 +17,7 @@ class TeamCreate(BaseModel):
 class TeamProduct(BaseModel):
     id: int
     name: str
-    title: str
+    title: typing.Optional[str]
 
     class Config:
         orm_mode = True
