@@ -902,21 +902,19 @@ class ReleasePlanner:
                     selectinload(models.ErrataRecord.references)
                 ))
                 db_records = {record.id: record for record in db_records.scalars().all()}
-                tasks = []
                 for record_id, packages in updateinfo_mapping.items():
                     db_record: models.ErrataRecord = db_records[record_id]
                     if db_record.platform_id != self.base_platform.id:
                         continue
                     errata_packages = [item[-1] for item in packages]
-                    tasks.append(release_errata_packages(
+                    await release_errata_packages(
                         self._db,
                         self._pulp_client,
                         db_record,
                         errata_packages,
                         self.base_platform,
                         repo.pulp_href,
-                    ))
-                await asyncio.gather(*tasks)
+                    )
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self._pulp_client.create_rpm_publication(repo.pulp_href))
