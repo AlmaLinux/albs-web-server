@@ -7,13 +7,14 @@ from fastapi import (
 
 from alws import database
 from alws.config import settings
-from alws.dependencies import get_db, JWTBearer
+from alws.auth import get_current_user
+from alws.dependencies import get_db
 from alws.schemas import errata_schema
 from alws.crud import errata as errata_crud
 from alws.utils.pulp_client import PulpClient
 
 router = APIRouter(
-    prefix="/errata", tags=["errata"], dependencies=[Depends(JWTBearer())]
+    prefix="/errata", tags=["errata"], dependencies=[Depends(get_current_user)]
 )
 
 

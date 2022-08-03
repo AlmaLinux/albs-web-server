@@ -3,17 +3,32 @@ import logging
 import re
 import urllib
 from io import BytesIO
+
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.constants import TestTaskStatus
+from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.schemas import test_schema
 from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
+
+async def create_test_tasks_for_build_id(db: Session, build_id: int):
+    async with db.begin():
+        ## We get all build_tasks with the same build_id
+        ## and whose status is COMPLETED
+        build_task_ids = (await db.execute(
+            select(models.BuildTask.id).where(
+                models.BuildTask.build_id == build_id,
+                models.BuildTask.status == BuildTaskStatus.COMPLETED
+            )
+        )).scalars().all()
+
+    for build_task_id in build_task_ids:
+        await create_test_tasks(db, build_task_id)
 
 
 async def create_test_tasks(db: Session, build_task_id: int):
@@ -79,6 +94,9 @@ async def create_test_tasks(db: Session, build_task_id: int):
 
 
 async def restart_build_tests(db: Session, build_id: int):
+    # Note that this functionality is triggered by frontend,
+    # which only restarts tests for those builds that already
+    # had passed the tests
     async with db.begin():
         build_task_ids = await db.execute(
             select(models.BuildTask.id).where(
