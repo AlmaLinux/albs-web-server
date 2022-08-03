@@ -30,13 +30,8 @@ from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
 from alws.pulp_models import UpdateRecord, UpdatePackage, UpdateCollection
+from alws.crud.errata import release_errata_packages
 
-
-ERRATA_SOLUTION = """For details on how to apply this update, \
-which includes the changes described in this advisory, refer to:
-
-https://access.redhat.com/articles/11258"""
-ERRATA_SUMMARY = 'An update for {} is now available for AlmaLinux {}.'
 
 class ReleasePlanner:
     def __init__(self, db: Session, pulp_db: Session):
@@ -65,7 +60,6 @@ class ReleasePlanner:
                 settings.cas_api_key,
                 settings.cas_signer_id,
             )
-
 
     async def get_pulp_packages(
         self,
@@ -904,88 +898,25 @@ class ReleasePlanner:
                             pulp_record.updated_date = datetime.now().strftime(
                                 '%Y-%m-%d %H:%M:%S'
                             )
-                records_to_add = []
                 db_records = await self._db.execute(select(models.ErrataRecord).options(
                     selectinload(models.ErrataRecord.references)
                 ))
                 db_records = {record.id: record for record in db_records.scalars().all()}
+                tasks = []
                 for record_id, packages in updateinfo_mapping.items():
                     db_record: models.ErrataRecord = db_records[record_id]
-                    repo_stage = repo.name.split('-')[-1]
-                    platform_modularity = self.base_platform.modularity
-                    platform_version = platform_modularity['versions'][-1]
-                    platform_version = platform_version['name'].replace('.', '_')
-                    collection_name = (
-                        f'{self.base_platform.name.lower()}-for-{arch}-{repo_stage}-'
-                        f'rpms__{platform_version}_default'
-                    )
-                    rpm_module = None
-                    reboot_suggested = False
-                    dict_packages = []
-                    released_names = set()
-                    for db_pkg, pulp_pkg, errata_pkg in packages:
-                        if errata_pkg.errata_package.reboot_suggested:
-                            reboot_suggested = True
-                        if pulp_pkg['name'] in released_names:
-                            continue
-                        released_names.add(pulp_pkg['name'])
-                        dict_packages.append({
-                            'name': pulp_pkg['name'],
-                            'release': pulp_pkg['release'],
-                            'version': pulp_pkg['version'],
-                            'epoch': pulp_pkg['epoch'],
-                            'arch': pulp_pkg['arch'],
-                            'filename': pulp_pkg['location_href'],
-                            'reboot_suggested': errata_pkg.errata_package.reboot_suggested,
-                            'src': pulp_pkg['rpm_sourcerpm'],
-                            'sum': pulp_pkg['sha256'],
-                            'sum_type': 'sha256',
-                        })
-                        db_module = db_pkg.build_task.rpm_module
-                        if db_module is not None:
-                            rpm_module = {
-                                'name': db_module.name,
-                                'stream': db_module.stream,
-                                'version': int(db_module.version),
-                                'context': db_module.context,
-                                'arch': db_module.arch,
-                            }
-                    default_summary = ERRATA_SUMMARY.format(
-                        packages[0][1]['name'], platform_version[0]
-                    )
-                    records_to_add.append({
-                        'id': db_record.id,
-                        'updated_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'issued_date': db_record.issued_date.strftime('%Y-%m-%d %H:%M:%S'),
-                        'description': db_record.get_description(),
-                        'fromstr': db_record.contact_mail,
-                        'status': db_record.status,
-                        'title': db_record.get_title(),
-                        'summary': db_record.summary or default_summary,
-                        'version': db_record.version,
-                        'type': db_record.get_type(),
-                        'severity': db_record.severity,
-                        'solution': db_record.solution or ERRATA_SOLUTION,
-                        'release': '0',
-                        'rights': db_record.rights,
-                        'pushcount': '1',
-                        'pkglist': [{
-                            'name': collection_name,
-                            'short': collection_name,
-                            'module': rpm_module,
-                            'packages': dict_packages,
-                        }],
-                        'references': [
-                            {
-                                'href': ref.href,
-                                'id': ref.ref_id,
-                                'title': ref.title,
-                                'type': ref.ref_type.value,
-                            } for ref in db_record.references
-                        ],
-                        'reboot_suggested': reboot_suggested,
-                    })
-                await self._pulp_client.add_errata_records(records_to_add, repo.pulp_href)
+                    if db_record.platform_id != self.base_platform.id:
+                        continue
+                    errata_packages = [item[-1] for item in packages]
+                    tasks.append(release_errata_packages(
+                        self._db,
+                        self._pulp_client,
+                        db_record,
+                        errata_packages,
+                        self.base_platform,
+                        repo.pulp_href,
+                    ))
+                await asyncio.gather(*tasks)
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self._pulp_client.create_rpm_publication(repo.pulp_href))

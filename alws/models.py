@@ -940,7 +940,7 @@ class PlatformFlavour(PermissionsMixin, Base):
     repos = relationship('Repository', secondary=FlavourRepo)
 
 
-# Errata/OVAL related tables 
+# Errata/OVAL related tables
 class ErrataRecord(Base):
     __tablename__ = 'errata_records'
 
@@ -983,8 +983,8 @@ class ErrataRecord(Base):
     variables = sqlalchemy.Column(JSONB, nullable=True)
     original_variables = sqlalchemy.Column(JSONB, nullable=True)
 
-    references = relationship('ErrataReference')
-    packages = relationship('ErrataPackage')
+    references = relationship('ErrataReference', cascade="all, delete")
+    packages = relationship('ErrataPackage', cascade="all, delete")
 
     cves = association_proxy("references", "cve_id")
 
@@ -997,7 +997,7 @@ class ErrataRecord(Base):
         if self.title:
             return self.title
         return self.original_title
-    
+
     def get_type(self):
         # Gets errata type from last part of errata id
         # For example, ALBS -> (BA) -> bugfix
@@ -1024,16 +1024,26 @@ class ErrataReference(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     ref_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    ref_type = sqlalchemy.Column(sqlalchemy.Enum(ErrataReferenceType), nullable=False)
+    ref_type = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataReferenceType), nullable=False
+    )
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_records.id'),
+        sqlalchemy.ForeignKey(
+            'errata_records.id',
+            name='errata_reference_errata_record_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=False
     )
-    cve = relationship('ErrataCVE')
+    cve = relationship('ErrataCVE', cascade="all, delete")
     cve_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_cves.id'),
+        sqlalchemy.ForeignKey(
+            'errata_cves.id',
+            name='errata_reference_cve_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=True
     )
 
@@ -1054,7 +1064,11 @@ class ErrataPackage(Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
-        sqlalchemy.ForeignKey('errata_records.id'),
+        sqlalchemy.ForeignKey(
+            'errata_records.id',
+            name='errata_package_errata_record_id_fk',
+            ondelete='CASCADE'
+        ),
         nullable=False
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1064,7 +1078,11 @@ class ErrataPackage(Base):
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
-    albs_packages = relationship('ErrataToALBSPackage', back_populates='errata_package')
+    albs_packages = relationship(
+        'ErrataToALBSPackage',
+        back_populates='errata_package',
+        cascade="all, delete"
+    )
 
 
 class ErrataPackageStatus(enum.Enum):
@@ -1084,11 +1102,15 @@ class ErrataToALBSPackage(Base):
             name='errata_to_albs_package_integrity_check'
         ),
     )
-    
+
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_package_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('errata_packages.id'),
+        sqlalchemy.ForeignKey(
+            'errata_packages.id',
+            name='errata_to_albs_package_errata_package_id_fk',
+            ondelete='CASCADE',
+        ),
         nullable=False
     )
     errata_package = relationship('ErrataPackage', back_populates='albs_packages')
@@ -1097,7 +1119,7 @@ class ErrataToALBSPackage(Base):
         sqlalchemy.ForeignKey('build_artifacts.id'),
         nullable=True
     )
-    build_artifact = relationship('BuildTaskArtifact')
+    build_artifact: BuildTaskArtifact = relationship('BuildTaskArtifact')
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
 
@@ -1111,12 +1133,17 @@ class ErrataToALBSPackage(Base):
     def build_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.build_id
-    
+
     @property
     def task_id(self):
         if self.build_artifact:
             return self.build_artifact.build_task.id
-    
+
+    def get_pulp_href(self):
+        if self.pulp_href:
+            return self.pulp_href
+        return self.build_artifact.href
+
 
 async def create_tables():
     async with engine.begin() as conn:
