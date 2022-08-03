@@ -378,7 +378,6 @@ class ReleasePlanner:
         packages = []
         added_packages = set()
         for package in pulp_packages:
-            package_repositories = []
             full_name = package['full_name']
             package_arch = package['arch']
             package.pop('is_beta')
@@ -393,14 +392,18 @@ class ReleasePlanner:
                 repos_mapping=repos_mapping,
                 task_arch=package['task_arch'],
             )
-            if devel_repo is not None:
-                package_repositories.append(devel_repo)
+            if devel_repo is None:
+                logging.debug(
+                    "Skipping package=%s, repositories is missing",
+                    full_name,
+                )
+                continue
             repo_arch_location = [package_arch]
             if package_arch == 'noarch':
                 repo_arch_location = self.base_platform.arch_list
             packages.append({
                 'package': package,
-                'repositories': package_repositories,
+                'repositories': [devel_repo],
                 'repo_arch_location': repo_arch_location,
             })
             added_packages.add(full_name)
@@ -526,6 +529,10 @@ class ReleasePlanner:
             module_name = module['name']
             module_stream = module['stream']
             module_arch_list = [module['arch']]
+            module_nvsca = (
+                f"{module_name}:{module['version']}:{module_stream}:"
+                f"{module['context']}:{module['arch']}"
+            )
             for strong_arch, weak_arches in strong_arches.items():
                 if module['arch'] in weak_arches:
                     module_arch_list.append(strong_arch)
@@ -547,8 +554,13 @@ class ReleasePlanner:
                     repos_mapping=repos_mapping,
                     is_module=True,
                 )
-                if devel_repo is not None:
-                    module_info['repositories'].append(devel_repo)
+                if devel_repo is None:
+                    logging.debug(
+                        "Skipping module=%s, repositories is missing",
+                        module_nvsca
+                    )
+                    continue
+                module_info['repositories'].append(devel_repo)
             rpm_modules.append(module_info)
             for module_response in module_responses:
                 distr = module_response['distribution']
@@ -585,7 +597,8 @@ class ReleasePlanner:
                 prod_repo = repos_mapping.get(repo_key)
                 if prod_repo is None:
                     logging.debug(
-                        "Cannot find prod repo for module by key: %s",
+                        "Skipping module=%s, cannot find prod repo by key: %s",
+                        module_nvsca,
                         repo_key,
                     )
                     continue
@@ -684,8 +697,13 @@ class ReleasePlanner:
                     repos_mapping=repos_mapping,
                     task_arch=package['task_arch'],
                 )
-                if devel_repo is not None:
-                    pkg_info['repositories'].append(devel_repo)
+                if devel_repo is None:
+                    logging.debug(
+                        "Skipping package=%s, repositories is missing",
+                        full_name,
+                    )
+                    continue
+                pkg_info['repositories'].append(devel_repo)
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
@@ -697,7 +715,8 @@ class ReleasePlanner:
                 # in some cases we get repos that we can't match
                 if release_repo is None:
                     logging.debug(
-                        "Cannot find prod repo for package by key: %s",
+                        "Skipping package=%s, cannot find prod repo by key: %s",
+                        full_name,
                         release_repo_key,
                     )
                     continue
