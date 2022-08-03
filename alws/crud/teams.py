@@ -156,7 +156,10 @@ async def update_members(
     db_users = await session.execute(
         select(User).where(User.id.in_((
             user.id for user in payload.members_to_update
-        ))).options(selectinload(User.roles)),
+        ))).options(
+            selectinload(User.roles),
+            selectinload(User.oauth_accounts)
+        ),
     )
     db_contributor_team_role = next(
         role for role in db_team.roles
