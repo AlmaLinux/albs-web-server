@@ -28,7 +28,7 @@ def parse_args():
                         dest='add_roles', type=str, help='Add role(s)',
                         choices=role_names)
     parser.add_argument('-r', '--remove-role', required=False, action='append',
-                        dest='remove_roles', type=str, help='Add role(s)',
+                        dest='remove_roles', type=str, help='Remove role(s)',
                         choices=role_names)
     return parser.parse_args()
 
