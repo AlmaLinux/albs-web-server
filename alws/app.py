@@ -66,6 +66,7 @@ app.include_router(
         github_client,
         CookieBackend,
         settings.jwt_secret,
+        redirect_url=settings.github_callback_url,
         associate_by_email=True
     ),
     prefix=AUTH_PREFIX + '/github',
