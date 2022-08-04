@@ -22,8 +22,14 @@ def upgrade():
         'platform_role_mapping',
         sa.Column('platform_id', sa.Integer(), nullable=False),
         sa.Column('role_id', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['platform_id'], ['platforms.id'], ),
-        sa.ForeignKeyConstraint(['role_id'], ['user_roles.id'], ),
+        sa.ForeignKeyConstraint(
+            ['platform_id'], ['platforms.id'],
+            name='platform_role_mapping_platform_id_fkey'
+        ),
+        sa.ForeignKeyConstraint(
+            ['role_id'], ['user_roles.id'],
+            name='platform_role_mapping_user_id_fkey'
+        ),
         sa.PrimaryKeyConstraint('platform_id', 'role_id')
     )
     op.add_column('build_releases', sa.Column('team_id', sa.Integer(), nullable=True))

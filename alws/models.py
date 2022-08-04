@@ -234,13 +234,15 @@ PlatformRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'platform_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
+        sqlalchemy.ForeignKey(
+            'platforms.id', name='platform_role_mapping_platform_id_fkey'),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id', name='platform_role_mapping_user_id_fkey'),
         primary_key=True
     )
 )
