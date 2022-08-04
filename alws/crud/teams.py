@@ -132,7 +132,9 @@ async def get_teams(
         }
     if team_id:
         query = generate_query().where(Team.id == team_id)
-        return (await session.execute(query)).scalars().first()
+        db_team = (await session.execute(query)).scalars().first()
+        db_team.members = sorted(db_team.members, key=lambda x: x.id)
+        return db_team
     return (await session.execute(generate_query())).scalars().all()
 
 

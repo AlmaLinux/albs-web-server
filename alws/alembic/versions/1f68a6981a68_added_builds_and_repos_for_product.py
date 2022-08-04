@@ -1,7 +1,7 @@
 """Added builds and repos for Product
 
 Revision ID: 1f68a6981a68
-Revises: 761f4aae2712
+Revises: 63a8cf1a53ec
 Create Date: 2022-07-19 15:12:56.315536
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '1f68a6981a68'
-down_revision = '761f4aae2712'
+down_revision = '63a8cf1a53ec'
 branch_labels = None
 depends_on = None
 
