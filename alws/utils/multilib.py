@@ -249,11 +249,13 @@ class MultilibProcessor:
                                   module_stream: str, packages: list):
         if not packages:
             return
-        if module_index.has_devel_module() and 'python' not in module_name:
+
+        # Ruby and Python modules should have multilib in their main module
+        if 'ruby' in module_name or 'python' in module_name:
+            module = module_index.get_module(module_name, module_stream)
+        else:
             module = module_index.get_module(
                 f'{module_name}-devel', module_stream)
-        else:
-            module = module_index.get_module(module_name, module_stream)
 
         for pkg_info in packages:
             module.add_rpm_artifact(pkg_info, multilib=True)
