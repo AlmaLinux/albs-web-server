@@ -59,7 +59,7 @@ async def create_team_roles(session: Session, team_name: str):
     return new_roles + existing_roles
 
 
-async def create_team(session: Session, team_name: str, user_id: int) -> Team:
+async def create_team(session: Session, team_name: str, user_id: int, flush=False) -> Team:
     owner = (await session.execute(select(User).where(
         User.id == user_id).options(
         selectinload(User.roles)
@@ -90,7 +90,10 @@ async def create_team(session: Session, team_name: str, user_id: int) -> Team:
     session.add(new_team)
     session.add_all(team_roles)
     session.add(owner)
-    await session.commit()
+    if flush:
+        await session.flush()
+    else:
+        await session.commit()
     await session.refresh(new_team)
     return new_team
 

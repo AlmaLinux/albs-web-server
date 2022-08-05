@@ -29,16 +29,16 @@ async def ensure_system_user_exists(session: database.Session) -> models.User:
         username=SYSTEM_USER_NAME, email=f'{SYSTEM_USER_NAME}@almalinux.org')
     session.add(user)
     await session.flush()
-    await session.refresh(user)
     return user
 
 
 async def main():
-    db = database.Session()
-    async with db.begin():
+    async with database.Session() as db, db.begin():
         objs = []
         system_user = await ensure_system_user_exists(db)
-        alma_team = await create_team(db, DEFAULT_TEAM, system_user.id)
+        alma_team = await create_team(
+            db, DEFAULT_TEAM, system_user.id, flush=True
+        )
         await create_product(
             db, ProductCreate(name=DEFAULT_PRODUCT, team_id=alma_team.id,
                               owner_id=system_user.id)
