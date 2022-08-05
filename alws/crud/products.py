@@ -298,10 +298,7 @@ async def modify_product(
     if modification == 'add':
         db_product.builds.append(db_build)
     else:
-        remove_query = models.Build.id.__eq__(build_id)
-        await db.execute(
-            delete(models.ProductBuilds).where(remove_query)
-        )
+        db_product.builds.remove(db_build)
     db.add(db_product)
     try:
         await db.commit()
