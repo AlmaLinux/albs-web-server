@@ -6,6 +6,7 @@ import threading
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.exceptions import ExceptionMiddleware
 
 from alws import routers
 from alws.auth import AuthRoutes
@@ -31,13 +32,12 @@ terminate_event = threading.Event()
 graceful_terminate_event = threading.Event()
 
 
-@app.middleware('http')
-async def permissions_middleware(request: Request, call_next):
-    try:
-        response = await call_next(request)
-        return response
-    except PermissionDenied as e:
-        return JSONResponse(content={'message': str(e)}, status_code=401)
+async def permissions_denied_handler(request: Request, exc):
+    return JSONResponse(content={'message': str(exc)}, status_code=401)
+
+
+app.add_middleware(ExceptionMiddleware,
+                   handlers={PermissionDenied: permissions_denied_handler})
 
 
 @app.on_event('startup')
