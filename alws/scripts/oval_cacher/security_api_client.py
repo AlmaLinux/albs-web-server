@@ -41,6 +41,8 @@ class SecurityApiClient:
                     "get", self.oval_list_endpoint, params={"page": page}
                 )
             )
+            if not items:
+                return
             for item in items:
                 yield OvalGenericInfo(**item)
             page += 1
