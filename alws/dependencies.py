@@ -19,10 +19,16 @@ __all__ = [
 DB_SEMAPHORE = asyncio.Semaphore(90)
 
 
+# FIXME: `get_current_user` dependency causes a transaction
+#  to exist on a connection so we need a separate dependency for it for now.
+#  Remove this later when better approach is found.
 async def get_async_session() -> database.Session:
     async with DB_SEMAPHORE:
         async with database.Session() as session:
-            yield session
+            try:
+                yield session
+            finally:
+                session.close()
 
 
 async def get_db() -> database.Session:
