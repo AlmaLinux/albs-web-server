@@ -146,10 +146,9 @@ async def update_members(
     session: Session,
     payload: team_schema.TeamMembersUpdate,
     team_id: int,
+    modification: str,
 ) -> Team:
     items_to_update = []
-    if payload.modification not in ('add', 'remove'):
-        raise TeamError(f'Unknown modification: {payload.modification}')
     db_team = (await session.execute(
         select(Team).where(Team.id == team_id).options(
             selectinload(Team.members),
@@ -171,7 +170,7 @@ async def update_members(
         role for role in db_team.roles
         if Contributor.name in role.name
     )
-    operation = 'append' if payload.modification == 'add' else 'remove'
+    operation = 'append' if modification == 'add' else 'remove'
     db_team_members_update = getattr(db_team.members, operation)
     for db_user in db_users.scalars().all():
         if operation == 'remove' and db_user not in db_team.members:

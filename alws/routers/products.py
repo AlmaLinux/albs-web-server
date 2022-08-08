@@ -8,7 +8,7 @@ from fastapi import (
 )
 
 from alws import database
-from alws.auth import get_current_user
+from alws.auth import get_current_superuser
 from alws.crud import products
 from alws.dependencies import get_db
 from alws.errors import ProductError
@@ -18,11 +18,16 @@ from alws.schemas import product_schema
 router = APIRouter(
     prefix='/products',
     tags=['products'],
-    dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_superuser)]
+)
+
+public_router = APIRouter(
+    prefix='/products',
+    tags=['products'],
 )
 
 
-@router.get('/', response_model=typing.Union[
+@public_router.get('/', response_model=typing.Union[
     typing.List[product_schema.Product], product_schema.ProductResponse])
 async def get_products(
     pageNumber: int = None,
@@ -50,7 +55,7 @@ async def create_product(
     return await products.get_products(db, product_id=db_product.id)
 
 
-@router.get('/{product_id}/', response_model=product_schema.Product)
+@public_router.get('/{product_id}/', response_model=product_schema.Product)
 async def get_product(
     product_id: int,
     db: database.Session = Depends(get_db),

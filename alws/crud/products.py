@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 import typing
 
-from sqlalchemy import delete, or_
+from sqlalchemy import or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func

@@ -42,5 +42,4 @@ class TeamResponse(BaseModel):
 
 
 class TeamMembersUpdate(BaseModel):
-    modification: str
     members_to_update: typing.List[User] = []
