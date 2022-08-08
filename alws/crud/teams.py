@@ -193,5 +193,9 @@ async def remove_team(db: Session, team_id: int):
     db_team = await get_teams(db, team_id=team_id)
     if not db_team:
         raise TeamError(f'Team={team_id} doesn`t exist')
+    if db_team.products:
+        raise TeamError(
+            f"Cannot delete Team={team_id}, team contains undeleted products",
+        )
     await db.delete(db_team)
     await db.commit()
