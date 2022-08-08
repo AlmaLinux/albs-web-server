@@ -28,7 +28,7 @@ async def get_async_session() -> database.Session:
             try:
                 yield session
             finally:
-                session.close()
+                await session.close()
 
 
 async def get_db() -> database.Session:
