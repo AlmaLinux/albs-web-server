@@ -124,7 +124,7 @@ async def mainloop():
                         continue
                     impact = "None"
                     if cve.threat_severity:
-                        impact = cve.threat_severity.lower()
+                        impact = cve.threat_severity.lower().capitalize()
                     dict_ref["cve"] = {
                         "id": ref.ref_id,
                         "cvss3": cve.cvss3.cvss3_scoring_vector,
@@ -182,7 +182,7 @@ async def mainloop():
                 "description": metadata.description,
                 "status": cvrf.document_tracking.status.lower(),
                 "version": cvrf.document_tracking.version,
-                "severity": item.severity,
+                "severity": item.severity.lower().capitalize(),
                 "rights": advisory.rights,
                 "definition_id": oval_info.definition.id,
                 "definition_version": oval_info.definition.version,
