@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws import models
-from alws.crud import teams as team_crud
+from alws.crud import teams as team_crud, user as user_crud
 from alws.dependencies import get_db
 from alws.perms.roles import RolesList
 
@@ -18,39 +18,71 @@ from alws.perms.roles import RolesList
 def parse_args():
     role_names = [r.name for r in RolesList]
     parser = argparse.ArgumentParser(
-        'manage_team_roles_for_user',
-        description='Script to manage roles for user on per-team basis')
-    parser.add_argument('-t', '--team-name', required=True, type=str,
-                        help='Team name')
+        'manage_users',
+        description='Script to manage users and roles for them')
     parser.add_argument('-e', '--email', required=True, type=str,
                         help='User e-mail')
+    parser.add_argument('-t', '--team-name', required=False, type=str,
+                        help='Team name')
     parser.add_argument('-a', '--add-role', required=False, action='append',
                         dest='add_roles', type=str, help='Add role(s)',
                         choices=role_names)
     parser.add_argument('-r', '--remove-role', required=False, action='append',
                         dest='remove_roles', type=str, help='Remove role(s)',
                         choices=role_names)
+    parser.add_argument('-v', '--verify', required=False, action='store_true',
+                        help='Verify user')
+    parser.add_argument('-d', '--deactivate', required=False,
+                        action='store_true', help='Deactivate user')
+    parser.add_argument('-S', '--superuser', required=False,
+                        action='store_true', help='Make user a superuser')
+    parser.add_argument('-u', '--usual-user', required=False,
+                        action='store_true', help='Make user a usual one')
     return parser.parse_args()
 
 
-async def main():
+async def main() -> int:
     arguments = parse_args()
     async for db in get_db():
         async with db.begin():
-            team = (await db.execute(select(models.Team).where(
-                models.Team.name == arguments.team_name))).scalars().first()
-            if not team:
-                raise ValueError(f'No such team in the system: '
-                                 f'{arguments.team_name}')
-
             user = (await db.execute(select(models.User).where(
                 models.User.email == arguments.email).options(
                 selectinload(models.User.roles),
                 selectinload(models.User.oauth_accounts),
             ))).scalars().first()
-            if not team:
+            if not user:
                 raise ValueError(f'No such user in the system: '
                                  f'{arguments.email}')
+
+            if arguments.verify and arguments.deactivate:
+                raise ValueError('Cannot both activate and deactivate user')
+
+            if arguments.superuser and arguments.usual_user:
+                raise ValueError('Cannot both make user a superuser '
+                                 'and usual one')
+
+            if arguments.verify:
+                await user_crud.activate_user(user.id, db)
+
+            if arguments.deactivate:
+                await user_crud.deactivate_user(user.id, db)
+
+            if arguments.superuser:
+                await user_crud.make_superuser(user.id, db)
+
+            if arguments.usual_user:
+                await user_crud.make_usual_user(user.id, db)
+
+            if (arguments.add_roles or
+                    arguments.remove_roles) and not arguments.team_name:
+                print('Cannot assign roles without team specified, exiting')
+                return 1
+
+            team = (await db.execute(select(models.Team).where(
+                models.Team.name == arguments.team_name))).scalars().first()
+            if not team:
+                raise ValueError(f'No such team in the system: '
+                                 f'{arguments.team_name}')
 
             add_roles = None
             remove_roles = None
@@ -61,6 +93,7 @@ async def main():
                         [team_crud.get_team_role_name(team.name, r)
                          for r in arguments.add_roles]))
                 )).scalars().all()
+
             if arguments.remove_roles:
                 remove_roles = (await db.execute(select(models.UserRole).where(
                     models.UserRole.name.in_(
@@ -76,7 +109,9 @@ async def main():
                     models.UserRoleMapping.c.role_id.in_(roles_ids)))
 
             db.add(user)
+    return 0
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    result = asyncio.run(main())
+    sys.exit(result)

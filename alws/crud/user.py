@@ -39,3 +39,13 @@ async def activate_user(user_id: int, db: Session):
 async def deactivate_user(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=False, is_active=False))
+
+
+async def make_superuser(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_superuser=True))
+
+
+async def make_usual_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_superuser=False))
