@@ -243,7 +243,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             raise RepositoryAddError(
                 f'Cannot add RPM packages to the repository {str(repo)}'
             )
-    
+
     def append_errata_package(_, errata_package, artifact, rpm_info):
         model = models.ErrataToALBSPackage(
             status=models.ErrataPackageStatus.proposal,
@@ -290,7 +290,12 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         ).where(sqlalchemy.and_(*conditions)))
         for errata_package in errata_packages.scalars().all():
             errata_package.source_srpm = src_name
-            await db.run_sync(append_errata_package, errata_package, artifact, rpm_info)
+            await db.run_sync(
+                append_errata_package,
+                errata_package,
+                artifact,
+                rpm_info,
+            )
         rpms.append(artifact)
 
     if module_index and rpms:
@@ -434,12 +439,14 @@ async def __process_build_task_artifacts(
         db.add_all(logs_entries)
         await db.flush()
     logging.info('Logs processing is finished')
+    logging.info('Processing packages')
     rpm_entries = await __process_rpms(
         db, pulp_client, build_task.id, build_task.arch,
         rpm_artifacts, rpm_repositories,
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index
     )
+    logging.info('Packages processing is finished')
     multilib_conditions = (
         src_rpm is not None,
         build_task.arch == 'x86_64',
@@ -451,6 +458,7 @@ async def __process_build_task_artifacts(
     if all(multilib_conditions):
         processor = MultilibProcessor(
             db, build_task, pulp_client=pulp_client, module_index=module_index)
+        logging.info('Processing multilib packages')
         multilib_packages = await processor.get_packages(src_rpm)
         if module_index:
             multilib_module_artifacts = await processor.get_module_artifacts()
@@ -462,7 +470,9 @@ async def __process_build_task_artifacts(
                 prepared_artifacts=multilib_module_artifacts)
         else:
             await processor.add_multilib_packages(multilib_packages)
+        logging.info('Multilib packages processing is finished')
     if build_task.rpm_module and module_index:
+        logging.info('Processing module template')
         try:
             module_pulp_href, sha256 = await pulp_client.create_module(
                 module_index.render(),
@@ -471,7 +481,9 @@ async def __process_build_task_artifacts(
                 build_task.rpm_module.context,
                 build_task.rpm_module.arch
             )
-            old_modules = await pulp_client.get_repo_modules(module_repo.pulp_href)
+            old_modules = await pulp_client.get_repo_modules(
+                module_repo.pulp_href,
+            )
             await pulp_client.modify_repository(
                 module_repo.pulp_href,
                 add=[module_pulp_href],
@@ -483,6 +495,7 @@ async def __process_build_task_artifacts(
             message = f'Cannot update module information inside Pulp: {str(e)}'
             logging.exception(message)
             raise ModuleUpdateError(message) from e
+        logging.info('Module template processing is finished')
 
     if rpm_entries:
         db.add_all(rpm_entries)
@@ -571,6 +584,7 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
         settings.pulp_user,
         settings.pulp_password
     )
+    logging.info("Start processing build_task: %d", request.task_id)
     try:
         async with db.begin():
             async with pulp.begin():
@@ -588,6 +602,7 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
         )
         await db.execute(remove_dep_query)
         await db.commit()
+    logging.info("Build task: %d, processing is finished", request.task_id)
     return success
 
 
@@ -621,10 +636,6 @@ async def build_done(db: Session, pulp: PulpClient,
     db_srpm_name = None
     srpm = None
     for rpm in rpms_result.scalars().all():
-        # if build task is excluded or failed, we don't need to create
-        # SourceRpm and BinaryRpm records, because it's break package releases
-        if status in (BuildTaskStatus.EXCLUDED, BuildTaskStatus.FAILED):
-            continue
         if rpm.name.endswith('.src.rpm'):
             db_srpm_name = rpm.name
             # retrieve already created instance of model SourceRpm
@@ -637,6 +648,10 @@ async def build_done(db: Session, pulp: PulpClient,
             srpm = db_srpm.scalars().first()
             if build_task.built_srpm_url is not None and srpm is not None:
                 continue
+        # if build task is excluded or failed, we don't need to create
+        # SourceRpm and BinaryRpm records, because it's break package releases
+        if status in (BuildTaskStatus.EXCLUDED, BuildTaskStatus.FAILED):
+            continue
         if rpm.name.endswith('.src.rpm') and srpm is None:
             srpm = models.SourceRpm()
             srpm.artifact = rpm
