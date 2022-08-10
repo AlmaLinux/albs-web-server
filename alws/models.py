@@ -914,7 +914,7 @@ class Product(PermissionsMixin, TeamMixin, Base):
 
     @property
     def full_name(self) -> str:
-        return f'{self.name}/{self.owner.username}'
+        return f'{self.owner.username}/{self.name}'
 
     @property
     def pulp_base_distro_name(self) -> str:
