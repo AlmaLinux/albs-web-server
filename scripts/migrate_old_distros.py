@@ -16,7 +16,7 @@ def migrate_old_records():
     with SyncSession() as session:
         with session.begin():
             if not hasattr(models, 'Distribution'):
-                print('Distribution model already deleted')
+                logging.debug('Distribution model already deleted')
                 return
             items_to_insert = []
             old_db_records = (
