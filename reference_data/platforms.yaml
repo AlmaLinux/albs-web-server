@@ -977,7 +977,7 @@
     - arch: s390x
       name: almalinux-8-beta-s390x
       type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux8-s390x-beta-AlmaLinux-8-s390x-dr/
+      remote_url: https://build.almalinux.org/pulp/content/builds/almalinux-8-beta-s390x-AlmaLinux-8-s390x-dr/
       production: false
       priority: 10
       debug: false
