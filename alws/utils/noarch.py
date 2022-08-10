@@ -1,4 +1,5 @@
 import copy
+import logging
 import typing
 
 import sqlalchemy
@@ -39,7 +40,11 @@ async def get_noarch_packages(
     return noarch_packages, debug_noarch_packages
 
 
-async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task: models.BuildTask):
+async def save_noarch_packages(
+    db: Session,
+    pulp_client: PulpClient,
+    build_task: models.BuildTask,
+):
     new_binary_rpms = []
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
@@ -55,10 +60,12 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
             for task in build_tasks):
         return new_binary_rpms
 
+    logging.info("Start processing noarch packages")
     build_task_ids = [task.id for task in build_tasks]
     noarch_packages, debug_noarch_packages = await get_noarch_packages(
         db, build_task_ids)
     if not any((noarch_packages, debug_noarch_packages)):
+        logging.info("Noarch packages doesn't found")
         return new_binary_rpms
 
     repos_to_update = {}
@@ -130,4 +137,5 @@ async def save_noarch_packages(db: Session, pulp_client: PulpClient, build_task:
             add=content_dict['add'],
             remove=content_dict['remove'],
         )
+    logging.info("Noarch packages processing is finished")
     return new_binary_rpms

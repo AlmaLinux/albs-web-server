@@ -649,7 +649,7 @@ async def build_done(db: Session, pulp: PulpClient,
             if build_task.built_srpm_url is not None and srpm is not None:
                 continue
         # if build task is excluded or failed, we don't need to create
-        # SourceRpm and BinaryRpm records, because it's break package releases
+        # SourceRpm and BinaryRpm records, because it breaks package releases
         if status in (BuildTaskStatus.EXCLUDED, BuildTaskStatus.FAILED):
             continue
         if rpm.name.endswith('.src.rpm') and srpm is None:
