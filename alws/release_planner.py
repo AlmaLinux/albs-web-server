@@ -1018,6 +1018,19 @@ class ReleasePlanner:
                         models.UserRole.actions)
                 ),
             )
+            product = (await self._db.execute(
+                select(models.Product).where(
+                    models.Product.id == payload.product_id).options(
+                    selectinload(models.Product.owner).selectinload(
+                        models.User.roles).selectinload(
+                        models.UserRole.actions),
+                    selectinload(models.Product.team).selectinload(
+                        models.Team.roles).selectinload(
+                        models.UserRole.actions),
+                    selectinload(models.Product.roles).selectinload(
+                        models.UserRole.actions)
+                )
+            )).scalars().first()
             platform = platform.scalars().first()
             user = user_result.scalars().first()
 
@@ -1035,7 +1048,7 @@ class ReleasePlanner:
                     raise PermissionDenied(f'User does not have permissions '
                                            f'to release build {build.id}')
 
-            if not can_perform(platform, user, actions.ReleaseToProduct.name):
+            if not can_perform(product, user, actions.ReleaseToProduct.name):
                 raise PermissionDenied('User does not have permissions '
                                        'to release to this product')
 
@@ -1050,6 +1063,7 @@ class ReleasePlanner:
                 build_tasks=payload.build_tasks
             )
             new_release.owner = user
+            new_release.team_id = product.team_id
             self._db.add(new_release)
             await self._db.commit()
 
