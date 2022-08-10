@@ -68,7 +68,7 @@ def get_clean_copr_chroot(copr_chroot: str) -> str:
     # for "AlmaLinux" distribution dnf COPR plugin use "EPEL" distribution
     if 'epel' in copr_chroot:
         copr_chroot = copr_chroot.replace('epel', 'almalinux')
-    return copr_chroot
+    return f"{copr_chroot}-dr"
 
 
 async def create_product_repo(
