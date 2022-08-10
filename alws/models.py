@@ -27,7 +27,6 @@ from alws.database import Base, engine
 __all__ = [
     'Build',
     'BuildTask',
-    'Distribution',
     'Platform',
     'SignKey',
     'SignTask',
@@ -154,60 +153,6 @@ BuildPlatformFlavour = sqlalchemy.Table(
     )
 )
 
-PlatformDependency = sqlalchemy.Table(
-    'platform_dependency',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'platform_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        primary_key=True
-    )
-)
-
-
-DistributionRepositories = sqlalchemy.Table(
-    'distribution_repositories',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'repository_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
-)
-
-
-DistributionBuilds = sqlalchemy.Table(
-    'distribution_packages',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'build_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
-    )
-)
-
-
 ReferencePlatforms = sqlalchemy.Table(
     'reference_platforms',
     Base.metadata,
@@ -260,22 +205,6 @@ class Platform(PermissionsMixin, Base):
     )
     repos = relationship('Repository', secondary=PlatformRepo)
     sign_keys = relationship('SignKey', back_populates='platform')
-
-
-class Distribution(PermissionsMixin, TeamMixin, Base):
-
-    __tablename__ = 'distributions'
-
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    name = sqlalchemy.Column(
-        sqlalchemy.Text,
-        nullable=False,
-        unique=True,
-        index=True
-    )
-    platforms = relationship('Platform', secondary=PlatformDependency)
-    repositories = relationship('Repository', secondary=DistributionRepositories)
-    builds = relationship('Build', secondary=DistributionBuilds)
 
 
 class CustomRepoRepr(Base):
