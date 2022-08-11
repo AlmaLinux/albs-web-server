@@ -8,15 +8,12 @@ from fastapi import (
     APIRouter,
     Depends,
     WebSocket,
-    HTTPException,
-    status,
 )
 
 from alws import database
 from alws.auth import get_current_user
 from alws.crud import sign_task
 from alws.dependencies import get_db, get_redis
-from alws.errors import PermissionDenied
 from alws import dramatiq
 from alws.schemas import sign_schema
 
@@ -43,13 +40,7 @@ async def get_sign_tasks(build_id: int = None,
 async def create_sign_task(payload: sign_schema.SignTaskCreate,
                            db: database.Session = Depends(get_db),
                            user=Depends(get_current_user)):
-    try:
-        return await sign_task.create_sign_task(db, payload, user.id)
-    except PermissionDenied as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        )
+    return await sign_task.create_sign_task(db, payload, user.id)
 
 
 @router.post('/get_sign_task/',
@@ -77,11 +68,12 @@ async def complete_sign_task(
     return {'success': True}
 
 
-@router.post('/sync_sign_task/',
-             response_model=typing.Union[
-                 sign_schema.SyncSignTaskResponse,
-                 sign_schema.SyncSignTaskError
-            ]
+@router.post(
+    '/sync_sign_task/',
+    response_model=typing.Union[
+        sign_schema.SyncSignTaskResponse,
+        sign_schema.SyncSignTaskError,
+    ],
 )
 async def create_small_sign_task(
             payload: sign_schema.SyncSignTaskRequest,

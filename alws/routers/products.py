@@ -11,7 +11,7 @@ from alws import database
 from alws.auth import get_current_user
 from alws.crud import products
 from alws.dependencies import get_db
-from alws.errors import ProductError, PermissionDenied
+from alws.errors import ProductError
 from alws.models import User
 from alws.schemas import product_schema
 
@@ -46,9 +46,6 @@ async def create_product(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
             )
-        except PermissionDenied as error:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail=str(error))
         await db.commit()
     return await products.get_products(db, product_id=db_product.id)
 
@@ -82,9 +79,6 @@ async def add_to_product(
     except ProductError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=str(error))
-    except PermissionDenied as error:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail=str(error))
 
 
 @public_router.post('/remove/{build_id}/{product}/',
@@ -102,9 +96,6 @@ async def remove_from_product(
     except ProductError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=str(error))
-    except PermissionDenied as error:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail=str(error))
 
 
 @public_router.delete('/{product_id}/remove/',
@@ -114,8 +105,4 @@ async def remove_product(
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    try:
-        return await products.remove_product(db, product_id, user.id)
-    except PermissionDenied as error:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail=str(error))
+    return await products.remove_product(db, product_id, user.id)
