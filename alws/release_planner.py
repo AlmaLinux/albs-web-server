@@ -20,9 +20,12 @@ from alws.errors import (
     DataNotFoundError,
     EmptyReleasePlan,
     MissingRepository,
+    PermissionDenied,
     ReleaseLogicError,
     SignError,
 )
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
@@ -218,7 +221,6 @@ class ReleasePlanner:
             if self.clean_base_dist_name_lower is None:
                 self.clean_base_dist_name_lower = get_clean_distr_name(
                     self.base_platform.name).lower()
-            pulp_repos = []
             prod_repo_names = (
                 f'{repo.name}-{repo.arch}'
                 for repo in self.base_platform.repos
@@ -998,7 +1000,10 @@ class ReleasePlanner:
         payload: release_schema.ReleaseCreate,
     ) -> models.Release:
         async with self._db.begin():
-            user_q = select(models.User).where(models.User.id == user_id)
+            user_q = select(models.User).where(models.User.id == user_id).options(
+                selectinload(models.User.roles).selectinload(
+                    models.UserRole.actions)
+            )
             user_result = await self._db.execute(user_q)
             logging.info('User %d is creating a release', user_id)
 
@@ -1008,11 +1013,45 @@ class ReleasePlanner:
                 ).options(
                     selectinload(models.Platform.reference_platforms),
                     selectinload(models.Platform.repos.and_(
-                        models.Repository.production.is_(True)))
+                        models.Repository.production.is_(True))),
+                    selectinload(models.Platform.roles).selectinload(
+                        models.UserRole.actions)
                 ),
             )
+            product = (await self._db.execute(
+                select(models.Product).where(
+                    models.Product.id == payload.product_id).options(
+                    selectinload(models.Product.owner).selectinload(
+                        models.User.roles).selectinload(
+                        models.UserRole.actions),
+                    selectinload(models.Product.team).selectinload(
+                        models.Team.roles).selectinload(
+                        models.UserRole.actions),
+                    selectinload(models.Product.roles).selectinload(
+                        models.UserRole.actions)
+                )
+            )).scalars().first()
             platform = platform.scalars().first()
             user = user_result.scalars().first()
+
+            builds = (await self._db.execute(
+                select(models.Build).where(
+                    models.Build.id.in_(payload.builds)).options(
+                    selectinload(models.Build.team).selectinload(
+                        models.Team.roles).selectinload(
+                            models.UserRole.actions)
+                )
+            )).scalars().all()
+
+            for build in builds:
+                if not can_perform(build, user, actions.ReleaseBuild.name):
+                    raise PermissionDenied(f'User does not have permissions '
+                                           f'to release build {build.id}')
+
+            if not can_perform(product, user, actions.ReleaseToProduct.name):
+                raise PermissionDenied('User does not have permissions '
+                                       'to release to this product')
+
             new_release = models.Release()
             new_release.build_ids = payload.builds
             if getattr(payload, 'build_tasks', None):
@@ -1024,6 +1063,7 @@ class ReleasePlanner:
                 build_tasks=payload.build_tasks
             )
             new_release.owner = user
+            new_release.team_id = product.team_id
             self._db.add(new_release)
             await self._db.commit()
 
@@ -1039,13 +1079,24 @@ class ReleasePlanner:
     async def update_release(
         self, release_id: int,
         payload: release_schema.ReleaseUpdate,
+        user_id: int
     ) -> models.Release:
         logging.info('Updating release %d', release_id)
         async with self._db.begin():
+            users = await self._db.execute(select(models.User).where(
+                models.User.id == user_id).options(
+                selectinload(models.User.roles).selectinload(
+                    models.UserRole.actions)
+            ))
+            user = users.scalars().first()
+
             query = select(models.Release).where(
                 models.Release.id == release_id
             ).options(
-                selectinload(models.Release.owner),
+                selectinload(models.Release.owner).selectinload(
+                    models.User.roles).selectinload(models.UserRole.actions),
+                selectinload(models.Release.team).selectinload(
+                    models.Team.roles).selectinload(models.UserRole.actions),
                 selectinload(models.Release.platform).selectinload(
                     models.Platform.reference_platforms),
                 selectinload(models.Release.platform).selectinload(
@@ -1059,6 +1110,11 @@ class ReleasePlanner:
             if not release:
                 raise DataNotFoundError(
                     f'Release with ID {release_id} not found')
+
+            if can_perform(release, user, actions.ReleaseToProduct.name):
+                raise PermissionDenied('User does not have permissions '
+                                       'to update release')
+
             if payload.plan:
                 # check packages presence in prod repos
                 self.base_platform = release.platform
@@ -1092,13 +1148,24 @@ class ReleasePlanner:
     async def commit_release(
         self,
         release_id: int,
+        user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         logging.info('Commiting release %d', release_id)
         async with self._db.begin():
+            users = await self._db.execute(select(models.User).where(
+                models.User.id == user_id).options(
+                selectinload(models.User.roles).selectinload(
+                    models.UserRole.actions)
+            ))
+            user = users.scalars().first()
+
             query = select(models.Release).where(
                 models.Release.id == release_id
             ).options(
-                selectinload(models.Release.owner),
+                selectinload(models.Release.owner).selectinload(
+                    models.User.roles).selectinload(models.UserRole.actions),
+                selectinload(models.Release.team).selectinload(
+                    models.Team.roles).selectinload(models.UserRole.actions),
                 selectinload(models.Release.platform).selectinload(
                     models.Platform.repos.and_(
                         models.Repository.production.is_(True)
@@ -1110,6 +1177,11 @@ class ReleasePlanner:
             if not release:
                 raise DataNotFoundError(
                     f'Release with ID {release_id} not found')
+
+            if not can_perform(release, user, actions.ReleaseToProduct.name):
+                raise PermissionDenied('User does not have permissions '
+                                       'to commit the release')
+
             builds_q = select(models.Build).where(
                 models.Build.id.in_(release.build_ids))
             builds_result = await self._db.execute(builds_q)
