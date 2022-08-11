@@ -6,13 +6,13 @@ import urllib
 from pathlib import Path
 
 from lxml.html import document_fromstring
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws import database
 from alws.crud import repo_exporter
 
 
 async def fs_export_repository(repository_ids: typing.List[int],
-                               db: database.Session):
+                               db: AsyncSession):
     export_task = await repo_exporter.create_pulp_exporters_to_fs(
         db, repository_ids)
     export_data = await repo_exporter.execute_pulp_exporters_to_fs(

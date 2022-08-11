@@ -10,6 +10,7 @@ from collections import defaultdict
 from cas_wrapper import CasWrapper
 import createrepo_c as cr
 from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
@@ -37,7 +38,7 @@ from alws.crud.errata import release_errata_packages
 
 
 class ReleasePlanner:
-    def __init__(self, db: Session, pulp_db: Session):
+    def __init__(self, db: AsyncSession, pulp_db: Session):
         self._db = db
         self._pulp_db = pulp_db
         self.pkgs_mapping = None
@@ -1082,65 +1083,66 @@ class ReleasePlanner:
         user_id: int
     ) -> models.Release:
         logging.info('Updating release %d', release_id)
-        async with self._db.begin():
-            users = await self._db.execute(select(models.User).where(
-                models.User.id == user_id).options(
-                selectinload(models.User.roles).selectinload(
-                    models.UserRole.actions)
-            ))
-            user = users.scalars().first()
+        # We do not need transaction now because `get_current_user` dependency
+        # has already acquired it
+        users = await self._db.execute(select(models.User).where(
+            models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(
+                models.UserRole.actions)
+        ))
+        user = users.scalars().first()
 
-            query = select(models.Release).where(
-                models.Release.id == release_id
-            ).options(
-                selectinload(models.Release.owner).selectinload(
-                    models.User.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.reference_platforms),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.repos.and_(
-                        models.Repository.production.is_(True)
-                    ),
+        query = select(models.Release).where(
+            models.Release.id == release_id
+        ).options(
+            selectinload(models.Release.owner).selectinload(
+                models.User.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.reference_platforms),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.repos.and_(
+                    models.Repository.production.is_(True)
                 ),
-            ).with_for_update()
-            release_result = await self._db.execute(query)
-            release = release_result.scalars().first()
-            if not release:
-                raise DataNotFoundError(
-                    f'Release with ID {release_id} not found')
+            ),
+        ).with_for_update()
+        release_result = await self._db.execute(query)
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(
+                f'Release with ID {release_id} not found')
 
-            if can_perform(release, user, actions.ReleaseToProduct.name):
-                raise PermissionDenied('User does not have permissions '
-                                       'to update release')
+        if can_perform(release, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to update release')
 
-            if payload.plan:
-                # check packages presence in prod repos
-                self.base_platform = release.platform
-                for pkg_dict in payload.plan['packages']:
-                    package = pkg_dict['package']
-                    is_debug = is_debuginfo_rpm(package['name'])
-                    await self.prepare_data_for_executing_async_tasks(
-                        package, is_debug)
-                pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
-                    payload.plan['packages'])
-                payload.plan['packages_from_repos'] = pkgs_from_repos
-                payload.plan['packages_in_repos'] = pkgs_in_repos
-                release.plan = payload.plan
-            build_tasks = getattr(payload, 'build_tasks', None)
-            if (payload.builds and payload.builds != release.build_ids) or (
-                    build_tasks and build_tasks != release.build_task_ids):
-                release.build_ids = payload.builds
-                if build_tasks:
-                    release.build_task_ids = payload.build_tasks
-                release.plan = await self.get_release_plan(
-                    build_ids=payload.builds,
-                    base_platform=self.base_platform,
-                    build_tasks=payload.build_tasks,
-                )
-            self._db.add(release)
-            await self._db.commit()
+        if payload.plan:
+            # check packages presence in prod repos
+            self.base_platform = release.platform
+            for pkg_dict in payload.plan['packages']:
+                package = pkg_dict['package']
+                is_debug = is_debuginfo_rpm(package['name'])
+                await self.prepare_data_for_executing_async_tasks(
+                    package, is_debug)
+            pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
+                payload.plan['packages'])
+            payload.plan['packages_from_repos'] = pkgs_from_repos
+            payload.plan['packages_in_repos'] = pkgs_in_repos
+            release.plan = payload.plan
+        build_tasks = getattr(payload, 'build_tasks', None)
+        if (payload.builds and payload.builds != release.build_ids) or (
+                build_tasks and build_tasks != release.build_task_ids):
+            release.build_ids = payload.builds
+            if build_tasks:
+                release.build_task_ids = payload.build_tasks
+            release.plan = await self.get_release_plan(
+                build_ids=payload.builds,
+                base_platform=self.base_platform,
+                build_tasks=payload.build_tasks,
+            )
+        self._db.add(release)
+        await self._db.commit()
         await self._db.refresh(release)
         logging.info('Successfully updated release %d', release_id)
         return release
@@ -1151,60 +1153,61 @@ class ReleasePlanner:
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         logging.info('Commiting release %d', release_id)
-        async with self._db.begin():
-            users = await self._db.execute(select(models.User).where(
-                models.User.id == user_id).options(
-                selectinload(models.User.roles).selectinload(
-                    models.UserRole.actions)
-            ))
-            user = users.scalars().first()
+        # We do not need transaction now because `get_current_user` dependency
+        # has already acquired it
+        users = await self._db.execute(select(models.User).where(
+            models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(
+                models.UserRole.actions)
+        ))
+        user = users.scalars().first()
 
-            query = select(models.Release).where(
-                models.Release.id == release_id
-            ).options(
-                selectinload(models.Release.owner).selectinload(
-                    models.User.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.repos.and_(
-                        models.Repository.production.is_(True)
-                    ),
+        query = select(models.Release).where(
+            models.Release.id == release_id
+        ).options(
+            selectinload(models.Release.owner).selectinload(
+                models.User.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.repos.and_(
+                    models.Repository.production.is_(True)
                 ),
-            ).with_for_update()
-            release_result = await self._db.execute(query)
-            release = release_result.scalars().first()
-            if not release:
-                raise DataNotFoundError(
-                    f'Release with ID {release_id} not found')
+            ),
+        ).with_for_update()
+        release_result = await self._db.execute(query)
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(
+                f'Release with ID {release_id} not found')
 
-            if not can_perform(release, user, actions.ReleaseToProduct.name):
-                raise PermissionDenied('User does not have permissions '
-                                       'to commit the release')
+        if not can_perform(release, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to commit the release')
 
-            builds_q = select(models.Build).where(
-                models.Build.id.in_(release.build_ids))
-            builds_result = await self._db.execute(builds_q)
-            for build in builds_result.scalars().all():
-                build.release = release
-                self._db.add(build)
-            # for updating plan during executing, we should use deepcopy
-            release_plan = copy.deepcopy(release.plan)
-            try:
-                release_messages = await self.execute_release_plan(
-                    release, release_plan)
-            except (EmptyReleasePlan, MissingRepository,
-                    SignError, ReleaseLogicError) as e:
-                message = f'Cannot commit release: {str(e)}'
-                release.status = ReleaseStatus.FAILED
-            else:
-                message = 'Successfully committed release'
-                message += '\n'.join(release_messages)
-                release.status = ReleaseStatus.COMPLETED
-            release_plan['last_log'] = message
-            release.plan = release_plan
-            self._db.add(release)
-            await self._db.commit()
+        builds_q = select(models.Build).where(
+            models.Build.id.in_(release.build_ids))
+        builds_result = await self._db.execute(builds_q)
+        for build in builds_result.scalars().all():
+            build.release = release
+            self._db.add(build)
+        # for updating plan during executing, we should use deepcopy
+        release_plan = copy.deepcopy(release.plan)
+        try:
+            release_messages = await self.execute_release_plan(
+                release, release_plan)
+        except (EmptyReleasePlan, MissingRepository,
+                SignError, ReleaseLogicError) as e:
+            message = f'Cannot commit release: {str(e)}'
+            release.status = ReleaseStatus.FAILED
+        else:
+            message = 'Successfully committed release'
+            message += '\n'.join(release_messages)
+            release.status = ReleaseStatus.COMPLETED
+        release_plan['last_log'] = message
+        release.plan = release_plan
+        self._db.add(release)
+        await self._db.commit()
         await self._db.refresh(release)
         logging.info('Successfully committed release %d', release_id)
         return release, message

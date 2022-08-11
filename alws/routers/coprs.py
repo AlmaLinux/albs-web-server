@@ -2,12 +2,11 @@ import typing
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
+from fastapi_sqla.asyncio_support import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
-from alws import database
 from alws import models
-from alws.dependencies import get_db
 from alws.utils.copr import (
     generate_repo_config,
     get_clean_copr_chroot,
@@ -22,7 +21,7 @@ copr_router = APIRouter(
 @copr_router.get('/api_3/project/search')
 async def search_repos(
     query: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ) -> typing.Dict:
     query = select(models.Product).where(
         models.Product.name == query,
@@ -37,7 +36,7 @@ async def search_repos(
 @copr_router.get('/api_3/project/list')
 async def list_repos(
     ownername: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ) -> typing.Dict:
     query = select(models.Product).where(
         models.Product.owner.has(username=ownername),
@@ -58,7 +57,7 @@ async def get_dnf_repo_config(
     name: str,
     platform: str,
     arch: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ):
     full_name = f'{ownername}/{name}'
     chroot = f'{platform}-{arch}'

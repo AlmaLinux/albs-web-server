@@ -1,14 +1,15 @@
 import typing
 
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 
 
 async def get_user(
-            db: Session,
+            db: AsyncSession,
             user_id: typing.Optional[int] = None,
             user_name: typing.Optional[str] = None,
             user_email: typing.Optional[str] = None
@@ -25,27 +26,27 @@ async def get_user(
     return db_user.scalars().first()
 
 
-async def get_all_users(db: Session) -> typing.List[models.User]:
+async def get_all_users(db: AsyncSession) -> typing.List[models.User]:
     db_users = await db.execute(select(models.User).options(
         selectinload(models.User.oauth_accounts)))
     return db_users.scalars().all()
 
 
-async def activate_user(user_id: int, db: Session):
+async def activate_user(user_id: int, db: AsyncSession):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=True, is_active=True))
 
 
-async def deactivate_user(user_id: int, db: Session):
+async def deactivate_user(user_id: int, db: AsyncSession):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=False, is_active=False))
 
 
-async def make_superuser(user_id: int, db: Session):
+async def make_superuser(user_id: int, db: AsyncSession):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_superuser=True))
 
 
-async def make_usual_user(user_id: int, db: Session):
+async def make_usual_user(user_id: int, db: AsyncSession):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_superuser=False))

@@ -14,6 +14,7 @@ from fastapi_users_db_sqlalchemy.access_token import (
 from sqlalchemy.orm import relationship, declared_attr, declarative_mixin
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
+from fastapi_sqla import Base
 
 from alws.constants import (
     Permissions,
@@ -21,7 +22,7 @@ from alws.constants import (
     ReleaseStatus,
     SignStatus,
 )
-from alws.database import Base, engine
+from alws.database import engine
 
 
 __all__ = [

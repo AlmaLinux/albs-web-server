@@ -4,7 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from alws.database import Base
+from alws.models import Base
 # Check why this is needed:
 # https://stackoverflow.com/questions/45695008/alembic-trying-to-delete-my-tables
 import alws.models

@@ -6,8 +6,9 @@ import traceback
 
 import sqlalchemy
 from sqlalchemy import delete, insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
@@ -30,81 +31,77 @@ from alws.utils.rpm_package import get_rpm_package_info
 
 
 async def get_available_build_task(
-            db: Session,
+            db: AsyncSession,
             request: build_node_schema.RequestTask
         ) -> models.BuildTask:
-    async with db.begin():
-        # TODO: here should be config value
-        ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
-        query = ~models.BuildTask.dependencies.any()
-        db_task = await db.execute(
-            select(models.BuildTask).where(query).with_for_update().filter(
-                    sqlalchemy.and_(
-                        models.BuildTask.status < BuildTaskStatus.COMPLETED,
-                        models.BuildTask.arch.in_(request.supported_arches),
-                        sqlalchemy.or_(
-                            models.BuildTask.ts < ts_expired,
-                            models.BuildTask.ts.__eq__(None)
-                        )
-                    )
-                ).options(
-                    selectinload(models.BuildTask.ref),
-                    selectinload(models.BuildTask.build).selectinload(
-                        models.Build.repos),
-                    selectinload(models.BuildTask.platform).selectinload(
-                        models.Platform.repos),
-                    selectinload(models.BuildTask.build).selectinload(
-                        models.Build.owner),
-                    selectinload(models.BuildTask.build).selectinload(
-                        models.Build.linked_builds).selectinload(
-                        models.Build.repos),
-                    selectinload(models.BuildTask.build).selectinload(
-                        models.Build.platform_flavors).selectinload(
-                        models.PlatformFlavour.repos),
-                    selectinload(models.BuildTask.artifacts),
-                    selectinload(models.BuildTask.rpm_module)
-            ).order_by(models.BuildTask.id.asc())
-        )
-        db_task = db_task.scalars().first()
-        if not db_task:
-            return
-        db_task.ts = datetime.datetime.now()
-        db_task.status = BuildTaskStatus.STARTED
-        await db.commit()
+    # TODO: here should be config value
+    ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
+    query = ~models.BuildTask.dependencies.any()
+    db_task = await db.execute(
+        select(models.BuildTask).where(query).with_for_update().filter(
+            sqlalchemy.and_(
+                models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                models.BuildTask.arch.in_(request.supported_arches),
+                sqlalchemy.or_(
+                    models.BuildTask.ts < ts_expired,
+                    models.BuildTask.ts.__eq__(None)
+                )
+            )
+        ).options(
+            selectinload(models.BuildTask.ref),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos),
+            selectinload(models.BuildTask.platform).selectinload(
+                models.Platform.repos),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.owner),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.linked_builds).selectinload(
+                models.Build.repos),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.platform_flavors).selectinload(
+                models.PlatformFlavour.repos),
+            selectinload(models.BuildTask.artifacts),
+            selectinload(models.BuildTask.rpm_module)
+        ).order_by(models.BuildTask.id.asc())
+    )
+    db_task = db_task.scalars().first()
+    if not db_task:
+        return
+    db_task.ts = datetime.datetime.now()
+    db_task.status = BuildTaskStatus.STARTED
     return db_task
 
 
-def add_build_task_dependencies(db: Session, task: models.BuildTask,
+def add_build_task_dependencies(db: AsyncSession, task: models.BuildTask,
                                 last_task: models.BuildTask):
     task.dependencies.append(last_task)
 
 
-async def update_failed_build_items(db: Session, build_id: int):
+async def update_failed_build_items(db: AsyncSession, build_id: int):
     query = select(models.BuildTask).where(
         sqlalchemy.and_(
             models.BuildTask.build_id == build_id,
             models.BuildTask.status == BuildTaskStatus.FAILED)
     ).order_by(models.BuildTask.index, models.BuildTask.id)
-    async with db.begin():
-        last_task = None
-        failed_tasks = await db.execute(query)
-        for task in failed_tasks.scalars():
-            task.status = BuildTaskStatus.IDLE
-            task.ts = None
-            if last_task is not None:
-                await db.run_sync(add_build_task_dependencies, task, last_task)
-            last_task = task
-        await db.commit()
+    last_task = None
+    failed_tasks = await db.execute(query)
+    for task in failed_tasks.scalars():
+        task.status = BuildTaskStatus.IDLE
+        task.ts = None
+        if last_task is not None:
+            await db.run_sync(add_build_task_dependencies, task, last_task)
+        last_task = task
 
 
-async def log_repo_exists(db: Session, task: models.BuildTask):
+async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
     repo = await db.execute(select(models.Repository).where(
         models.Repository.name == task.get_log_repo_name()
     ))
     return bool(repo.scalars().first())
 
 
-async def create_build_log_repo(db: Session, task: models.BuildTask):
+async def create_build_log_repo(db: AsyncSession, task: models.BuildTask):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -136,21 +133,18 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
             repository_id=log_repo.id
         )
     )
-    await db.commit()
 
 
 async def ping_tasks(
-            db: Session,
+            db: AsyncSession,
             task_list: typing.List[int]
         ):
     query = models.BuildTask.id.in_(task_list)
     now = datetime.datetime.now()
-    async with db.begin():
-        await db.execute(update(models.BuildTask).where(query).values(ts=now))
-        await db.commit()
+    await db.execute(update(models.BuildTask).where(query).values(ts=now))
 
 
-async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
+async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
     build_tasks = await db.execute(
         select(models.BuildTask).where(models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform)
@@ -172,7 +166,7 @@ def __verify_checksums(processed_entities: typing.List[typing.Tuple[
 
 
 async def get_srpm_artifact_by_build_task_id(
-        db: Session, build_task_id: int) -> models.BuildTaskArtifact:
+        db: AsyncSession, build_task_id: int) -> models.BuildTaskArtifact:
     srpm_artifact = await db.execute(
         select(models.BuildTaskArtifact).where(
             models.BuildTaskArtifact.build_task_id == build_task_id,
@@ -183,7 +177,7 @@ async def get_srpm_artifact_by_build_task_id(
     return srpm_artifact.scalars().first()
 
 
-async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
+async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int,
                          task_arch: str, task_artifacts: list,
                          repositories: list,
                          built_srpm_url: str = None, module_index=None):
@@ -372,7 +366,7 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
 
 
 async def __process_build_task_artifacts(
-    db: Session,
+    db: AsyncSession,
     pulp_client: PulpClient,
     task_id: int,
     task_artifacts: list,
@@ -505,7 +499,7 @@ async def __process_build_task_artifacts(
     return build_task
 
 
-async def __update_built_srpm_url(db: Session, build_task: models.BuildTask,
+async def __update_built_srpm_url(db: AsyncSession, build_task: models.BuildTask,
                                   request: build_node_schema.BuildDone):
     uncompleted_tasks_ids = []
     if build_task.status in (BuildTaskStatus.COMPLETED,
@@ -577,7 +571,7 @@ async def __update_built_srpm_url(db: Session, build_task: models.BuildTask,
             await db.execute(insert(models.BuildTaskArtifact), insert_values)
 
 
-async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
+async def safe_build_done(db: AsyncSession, request: build_node_schema.BuildDone):
     success = True
     pulp = PulpClient(
         settings.pulp_host,
@@ -586,9 +580,8 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     )
     logging.info("Start processing build_task: %d", request.task_id)
     try:
-        async with db.begin():
-            async with pulp.begin():
-                await build_done(db, pulp, request)
+        async with pulp.begin():
+            await build_done(db, pulp, request)
     except Exception:
         logging.exception('Build done failed:')
         success = False
@@ -601,12 +594,11 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
             models.BuildTaskDependency.c.build_task_dependency == request.task_id
         )
         await db.execute(remove_dep_query)
-        await db.commit()
     logging.info("Build task: %d, processing is finished", request.task_id)
     return success
 
 
-async def build_done(db: Session, pulp: PulpClient,
+async def build_done(db: AsyncSession, pulp: PulpClient,
                      request: build_node_schema.BuildDone):
     status = BuildTaskStatus.COMPLETED
     if request.status == 'failed':

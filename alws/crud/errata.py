@@ -14,7 +14,6 @@ from alws import models
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.parsing import parse_rpm_nevra, clean_release
-from alws.utils.pulp_client import PulpClient
 from alws.config import settings
 from alws.utils.errata import (
     debrand_id,
@@ -22,6 +21,7 @@ from alws.utils.errata import (
     debrand_reference,
     debrand_comment,
 )
+from alws.utils.pulp_client import PulpClient
 
 try:
     # FIXME: ovallib dependency should stay optional
@@ -410,7 +410,7 @@ async def update_errata_record(
             record.description = None
         else:
             record.description = update_record.description
-    await db.commit()
+    await db.flush()
     await db.refresh(record)
     return record
 
@@ -598,7 +598,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
             await search_for_albs_packages(db, db_package, prod_repos_cache)
         )
     db.add_all(items_to_insert)
-    await db.commit()
+    await db.flush()
     await db.refresh(db_errata)
     return db_errata
 

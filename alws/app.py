@@ -4,6 +4,7 @@ import importlib
 import logging
 import threading
 
+import fastapi_sqla
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import ExceptionMiddleware
@@ -27,6 +28,7 @@ AUTH_PREFIX = APP_PREFIX + '/auth'
 AUTH_TAG = 'auth'
 
 app = FastAPI()
+fastapi_sqla.setup(app)
 scheduler = None
 terminate_event = threading.Event()
 graceful_terminate_event = threading.Event()
@@ -51,6 +53,7 @@ async def startup():
 async def shutdown():
     global terminate_event
     terminate_event.set()
+
 
 for module in ROUTERS:
     for router_type in (

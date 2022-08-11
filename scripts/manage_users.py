@@ -3,6 +3,7 @@ import asyncio
 import os
 import sys
 
+from fastapi_sqla import open_async_session
 from sqlalchemy import delete
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -11,8 +12,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws import models
 from alws.crud import teams as team_crud, user as user_crud
-from alws.dependencies import get_db
 from alws.perms.roles import RolesList
+from alws.utils.db_utils import prepare_mappings
 
 
 def parse_args():
@@ -43,72 +44,73 @@ def parse_args():
 
 async def main() -> int:
     arguments = parse_args()
-    async for db in get_db():
-        async with db.begin():
-            user = (await db.execute(select(models.User).where(
-                models.User.email == arguments.email).options(
-                selectinload(models.User.roles),
-                selectinload(models.User.oauth_accounts),
-            ))).scalars().first()
-            if not user:
-                raise ValueError(f'No such user in the system: '
-                                 f'{arguments.email}')
+    await prepare_mappings()
 
-            if arguments.verify and arguments.deactivate:
-                raise ValueError('Cannot both activate and deactivate user')
+    async with open_async_session() as db, db.begin():
+        user = (await db.execute(select(models.User).where(
+            models.User.email == arguments.email).options(
+            selectinload(models.User.roles),
+            selectinload(models.User.oauth_accounts),
+        ))).scalars().first()
+        if not user:
+            raise ValueError(f'No such user in the system: '
+                             f'{arguments.email}')
 
-            if arguments.superuser and arguments.usual_user:
-                raise ValueError('Cannot both make user a superuser '
-                                 'and usual one')
+        if arguments.verify and arguments.deactivate:
+            raise ValueError('Cannot both activate and deactivate user')
 
-            if arguments.verify:
-                await user_crud.activate_user(user.id, db)
+        if arguments.superuser and arguments.usual_user:
+            raise ValueError('Cannot both make user a superuser '
+                             'and usual one')
 
-            if arguments.deactivate:
-                await user_crud.deactivate_user(user.id, db)
+        if arguments.verify:
+            await user_crud.activate_user(user.id, db)
 
-            if arguments.superuser:
-                await user_crud.make_superuser(user.id, db)
+        if arguments.deactivate:
+            await user_crud.deactivate_user(user.id, db)
 
-            if arguments.usual_user:
-                await user_crud.make_usual_user(user.id, db)
+        if arguments.superuser:
+            await user_crud.make_superuser(user.id, db)
 
-            if (arguments.add_roles or
-                    arguments.remove_roles) and not arguments.team_name:
-                print('Cannot assign roles without team specified, exiting')
-                return 1
+        if arguments.usual_user:
+            await user_crud.make_usual_user(user.id, db)
 
-            team = (await db.execute(select(models.Team).where(
-                models.Team.name == arguments.team_name))).scalars().first()
-            if not team:
-                raise ValueError(f'No such team in the system: '
-                                 f'{arguments.team_name}')
+        if (arguments.add_roles or
+            arguments.remove_roles) and not arguments.team_name:
+            print('Cannot assign roles without team specified, exiting')
+            return 1
 
-            add_roles = None
-            remove_roles = None
+        team = (await db.execute(select(models.Team).where(
+            models.Team.name == arguments.team_name))).scalars().first()
+        if not team:
+            raise ValueError(f'No such team in the system: '
+                             f'{arguments.team_name}')
 
-            if arguments.add_roles:
-                add_roles = (await db.execute(select(models.UserRole).where(
-                    models.UserRole.name.in_(
-                        [team_crud.get_team_role_name(team.name, r)
-                         for r in arguments.add_roles]))
-                )).scalars().all()
+        add_roles = None
+        remove_roles = None
 
-            if arguments.remove_roles:
-                remove_roles = (await db.execute(select(models.UserRole).where(
-                    models.UserRole.name.in_(
-                        [team_crud.get_team_role_name(team.name, r)
-                         for r in arguments.remove_roles]))
-                )).scalars().all()
+        if arguments.add_roles:
+            add_roles = (await db.execute(select(models.UserRole).where(
+                models.UserRole.name.in_(
+                    [team_crud.get_team_role_name(team.name, r)
+                     for r in arguments.add_roles]))
+            )).scalars().all()
 
-            if add_roles:
-                user.roles.extend(add_roles)
-            if remove_roles:
-                roles_ids = [r.id for r in remove_roles]
-                await db.execute(delete(models.UserRoleMapping).where(
-                    models.UserRoleMapping.c.role_id.in_(roles_ids)))
+        if arguments.remove_roles:
+            remove_roles = (await db.execute(select(models.UserRole).where(
+                models.UserRole.name.in_(
+                    [team_crud.get_team_role_name(team.name, r)
+                     for r in arguments.remove_roles]))
+            )).scalars().all()
 
-            db.add(user)
+        if add_roles:
+            user.roles.extend(add_roles)
+        if remove_roles:
+            roles_ids = [r.id for r in remove_roles]
+            await db.execute(delete(models.UserRoleMapping).where(
+                models.UserRoleMapping.c.role_id.in_(roles_ids)))
+
+        db.add(user)
     return 0
 
 

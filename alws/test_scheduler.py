@@ -3,13 +3,13 @@ import random
 import threading
 import asyncio
 
+from fastapi_sqla import open_session
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
 from alws.constants import TestTaskStatus
-from alws.database import SyncSession
 from alws.utils.alts_client import AltsClient
 
 
@@ -23,7 +23,7 @@ class TestTaskScheduler(threading.Thread):
 
     async def _schedule_tasks_for_execution(self):
         updated_tasks = []
-        with SyncSession() as session:
+        with open_session() as session:
             with session.begin():
                 try:
                     tasks_query = session.execute(

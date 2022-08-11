@@ -1,15 +1,15 @@
 import typing
 
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
 
 
 async def get_releases(page_number: typing.Optional[int],
-                       db: Session
-) -> typing.List[models.Release]:
+                       db: AsyncSession) -> typing.List[models.Release]:
     query = select(models.Release).options(
         selectinload(models.Release.owner),
         selectinload(models.Release.platform),

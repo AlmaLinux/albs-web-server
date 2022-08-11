@@ -3,8 +3,9 @@ import logging
 import typing
 
 import sqlalchemy
+from fastapi_sqla.asyncio_support import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.constants import BuildTaskStatus
@@ -18,7 +19,7 @@ __all__ = [
 
 
 async def get_noarch_packages(
-    db: Session,
+    db: AsyncSession,
     build_task_ids: typing.List[int]
 ) -> typing.Tuple[dict, dict]:
     query = select(models.BuildTaskArtifact).where(sqlalchemy.and_(
@@ -41,7 +42,7 @@ async def get_noarch_packages(
 
 
 async def save_noarch_packages(
-    db: Session,
+    db: AsyncSession,
     pulp_client: PulpClient,
     build_task: models.BuildTask,
 ):

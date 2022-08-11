@@ -2,11 +2,11 @@ import logging
 import typing
 
 import dramatiq
+from fastapi_sqla import open_async_session
 from sqlalchemy import update
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, TestTaskStatus
 from alws.crud import test as t_crud
-from alws.database import Session
 from alws.dramatiq import event_loop
 from alws.models import TestTask
 from alws.schemas.test_schema import TestTaskResult
@@ -16,7 +16,7 @@ __all__ = ['complete_test_task']
 
 
 async def _complete_test_task(task_id: int, task_result: TestTaskResult):
-    async with Session() as db, db.begin():
+    async with open_async_session() as db, db.begin():
         try:
             await t_crud.complete_test_task(db, task_id, task_result)
         except Exception as e:

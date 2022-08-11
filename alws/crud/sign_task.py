@@ -5,14 +5,15 @@ import typing
 import urllib.parse
 from collections import defaultdict
 
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy import update, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
-from alws.database import Session
 from alws.errors import (
     BuildAlreadySignedError,
     DataNotFoundError,
@@ -27,7 +28,7 @@ from alws.utils.pulp_client import PulpClient
 
 
 async def __get_build_repos(
-        db: Session, build_id: int, build: models.Build = None) -> dict:
+        db: AsyncSession, build_id: int, build: models.Build = None) -> dict:
     if not build:
         builds = await db.execute(select(models.Build).where(
             models.Build.id == build_id).options(
@@ -44,7 +45,7 @@ def __get_package_url(base_url: str, package_name: str) -> str:
         base_url, f'Packages/{pkg_first_letter}/{package_name}')
 
 
-async def get_sign_tasks(db: Session, build_id: int = None) \
+async def get_sign_tasks(db: AsyncSession, build_id: int = None) \
         -> typing.List[models.SignTask]:
     query = select(models.SignTask)
     if build_id:
@@ -54,64 +55,66 @@ async def get_sign_tasks(db: Session, build_id: int = None) \
     return result.scalars().all()
 
 
-async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
+async def create_sign_task(db: AsyncSession, payload: sign_schema.SignTaskCreate,
                            user_id: int) \
         -> models.SignTask:
-    async with db.begin():
-        user = (await db.execute(select(models.User).where(
-            models.User.id == user_id).options(
-            selectinload(models.User.roles).selectinload(models.UserRole.actions)
-        ))).scalars().first()
-        builds = await db.execute(select(models.Build).where(
-            models.Build.id == payload.build_id).options(
-                selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms),
-                selectinload(models.Build.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
-        ))
-        build = builds.scalars().first()
-        if not build:
-            raise DataNotFoundError(
-                f'Build with ID {payload.build_id} does not exist')
-        if build.signed:
-            raise BuildAlreadySignedError(
-                f'Build with ID {payload.build_id} is already signed')
-        if not build.source_rpms or not build.binary_rpms:
-            raise ValueError(
-                f'No built packages in build with ID {payload.build_id}')
-        sign_keys = await db.execute(select(models.SignKey).where(
-            models.SignKey.id == payload.sign_key_id).options(
-            selectinload(models.SignKey.roles).selectinload(
-                models.UserRole.actions)
-        ))
-        sign_key = sign_keys.scalars().first()
+    user = (await db.execute(select(models.User).where(
+        models.User.id == user_id).options(
+        selectinload(models.User.roles).selectinload(models.UserRole.actions)
+    ))).scalars().first()
+    builds = await db.execute(select(models.Build).where(
+        models.Build.id == payload.build_id).options(
+        selectinload(models.Build.owner),
+        selectinload(models.Build.source_rpms),
+        selectinload(models.Build.binary_rpms),
+        selectinload(models.Build.team).selectinload(
+            models.Team.roles).selectinload(models.UserRole.actions),
+    ))
+    build = builds.scalars().first()
+    if not build:
+        raise DataNotFoundError(
+            f'Build with ID {payload.build_id} does not exist')
+    if build.signed:
+        raise BuildAlreadySignedError(
+            f'Build with ID {payload.build_id} is already signed')
+    if not build.source_rpms or not build.binary_rpms:
+        raise ValueError(
+            f'No built packages in build with ID {payload.build_id}')
+    sign_keys = await db.execute(select(models.SignKey).where(
+        models.SignKey.id == payload.sign_key_id).options(
+        selectinload(models.SignKey.owner),
+        selectinload(models.SignKey.roles).selectinload(
+            models.UserRole.actions),
+    ))
+    sign_key = sign_keys.scalars().first()
 
-        if not sign_key:
-            raise DataNotFoundError(
-                f'Sign key with ID {payload.sign_key_id} does not exist')
+    if not sign_key:
+        raise DataNotFoundError(
+            f'Sign key with ID {payload.sign_key_id} does not exist')
 
-        if not can_perform(build, user, actions.SignBuild.name):
-            raise PermissionDenied('User does not have permissions to sign '
-                                   'this build')
-        if not can_perform(sign_key, user, actions.UseSignKey.name):
-            raise PermissionDenied('User does not have permissions to use '
-                                   'this sign key')
+    if not can_perform(build, user, actions.SignBuild.name):
+        raise PermissionDenied('User does not have permissions to sign '
+                               'this build')
+    if not can_perform(sign_key, user, actions.UseSignKey.name):
+        raise PermissionDenied('User does not have permissions to use '
+                               'this sign key')
 
-        sign_task = models.SignTask(
-            status=SignStatus.IDLE,
-            build_id=payload.build_id,
-            sign_key_id=payload.sign_key_id
-        )
-        db.add(sign_task)
-        await db.commit()
+    sign_task = models.SignTask(
+        status=SignStatus.IDLE,
+        build_id=payload.build_id,
+        sign_key_id=payload.sign_key_id
+    )
+    db.add(sign_task)
+    await db.flush()
     await db.refresh(sign_task)
+
     sign_tasks = await db.execute(select(models.SignTask).where(
         models.SignTask.id == sign_task.id).options(
         selectinload(models.SignTask.sign_key)))
     return sign_tasks.scalars().first()
 
 
-async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
+async def get_available_sign_task(db: AsyncSession, key_ids: typing.List[str]):
     sign_tasks = await db.execute(select(models.SignTask).join(
         models.SignTask.sign_key).where(
             models.SignTask.status == SignStatus.IDLE,
@@ -190,11 +193,18 @@ async def get_sign_task(db, sign_task_id: int) -> models.SignTask:
     return sign_tasks.scalars().first()
 
 
+async def update_sign_task_ts(db: AsyncSession, task_id: int,
+                              new_ts: datetime.datetime):
+    await db.execute(update(models.SignTask).where(
+        models.SignTask.id == task_id).values(ts=new_ts))
+    await db.flush()
+
+
 async def complete_sign_task(
             sign_task_id: int,
             payload: sign_schema.SignTaskComplete
         ) -> models.SignTask:
-    async with Session() as db, db.begin():
+    async with open_session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
             selectinload(models.Build.repos)))
@@ -321,7 +331,7 @@ async def complete_sign_task(
         return sign_task
 
 
-async def verify_signed_build(db: Session, build_id: int,
+async def verify_signed_build(db: AsyncSession, build_id: int,
                               platform_id: int) -> bool:
     build = await db.execute(select(models.Build).where(
         models.Build.id == build_id).options(

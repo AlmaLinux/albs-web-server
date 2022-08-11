@@ -1,5 +1,5 @@
 fastapi[all]==0.75.0
-fastapi-users[all]==10.1.1
+fastapi-users[all]==10.1.4
 uvicorn==0.15.0
 asyncpg==0.25.0
 psycopg2-binary==2.9.3
@@ -24,4 +24,5 @@ pgpy==0.5.4
 markdown==3.4.1
 fastapi-users-db-sqlalchemy==4.0.3
 httpx-oauth==0.7.0
+fastapi-sqla==2.3.5
 git+https://git.almalinux.org/almalinux/cas_wrapper.git@0.0.2#egg=cas_wrapper

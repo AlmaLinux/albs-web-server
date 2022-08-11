@@ -1,15 +1,17 @@
 import dramatiq
 
+from fastapi_sqla import open_async_session
+
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.dramatiq import event_loop
-from alws.dependencies import get_db, get_pulp_db
+from alws.dependencies import get_pulp_db
 from alws.release_planner import ReleasePlanner
 
 __all__ = ["execute_release_plan"]
 
 
 async def _commit_release(release_id, user_id):
-    async for db in get_db():
+    async with open_async_session() as db:
         for pulp_db in get_pulp_db():
             release_planner = ReleasePlanner(db, pulp_db)
             await release_planner.commit_release(release_id, user_id)

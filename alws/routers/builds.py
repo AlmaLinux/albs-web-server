@@ -7,8 +7,9 @@ from fastapi import (
     Request,
     status,
 )
+from fastapi_sqla.asyncio_support import AsyncSession
 
-from alws import database, models
+from alws import models
 from alws.auth import get_current_user
 from alws.crud import (
     build as build_crud,
@@ -16,8 +17,7 @@ from alws.crud import (
     platform as platform_crud,
     platform_flavors as flavors_crud
 )
-from alws.dependencies import get_db
-from alws.errors import BuildError, DataNotFoundError, PermissionDenied
+from alws.errors import BuildError, DataNotFoundError
 from alws.schemas import build_schema
 
 
@@ -37,15 +37,9 @@ public_router = APIRouter(
 async def create_build(
             build: build_schema.BuildCreate,
             user: models.User = Depends(get_current_user),
-            db: database.Session = Depends(get_db)
+            db: AsyncSession = Depends()
         ):
-    try:
-        return await build_crud.create_build(db, build, user.id)
-    except PermissionDenied:
-        return HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='User has no permissions to create build'
-        )
+    return await build_crud.create_build(db, build, user.id)
 
 
 @public_router.get('/', response_model=typing.Union[
@@ -53,7 +47,7 @@ async def create_build(
 async def get_builds_per_page(
     request: Request,
     pageNumber: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ):
     search_params = build_schema.BuildSearch(**request.query_params)
     return await build_crud.get_builds(
@@ -67,7 +61,7 @@ async def get_builds_per_page(
              response_model=build_schema.ModulePreview)
 async def get_module_preview(
     module_request: build_schema.ModulePreviewRequest,
-    db: database.Session = Depends(get_db)
+    db: AsyncSession = Depends()
 ):
     platform = await platform_crud.get_platform(
         db, module_request.platform_name
@@ -81,7 +75,7 @@ async def get_module_preview(
 
 
 @public_router.get('/{build_id}/', response_model=build_schema.Build)
-async def get_build(build_id: int, db: database.Session = Depends(get_db)):
+async def get_build(build_id: int, db: AsyncSession = Depends()):
     db_build = await build_crud.get_builds(db, build_id)
     if db_build is None:
         raise HTTPException(
@@ -93,12 +87,12 @@ async def get_build(build_id: int, db: database.Session = Depends(get_db)):
 
 @router.patch('/{build_id}/restart-failed', response_model=build_schema.Build)
 async def restart_failed_build_items(build_id: int,
-                                     db: database.Session = Depends(get_db)):
+                                     db: AsyncSession = Depends()):
     return await build_node.update_failed_build_items(db, build_id)
 
 
 @router.delete('/{build_id}/remove', status_code=status.HTTP_204_NO_CONTENT)
-async def remove_build(build_id: int, db: database.Session = Depends(get_db)):
+async def remove_build(build_id: int, db: AsyncSession = Depends()):
     try:
         await build_crud.remove_build_job(db, build_id)
     except DataNotFoundError as exc:

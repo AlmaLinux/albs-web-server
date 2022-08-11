@@ -1,9 +1,8 @@
-import logging
 from typing import Dict, Any
 
 import dramatiq
+from fastapi_sqla import Session, open_session, open_async_session
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -19,22 +18,20 @@ from alws.errors import (
 )
 from alws.build_planner import BuildPlanner
 from alws.schemas import build_schema, build_node_schema
-from alws.database import SyncSession
-from alws.dependencies import get_db
 from alws.dramatiq import event_loop
 
 
 __all__ = ['start_build', 'build_done']
 
 
-def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
+def _sync_fetch_build(db: Session, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
     result = db.execute(query)
     return result.scalars().first()
 
 
 async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
-    with SyncSession() as db:
+    with open_session() as db:
         with db.begin():
             build = _sync_fetch_build(db, build_id)
             planner = BuildPlanner(
@@ -56,7 +53,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 
 async def _build_done(request: build_node_schema.BuildDone):
-    async for db in get_db():
+    async with open_async_session() as db:
         success = await build_node_crud.safe_build_done(db, request)
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
@@ -70,7 +67,7 @@ async def _build_done(request: build_node_schema.BuildDone):
 
 
 async def _create_log_repo(task_id: int):
-    async for db in get_db():
+    async with open_async_session() as db:
         task = await build_node_crud.get_build_task(db, task_id)
         await build_node_crud.create_build_log_repo(db, task)
 

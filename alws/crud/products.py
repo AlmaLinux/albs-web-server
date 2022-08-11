@@ -3,6 +3,7 @@ from collections import defaultdict
 import typing
 
 from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
@@ -12,7 +13,6 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.crud.user import get_user
 from alws.crud.teams import get_teams
-from alws.database import Session
 from alws.errors import ProductError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
@@ -29,7 +29,7 @@ __all__ = [
 
 
 async def create_product(
-    db: Session,
+    db: AsyncSession,
     payload: ProductCreate,
 ) -> models.Product:
 
@@ -99,7 +99,7 @@ async def create_product(
 
 
 async def get_products(
-    db: Session,
+    db: AsyncSession,
     search_string: str = None,
     page_number: int = None,
     product_id: int = None,
@@ -157,7 +157,7 @@ async def get_products(
 
 
 async def remove_product(
-    db: Session,
+    db: AsyncSession,
     product_id: int,
     user_id: int,
 ):
@@ -185,7 +185,6 @@ async def remove_product(
         )
     await asyncio.gather(*delete_tasks)
     await db.delete(db_product)
-    await db.commit()
 
 
 async def get_existing_packages(
@@ -257,47 +256,45 @@ async def prepare_repo_modify_dict(
 
 
 async def modify_product(
-    db: Session,
+    db: AsyncSession,
     build_id: int,
     product: str,
     user_id: int,
     modification: str,
     force: bool = False,
 ):
-
-    async with db.begin():
-        db_product = await get_products(db, product_name=product)
-        db_user = await get_user(db, user_id=user_id)
-        if not db_user:
-            raise
-        if not can_perform(db_product, db_user, actions.UpdateProduct.name):
-            raise PermissionDenied(
-                f'User has no permissions '
-                f'to modify the product "{db_product.name}"'
-            )
-
-        db_build = await db.execute(
-            select(models.Build).where(
-                models.Build.id.__eq__(build_id),
-            ).options(
-                selectinload(models.Build.repos),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module),
-            ),
+    db_product = await get_products(db, product_name=product)
+    db_user = await get_user(db, user_id=user_id)
+    if not db_user:
+        raise
+    if not can_perform(db_product, db_user, actions.UpdateProduct.name):
+        raise PermissionDenied(
+            f'User has no permissions '
+            f'to modify the product "{db_product.name}"'
         )
-        db_build = db_build.scalars().first()
 
-        if modification == 'add' and not force:
-            if db_build in db_product.builds:
-                error_msg = f'Packages of build {build_id} have already been' \
-                            f' added to {product} product'
-                raise ProductError(error_msg)
-        if modification == 'remove' and not force:
-            if db_build not in db_product.builds:
-                error_msg = f'Packages of build {build_id} cannot be removed ' \
-                            f'from {product} product ' \
-                            f'as they are not added there'
-                raise ProductError(error_msg)
+    db_build = await db.execute(
+        select(models.Build).where(
+            models.Build.id.__eq__(build_id),
+        ).options(
+            selectinload(models.Build.repos),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_module),
+        ),
+    )
+    db_build = db_build.scalars().first()
+
+    if modification == 'add' and not force:
+        if db_build in db_product.builds:
+            error_msg = f'Packages of build {build_id} have already been' \
+                        f' added to {product} product'
+            raise ProductError(error_msg)
+    if modification == 'remove' and not force:
+        if db_build not in db_product.builds:
+            error_msg = f'Packages of build {build_id} cannot be removed ' \
+                        f'from {product} product ' \
+                        f'as they are not added there'
+            raise ProductError(error_msg)
 
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
@@ -316,7 +313,3 @@ async def modify_product(
     else:
         db_product.builds.remove(db_build)
     db.add(db_product)
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()

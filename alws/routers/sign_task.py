@@ -5,11 +5,11 @@ import datetime
 
 import aioredis
 from fastapi import APIRouter, Depends, WebSocket
+from fastapi_sqla.asyncio_support import AsyncSession
 
-from alws import database
 from alws.auth import get_current_user
 from alws.crud import sign_task
-from alws.dependencies import get_db, get_redis
+from alws.dependencies import get_redis
 from alws import dramatiq
 from alws.schemas import sign_schema
 
@@ -28,13 +28,13 @@ public_router = APIRouter(
 
 @public_router.get('/', response_model=typing.List[sign_schema.SignTask])
 async def get_sign_tasks(build_id: int = None,
-                         db: database.Session = Depends(get_db)):
+                         db: AsyncSession = Depends()):
     return await sign_task.get_sign_tasks(db, build_id=build_id)
 
 
 @router.post('/', response_model=sign_schema.SignTask)
 async def create_sign_task(payload: sign_schema.SignTaskCreate,
-                           db: database.Session = Depends(get_db),
+                           db: AsyncSession = Depends(),
                            user=Depends(get_current_user)):
     return await sign_task.create_sign_task(db, payload, user.id)
 
@@ -43,7 +43,7 @@ async def create_sign_task(payload: sign_schema.SignTaskCreate,
              response_model=typing.Union[dict, sign_schema.AvailableSignTask])
 async def get_available_sign_task(
         payload: sign_schema.SignTaskGet,
-        db: database.Session = Depends(get_db)):
+        db: AsyncSession = Depends()):
     result = await sign_task.get_available_sign_task(db, payload.key_ids)
     if any([not result.get(item) for item in
             ['build_id', 'id', 'keyid', 'packages']]):
@@ -56,10 +56,9 @@ async def get_available_sign_task(
 async def complete_sign_task(
         sign_task_id: int,
         payload: sign_schema.SignTaskComplete,
-        db: database.Session = Depends(get_db)):
-    task = await sign_task.get_sign_task(db, sign_task_id)
-    task.ts = datetime.datetime.now() + datetime.timedelta(hours=2)
-    await db.commit()
+        db: AsyncSession = Depends()):
+    new_ts = datetime.datetime.now() + datetime.timedelta(hours=2)
+    await sign_task.update_sign_task_ts(db, sign_task_id, new_ts)
     dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
     return {'success': True}
 
