@@ -50,6 +50,11 @@ async def create_product(
     if product:
         raise ProductError(f'Product with name={payload.name} already exist')
 
+    if not can_perform(team, owner, actions.CreateProduct.name):
+        raise PermissionDenied(
+            'User has no permissions to create the product'
+        )
+
     product = models.Product(**payload.dict())
     product.platforms = (await db.execute(
         select(models.Platform).where(
@@ -59,15 +64,7 @@ async def create_product(
             ]),
         ),
     )).scalars().all()
-    db.add(product)
-    await db.flush()
-    await db.refresh(product)
 
-    product = await get_products(db, product_name=payload.name)
-    if not can_perform(product, owner, actions.CreateProduct.name):
-        raise PermissionDenied(
-            'User has no permissions to create the product'
-        )
     for platform in product.platforms:
         platform_name = platform.name.lower()
         repo_tasks.extend((
