@@ -13,12 +13,15 @@ async def get_user(
             user_name: typing.Optional[str] = None,
             user_email: typing.Optional[str] = None
         ) -> models.User:
-    query = models.User.id == user_id
+    query = select(models.User).options(
+        selectinload(models.User.roles).selectinload(models.UserRole.actions),
+    )
+    condition = models.User.id == user_id
     if user_name is not None:
-        query = models.User.name == user_name
+        condition = models.User.name == user_name
     elif user_email is not None:
-        query = models.User.email == user_email
-    db_user = await db.execute(select(models.User).where(query))
+        condition = models.User.email == user_email
+    db_user = await db.execute(query.where(condition))
     return db_user.scalars().first()
 
 

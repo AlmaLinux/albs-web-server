@@ -1,0 +1,88 @@
+import re
+import typing
+
+from alws.config import settings
+from alws.models import Product, Repository
+from alws.utils.pulp_client import PulpClient
+
+__all__ = [
+    'create_product_repo',
+    'generate_repo_config',
+    'get_clean_copr_chroot',
+    'get_copr_chroot_repo_key',
+    'make_copr_plugin_response',
+]
+
+
+def generate_repo_config(
+    repo: Repository,
+    ownername: str,
+) -> str:
+    # we should clean "http" protocol from host url
+    clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
+    clean_base_url = re.sub(rf'-{repo.arch}-dr/$', '-$basearch-dr/', repo.url)
+    config_template = (
+        f"[copr:{clean_host_name}:{ownername}:{repo.name}]\n"
+        f"name=Copr repo for {repo.name} owned by {ownername}\n"
+        f"baseurl={clean_base_url}\n"
+        "type=rpm-md\n"
+        "skip_if_unavailable=True\n"
+        "gpgcheck=0\n"
+        "enabled=1\n"
+        "enabled_metadata=1\n"
+    )
+    return config_template
+
+
+def get_copr_chroot_repo_key(repo_name: str) -> str:
+    # we should return repositories by "distr_name-distr_ver-arch" key
+    # e.g.: test_user-test_product-AlmaLinux-8-i686-dr -> "epel-8-i686"
+    repo_name = repo_name.lower().replace('-almalinux-', '-epel-')
+    start_index = -4
+    if repo_name.endswith('debug-dr'):
+        start_index = -5
+    chroot_repo_key = '-'.join(repo_name.split('-')[start_index:-1])
+    return chroot_repo_key
+
+
+def make_copr_plugin_response(
+    db_products: typing.List[Product],
+) -> typing.List[dict]:
+    result = []
+    for db_product in db_products:
+        product_dict = {
+            'name': db_product.name,
+            'full_name': db_product.full_name,
+            'description': db_product.description,
+            'ownername': db_product.owner.username,
+            'chroot_repos': {
+                get_copr_chroot_repo_key(repo.name): repo.url
+                for repo in db_product.repositories
+            },
+        }
+        result.append(product_dict)
+    return result
+
+
+def get_clean_copr_chroot(copr_chroot: str) -> str:
+    # for "AlmaLinux" distribution dnf COPR plugin use "EPEL" distribution
+    if 'epel' in copr_chroot:
+        copr_chroot = copr_chroot.replace('epel', 'almalinux')
+    return f"{copr_chroot}-dr"
+
+
+async def create_product_repo(
+    pulp_client: PulpClient,
+    product_name: str,
+    ownername: str,
+    platform_name: str,
+    arch: str,
+    is_debug: bool,
+) -> typing.Tuple[str, str, str, str, bool]:
+
+    debug_suffix = '-debug' if is_debug else ''
+    repo_name = (
+        f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
+    )
+    repo_url, repo_href = await pulp_client.create_build_rpm_repo(repo_name)
+    return repo_name, repo_url, arch, repo_href, is_debug
