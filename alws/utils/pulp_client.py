@@ -61,7 +61,8 @@ class PulpClient:
 
     async def get_repo_modules(self, repo_href: str) -> typing.List[str]:
         version = await self.get_by_href(repo_href)
-        content = await self.get_latest_repo_present_content(version['latest_version_href'])
+        content = await self.get_latest_repo_present_content(
+            version['latest_version_href'])
         if not content.get('rpm.modulemd', {}).get('href'):
             return []
         modules = await self.get_by_href(content['rpm.modulemd']['href'])
@@ -119,6 +120,30 @@ class PulpClient:
         if response['count'] == 0:
             return None
         return response['results'][0]
+
+    async def get_rpm_distros(
+        self,
+        include_fields: typing.List[str] = None,
+        exclude_fields: typing.List[str] = None,
+        **search_params,
+    ) -> typing.List[dict]:
+        endpoint = "pulp/api/v3/distributions/rpm/rpm/"
+        all_distros = []
+        result = await self.__get_content_info(
+            endpoint, include_fields=include_fields,
+            exclude_fields=exclude_fields, **search_params)
+        if result["count"] == 0:
+            return []
+        all_distros.extend(result["results"])
+        while result.get("next"):
+            new_url = result.get("next")
+            parsed_url = urllib.parse.urlsplit(new_url)
+            new_url = parsed_url.path + "?" + parsed_url.query
+            result = await self.__get_content_info(
+                new_url, include_fields=include_fields,
+                exclude_fields=exclude_fields, **search_params)
+            all_distros.extend(result["results"])
+        return all_distros
 
     async def get_rpm_remote(self, name: str) -> typing.Union[dict, None]:
         endpoint = 'pulp/api/v3/remotes/rpm/rpm/'
@@ -257,7 +282,10 @@ class PulpClient:
                 remove: List[str] = None
             ):
         if not self._current_transaction.get(repo_to):
-            self._current_transaction[repo_to] = {'add': set(), 'remove': set()}
+            self._current_transaction[repo_to] = {
+                'add': set(),
+                'remove': set(),
+            }
         self._current_transaction[repo_to]['add'].update(add or [])
         self._current_transaction[repo_to]['remove'].update(remove or [])
 
@@ -562,8 +590,9 @@ class PulpClient:
     ) -> typing.Union[str, None]:
         repository_data = await self.request('GET', repo_href)
         return repository_data.get('latest_version_href')
-    
-    async def iter_repo_packages(self, version_href: str, limit: int = 1000, fields=None):
+
+    async def iter_repo_packages(self, version_href: str,
+                                 limit: int = 1000, fields=None):
         payload = {'repository_version': version_href, 'limit': limit}
         if fields is not None:
             payload['fields'] = fields

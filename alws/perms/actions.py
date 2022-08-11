@@ -30,7 +30,8 @@ __all__ = [
     'ReadPlatform',
     'UpdatePlatform',
     'DeletePlatform',
-    'ReleaseToPlatform',
+    'ReadSignKeyInfo',
+    'UseSignKey',
 ]
 
 
@@ -134,9 +135,13 @@ DeletePlatform = Action(
     name='delete_platform',
     description='Ability to delete a platform'
 )
-ReleaseToPlatform = Action(
-    name='release_to_platform',
-    description='Ability to release to a platform'
+ReadSignKeyInfo = Action(
+    name='read_sign_key_info',
+    description='Ability to read sign key information'
+)
+UseSignKey = Action(
+    name='use_sign_key',
+    description='Ability to use sign key'
 )
 
 ActionsList = [
@@ -165,7 +170,9 @@ ActionsList = [
     ReadPlatform,
     UpdatePlatform,
     DeletePlatform,
-    ReleaseToPlatform,
+
+    ReadSignKeyInfo,
+    UseSignKey,
 ]
 
 ActionsMaskMapping = {
@@ -194,5 +201,7 @@ ActionsMaskMapping = {
     ReadPlatform.name: Permissions.READ,
     UpdatePlatform.name: Permissions.WRITE,
     DeletePlatform.name: Permissions.DELETE,
-    ReleaseToPlatform.name: Permissions.WRITE,
+
+    ReadSignKeyInfo.name: Permissions.READ,
+    UseSignKey.name: Permissions.WRITE,
 }

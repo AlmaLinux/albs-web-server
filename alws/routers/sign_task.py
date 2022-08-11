@@ -34,8 +34,9 @@ async def get_sign_tasks(build_id: int = None,
 
 @router.post('/', response_model=sign_schema.SignTask)
 async def create_sign_task(payload: sign_schema.SignTaskCreate,
-                           db: database.Session = Depends(get_db)):
-    return await sign_task.create_sign_task(db, payload)
+                           db: database.Session = Depends(get_db),
+                           user=Depends(get_current_user)):
+    return await sign_task.create_sign_task(db, payload, user.id)
 
 
 @router.post('/get_sign_task/',

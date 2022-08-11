@@ -9,7 +9,12 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.errors import DataNotFoundError, PermissionDenied
+from alws.errors import (
+    BuildError,
+    DataNotFoundError,
+    PermissionDenied,
+)
+from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
@@ -40,7 +45,7 @@ async def create_build(
     if not user:
         raise ValueError(f'Cannot find user with id {user_id}')
 
-    if not can_perform(product, user, 'create_build'):
+    if not can_perform(product, user, actions.CreateBuild.name):
         raise PermissionDenied(
             f'User has no permissions '
             f'to create build for the product "{product.name}"'
@@ -183,12 +188,13 @@ async def get_module_preview(
     )
 
 
-async def remove_build_job(db: Session, build_id: int) -> bool:
+async def remove_build_job(db: Session, build_id: int):
     query_bj = select(models.Build).where(
         models.Build.id == build_id).options(
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.artifacts),
         selectinload(models.Build.repos),
+        selectinload(models.Build.products),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.test_tasks).selectinload(
             models.TestTask.artifacts)
@@ -205,8 +211,17 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         build = build.scalars().first()
         if build is None:
             raise DataNotFoundError(f'Build with {build_id} not found')
+        if build.products:
+            product_names = "\n".join((
+                product.name
+                for product in build.products
+            ))
+            raise BuildError(
+                f"Cannot delete Build={build_id}, "
+                f"build contains in following products:\n{product_names}"
+            )
         if build.released:
-            return False
+            raise BuildError(f"Build with {build_id} is released")
         for bt in build.tasks:
             build_task_ids.append(bt.id)
             build_task_ref_ids.append(bt.ref_id)
@@ -288,4 +303,3 @@ async def remove_build_job(db: Session, build_id: int) -> bool:
         await db.execute(
             delete(models.Build).where(models.Build.id == build_id))
         await db.commit()
-    return True

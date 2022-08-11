@@ -17,7 +17,7 @@ from alws.crud import (
     platform_flavors as flavors_crud
 )
 from alws.dependencies import get_db
-from alws.errors import DataNotFoundError, PermissionDenied
+from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.schemas import build_schema
 
 
@@ -97,18 +97,17 @@ async def restart_failed_build_items(build_id: int,
     return await build_node.update_failed_build_items(db, build_id)
 
 
-@router.delete('/{build_id}/remove', status_code=204)
+@router.delete('/{build_id}/remove', status_code=status.HTTP_204_NO_CONTENT)
 async def remove_build(build_id: int, db: database.Session = Depends(get_db)):
     try:
-        result = await build_crud.remove_build_job(db, build_id)
-    except DataNotFoundError:
+        await build_crud.remove_build_job(db, build_id)
+    except DataNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Build with {build_id=} is not found',
+            detail=str(exc),
         )
-    if not result:
+    except BuildError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f'Build with {build_id=} is released',
+            detail=str(exc),
         )
-    return result

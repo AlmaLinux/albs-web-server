@@ -17,6 +17,7 @@ from alws.constants import (
 from alws.crud.teams import create_team, create_team_roles
 from alws.crud.products import create_product
 from alws.schemas.product_schema import ProductCreate
+from alws.schemas.team_schema import TeamCreate
 
 
 async def ensure_system_user_exists(session: database.Session) -> models.User:
@@ -37,11 +38,13 @@ async def main():
         objs = []
         system_user = await ensure_system_user_exists(db)
         alma_team = await create_team(
-            db, DEFAULT_TEAM, system_user.id, flush=True
+            session=db,
+            payload=TeamCreate(team_name=DEFAULT_TEAM, user_id=system_user.id),
+            flush=True,
         )
         await create_product(
             db, ProductCreate(name=DEFAULT_PRODUCT, team_id=alma_team.id,
-                              owner_id=system_user.id)
+                              owner_id=system_user.id, title=DEFAULT_PRODUCT)
         )
         await db.execute(update(models.SignKey).where(
             models.SignKey.owner_id.is_(None)).values(owner_id=system_user.id))
@@ -50,12 +53,6 @@ async def main():
         ).values(owner_id=system_user.id))
         await db.execute(update(models.Build).where(
             models.Build.team_id.is_(None),
-        ).values(team_id=alma_team.id))
-        await db.execute(update(models.Distribution).where(
-            models.Distribution.owner_id.is_(None),
-        ).values(owner_id=system_user.id))
-        await db.execute(update(models.Distribution).where(
-            models.Distribution.team_id.is_(None),
         ).values(team_id=alma_team.id))
         await db.execute(update(models.Platform).where(
             models.Platform.owner_id.is_(None),

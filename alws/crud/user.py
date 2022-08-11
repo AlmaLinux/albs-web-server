@@ -13,12 +13,15 @@ async def get_user(
             user_name: typing.Optional[str] = None,
             user_email: typing.Optional[str] = None
         ) -> models.User:
-    query = models.User.id == user_id
+    query = select(models.User).options(
+        selectinload(models.User.roles).selectinload(models.UserRole.actions),
+    )
+    condition = models.User.id == user_id
     if user_name is not None:
-        query = models.User.name == user_name
+        condition = models.User.name == user_name
     elif user_email is not None:
-        query = models.User.email == user_email
-    db_user = await db.execute(select(models.User).where(query))
+        condition = models.User.email == user_email
+    db_user = await db.execute(query.where(condition))
     return db_user.scalars().first()
 
 
@@ -36,3 +39,13 @@ async def activate_user(user_id: int, db: Session):
 async def deactivate_user(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=False, is_active=False))
+
+
+async def make_superuser(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_superuser=True))
+
+
+async def make_usual_user(user_id: int, db: Session):
+    await db.execute(update(models.User).where(
+        models.User.id == user_id).values(is_superuser=False))

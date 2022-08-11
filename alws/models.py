@@ -171,6 +171,26 @@ ReferencePlatforms = sqlalchemy.Table(
 )
 
 
+PlatformRoleMapping = sqlalchemy.Table(
+    'platform_role_mapping',
+    Base.metadata,
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'platforms.id', name='platform_role_mapping_platform_id_fkey'),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'role_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'user_roles.id', name='platform_role_mapping_user_id_fkey'),
+        primary_key=True
+    )
+)
+
+
 class Platform(PermissionsMixin, Base):
 
     __tablename__ = 'platforms'
@@ -205,6 +225,9 @@ class Platform(PermissionsMixin, Base):
     )
     repos = relationship('Repository', secondary=PlatformRepo)
     sign_keys = relationship('SignKey', back_populates='platform')
+    roles = relationship(
+        'UserRole', secondary=PlatformRoleMapping
+    )
 
 
 class CustomRepoRepr(Base):
@@ -239,7 +262,8 @@ class Repository(CustomRepoRepr, PermissionsMixin):
 class RepositoryRemote(CustomRepoRepr):
     __tablename__ = 'repository_remotes'
     __tableargs__ = [
-        sqlalchemy.UniqueConstraint('name', 'arch', 'url', name='repo_remote_uix')
+        sqlalchemy.UniqueConstraint('name', 'arch', 'url',
+                                    name='repo_remote_uix')
     ]
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -318,6 +342,13 @@ class Build(PermissionsMixin, TeamMixin, Base):
     binary_rpms = relationship('BinaryRpm', back_populates='build')
     platform_flavors = relationship(
         'PlatformFlavour', secondary=BuildPlatformFlavour
+    )
+    products = relationship(
+        'Product',
+        secondary='product_packages',
+        back_populates='builds',
+        cascade='all, delete',
+        passive_deletes=True,
     )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
@@ -528,13 +559,21 @@ ActionRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'action_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_actions.id'),
+        sqlalchemy.ForeignKey(
+            'user_actions.id',
+            ondelete='CASCADE',
+            name='fk_action_role_mapping_action_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_action_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -560,13 +599,21 @@ UserRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'user_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('users.id'),
+        sqlalchemy.ForeignKey(
+            'users.id',
+            ondelete='CASCADE',
+            name='fk_user_role_mapping_user_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_user_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -577,13 +624,21 @@ ProductRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'product_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('products.id'),
+        sqlalchemy.ForeignKey(
+            'products.id',
+            ondelete='CASCADE',
+            name='fk_product_role_mapping_product_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_product_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -594,13 +649,21 @@ TeamRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'team_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('teams.id'),
+        sqlalchemy.ForeignKey(
+            'teams.id',
+            ondelete='CASCADE',
+            name='fk_team_role_mapping_team_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_team_role_mapping_role_id',
+        ),
         primary_key=True
     )
 )
@@ -677,12 +740,88 @@ class Team(PermissionsMixin, Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     members = relationship(
-        'User', secondary=TeamUserMapping, back_populates='teams'
+        'User',
+        secondary=TeamUserMapping,
+        back_populates='teams'
     )
     products = relationship('Product', back_populates='team')
     roles = relationship(
-        'UserRole', secondary=TeamRoleMapping
+        'UserRole',
+        secondary=TeamRoleMapping,
+        cascade='all, delete',
     )
+
+
+ProductRepositories = sqlalchemy.Table(
+    'product_repositories',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_repositories_products_id',
+        ),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        'repository_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'repositories.id',
+            name='fk_product_repositories_repositories_id',
+        ),
+        primary_key=True,
+    )
+)
+
+
+ProductBuilds = sqlalchemy.Table(
+    'product_packages',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_packages_products_id',
+        ),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        'build_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'builds.id',
+            name='fk_product_packages_builds_id',
+        ),
+        primary_key=True,
+    )
+)
+
+
+ProductPlatforms = sqlalchemy.Table(
+    'product_platforms',
+    Base.metadata,
+    sqlalchemy.Column(
+        'product_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='fk_product_platforms_products_id',
+        ),
+        primary_key=True
+    ),
+    sqlalchemy.Column(
+        'platform_id',
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'platforms.id',
+            name='fk_product_platforms_platforms_id',
+        ),
+        primary_key=True
+    )
+)
 
 
 class Product(PermissionsMixin, TeamMixin, Base):
@@ -691,10 +830,35 @@ class Product(PermissionsMixin, TeamMixin, Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    # FIXME: change nullable to False after population
+    title = sqlalchemy.Column(sqlalchemy.String(100), nullable=True)
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     team = relationship('Team', back_populates='products')
     roles = relationship(
         'UserRole', secondary=ProductRoleMapping
     )
+    repositories = relationship(
+        'Repository',
+        secondary=ProductRepositories,
+        cascade='all, delete',
+    )
+    platforms = relationship(
+        'Platform',
+        secondary=ProductPlatforms,
+    )
+    builds = relationship(
+        'Build',
+        secondary=ProductBuilds,
+        back_populates='products',
+    )
+
+    @property
+    def full_name(self) -> str:
+        return f'{self.owner.username}/{self.name}'
+
+    @property
+    def pulp_base_distro_name(self) -> str:
+        return f'{self.owner.username}-{self.name}'
 
 
 class TestTask(Base):
@@ -738,7 +902,7 @@ class TestTaskArtifact(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
-class Release(PermissionsMixin, Base):
+class Release(PermissionsMixin, TeamMixin, Base):
     __tablename__ = 'build_releases'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -769,13 +933,21 @@ SignKeyRoleMapping = sqlalchemy.Table(
     sqlalchemy.Column(
         'sign_key_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
+        sqlalchemy.ForeignKey(
+            'sign_keys.id',
+            ondelete='CASCADE',
+            name='fk_sign_key_role_mapping_sign_key_id',
+        ),
         primary_key=True
     ),
     sqlalchemy.Column(
         'role_id',
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('user_roles.id'),
+        sqlalchemy.ForeignKey(
+            'user_roles.id',
+            ondelete='CASCADE',
+            name='fk_sign_key_role_mapping_role_id'
+        ),
         primary_key=True
     )
 )
@@ -1040,7 +1212,8 @@ class ErrataToALBSPackage(Base):
         ),
         nullable=False
     )
-    errata_package = relationship('ErrataPackage', back_populates='albs_packages')
+    errata_package = relationship('ErrataPackage',
+                                  back_populates='albs_packages')
     albs_artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_artifacts.id'),
@@ -1048,7 +1221,8 @@ class ErrataToALBSPackage(Base):
     )
     build_artifact: BuildTaskArtifact = relationship('BuildTaskArtifact')
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus), nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus),
+                               nullable=False)
 
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)

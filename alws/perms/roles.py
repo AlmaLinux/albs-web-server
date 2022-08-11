@@ -9,9 +9,9 @@ __all__ = [
     'Contributor',
     'Manager',
     'Observer',
-    'PlatformMaintainer',
     'ProductMaintainer',
     'Signer',
+    'RolesList',
 ]
 
 
@@ -42,6 +42,7 @@ Manager = Role(
         actions.ReadProduct.name,
         actions.UpdateProduct.name,
         actions.DeleteProduct.name,
+        actions.ReadSignKeyInfo.name,
     ]
 )
 
@@ -82,21 +83,7 @@ ProductMaintainer = Role(
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
         actions.ReleaseToProduct.name,
-    ]
-)
-
-PlatformMaintainer = Role(
-    name='platform_maintainer',
-    actions=[
-        actions.ReadTeam.name,
-        actions.ReadBuild.name,
-        actions.LeaveTeam.name,
-        actions.CreateTeam.name,
-        actions.CreateBuild.name,
-        actions.CreateProduct.name,
-        actions.ReadProduct.name,
-        actions.ReadPlatform.name,
-        actions.ReleaseToPlatform.name,
+        actions.ReadSignKeyInfo.name,
     ]
 )
 
@@ -112,5 +99,15 @@ Signer = Role(
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
         actions.SignBuild.name,
+        actions.ReadSignKeyInfo.name,
+        actions.UseSignKey.name,
     ]
 )
+
+RolesList = [
+    Contributor,
+    Observer,
+    Manager,
+    ProductMaintainer,
+    Signer,
+]
