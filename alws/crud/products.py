@@ -10,8 +10,12 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
+from alws.crud.user import get_user
+from alws.crud.teams import get_teams
 from alws.database import Session
-from alws.errors import ProductError
+from alws.errors import ProductError, PermissionDenied
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import create_product_repo
@@ -33,18 +37,16 @@ async def create_product(
                              settings.pulp_password)
     items_to_insert = []
     repo_tasks = []
-    team_id = (await db.execute(select(models.Team.id).where(
-        models.Team.id == payload.team_id))).scalars().first()
-    if not team_id:
+
+    team = await get_teams(db, team_id=payload.team_id)
+    if not team:
         raise ProductError(f'Incorrect team ID: {payload.team_id}')
 
-    owner = (await db.execute(select(models.User).where(
-        models.User.id == payload.owner_id))).scalars().first()
+    owner = await get_user(db, user_id=payload.owner_id)
     if not owner:
         raise ProductError(f'Incorrect owner ID: {payload.owner_id}')
 
-    product = (await db.execute(select(models.Product).where(
-        models.Product.name == payload.name))).scalars().first()
+    product = await get_products(db, product_name=payload.name)
     if product:
         raise ProductError(f'Product with name={payload.name} already exist')
 
@@ -57,7 +59,15 @@ async def create_product(
             ]),
         ),
     )).scalars().all()
-    items_to_insert.append(product)
+    db.add(product)
+    await db.flush()
+    await db.refresh(product)
+
+    product = await get_products(db, product_name=payload.name)
+    if not can_perform(product, owner, actions.CreateProduct.name):
+        raise PermissionDenied(
+            'User has no permissions to create the product'
+        )
     for platform in product.platforms:
         platform_name = platform.name.lower()
         repo_tasks.extend((
@@ -83,6 +93,7 @@ async def create_product(
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)
+    items_to_insert.append(product)
 
     db.add_all(items_to_insert)
     await db.flush()
@@ -95,6 +106,7 @@ async def get_products(
     search_string: str = None,
     page_number: int = None,
     product_id: int = None,
+    product_name: str = None,
 ) -> typing.Union[
     typing.List[models.Product],
     models.Product,
@@ -108,8 +120,12 @@ async def get_products(
             selectinload(models.Product.owner),
             selectinload(models.Product.platforms),
             selectinload(models.Product.repositories),
-            selectinload(models.Product.team).selectinload(models.Team.owner),
-            selectinload(models.Product.team).selectinload(models.Team.roles),
+            selectinload(models.Product.roles).selectinload(
+                models.UserRole.actions),
+            selectinload(models.Product.team).selectinload(
+                models.Team.owner),
+            selectinload(models.Product.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
             selectinload(models.Product.team).selectinload(
                 models.Team.members),
             selectinload(models.Product.team).selectinload(
@@ -134,8 +150,11 @@ async def get_products(
             ).scalar(),
             'current_page': page_number,
         }
-    if product_id:
-        query = generate_query().where(models.Product.id == product_id)
+    if product_id or product_name:
+        query = generate_query().where(or_(
+            models.Product.id == product_id,
+            models.Product.name == product_name,
+        ))
         return (await db.execute(query)).scalars().first()
     return (await db.execute(generate_query())).scalars().all()
 
@@ -143,16 +162,15 @@ async def get_products(
 async def remove_product(
     db: Session,
     product_id: int,
+    user_id: int,
 ):
 
-    db_product = (await db.execute(
-        select(models.Product).where(
-            models.Product.id == product_id,
-        ).options(
-            selectinload(models.Product.owner),
-            selectinload(models.Product.repositories),
-        ),
-    )).scalars().first()
+    db_product = await get_products(db, product_id=product_id)
+    db_user = await get_user(db, user_id=user_id)
+    if not can_perform(db_product, db_user, actions.DeleteProduct.name):
+        raise PermissionDenied(
+            f"User has no permissions to delete the product {db_product.name}"
+        )
     if not db_product:
         raise Exception(f"Product={product_id} doesn't exist")
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
@@ -245,20 +263,21 @@ async def modify_product(
     db: Session,
     build_id: int,
     product: str,
+    user_id: int,
     modification: str,
     force: bool = False,
 ):
 
     async with db.begin():
-        db_product = await db.execute(
-            select(models.Product).where(
-                models.Product.name.__eq__(product),
-            ).options(
-                selectinload(models.Product.repositories),
-                selectinload(models.Product.builds),
-            ),
-        )
-        db_product = db_product.scalars().first()
+        db_product = await get_products(db, product_name=product)
+        db_user = await get_user(db, user_id=user_id)
+        if not db_user:
+            raise
+        if not can_perform(db_product, db_user, actions.UpdateProduct.name):
+            raise PermissionDenied(
+                f'User has no permissions '
+                f'to modify the product "{db_product.name}"'
+            )
 
         db_build = await db.execute(
             select(models.Build).where(

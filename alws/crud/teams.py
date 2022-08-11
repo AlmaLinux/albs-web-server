@@ -117,7 +117,7 @@ async def get_teams(
         query = select(Team).order_by(Team.id.desc()).options(
             selectinload(Team.members),
             selectinload(Team.owner),
-            selectinload(Team.roles),
+            selectinload(Team.roles).selectinload(UserRole.actions),
             selectinload(Team.products),
         )
         if count:
@@ -171,16 +171,20 @@ async def update_members(
         if Contributor.name in role.name
     )
     operation = 'append' if modification == 'add' else 'remove'
-    db_team_members_update = getattr(db_team.members, operation)
+    db_team_members_update_operation = getattr(db_team.members, operation)
     for db_user in db_users.scalars().all():
         if operation == 'remove' and db_user not in db_team.members:
             raise TeamError(
                 f'Cannot remove user={db_user.id} from team,'
                 ' user not in team members'
             )
-        db_user_role_update = getattr(db_user.roles, operation)
-        db_team_members_update(db_user)
-        db_user_role_update(db_contributor_team_role)
+        db_user_role_update_operation = getattr(db_user.roles, operation)
+        db_team_members_update_operation(db_user)
+        db_user_role_update_operation(db_contributor_team_role)
+        if operation == 'remove':
+            for user_role in db_user.roles:
+                if user_role in db_team.roles:
+                    db_user_role_update_operation(user_role)
         items_to_update.append(db_user)
     items_to_update.append(db_team)
     session.add_all(items_to_update)

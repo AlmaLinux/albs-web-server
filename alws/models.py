@@ -837,7 +837,6 @@ ProductBuilds = sqlalchemy.Table(
         sqlalchemy.ForeignKey(
             'products.id',
             name='fk_product_packages_products_id',
-            ondelete='CASCADE',
         ),
         primary_key=True,
     ),
@@ -847,7 +846,6 @@ ProductBuilds = sqlalchemy.Table(
         sqlalchemy.ForeignKey(
             'builds.id',
             name='fk_product_packages_builds_id',
-            ondelete='CASCADE',
         ),
         primary_key=True,
     )
@@ -863,7 +861,6 @@ ProductPlatforms = sqlalchemy.Table(
         sqlalchemy.ForeignKey(
             'products.id',
             name='fk_product_platforms_products_id',
-            ondelete='CASCADE',
         ),
         primary_key=True
     ),
@@ -873,7 +870,6 @@ ProductPlatforms = sqlalchemy.Table(
         sqlalchemy.ForeignKey(
             'platforms.id',
             name='fk_product_platforms_platforms_id',
-            ondelete='CASCADE',
         ),
         primary_key=True
     )
@@ -901,15 +897,11 @@ class Product(PermissionsMixin, TeamMixin, Base):
     platforms = relationship(
         'Platform',
         secondary=ProductPlatforms,
-        cascade='all, delete',
-        passive_deletes=True,
     )
     builds = relationship(
         'Build',
         secondary=ProductBuilds,
         back_populates='products',
-        cascade='all, delete',
-        passive_deletes=True,
     )
 
     @property

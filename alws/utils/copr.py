@@ -37,7 +37,7 @@ def generate_repo_config(
 def get_copr_chroot_repo_key(repo_name: str) -> str:
     # we should return repositories by "distr_name-distr_ver-arch" key
     # e.g.: test_user-test_product-AlmaLinux-8-i686-dr -> "epel-8-i686"
-    repo_name = repo_name.replace('-AlmaLinux-', '-epel-')
+    repo_name = repo_name.lower().replace('-almalinux-', '-epel-')
     start_index = -4
     if repo_name.endswith('debug-dr'):
         start_index = -5
