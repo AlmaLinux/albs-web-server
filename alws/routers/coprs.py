@@ -78,6 +78,6 @@ async def get_dnf_repo_config(
     for product_repo in db_product.repositories:
         if product_repo.debug or arch != product_repo.arch:
             continue
-        if product_repo.name.endswith(clean_chroot):
+        if product_repo.name.lower().endswith(clean_chroot):
             return generate_repo_config(product_repo, ownername)
     return f'Chroot {chroot} doesn`t exist in {full_name}'
