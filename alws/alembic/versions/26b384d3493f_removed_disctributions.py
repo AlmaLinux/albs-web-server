@@ -1,7 +1,7 @@
 """Removed Distributions
 
 Revision ID: 26b384d3493f
-Revises: 9c9b0fdc1a7f
+Revises: 46393610f521
 Create Date: 2022-07-27 15:35:12.334677
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "26b384d3493f"
-down_revision = "9c9b0fdc1a7f"
+down_revision = "46393610f521"
 branch_labels = None
 depends_on = None
 
