@@ -153,63 +153,6 @@ BuildPlatformFlavour = sqlalchemy.Table(
     )
 )
 
-# FIXME: delete after Product population
-PlatformDependency = sqlalchemy.Table(
-    'platform_dependency',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'platform_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        primary_key=True
-    )
-)
-
-
-# FIXME: delete after Product population
-DistributionRepositories = sqlalchemy.Table(
-    'distribution_repositories',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'repository_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
-)
-
-
-# FIXME: delete after Product population
-DistributionBuilds = sqlalchemy.Table(
-    'distribution_packages',
-    Base.metadata,
-    sqlalchemy.Column(
-        'distribution_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('distributions.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'build_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
-    )
-)
-
-
 ReferencePlatforms = sqlalchemy.Table(
     'reference_platforms',
     Base.metadata,
@@ -285,24 +228,6 @@ class Platform(PermissionsMixin, Base):
     roles = relationship(
         'UserRole', secondary=PlatformRoleMapping
     )
-
-
-# FIXME: delete after Product population
-class Distribution(PermissionsMixin, TeamMixin, Base):
-
-    __tablename__ = 'distributions'
-
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    name = sqlalchemy.Column(
-        sqlalchemy.Text,
-        nullable=False,
-        unique=True,
-        index=True
-    )
-    platforms = relationship('Platform', secondary=PlatformDependency)
-    repositories = relationship('Repository',
-                                secondary=DistributionRepositories)
-    builds = relationship('Build', secondary=DistributionBuilds)
 
 
 class CustomRepoRepr(Base):
