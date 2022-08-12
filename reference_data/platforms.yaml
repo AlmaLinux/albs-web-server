@@ -55,6 +55,8 @@
       dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: dnf
       releasever: '8'
+      environment:
+        DFLTCC: '0'
       use_bootstrap_container: false
       macros:
         "%__pesign_cert": "%pe_signing_cert"
