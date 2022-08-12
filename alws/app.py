@@ -33,7 +33,7 @@ graceful_terminate_event = threading.Event()
 
 
 async def permissions_denied_handler(request: Request, exc):
-    return JSONResponse(content={'message': str(exc)}, status_code=401)
+    return JSONResponse(content={'detail': str(exc)}, status_code=403)
 
 
 app.add_middleware(ExceptionMiddleware,

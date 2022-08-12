@@ -4,7 +4,11 @@ import typing
 import datetime
 
 import aioredis
-from fastapi import APIRouter, Depends, WebSocket
+from fastapi import (
+    APIRouter,
+    Depends,
+    WebSocket,
+)
 
 from alws import database
 from alws.auth import get_current_user
@@ -64,11 +68,12 @@ async def complete_sign_task(
     return {'success': True}
 
 
-@router.post('/sync_sign_task/',
-             response_model=typing.Union[
-                 sign_schema.SyncSignTaskResponse,
-                 sign_schema.SyncSignTaskError
-            ]
+@router.post(
+    '/sync_sign_task/',
+    response_model=typing.Union[
+        sign_schema.SyncSignTaskResponse,
+        sign_schema.SyncSignTaskError,
+    ],
 )
 async def create_small_sign_task(
             payload: sign_schema.SyncSignTaskRequest,

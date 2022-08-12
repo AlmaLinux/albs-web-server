@@ -270,7 +270,7 @@ async def modify_product(
         db_user = await get_user(db, user_id=user_id)
         if not db_user:
             raise
-        if not can_perform(db_product, db_user, actions.UpdateProduct.name):
+        if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
             raise PermissionDenied(
                 f'User has no permissions '
                 f'to modify the product "{db_product.name}"'

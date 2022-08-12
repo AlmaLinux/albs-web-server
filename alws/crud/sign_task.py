@@ -60,14 +60,16 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
     async with db.begin():
         user = (await db.execute(select(models.User).where(
             models.User.id == user_id).options(
-            selectinload(models.User.roles).selectinload(models.UserRole.actions)
+            selectinload(models.User.roles)
+            .selectinload(models.UserRole.actions)
         ))).scalars().first()
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
                 selectinload(models.Build.source_rpms),
                 selectinload(models.Build.binary_rpms),
-                selectinload(models.Build.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
+                selectinload(models.Build.team)
+                .selectinload(models.Team.roles)
+                .selectinload(models.UserRole.actions),
         ))
         build = builds.scalars().first()
         if not build:
@@ -81,8 +83,9 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
                 f'No built packages in build with ID {payload.build_id}')
         sign_keys = await db.execute(select(models.SignKey).where(
             models.SignKey.id == payload.sign_key_id).options(
-            selectinload(models.SignKey.roles).selectinload(
-                models.UserRole.actions)
+                selectinload(models.SignKey.owner),
+                selectinload(models.SignKey.roles)
+                .selectinload(models.UserRole.actions)
         ))
         sign_key = sign_keys.scalars().first()
 
