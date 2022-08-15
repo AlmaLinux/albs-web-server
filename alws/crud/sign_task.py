@@ -67,6 +67,9 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
             models.Build.id == payload.build_id).options(
                 selectinload(models.Build.source_rpms),
                 selectinload(models.Build.binary_rpms),
+                selectinload(models.Build.owner)
+                .selectinload(models.User.roles)
+                .selectinload(models.UserRole.actions),
                 selectinload(models.Build.team)
                 .selectinload(models.Team.roles)
                 .selectinload(models.UserRole.actions),

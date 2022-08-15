@@ -10,7 +10,11 @@ from sqlalchemy.orm import selectinload
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws import models
-from alws.crud import teams as team_crud, user as user_crud
+from alws.crud import (
+    actions as action_crud,
+    roles as role_crud,
+    teams as team_crud, user as user_crud,
+)
 from alws.dependencies import get_db
 from alws.perms.roles import RolesList
 
@@ -38,6 +42,8 @@ def parse_args():
                         action='store_true', help='Make user a superuser')
     parser.add_argument('-u', '--usual-user', required=False,
                         action='store_true', help='Make user a usual one')
+    parser.add_argument('-f', '--fix', required=False, action='store_true',
+                        help='Fix roles and actions')
     return parser.parse_args()
 
 
@@ -60,6 +66,10 @@ async def main() -> int:
             if arguments.superuser and arguments.usual_user:
                 raise ValueError('Cannot both make user a superuser '
                                  'and usual one')
+
+            if arguments.fix:
+                await action_crud.ensure_all_actions_exist(db)
+                await role_crud.fix_roles_actions(db)
 
             if arguments.verify:
                 await user_crud.activate_user(user.id, db)
