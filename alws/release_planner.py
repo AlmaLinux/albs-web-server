@@ -1111,7 +1111,7 @@ class ReleasePlanner:
                 raise DataNotFoundError(
                     f'Release with ID {release_id} not found')
 
-            if can_perform(release, user, actions.ReleaseToProduct.name):
+            if not can_perform(release, user, actions.ReleaseToProduct.name):
                 raise PermissionDenied('User does not have permissions '
                                        'to update release')
 
