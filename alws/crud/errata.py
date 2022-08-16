@@ -898,6 +898,9 @@ async def prepare_updateinfo_mapping(
             errata_pkgs = await db.execute(
                 select(models.ErrataToALBSPackage).where(
                     models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
+                    # we should release only approved bulletins
+                    models.ErrataToALBSPackage.status
+                    == ErrataPackageStatus.approved,
                 ).options(
                     selectinload(models.ErrataToALBSPackage.errata_package)
                 )
