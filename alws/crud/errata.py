@@ -574,11 +574,17 @@ async def create_errata_record(db, errata: BaseErrataRecord):
                     public=ref.cve.public,
                 )
                 items_to_insert.append(db_cve)
+        ref_title = ""
+        if ref.ref_type in (
+            ErrataReferenceType.cve.value,
+            ErrataReferenceType.rhsa.value,
+        ):
+            ref_title = ref.ref_id
         db_reference = models.ErrataReference(
             href=ref.href,
             ref_id=ref.ref_id,
             ref_type=ref.ref_type,
-            title="",
+            title=ref_title,
             cve=db_cve,
         )
         if ref.ref_type == ErrataReferenceType.self_ref.value:
