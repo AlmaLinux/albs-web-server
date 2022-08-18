@@ -24,4 +24,4 @@ pgpy==0.5.4
 markdown==3.4.1
 fastapi-users-db-sqlalchemy==4.0.3
 httpx-oauth==0.7.0
-git+https://git.almalinux.org/almalinux/cas_wrapper.git@0.0.2#egg=cas_wrapper
+git+https://git.almalinux.org/almalinux/cas_wrapper.git@0.0.3#egg=cas_wrapper
