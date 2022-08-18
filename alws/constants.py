@@ -15,6 +15,8 @@ __all__ = [
     'BuildTaskStatus',
     'BuildTaskRefType',
     'ExportStatus',
+    'ErrataPackageStatus',
+    'ErrataReferenceType',
     'PackageNevra',
     'Permissions',
     'PermissionTriad',
@@ -71,6 +73,20 @@ class TestCaseStatus(enum.IntEnum):
     DONE = 2
     TODO = 3
     SKIPPED = 4
+
+
+class ErrataPackageStatus(enum.Enum):
+    proposal = 'proposal'
+    skipped = 'skipped'
+    released = 'released'
+    approved = 'approved'
+
+
+class ErrataReferenceType(enum.Enum):
+    cve = 'cve'
+    rhsa = 'rhsa'
+    self_ref = 'self'
+    bugzilla = 'bugzilla'
 
 
 class ReleaseStatus(enum.IntEnum):

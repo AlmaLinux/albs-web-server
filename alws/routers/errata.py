@@ -20,7 +20,8 @@ router = APIRouter(
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
 async def create_errata_record(
-    errata: errata_schema.BaseErrataRecord, db: database.Session = Depends(get_db)
+    errata: errata_schema.BaseErrataRecord,
+    db: database.Session = Depends(get_db)
 ):
     record = await errata_crud.create_errata_record(
         db,
@@ -81,9 +82,9 @@ async def list_all_errata_records(
 ):
     return [
         {"id": record.id, "updated_date": record.updated_date}
-        for record in (await errata_crud.list_errata_records(db, compact=True))[
-            "records"
-        ]
+        for record in (
+            await errata_crud.list_errata_records(db, compact=True)
+        )["records"]
     ]
 
 
@@ -96,7 +97,9 @@ async def update_package_status(
     db: database.Session = Depends(get_db),
 ):
     try:
-        return {"ok": bool(await errata_crud.update_package_status(db, packages))}
+        return {
+            "ok": bool(await errata_crud.update_package_status(db, packages))
+        }
     except ValueError as e:
         return {"ok": False, "error": e.message}
 

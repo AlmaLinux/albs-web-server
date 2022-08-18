@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import enum
 import re
 
 import sqlalchemy
@@ -16,6 +15,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
 
 from alws.constants import (
+    ErrataPackageStatus,
+    ErrataReferenceType,
     Permissions,
     PermissionTriad,
     ReleaseStatus,
@@ -1109,13 +1110,6 @@ class ErrataRecord(Base):
         }[self.id[2:4]]
 
 
-class ErrataReferenceType(enum.Enum):
-    cve = 'cve'
-    rhsa = 'rhsa'
-    self_ref = 'self'
-    bugzilla = 'bugzilla'
-
-
 class ErrataReference(Base):
     __tablename__ = 'errata_references'
 
@@ -1182,13 +1176,6 @@ class ErrataPackage(Base):
         back_populates='errata_package',
         cascade="all, delete"
     )
-
-
-class ErrataPackageStatus(enum.Enum):
-    proposal = 'proposal'
-    skipped = 'skipped'
-    released = 'released'
-    approved = 'approved'
 
 
 class ErrataToALBSPackage(Base):

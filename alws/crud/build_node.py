@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, ErrataPackageStatus
 from alws.crud.errata import clean_release
 from alws.errors import (
     ArtifactConversionError,
@@ -246,7 +246,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
 
     def append_errata_package(_, errata_package, artifact, rpm_info):
         model = models.ErrataToALBSPackage(
-            status=models.ErrataPackageStatus.proposal,
+            status=ErrataPackageStatus.proposal,
             name=rpm_info['name'],
             version=rpm_info['version'],
             release=rpm_info['release'],

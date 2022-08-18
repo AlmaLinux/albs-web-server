@@ -3,12 +3,9 @@ import re
 import copy
 import logging
 import typing
-import uuid
-from datetime import datetime
 from collections import defaultdict
 
 from cas_wrapper import CasWrapper
-import createrepo_c as cr
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -32,8 +29,11 @@ from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
-from alws.pulp_models import UpdateRecord, UpdatePackage, UpdateCollection
-from alws.crud.errata import release_errata_packages
+from alws.crud.errata import (
+    append_update_packages_in_update_records,
+    prepare_updateinfo_mapping,
+    release_errata_packages,
+)
 
 
 class ReleasePlanner:
@@ -403,8 +403,10 @@ class ReleasePlanner:
                 'repo_arch_location': repo_arch_location,
             })
             added_packages.add(full_name)
-        pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
-            packages)
+        (
+            pkgs_from_repos,
+            pkgs_in_repos,
+        ) = await self.prepare_and_execute_async_tasks(packages)
 
         return {
             'packages': packages,
@@ -711,7 +713,8 @@ class ReleasePlanner:
                 # in some cases we get repos that we can't match
                 if release_repo is None:
                     logging.debug(
-                        "Skipping package=%s, cannot find prod repo by key: %s",
+                        "Skipping package=%s, "
+                        "cannot find prod repo by key: %s",
                         full_name,
                         release_repo_key,
                     )
@@ -735,8 +738,10 @@ class ReleasePlanner:
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
-        pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
-            packages)
+        (
+            pkgs_from_repos,
+            pkgs_in_repos,
+        ) = await self.prepare_and_execute_async_tasks(packages)
         return {
             'packages': packages,
             'packages_from_repos': pkgs_from_repos,
@@ -744,6 +749,51 @@ class ReleasePlanner:
             'modules': rpm_modules,
             'repositories': prod_repos,
         }
+
+    async def process_errata_release(
+        self,
+        repo: models.Repository,
+        packages: typing.List[str],
+    ):
+        updateinfo_mapping = await prepare_updateinfo_mapping(
+            self._db, self._pulp_client, packages,
+        )
+        latest_repo_version = (
+            await self._pulp_client.get_repo_latest_version(
+                repo.pulp_href,
+            )
+        )
+        errata_records = (
+            await self._pulp_client.list_updateinfo_records(
+                id__in=list(updateinfo_mapping.keys()),
+                repository_version=latest_repo_version,
+            )
+        )
+        append_update_packages_in_update_records(
+            self._pulp_db, errata_records, updateinfo_mapping,
+        )
+        db_records = await self._db.execute(
+            select(models.ErrataRecord).options(
+                selectinload(models.ErrataRecord.references)
+            ),
+        )
+        db_records = {
+            record.id: record
+            for record in db_records.scalars().all()
+        }
+        for record_id, packages in updateinfo_mapping.items():
+            db_record: models.ErrataRecord = db_records[record_id]
+            if db_record.platform_id != self.base_platform.id:
+                continue
+            errata_packages = [item[-1] for item in packages]
+            await release_errata_packages(
+                self._db,
+                self._pulp_client,
+                db_record,
+                errata_packages,
+                self.base_platform,
+                repo.pulp_href,
+            )
 
     async def authenticate_package(self, package_checksum: str):
         is_authenticated = self._cas_wrapper.authenticate_artifact(
@@ -780,10 +830,16 @@ class ReleasePlanner:
             is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
                 package, is_debug)
-            authenticate_tasks.append(
-                self.authenticate_package(package['sha256']))
-        pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
-            release_plan['packages'])
+            if self.codenotary_enabled:
+                authenticate_tasks.append(
+                    self.authenticate_package(package['sha256'])
+                )
+        (
+            pkgs_from_repos,
+            pkgs_in_repos,
+        ) = await self.prepare_and_execute_async_tasks(
+            release_plan['packages'],
+        )
         release_plan['packages_from_repos'] = pkgs_from_repos
         release_plan['packages_in_repos'] = pkgs_in_repos
         if self.codenotary_enabled:
@@ -900,93 +956,7 @@ class ReleasePlanner:
                         f'or doesn\'t have pulp_href field')
                 modify_tasks.append(self._pulp_client.modify_repository(
                     repo.pulp_href, add=packages))
-                updateinfo_mapping = defaultdict(list)
-                for pkg in set(packages):
-                    db_pkg_list = await self._db.execute(select(models.BuildTaskArtifact).where(
-                        models.BuildTaskArtifact.href == pkg
-                    ).options(selectinload(models.BuildTaskArtifact.build_task).selectinload(
-                        models.BuildTask.rpm_module
-                    )))
-                    db_pkg_list = db_pkg_list.scalars().all()
-                    for db_pkg in db_pkg_list:
-                        errata_pkgs = await self._db.execute(select(models.ErrataToALBSPackage).where(
-                            models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id
-                        ).options(selectinload(models.ErrataToALBSPackage.errata_package)))
-                        for errata_pkg in errata_pkgs.scalars().all():
-                            errata_pkg.status = models.ErrataPackageStatus.released
-                            errata = errata_pkg.errata_package.errata_record_id
-                            pulp_pkg = await self._pulp_client.get_rpm_package(
-                                db_pkg.href,
-                                include_fields=[
-                                    'name', 'version', 'release', 'epoch', 'arch',
-                                    'location_href', 'sha256', 'rpm_sourcerpm'
-                                ]
-                            )
-                            updateinfo_mapping[errata].append((db_pkg, pulp_pkg, errata_pkg))
-                errata_records = await self._pulp_client.list_updateinfo_records(
-                    id__in=list(updateinfo_mapping.keys()),
-                    repository_version=await self._pulp_client.get_repo_latest_version(
-                        repo.pulp_href
-                    )
-                )
-                with self._pulp_db.begin():
-                    for record in errata_records:
-                        record_uuid = uuid.UUID(record['pulp_href'].split('/')[-2])
-                        packages = updateinfo_mapping.pop(record['id'], None)
-                        if not packages:
-                            continue
-                        pulp_record = self._pulp_db.execute(
-                            select(UpdateRecord).where(
-                                UpdateRecord.content_ptr_id == record_uuid
-                            ).options(
-                                selectinload(
-                                    UpdateRecord.collections
-                                ).selectinload(
-                                    UpdateCollection.packages
-                                )
-                            )
-                        )
-                        pulp_record: UpdateRecord = pulp_record.scalars().first()
-                        for db_pkg, pulp_pkg, pkg in packages:
-                            already_released = False
-                            for collection in pulp_record.collections:
-                                for package in collection.packages:
-                                    if package.name == pulp_pkg['name']:
-                                        already_released = True
-                            if already_released:
-                                continue
-                            pulp_record.collections[0].packages.append(UpdatePackage(
-                                name=pulp_pkg['name'],
-                                filename=pulp_pkg['location_href'],
-                                arch=pulp_pkg['arch'],
-                                version=pulp_pkg['version'],
-                                release=pulp_pkg['release'],
-                                epoch=str(pulp_pkg['epoch']),
-                                reboot_suggested=pkg.errata_package.reboot_suggested,
-                                src=pulp_pkg['rpm_sourcerpm'],
-                                sum=pulp_pkg['sha256'],
-                                sum_type=cr.checksum_type('sha256'),
-                            ))
-                            pulp_record.updated_date = datetime.now().strftime(
-                                '%Y-%m-%d %H:%M:%S'
-                            )
-                db_records = await self._db.execute(select(models.ErrataRecord).options(
-                    selectinload(models.ErrataRecord.references)
-                ))
-                db_records = {record.id: record for record in db_records.scalars().all()}
-                for record_id, packages in updateinfo_mapping.items():
-                    db_record: models.ErrataRecord = db_records[record_id]
-                    if db_record.platform_id != self.base_platform.id:
-                        continue
-                    errata_packages = [item[-1] for item in packages]
-                    await release_errata_packages(
-                        self._db,
-                        self._pulp_client,
-                        db_record,
-                        errata_packages,
-                        self.base_platform,
-                        repo.pulp_href,
-                    )
+                await self.process_errata_release(repo, packages)
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self._pulp_client.create_rpm_publication(repo.pulp_href))
@@ -1000,9 +970,11 @@ class ReleasePlanner:
         payload: release_schema.ReleaseCreate,
     ) -> models.Release:
         async with self._db.begin():
-            user_q = select(models.User).where(models.User.id == user_id).options(
-                selectinload(models.User.roles).selectinload(
-                    models.UserRole.actions)
+            user_q = select(models.User).where(
+                models.User.id == user_id
+            ).options(
+                selectinload(models.User.roles)
+                .selectinload(models.UserRole.actions),
             )
             user_result = await self._db.execute(user_q)
             logging.info('User %d is creating a release', user_id)
@@ -1123,8 +1095,12 @@ class ReleasePlanner:
                     is_debug = is_debuginfo_rpm(package['name'])
                     await self.prepare_data_for_executing_async_tasks(
                         package, is_debug)
-                pkgs_from_repos, pkgs_in_repos = await self.prepare_and_execute_async_tasks(
-                    payload.plan['packages'])
+                (
+                    pkgs_from_repos,
+                    pkgs_in_repos,
+                ) = await self.prepare_and_execute_async_tasks(
+                    payload.plan['packages'],
+                )
                 payload.plan['packages_from_repos'] = pkgs_from_repos
                 payload.plan['packages_in_repos'] = pkgs_in_repos
                 release.plan = payload.plan
