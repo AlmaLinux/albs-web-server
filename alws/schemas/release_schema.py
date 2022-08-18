@@ -14,6 +14,17 @@ __all__ = [
 ]
 
 
+class ReleaseProduct(BaseModel):
+    id: int
+    name: str
+    title: typing.Optional[str]
+    description: typing.Optional[str]
+    is_community: bool
+
+    class Config:
+        orm_mode = True
+
+
 class Release(BaseModel):
     id: int
     status: int
@@ -23,6 +34,7 @@ class Release(BaseModel):
     plan: typing.Optional[typing.Dict[str, typing.Any]]
     owner: User
     platform: Platform
+    product: ReleaseProduct
 
     class Config:
         orm_mode = True

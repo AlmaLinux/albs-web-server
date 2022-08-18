@@ -6,7 +6,7 @@ from alws.schemas.user_schema import User
 from alws.schemas.role_schema import Role
 
 
-__all__ = ['Team']
+__all__ = ['Team', 'TeamCreate']
 
 
 class TeamCreate(BaseModel):

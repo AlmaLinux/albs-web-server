@@ -835,6 +835,8 @@ class Product(PermissionsMixin, TeamMixin, Base):
     title = sqlalchemy.Column(sqlalchemy.String(100), nullable=True)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     team = relationship('Team', back_populates='products')
+    is_community = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False,
+                                     default=True)
     roles = relationship(
         'UserRole', secondary=ProductRoleMapping
     )
@@ -921,6 +923,15 @@ class Release(PermissionsMixin, TeamMixin, Base):
         nullable=False
     )
     platform = relationship('Platform')
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='build_releases_product_id_fkey'
+        ),
+        nullable=False,
+    )
+    product = relationship('Product')
     plan = sqlalchemy.Column(JSONB, nullable=True)
     status = sqlalchemy.Column(
         sqlalchemy.Integer,

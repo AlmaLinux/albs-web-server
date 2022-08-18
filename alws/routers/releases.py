@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends
 from alws import database, models
 from alws.auth import get_current_user
 from alws.crud import release as r_crud
-from alws.dependencies import get_db, get_pulp_db
+from alws.dependencies import get_db
 from alws.schemas import release_schema
-from alws.release_planner import ReleasePlanner
 from alws.dramatiq import execute_release_plan
 from alws.constants import ReleaseStatus
 
@@ -32,10 +31,8 @@ async def get_releases(pageNumber: int = None,
 @router.post('/new/', response_model=release_schema.Release)
 async def create_new_release(payload: release_schema.ReleaseCreate,
                              db: database.Session = Depends(get_db),
-                             pulp_db: database.Session = Depends(get_pulp_db),
                              user: models.User = Depends(get_current_user)):
-    release_planner = ReleasePlanner(db, pulp_db)
-    release = await release_planner.create_new_release(user.id, payload)
+    release = await r_crud.create_release(db, user.id, payload)
     return release
 
 
@@ -43,11 +40,10 @@ async def create_new_release(payload: release_schema.ReleaseCreate,
 async def update_release(release_id: int,
                          payload: release_schema.ReleaseUpdate,
                          db: database.Session = Depends(get_db),
-                         pulp_db: database.Session = Depends(get_pulp_db),
                          user: models.User = Depends(get_current_user),
                          ):
-    release_planner = ReleasePlanner(db, pulp_db)
-    return await release_planner.update_release(release_id, payload, user.id)
+    release = await r_crud.update_release(db, release_id, user.id, payload)
+    return release
 
 
 @router.post('/{release_id}/commit/',

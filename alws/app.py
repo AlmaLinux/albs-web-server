@@ -4,8 +4,7 @@ import importlib
 import logging
 import threading
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from starlette.exceptions import ExceptionMiddleware
 
 from alws import routers
@@ -14,7 +13,7 @@ from alws.auth.backend import CookieBackend
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
-from alws.errors import PermissionDenied
+from alws.middlewares import handlers
 from alws.test_scheduler import TestTaskScheduler
 
 
@@ -32,12 +31,7 @@ terminate_event = threading.Event()
 graceful_terminate_event = threading.Event()
 
 
-async def permissions_denied_handler(request: Request, exc):
-    return JSONResponse(content={'detail': str(exc)}, status_code=403)
-
-
-app.add_middleware(ExceptionMiddleware,
-                   handlers={PermissionDenied: permissions_denied_handler})
+app.add_middleware(ExceptionMiddleware, handlers=handlers)
 
 
 @app.on_event('startup')

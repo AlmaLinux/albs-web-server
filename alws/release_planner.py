@@ -3,6 +3,7 @@ import re
 import copy
 import logging
 import typing
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
 from cas_wrapper import CasWrapper
@@ -14,6 +15,7 @@ from alws import models
 from alws.config import settings
 from alws.constants import ReleaseStatus, RepoType, PackageNevra
 from alws.crud import sign_task
+from alws.dependencies import get_pulp_db
 from alws.errors import (
     DataNotFoundError,
     EmptyReleasePlan,
@@ -37,23 +39,17 @@ from alws.crud.errata import (
 )
 
 
-class ReleasePlanner:
-    def __init__(self, db: Session, pulp_db: Session):
+__all__ = [
+    'CommunityReleasePlanner',
+    'AlmaLinuxReleasePlanner',
+    'get_releaser_class',
+]
+
+
+class BaseReleasePlanner(metaclass=ABCMeta):
+    def __init__(self, db: Session):
         self._db = db
-        self._pulp_db = pulp_db
-        self.pkgs_mapping = None
-        self.repo_data_by_href = None
-        self.pkgs_nevra = None
-        self.debug_pkgs_nevra = None
-        self.packages_presence_info = None
-        self.latest_repo_versions = None
-        self.base_platform = None
-        self.clean_base_dist_name_lower = None
-        self.repo_name_regex = re.compile(
-            r'\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)')
-        self.max_list_len = 100  # max elements in list for pulp request
-        self._beholder_client = BeholderClient(settings.beholder_host)
-        self._pulp_client = PulpClient(
+        self.pulp_client = PulpClient(
             settings.pulp_host,
             settings.pulp_user,
             settings.pulp_password,
@@ -65,11 +61,79 @@ class ReleasePlanner:
                 settings.cas_signer_id,
             )
 
+    @property
+    def db(self):
+        return self._db
+
+    @abstractmethod
+    def get_production_pulp_repositories_names(
+            self, product: models.Product = None,
+            platform: models.Platform = None,
+    ):
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def get_release_plan(
+            self,
+            base_platform: models.Platform,
+            build_ids: typing.List[int],
+            build_tasks: typing.List[int] = None,
+            product: models.Product = None,
+    ) -> dict:
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def update_release_plan(
+            self, plan: dict,
+            release: models.Release,
+    ) -> dict:
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def execute_release_plan(
+            self, release: models.Release
+    ) -> typing.List[str]:
+        raise NotImplementedError()
+
+    @staticmethod
+    def is_beta_build(build: models.Build) -> bool:
+        return False
+
+    @staticmethod
+    def is_debug_repository(repo_name: str) -> bool:
+        return bool(re.search(r'debug(info|source|)', repo_name))
+
+    async def authenticate_package(self, package_checksum: str):
+        is_authenticated = False
+        if self.codenotary_enabled:
+            is_authenticated = self._cas_wrapper.authenticate_artifact(
+                package_checksum, use_hash=True)
+        return package_checksum, is_authenticated
+
+    async def get_production_pulp_repositories(
+            self, product: models.Product = None,
+            platform: models.Platform = None,
+    ):
+        repo_names = self.get_production_pulp_repositories_names(
+            product=product, platform=platform)
+        params = {
+            'name__in': ','.join(repo_names),
+            'fields': ','.join(('pulp_href', 'name',
+                                'latest_version_href')),
+            'limit': 1000,
+        }
+        pulp_repos = await self.pulp_client.get_rpm_repositories(params)
+        return {
+            repo.pop('pulp_href'): repo
+            for repo in pulp_repos
+        }
+
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
         build_tasks: typing.List[int] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
+
         src_rpm_names = []
         packages_fields = [
             'name',
@@ -96,13 +160,12 @@ class ReleasePlanner:
                 ),
                 selectinload(models.Build.repos)
         )
-        build_result = await self._db.execute(builds_q)
+        build_result = await self.db.execute(builds_q)
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
-            is_beta = bool(build.platform_flavors)
             build_rpms = build.source_rpms + build.binary_rpms
             pulp_artifacts = await asyncio.gather(*(
-                self._pulp_client.get_rpm_package(
+                self.pulp_client.get_rpm_package(
                     rpm.artifact.href, include_fields=packages_fields)
                 for rpm in build_rpms
                 if build_tasks and rpm.artifact.build_task_id in build_tasks
@@ -116,10 +179,10 @@ class ReleasePlanner:
                 if build_tasks and artifact_task_id not in build_tasks:
                     continue
                 artifact_name = rpm.artifact.name
-                if '.src.' in artifact_name:
+                if '.src.rpm' in artifact_name:
                     src_rpm_names.append(artifact_name)
                 pkg_info = copy.deepcopy(pulp_artifacts[rpm.artifact.href])
-                pkg_info['is_beta'] = is_beta
+                pkg_info['is_beta'] = self.is_beta_build(build)
                 pkg_info['build_id'] = build.id
                 pkg_info['artifact_href'] = rpm.artifact.href
                 pkg_info['cas_hash'] = rpm.artifact.cas_hash
@@ -149,7 +212,7 @@ class ReleasePlanner:
                         and not build_repo.debug
                         and build_repo.type == 'rpm'
                     )
-                    template = await self._pulp_client.get_repo_modules_yaml(
+                    template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url)
                     module_index = IndexWrapper.from_template(template)
                     for module in module_index.iter_modules():
@@ -171,6 +234,401 @@ class ReleasePlanner:
         ]
         return pulp_packages, src_rpm_names, pulp_rpm_modules
 
+    async def __get_release(self, release_id: int) -> models.Release:
+        release_res = await self.db.execute(select(models.Release).where(
+            models.Release.id == release_id).options(
+            selectinload(models.Release.owner),
+            selectinload(models.Release.platform),
+            selectinload(models.Release.product),
+        ))
+        return release_res.scalars().first()
+
+    async def create_new_release(
+        self,
+        user_id: int,
+        payload: release_schema.ReleaseCreate,
+    ) -> models.Release:
+        user_q = select(models.User).where(models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(
+                models.UserRole.actions)
+        )
+        user_result = await self.db.execute(user_q)
+        logging.info('User %d is creating a release', user_id)
+
+        platform = await self.db.execute(
+            select(models.Platform).where(
+                models.Platform.id == payload.platform_id,
+            ).options(
+                selectinload(models.Platform.reference_platforms),
+                selectinload(models.Platform.repos.and_(
+                    models.Repository.production.is_(True))),
+                selectinload(models.Platform.roles).selectinload(
+                    models.UserRole.actions)
+            ),
+        )
+        product = (await self.db.execute(
+            select(models.Product).where(
+                models.Product.id == payload.product_id).options(
+                selectinload(models.Product.owner).selectinload(
+                    models.User.roles).selectinload(
+                    models.UserRole.actions),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.roles).selectinload(
+                    models.UserRole.actions),
+                selectinload(models.Product.roles).selectinload(
+                    models.UserRole.actions),
+                selectinload(models.Product.repositories)
+            )
+        )).scalars().first()
+        platform = platform.scalars().first()
+        user = user_result.scalars().first()
+
+        builds = (await self.db.execute(
+            select(models.Build).where(
+                models.Build.id.in_(payload.builds)).options(
+                selectinload(models.Build.team).selectinload(
+                    models.Team.roles).selectinload(
+                    models.UserRole.actions)
+            )
+        )).scalars().all()
+
+        for build in builds:
+            if not can_perform(build, user, actions.ReleaseBuild.name):
+                raise PermissionDenied(f'User does not have permissions '
+                                       f'to release build {build.id}')
+
+        if not can_perform(product, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to release to this product')
+
+        new_release = models.Release()
+        new_release.build_ids = payload.builds
+        if getattr(payload, 'build_tasks', None):
+            new_release.build_task_ids = payload.build_tasks
+        new_release.platform = platform
+        new_release.plan = await self.get_release_plan(
+            base_platform=platform,
+            build_ids=payload.builds,
+            build_tasks=payload.build_tasks,
+            product=product
+        )
+        new_release.owner = user
+        new_release.team_id = product.team_id
+        new_release.product_id = product.id
+        self.db.add(new_release)
+        await self.db.commit()
+        await self.db.refresh(new_release)
+
+        logging.info('New release %d successfully created', new_release.id)
+        return await self.__get_release(new_release.id)
+
+    async def update_release(
+        self, release_id: int,
+        payload: release_schema.ReleaseUpdate,
+        user_id: int
+    ) -> models.Release:
+        logging.info('Updating release %d', release_id)
+        users = await self.db.execute(select(models.User).where(
+            models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(
+                models.UserRole.actions)
+        ))
+        user = users.scalars().first()
+
+        query = select(models.Release).where(
+            models.Release.id == release_id
+        ).options(
+            selectinload(models.Release.owner),
+            selectinload(models.Release.owner).selectinload(
+                models.User.oauth_accounts),
+            selectinload(models.Release.owner).selectinload(
+                models.User.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.owner).selectinload(
+                models.User.oauth_accounts),
+            selectinload(models.Release.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.reference_platforms),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.repos.and_(
+                    models.Repository.production.is_(True)
+                ),
+            ),
+            selectinload(models.Release.product).selectinload(
+                models.Product.repositories),
+        ).with_for_update()
+        release_result = await self.db.execute(query)
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(
+                f'Release with ID {release_id} not found')
+
+        if not can_perform(release, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to update release')
+
+        build_tasks = getattr(payload, 'build_tasks', None)
+        if (payload.builds and payload.builds != release.build_ids) or (
+                build_tasks and build_tasks != release.build_task_ids):
+            release.build_ids = payload.builds
+            if build_tasks:
+                release.build_task_ids = payload.build_tasks
+            release.plan = await self.get_release_plan(
+                base_platform=release.platform,
+                build_ids=payload.builds,
+                build_tasks=payload.build_tasks,
+                product=release.product
+            )
+        elif payload.plan:
+            # check packages presence in prod repos
+            new_plan = await self.update_release_plan(
+                payload.plan, release)
+            release.plan = new_plan
+        self.db.add(release)
+        await self.db.commit()
+        await self.db.refresh(release)
+        logging.info('Successfully updated release %d', release_id)
+        return await self.__get_release(release.id)
+
+    async def commit_release(
+        self,
+        release_id: int,
+        user_id: int,
+    ) -> typing.Tuple[models.Release, str]:
+        logging.info('Commiting release %d', release_id)
+        users = await self.db.execute(select(models.User).where(
+            models.User.id == user_id).options(
+            selectinload(models.User.roles).selectinload(
+                models.UserRole.actions)
+        ))
+        user = users.scalars().first()
+
+        query = select(models.Release).where(
+            models.Release.id == release_id
+        ).options(
+            selectinload(models.Release.owner),
+            selectinload(models.Release.owner).selectinload(
+                models.User.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.owner).selectinload(
+                models.User.oauth_accounts),
+            selectinload(models.Release.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.repos.and_(
+                    models.Repository.production.is_(True)
+                ),
+            ),
+            selectinload(models.Release.product).selectinload(
+                models.Product.repositories
+            ),
+        ).with_for_update()
+        release_result = await self.db.execute(query)
+        release = release_result.scalars().first()
+        if not release:
+            raise DataNotFoundError(
+                f'Release with ID {release_id} not found')
+
+        if not can_perform(release, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to commit the release')
+
+        builds_q = select(models.Build).where(
+            models.Build.id.in_(release.build_ids))
+        builds_result = await self.db.execute(builds_q)
+        builds_released = False
+        for build in builds_result.scalars().all():
+            build.release = release
+            self.db.add(build)
+        try:
+            release_messages = await self.execute_release_plan(release)
+        except (EmptyReleasePlan, MissingRepository,
+                SignError, ReleaseLogicError) as e:
+            message = f'Cannot commit release: {str(e)}'
+            release.status = ReleaseStatus.FAILED
+        else:
+            message = 'Successfully committed release'
+            message += '\n'.join(release_messages)
+            release.status = ReleaseStatus.COMPLETED
+            builds_released = True
+
+        await self._db.execute(
+            update(models.Build)
+            .where(models.Build.id.in_(release.build_ids))
+            .values(release_id=release.id, released=builds_released)
+        )
+        release.plan['last_log'] = message
+        self.db.add(release)
+        await self.db.commit()
+        await self.db.refresh(release)
+        logging.info('Successfully committed release %d', release_id)
+        release = await self.__get_release(release_id)
+        return release, message
+
+
+class CommunityReleasePlanner(BaseReleasePlanner):
+
+    @staticmethod
+    def get_production_repositories_mapping(
+            product: models.Product,
+            include_pulp_href: bool = False
+    ) -> dict:
+        result = {}
+        repo_name_regex = re.compile(
+            r'(?P<platform_name>\w+-\d+)-(?P<arch>[\w\d]+)(?P<debug>-debug)?')
+
+        for repo in product.repositories:
+            main_info = {
+                'id': repo.id,
+                'name': repo_name_regex.search(repo.name).group(),
+                'url': repo.url,
+                'arch': repo.arch,
+                'debug': repo.debug
+            }
+            if include_pulp_href:
+                main_info['pulp_href'] = repo.pulp_href
+            result[(repo.arch, repo.debug)] = main_info
+
+        return result
+
+    async def get_release_plan(
+            self,
+            base_platform: models.Platform,
+            build_ids: typing.List[int],
+            build_tasks: typing.List[int] = None,
+            product: models.Product = None) -> dict:
+
+        release_plan = {'modules': {}}
+
+        db_repos_mapping = self.get_production_repositories_mapping(product)
+
+        (
+            pulp_packages,
+            src_rpm_names,
+            pulp_rpm_modules
+        ) = await self.get_pulp_packages(build_ids, build_tasks=build_tasks)
+
+        release_plan['repositories'] = list(db_repos_mapping.values())
+
+        plan_packages = []
+        for pkg in pulp_packages:
+            is_debug = is_debuginfo_rpm(pkg['full_name'])
+            arch = pkg['arch']
+            if arch == 'noarch':
+                repositories = [db_repos_mapping[(a, is_debug)]
+                                for a in base_platform.arch_list]
+            else:
+                repositories = [db_repos_mapping[(arch, is_debug)]]
+            repo_arch_location = [arch]
+            if arch == 'noarch':
+                repo_arch_location = base_platform.arch_list
+            plan_packages.append({
+                'package': pkg,
+                'repositories': repositories,
+                'repo_arch_location': repo_arch_location
+            })
+        release_plan['packages'] = plan_packages
+
+        if pulp_rpm_modules:
+            plan_modules = []
+            for module in pulp_rpm_modules:
+                # Modules go only in non-debug repos
+                repository = db_repos_mapping[(module['arch'], False)]
+                plan_modules.append({
+                    'module': module,
+                    'repositories': [repository]
+                })
+            release_plan['modules'] = plan_modules
+
+        return release_plan
+
+    async def update_release_plan(
+            self, plan: dict, release: models.Release) -> dict:
+        # We do not need to take additional actions for release update
+        # right now
+        return plan
+
+    async def execute_release_plan(
+            self, release: models.Release
+    ) -> typing.List[str]:
+        # for updating plan during executing, we should use deepcopy
+        release_plan = copy.deepcopy(release.plan)
+        if not release_plan.get('packages') or (
+                not release_plan.get('repositories')):
+            raise EmptyReleasePlan(
+                'Cannot execute plan with empty packages or repositories: '
+                '{packages}, {repositories}'.format_map(release_plan)
+            )
+
+        repository_modification_mapping = defaultdict(list)
+        db_repos_mapping = self.get_production_repositories_mapping(
+            release.product, include_pulp_href=True)
+
+        for pkg in release_plan['packages']:
+            package = pkg['package']
+            for repository in pkg['repositories']:
+                repo_key = (repository['arch'], repository['debug'])
+                db_repo = db_repos_mapping[repo_key]
+                repository_modification_mapping[db_repo['pulp_href']].append(
+                    package['artifact_href'])
+
+        # TODO: Add support for modules releases
+
+        await asyncio.gather(*(
+            self.pulp_client.modify_repository(href, add=packages)
+            for href, packages in repository_modification_mapping.items()
+        ))
+        await asyncio.gather(*(
+            self.pulp_client.create_rpm_publication(href)
+            for href in repository_modification_mapping.keys()
+        ))
+
+        return []
+
+    def get_production_pulp_repositories_names(
+            self, product: models.Product = None,
+            platform: models.Platform = None,
+    ):
+        pl_name_lower = platform.name.lower()
+        return [r.name for r in product.repositories
+                if pl_name_lower in r.name]
+
+
+class AlmaLinuxReleasePlanner(BaseReleasePlanner):
+    def __init__(self, db: Session):
+        super().__init__(db)
+        self.packages_presence_info = defaultdict(list)
+        self.pkgs_mapping = {}
+        self.repo_data_by_href = {}
+        self.pkgs_nevra = None
+        self.debug_pkgs_nevra = None
+        self.latest_repo_versions = None
+        self.base_platform = None
+        self.clean_base_dist_name_lower = None
+        self.repo_name_regex = re.compile(
+            r'\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)')
+        self.max_list_len = 100  # max elements in list for pulp request
+        self._beholder_client = BeholderClient(settings.beholder_host)
+        self.codenotary_enabled = settings.codenotary_enabled
+        if self.codenotary_enabled:
+            self._cas_wrapper = CasWrapper(
+                settings.cas_api_key,
+                settings.cas_signer_id,
+            )
+
+    @staticmethod
+    def is_beta_build(build: models.Build):
+        if not hasattr(build, 'platform_flavors'):
+            return False
+        if not build.platform_flavors:
+            return False
+        # Search for beta flavor
+        found = False
+        for flavor in build.platform_flavors:
+            if bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
+                found = True
+                break
+        return found
+
     async def check_package_presence_in_repo(
         self,
         pkg_names: list,
@@ -189,7 +647,7 @@ class ReleasePlanner:
             'repository_version': repo_ver_href,
             'fields': 'pulp_href,name,epoch,version,release,arch',
         }
-        pulp_packages_by_params = await self._pulp_client.get_rpm_packages(
+        pulp_packages_by_params = await self.pulp_client.get_rpm_packages(
             **params)
         if pulp_packages_by_params:
             for pkg in pulp_packages_by_params:
@@ -201,6 +659,13 @@ class ReleasePlanner:
                     continue
                 data = (pkg['pulp_href'], repo_id, repo_arch)
                 self.packages_presence_info[full_name].append(data)
+
+    def get_production_pulp_repositories_names(
+            self, product: models.Product = None,
+            platform: models.Platform = None,
+    ):
+        return [f'{repo.name}-{repo.arch}'
+                for repo in self.base_platform.repos]
 
     async def prepare_data_for_executing_async_tasks(
         self,
@@ -217,32 +682,16 @@ class ReleasePlanner:
             })
             self.debug_pkgs_nevra = copy.deepcopy(self.pkgs_nevra)
             self.packages_presence_info = defaultdict(list)
-            self.pkgs_mapping = {}
-            self.repo_data_by_href = {}
             if self.clean_base_dist_name_lower is None:
                 self.clean_base_dist_name_lower = get_clean_distr_name(
                     self.base_platform.name).lower()
-            prod_repo_names = (
-                f'{repo.name}-{repo.arch}'
-                for repo in self.base_platform.repos
-            )
-            params = {
-                'name__in': ','.join(prod_repo_names),
-                'fields': ','.join(('pulp_href', 'name',
-                                    'latest_version_href')),
-                'limit': 1000,
-            }
-            pulp_repos = await self._pulp_client.get_rpm_repositories(params)
-            pulp_repos = {
-                repo.pop('pulp_href'): repo
-                for repo in pulp_repos
-            }
+
+            pulp_repos = await self.get_production_pulp_repositories()
             self.latest_repo_versions = []
             for repo in self.base_platform.repos:
                 pulp_repo_info = pulp_repos[repo.pulp_href]
                 self.repo_data_by_href[repo.pulp_href] = (repo.id, repo.arch)
-                repo_is_debug = bool(re.search(r'debug(info|source|)',
-                                               pulp_repo_info['name']))
+                repo_is_debug = self.is_debug_repository(pulp_repo_info['name'])
                 self.latest_repo_versions.append((
                     pulp_repo_info['latest_version_href'], repo_is_debug))
 
@@ -478,6 +927,7 @@ class ReleasePlanner:
         build_ids: typing.List[int],
         base_platform: models.Platform,
         build_tasks: typing.List[int] = None,
+        product: models.Product = None,
     ) -> dict:
         packages = []
         rpm_modules = []
@@ -757,23 +1207,24 @@ class ReleasePlanner:
         packages: typing.List[str],
     ):
         updateinfo_mapping = await prepare_updateinfo_mapping(
-            self._db, self._pulp_client, packages,
+            self.db, self.pulp_client, packages,
         )
         latest_repo_version = (
-            await self._pulp_client.get_repo_latest_version(
+            await self.pulp_client.get_repo_latest_version(
                 repo.pulp_href,
             )
         )
         errata_records = (
-            await self._pulp_client.list_updateinfo_records(
+            await self.pulp_client.list_updateinfo_records(
                 id__in=list(updateinfo_mapping.keys()),
                 repository_version=latest_repo_version,
             )
         )
-        append_update_packages_in_update_records(
-            self._pulp_db, errata_records, updateinfo_mapping,
-        )
-        db_records = await self._db.execute(
+        with get_pulp_db as pulp_db:
+            append_update_packages_in_update_records(
+                pulp_db, errata_records, updateinfo_mapping,
+            )
+        db_records = await self.db.execute(
             select(models.ErrataRecord).options(
                 selectinload(models.ErrataRecord.references)
             ),
@@ -788,25 +1239,23 @@ class ReleasePlanner:
                 continue
             errata_packages = [item[-1] for item in packages]
             await release_errata_packages(
-                self._db,
-                self._pulp_client,
+                self.db,
+                self.pulp_client,
                 db_record,
                 errata_packages,
                 self.base_platform,
                 repo.pulp_href,
             )
 
-    async def authenticate_package(self, package_checksum: str):
-        is_authenticated = self._cas_wrapper.authenticate_artifact(
-            package_checksum, use_hash=True)
-        return package_checksum, is_authenticated
-
-    async def execute_release_plan(self, release: models.Release,
-                                   release_plan: dict) -> typing.List[str]:
+    async def execute_release_plan(
+            self, release: models.Release
+    ) -> typing.List[str]:
         additional_messages = []
         authenticate_tasks = []
         packages_mapping = {}
         packages_to_repo_layout = {}
+        # for updating plan during executing, we should use deepcopy
+        release_plan = copy.deepcopy(release.plan)
         if not release_plan.get('packages') or (
                 not release_plan.get('repositories')):
             raise EmptyReleasePlan(
@@ -816,7 +1265,7 @@ class ReleasePlanner:
         for build_id in release.build_ids:
             try:
                 verified = await sign_task.verify_signed_build(
-                    self._db, build_id, release.platform.id)
+                    self.db, build_id, release.platform.id)
             except (DataNotFoundError, ValueError, SignError) as e:
                 msg = f'The build {build_id} was not verified, because\n{e}'
                 raise SignError(msg)
@@ -900,7 +1349,7 @@ class ReleasePlanner:
                     )
                 repo_module_index = prod_repo_modules_cache.get(repo_url)
                 if repo_module_index is None:
-                    template = await self._pulp_client.get_repo_modules_yaml(
+                    template = await self.pulp_client.get_repo_modules_yaml(
                         repo_url)
                     repo_module_index = IndexWrapper.from_template(template)
                     prod_repo_modules_cache[repo_url] = repo_module_index
@@ -927,7 +1376,7 @@ class ReleasePlanner:
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href, _ = await self._pulp_client.create_module(
+                module_pulp_href, _ = await self.pulp_client.create_module(
                     module_info['template'],
                     module_info['name'],
                     module_info['stream'],
@@ -943,246 +1392,51 @@ class ReleasePlanner:
         for repository_name, arches in packages_to_repo_layout.items():
             for arch, packages in arches.items():
                 # TODO: we already have all repos in self.base_platform.repos,
-                # we can store them in dict
-                # for example: (repo_name, arch): repo
+                #   we can store them in dict
+                #   for example: (repo_name, arch): repo
                 repo_q = select(models.Repository).where(
                     models.Repository.name == repository_name,
                     models.Repository.arch == arch
                 )
-                repo_result = await self._db.execute(repo_q)
+                repo_result = await self.db.execute(repo_q)
                 repo: models.Repository = repo_result.scalars().first()
                 if not repo:
                     raise MissingRepository(
                         f'Repository with name {repository_name} is missing '
                         f'or doesn\'t have pulp_href field')
-                modify_tasks.append(self._pulp_client.modify_repository(
+                modify_tasks.append(self.pulp_client.modify_repository(
                     repo.pulp_href, add=packages))
                 await self.process_errata_release(repo, packages)
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
-                    self._pulp_client.create_rpm_publication(repo.pulp_href))
+                    self.pulp_client.create_rpm_publication(repo.pulp_href))
         await asyncio.gather(*modify_tasks)
         await asyncio.gather(*publication_tasks)
         return additional_messages
 
-    async def create_new_release(
-        self,
-        user_id: int,
-        payload: release_schema.ReleaseCreate,
-    ) -> models.Release:
-        async with self._db.begin():
-            user_q = select(models.User).where(
-                models.User.id == user_id
-            ).options(
-                selectinload(models.User.roles)
-                .selectinload(models.UserRole.actions),
-            )
-            user_result = await self._db.execute(user_q)
-            logging.info('User %d is creating a release', user_id)
+    async def update_release_plan(
+            self, plan: dict,
+            release: models.Release,
+    ) -> dict:
+        updated_plan = plan.copy()
+        self.base_platform = release.platform
+        for pkg_dict in plan['packages']:
+            package = pkg_dict['package']
+            is_debug = is_debuginfo_rpm(package['name'])
+            await self.prepare_data_for_executing_async_tasks(
+                package, is_debug)
+        (
+            pkgs_from_repos, pkgs_in_repos
+        ) = await self.prepare_and_execute_async_tasks(plan['packages'])
+        updated_plan['packages_from_repos'] = pkgs_from_repos
+        updated_plan['packages_in_repos'] = pkgs_in_repos
+        return updated_plan
 
-            platform = await self._db.execute(
-                select(models.Platform).where(
-                    models.Platform.id == payload.platform_id,
-                ).options(
-                    selectinload(models.Platform.reference_platforms),
-                    selectinload(models.Platform.repos.and_(
-                        models.Repository.production.is_(True))),
-                    selectinload(models.Platform.roles).selectinload(
-                        models.UserRole.actions)
-                ),
-            )
-            product = (await self._db.execute(
-                select(models.Product).where(
-                    models.Product.id == payload.product_id).options(
-                    selectinload(models.Product.owner).selectinload(
-                        models.User.roles).selectinload(
-                        models.UserRole.actions),
-                    selectinload(models.Product.team).selectinload(
-                        models.Team.roles).selectinload(
-                        models.UserRole.actions),
-                    selectinload(models.Product.roles).selectinload(
-                        models.UserRole.actions)
-                )
-            )).scalars().first()
-            platform = platform.scalars().first()
-            user = user_result.scalars().first()
 
-            builds = (await self._db.execute(
-                select(models.Build).where(
-                    models.Build.id.in_(payload.builds)).options(
-                    selectinload(models.Build.team).selectinload(
-                        models.Team.roles).selectinload(
-                            models.UserRole.actions)
-                )
-            )).scalars().all()
-
-            for build in builds:
-                if not can_perform(build, user, actions.ReleaseBuild.name):
-                    raise PermissionDenied(f'User does not have permissions '
-                                           f'to release build {build.id}')
-
-            if not can_perform(product, user, actions.ReleaseToProduct.name):
-                raise PermissionDenied('User does not have permissions '
-                                       'to release to this product')
-
-            new_release = models.Release()
-            new_release.build_ids = payload.builds
-            if getattr(payload, 'build_tasks', None):
-                new_release.build_task_ids = payload.build_tasks
-            new_release.platform = platform
-            new_release.plan = await self.get_release_plan(
-                build_ids=payload.builds,
-                base_platform=platform,
-                build_tasks=payload.build_tasks
-            )
-            new_release.owner = user
-            new_release.team_id = product.team_id
-            self._db.add(new_release)
-            await self._db.commit()
-
-        await self._db.refresh(new_release)
-        release_res = await self._db.execute(select(models.Release).where(
-            models.Release.id == new_release.id).options(
-            selectinload(models.Release.owner),
-            selectinload(models.Release.platform)
-        ))
-        logging.info('New release %d successfully created', new_release.id)
-        return release_res.scalars().first()
-
-    async def update_release(
-        self, release_id: int,
-        payload: release_schema.ReleaseUpdate,
-        user_id: int
-    ) -> models.Release:
-        logging.info('Updating release %d', release_id)
-        async with self._db.begin():
-            users = await self._db.execute(select(models.User).where(
-                models.User.id == user_id).options(
-                selectinload(models.User.roles).selectinload(
-                    models.UserRole.actions)
-            ))
-            user = users.scalars().first()
-
-            query = select(models.Release).where(
-                models.Release.id == release_id
-            ).options(
-                selectinload(models.Release.owner).selectinload(
-                    models.User.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.reference_platforms),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.repos.and_(
-                        models.Repository.production.is_(True)
-                    ),
-                ),
-            ).with_for_update()
-            release_result = await self._db.execute(query)
-            release = release_result.scalars().first()
-            if not release:
-                raise DataNotFoundError(
-                    f'Release with ID {release_id} not found')
-
-            if not can_perform(release, user, actions.ReleaseToProduct.name):
-                raise PermissionDenied('User does not have permissions '
-                                       'to update release')
-
-            if payload.plan:
-                # check packages presence in prod repos
-                self.base_platform = release.platform
-                for pkg_dict in payload.plan['packages']:
-                    package = pkg_dict['package']
-                    is_debug = is_debuginfo_rpm(package['name'])
-                    await self.prepare_data_for_executing_async_tasks(
-                        package, is_debug)
-                (
-                    pkgs_from_repos,
-                    pkgs_in_repos,
-                ) = await self.prepare_and_execute_async_tasks(
-                    payload.plan['packages'],
-                )
-                payload.plan['packages_from_repos'] = pkgs_from_repos
-                payload.plan['packages_in_repos'] = pkgs_in_repos
-                release.plan = payload.plan
-            build_tasks = getattr(payload, 'build_tasks', None)
-            if (payload.builds and payload.builds != release.build_ids) or (
-                    build_tasks and build_tasks != release.build_task_ids):
-                release.build_ids = payload.builds
-                if build_tasks:
-                    release.build_task_ids = payload.build_tasks
-                release.plan = await self.get_release_plan(
-                    build_ids=payload.builds,
-                    base_platform=self.base_platform,
-                    build_tasks=payload.build_tasks,
-                )
-            self._db.add(release)
-            await self._db.commit()
-        await self._db.refresh(release)
-        logging.info('Successfully updated release %d', release_id)
-        return release
-
-    async def commit_release(
-        self,
-        release_id: int,
-        user_id: int,
-    ) -> typing.Tuple[models.Release, str]:
-        logging.info('Commiting release %d', release_id)
-        release_status = False
-        async with self._db.begin():
-            users = await self._db.execute(select(models.User).where(
-                models.User.id == user_id).options(
-                selectinload(models.User.roles).selectinload(
-                    models.UserRole.actions)
-            ))
-            user = users.scalars().first()
-
-            query = select(models.Release).where(
-                models.Release.id == release_id
-            ).options(
-                selectinload(models.Release.owner).selectinload(
-                    models.User.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.team).selectinload(
-                    models.Team.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Release.platform).selectinload(
-                    models.Platform.repos.and_(
-                        models.Repository.production.is_(True)
-                    ),
-                ),
-            ).with_for_update()
-            release_result = await self._db.execute(query)
-            release = release_result.scalars().first()
-            if not release:
-                raise DataNotFoundError(
-                    f'Release with ID {release_id} not found')
-
-            if not can_perform(release, user, actions.ReleaseToProduct.name):
-                raise PermissionDenied('User does not have permissions '
-                                       'to commit the release')
-
-            # for updating plan during executing, we should use deepcopy
-            release_plan = copy.deepcopy(release.plan)
-            try:
-                release_messages = await self.execute_release_plan(
-                    release, release_plan)
-            except (EmptyReleasePlan, MissingRepository,
-                    SignError, ReleaseLogicError) as e:
-                message = f'Cannot commit release: {str(e)}'
-                release.status = ReleaseStatus.FAILED
-            else:
-                message = 'Successfully committed release'
-                message += '\n'.join(release_messages)
-                release.status = ReleaseStatus.COMPLETED
-                release_status = True
-            await self._db.execute(
-                update(models.Build)
-                .where(models.Build.id.in_(release.build_ids))
-                .values(release_id=release.id, released=release_status)
-            )
-            release_plan['last_log'] = message
-            release.plan = release_plan
-            self._db.add(release)
-            await self._db.commit()
-        await self._db.refresh(release)
-        logging.info('Successfully committed release %d', release_id)
-        return release, message
+def get_releaser_class(
+        product: models.Product
+) -> typing.Union[typing.Type[CommunityReleasePlanner],
+                  typing.Type[AlmaLinuxReleasePlanner]]:
+    if product.is_community:
+        return CommunityReleasePlanner
+    return AlmaLinuxReleasePlanner

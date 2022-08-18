@@ -11,7 +11,6 @@ from alws import database
 from alws.auth import get_current_user
 from alws.crud import products
 from alws.dependencies import get_db
-from alws.errors import ProductError
 from alws.models import User
 from alws.schemas import product_schema
 
@@ -39,13 +38,7 @@ async def create_product(
     db: database.Session = Depends(get_db),
 ):
     async with db.begin():
-        try:
-            db_product = await products.create_product(db, product)
-        except ProductError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            )
+        db_product = await products.create_product(db, product)
         await db.commit()
     return await products.get_products(db, product_id=db_product.id)
 
@@ -72,13 +65,8 @@ async def add_to_product(
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    try:
-        await products.modify_product(
-            db, build_id, product, user.id, 'add')
-        return {'success': True}
-    except ProductError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=str(error))
+    await products.modify_product(
+        db, build_id, product, user.id, 'add')
 
 
 @public_router.post('/remove/{build_id}/{product}/',
@@ -89,13 +77,9 @@ async def remove_from_product(
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    try:
-        await products.modify_product(
-            db, build_id, product, user.id, 'remove')
-        return {'success': True}
-    except ProductError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=str(error))
+    await products.modify_product(
+        db, build_id, product, user.id, 'remove')
+    return {'success': True}
 
 
 @public_router.delete('/{product_id}/remove/',
