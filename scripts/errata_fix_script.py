@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 import logging
 import re
 import typing
@@ -179,10 +180,9 @@ async def update_albs_db():
             ErrataReference.title == '',
         )
     )
-    async for db in get_db():
-        async with db.begin():
-            for reference in (await db.execute(query)).scalars().all():
-                reference.title = reference.ref_id
+    async with asynccontextmanager(get_db)() as db, db.begin():
+        for reference in (await db.execute(query)).scalars().all():
+            reference.title = reference.ref_id
     logging.info("Update albs db is done")
 
 
