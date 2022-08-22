@@ -32,6 +32,7 @@ class UpdateRecord(PulpBase):
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean)
 
     collections: List['UpdateCollection'] = relationship('UpdateCollection')
+    references: List['UpdateReference'] = relationship('UpdateReference')
 
 
 class UpdateCollection(PulpBase):
@@ -76,3 +77,24 @@ class UpdatePackage(PulpBase):
         nullable=False
     )
     sum_type = sqlalchemy.Column(sqlalchemy.Integer)
+
+
+class UpdateReference(PulpBase):
+    __tablename__ = 'rpm_updatereference'
+
+    pulp_id = sqlalchemy.Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+    )
+    pulp_created = sqlalchemy.Column(sqlalchemy.DATETIME, default=datetime.now)
+    pulp_last_updated = sqlalchemy.Column(
+        sqlalchemy.DATETIME, default=datetime.now
+    )
+    href = sqlalchemy.Column(sqlalchemy.Text)
+    ref_id = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    ref_type = sqlalchemy.Column(sqlalchemy.Text)
+    update_record_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(UpdateRecord.content_ptr_id),
+        nullable=False,
+    )
