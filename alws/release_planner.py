@@ -1127,6 +1127,8 @@ class ReleasePlanner:
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         logging.info('Commiting release %d', release_id)
+        items_to_insert = []
+        release_status = False
         async with self._db.begin():
             users = await self._db.execute(select(models.User).where(
                 models.User.id == user_id).options(
@@ -1158,12 +1160,10 @@ class ReleasePlanner:
                 raise PermissionDenied('User does not have permissions '
                                        'to commit the release')
 
-            builds_q = select(models.Build).where(
-                models.Build.id.in_(release.build_ids))
-            builds_result = await self._db.execute(builds_q)
-            for build in builds_result.scalars().all():
-                build.release = release
-                self._db.add(build)
+            release_builds = await self._db.execute(
+                select(models.Build)
+                .where(models.Build.id.in_(release.build_ids))
+            )
             # for updating plan during executing, we should use deepcopy
             release_plan = copy.deepcopy(release.plan)
             try:
@@ -1177,9 +1177,15 @@ class ReleasePlanner:
                 message = 'Successfully committed release'
                 message += '\n'.join(release_messages)
                 release.status = ReleaseStatus.COMPLETED
+                release_status = True
+            for build in release_builds.scalars().all():
+                build.release = release
+                build.released = release_status
+                items_to_insert.append(build)
             release_plan['last_log'] = message
             release.plan = release_plan
-            self._db.add(release)
+            items_to_insert.append(release)
+            self._db.add_all(items_to_insert)
             await self._db.commit()
         await self._db.refresh(release)
         logging.info('Successfully committed release %d', release_id)
