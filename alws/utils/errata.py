@@ -12,6 +12,27 @@ import createrepo_c as cr
 SCHEMA_VERSION = '1.0'
 
 
+def clean_errata_title(title: str) -> str:
+    # default title looks like this:
+    # ALSA-2022:5564: kernel security and enhancement update (Important)
+    #
+    # We're trying to remove ALSA-... and (Important) part from it.
+    title = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', title)
+    title = re.sub(r'\s+\(.*\)$', '', title)
+    return title
+
+
+def get_verbose_errata_title(title: str, severity: str) -> str:
+    capitalized_severity = severity.lower().capitalize()
+    title = clean_errata_title(title)
+    if (
+        not title.startswith(f"{capitalized_severity}:")
+        and capitalized_severity not in ('', 'None')
+    ):
+        title = f"{capitalized_severity}: {title.strip()}"
+    return title
+
+
 def debrand_id(rec_id: str) -> str:
     """
     De-brands an RHEL element identifier.

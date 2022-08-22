@@ -22,6 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws import models
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
+from alws.utils.errata import (
+    clean_errata_title,
+    get_verbose_errata_title,
+)
 from alws.utils.parsing import parse_rpm_nevra, clean_release
 from alws.utils.pulp_client import PulpClient
 from alws.config import settings
@@ -519,6 +523,8 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         )
         value = re.sub(r"^RH", "AL", value)
         value = re.sub(r"RHEL", "AlmaLinux", value)
+        if key == "title":
+            value = get_verbose_errata_title(value, errata.severity)
         setattr(errata, key, value)
     db_errata = models.ErrataRecord(
         id=re.sub(r"^RH", "AL", errata.id),
@@ -812,12 +818,7 @@ async def release_errata_packages(
         f"{platform.name.lower()}-for-{arch}-{repo_stage}-"
         f"rpms__{platform_version}_default"
     )
-    # default title looks like this:
-    # ALSA-2022:5564: kernel security and enhancement update (Important)
-    #
-    # We're trying to remove ALSA-... and (Important) part from it.
-    default_summary = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', record.get_title())
-    default_summary = re.sub(r'\s+\(.*\)$', '', default_summary)
+    default_summary = clean_errata_title(record.get_title())
     pulp_record = {
         "id": record.id,
         "updated_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
