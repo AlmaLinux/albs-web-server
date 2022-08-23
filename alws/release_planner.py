@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import ReleaseStatus, RepoType, PackageNevra
-from alws.crud import sign_task
+from alws.crud import (
+    products as product_crud,
+    sign_task,
+    user as user_crud,
+)
 from alws.dependencies import get_pulp_db
 from alws.errors import (
     DataNotFoundError,
@@ -234,7 +238,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         ]
         return pulp_packages, src_rpm_names, pulp_rpm_modules
 
-    async def __get_release(self, release_id: int) -> models.Release:
+    async def __get_final_release(self, release_id: int) -> models.Release:
         release_res = await self.db.execute(select(models.Release).where(
             models.Release.id == release_id).options(
             selectinload(models.Release.owner),
@@ -243,16 +247,39 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         ))
         return release_res.scalars().first()
 
+    async def __get_release_for_update(self, release_id) -> models.Release:
+        query = select(models.Release).where(
+            models.Release.id == release_id
+        ).options(
+            selectinload(models.Release.owner),
+            selectinload(models.Release.owner).selectinload(
+                models.User.oauth_accounts),
+            selectinload(models.Release.owner).selectinload(
+                models.User.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.owner).selectinload(
+                models.User.oauth_accounts),
+            selectinload(models.Release.team).selectinload(
+                models.Team.roles).selectinload(models.UserRole.actions),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.reference_platforms),
+            selectinload(models.Release.platform).selectinload(
+                models.Platform.repos.and_(
+                    models.Repository.production.is_(True)
+                ),
+            ),
+            selectinload(models.Release.product).selectinload(
+                models.Product.repositories),
+        ).with_for_update()
+        release_result = await self.db.execute(query)
+        release = release_result.scalars().first()
+        return release
+
     async def create_new_release(
         self,
         user_id: int,
         payload: release_schema.ReleaseCreate,
     ) -> models.Release:
-        user_q = select(models.User).where(models.User.id == user_id).options(
-            selectinload(models.User.roles).selectinload(
-                models.UserRole.actions)
-        )
-        user_result = await self.db.execute(user_q)
+        user = await user_crud.get_user(self.db, user_id=user_id)
         logging.info('User %d is creating a release', user_id)
 
         platform = await self.db.execute(
@@ -266,22 +293,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     models.UserRole.actions)
             ),
         )
-        product = (await self.db.execute(
-            select(models.Product).where(
-                models.Product.id == payload.product_id).options(
-                selectinload(models.Product.owner).selectinload(
-                    models.User.roles).selectinload(
-                    models.UserRole.actions),
-                selectinload(models.Product.team).selectinload(
-                    models.Team.roles).selectinload(
-                    models.UserRole.actions),
-                selectinload(models.Product.roles).selectinload(
-                    models.UserRole.actions),
-                selectinload(models.Product.repositories)
-            )
-        )).scalars().first()
         platform = platform.scalars().first()
-        user = user_result.scalars().first()
+        product = await product_crud.get_products(
+            self.db, product_id=payload.product_id)
 
         builds = (await self.db.execute(
             select(models.Build).where(
@@ -320,7 +334,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.refresh(new_release)
 
         logging.info('New release %d successfully created', new_release.id)
-        return await self.__get_release(new_release.id)
+        return await self.__get_final_release(new_release.id)
 
     async def update_release(
         self, release_id: int,
@@ -328,37 +342,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         user_id: int
     ) -> models.Release:
         logging.info('Updating release %d', release_id)
-        users = await self.db.execute(select(models.User).where(
-            models.User.id == user_id).options(
-            selectinload(models.User.roles).selectinload(
-                models.UserRole.actions)
-        ))
-        user = users.scalars().first()
+        user = await user_crud.get_user(self.db, user_id=user_id)
 
-        query = select(models.Release).where(
-            models.Release.id == release_id
-        ).options(
-            selectinload(models.Release.owner),
-            selectinload(models.Release.owner).selectinload(
-                models.User.oauth_accounts),
-            selectinload(models.Release.owner).selectinload(
-                models.User.roles).selectinload(models.UserRole.actions),
-            selectinload(models.Release.owner).selectinload(
-                models.User.oauth_accounts),
-            selectinload(models.Release.team).selectinload(
-                models.Team.roles).selectinload(models.UserRole.actions),
-            selectinload(models.Release.platform).selectinload(
-                models.Platform.reference_platforms),
-            selectinload(models.Release.platform).selectinload(
-                models.Platform.repos.and_(
-                    models.Repository.production.is_(True)
-                ),
-            ),
-            selectinload(models.Release.product).selectinload(
-                models.Product.repositories),
-        ).with_for_update()
-        release_result = await self.db.execute(query)
-        release = release_result.scalars().first()
+        release = await self.__get_release_for_update(release_id)
         if not release:
             raise DataNotFoundError(
                 f'Release with ID {release_id} not found')
@@ -388,7 +374,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.commit()
         await self.db.refresh(release)
         logging.info('Successfully updated release %d', release_id)
-        return await self.__get_release(release.id)
+        return await self.__get_final_release(release.id)
 
     async def commit_release(
         self,
@@ -396,34 +382,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         logging.info('Commiting release %d', release_id)
-        users = await self.db.execute(select(models.User).where(
-            models.User.id == user_id).options(
-            selectinload(models.User.roles).selectinload(
-                models.UserRole.actions)
-        ))
-        user = users.scalars().first()
 
-        query = select(models.Release).where(
-            models.Release.id == release_id
-        ).options(
-            selectinload(models.Release.owner),
-            selectinload(models.Release.owner).selectinload(
-                models.User.roles).selectinload(models.UserRole.actions),
-            selectinload(models.Release.owner).selectinload(
-                models.User.oauth_accounts),
-            selectinload(models.Release.team).selectinload(
-                models.Team.roles).selectinload(models.UserRole.actions),
-            selectinload(models.Release.platform).selectinload(
-                models.Platform.repos.and_(
-                    models.Repository.production.is_(True)
-                ),
-            ),
-            selectinload(models.Release.product).selectinload(
-                models.Product.repositories
-            ),
-        ).with_for_update()
-        release_result = await self.db.execute(query)
-        release = release_result.scalars().first()
+        user = await user_crud.get_user(self.db, user_id=user_id)
+        release = await self.__get_release_for_update(release_id)
         if not release:
             raise DataNotFoundError(
                 f'Release with ID {release_id} not found')
@@ -432,13 +393,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             raise PermissionDenied('User does not have permissions '
                                    'to commit the release')
 
-        builds_q = select(models.Build).where(
-            models.Build.id.in_(release.build_ids))
-        builds_result = await self.db.execute(builds_q)
         builds_released = False
-        for build in builds_result.scalars().all():
-            build.release = release
-            self.db.add(build)
         try:
             release_messages = await self.execute_release_plan(release)
         except (EmptyReleasePlan, MissingRepository,
@@ -461,7 +416,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.commit()
         await self.db.refresh(release)
         logging.info('Successfully committed release %d', release_id)
-        release = await self.__get_release(release_id)
+        release = await self.__get_final_release(release_id)
         return release, message
 
 
