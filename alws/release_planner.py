@@ -1220,7 +1220,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 repository_version=latest_repo_version,
             )
         )
-        with get_pulp_db as pulp_db:
+        with get_pulp_db() as pulp_db:
             append_update_packages_in_update_records(
                 pulp_db, errata_records, updateinfo_mapping,
             )
