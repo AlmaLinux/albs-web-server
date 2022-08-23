@@ -6,6 +6,7 @@ import typing
 from collections import defaultdict
 
 from cas_wrapper import CasWrapper
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -1127,6 +1128,7 @@ class ReleasePlanner:
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         logging.info('Commiting release %d', release_id)
+        release_status = False
         async with self._db.begin():
             users = await self._db.execute(select(models.User).where(
                 models.User.id == user_id).options(
@@ -1158,12 +1160,6 @@ class ReleasePlanner:
                 raise PermissionDenied('User does not have permissions '
                                        'to commit the release')
 
-            builds_q = select(models.Build).where(
-                models.Build.id.in_(release.build_ids))
-            builds_result = await self._db.execute(builds_q)
-            for build in builds_result.scalars().all():
-                build.release = release
-                self._db.add(build)
             # for updating plan during executing, we should use deepcopy
             release_plan = copy.deepcopy(release.plan)
             try:
@@ -1177,6 +1173,12 @@ class ReleasePlanner:
                 message = 'Successfully committed release'
                 message += '\n'.join(release_messages)
                 release.status = ReleaseStatus.COMPLETED
+                release_status = True
+            await self._db.execute(
+                update(models.Build)
+                .where(models.Build.id.in_(release.build_ids))
+                .values(release_id=release.id, released=release_status)
+            )
             release_plan['last_log'] = message
             release.plan = release_plan
             self._db.add(release)
