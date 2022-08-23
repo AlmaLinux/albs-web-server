@@ -8,8 +8,6 @@ Create Date: 2022-08-18 07:38:00.361373
 from alembic import op
 import sqlalchemy as sa
 
-from alws.constants import DEFAULT_PRODUCT
-
 
 # revision identifiers, used by Alembic.
 revision = 'ec505e94fd1a'
