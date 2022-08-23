@@ -12,13 +12,15 @@ import createrepo_c as cr
 SCHEMA_VERSION = '1.0'
 
 
-def clean_errata_title(title: str) -> str:
+def clean_errata_title(title: str, severity: str = '') -> str:
     # default title looks like this:
     # ALSA-2022:5564: kernel security and enhancement update (Important)
+    # Important: kernel security and enhancement update
     #
     # We're trying to remove ALSA-... and (Important) part from it.
     title = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', title)
     title = re.sub(r'\s+\(.*\)$', '', title)
+    title = re.sub(rf'^{severity}:\s+', '',  title, flags=re.IGNORECASE)
     return title
 
 

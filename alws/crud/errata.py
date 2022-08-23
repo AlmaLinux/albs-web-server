@@ -523,8 +523,6 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         )
         value = re.sub(r"^RH", "AL", value)
         value = re.sub(r"RHEL", "AlmaLinux", value)
-        if key == "title":
-            value = get_verbose_errata_title(value, errata.severity)
         setattr(errata, key, value)
     db_errata = models.ErrataRecord(
         id=re.sub(r"^RH", "AL", errata.id),
@@ -537,7 +535,7 @@ async def create_errata_record(db, errata: BaseErrataRecord):
         description=None,
         original_description=errata.description,
         title=None,
-        original_title=errata.title,
+        original_title=get_verbose_errata_title(errata.title, errata.severity),
         contact_mail=platform.contact_mail,
         status=errata.status,
         version=errata.version,
@@ -818,7 +816,8 @@ async def release_errata_packages(
         f"{platform.name.lower()}-for-{arch}-{repo_stage}-"
         f"rpms__{platform_version}_default"
     )
-    default_summary = clean_errata_title(record.get_title())
+    default_summary = clean_errata_title(
+        record.get_title(), severity=record.severity)
     pulp_record = {
         "id": record.id,
         "updated_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
