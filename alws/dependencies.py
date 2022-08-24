@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import contextmanager
 
 import aioredis
 
@@ -40,6 +41,7 @@ async def get_db() -> database.Session:
                 await session.close()
 
 
+@contextmanager
 def get_pulp_db() -> database.Session:
     with database.PulpSession() as session:
         try:

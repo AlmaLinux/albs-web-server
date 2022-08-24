@@ -24,6 +24,7 @@ from alws.schemas import team_schema
 
 
 __all__ = [
+    'create_team',
     'create_team_roles',
     'get_team_role_name',
     'get_teams',

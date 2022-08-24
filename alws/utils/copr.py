@@ -84,5 +84,8 @@ async def create_product_repo(
     repo_name = (
         f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
     )
-    repo_url, repo_href = await pulp_client.create_build_rpm_repo(repo_name)
+    repo_url, repo_href = await pulp_client.create_rpm_repository(
+        repo_name, auto_publish=False, create_publication=True,
+        base_path_start='copr',
+    )
     return repo_name, repo_url, arch, repo_href, is_debug

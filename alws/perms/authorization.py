@@ -1,3 +1,4 @@
+import logging
 import typing
 
 from alws.models import User
@@ -23,7 +24,12 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
     if hasattr(obj, 'team'):
         obj_roles.extend(obj.team.roles)
 
+    logging.debug('Object roles: %s', str(obj_roles))
+    logging.debug('User roles: %s', str(user.roles))
+
     groups_intersection = list(set(user.roles) & set(obj_roles))
+    logging.debug('Intersection between object and user roles: %s',
+                  str(groups_intersection))
     object_permissions = obj.permissions_triad
     if obj.owner.id == user.id:
         is_performable = bool(object_permissions.owner & action_mask)
@@ -39,6 +45,8 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
     is_allowed = False
     for group in groups_intersection:
         action_names = {act.name for act in group.actions}
+        logging.debug('Action names for group %s: %s',
+                      group.name, str(action_names))
         is_allowed = action in action_names
         if is_allowed:
             break

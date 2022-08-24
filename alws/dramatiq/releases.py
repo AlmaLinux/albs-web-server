@@ -1,18 +1,18 @@
+from contextlib import asynccontextmanager
+
 import dramatiq
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
+from alws.crud import release as r_crud
 from alws.dramatiq import event_loop
-from alws.dependencies import get_db, get_pulp_db
-from alws.release_planner import ReleasePlanner
+from alws.dependencies import get_db
 
 __all__ = ["execute_release_plan"]
 
 
 async def _commit_release(release_id, user_id):
-    async for db in get_db():
-        for pulp_db in get_pulp_db():
-            release_planner = ReleasePlanner(db, pulp_db)
-            await release_planner.commit_release(release_id, user_id)
+    async with asynccontextmanager(get_db)() as db:
+        await r_crud.commit_release(db, release_id, user_id)
 
 
 @dramatiq.actor(
