@@ -240,6 +240,7 @@ class Build(BaseModel):
     linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     platform_flavors: typing.List[PlatformFlavour]
+    released: bool
 
     @validator('linked_builds', pre=True)
     def linked_builds_validator(cls, v):
