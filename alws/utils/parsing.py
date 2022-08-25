@@ -8,7 +8,7 @@ from alws.constants import TestCaseStatus
 
 
 __all__ = [
-    'clean_module_tag',
+    'clean_release',
     'get_clean_distr_name',
     'parse_git_ref',
     'parse_tap_output',
@@ -25,14 +25,14 @@ def slice_list(source_list: list,
     )
 
 
-def clean_module_tag(tag: str):
-    clean_tag = re.sub(r'\.alma.*$', '', tag)
+def clean_release(release: str) -> str:
+    release = re.sub(r'\.alma.*$', '', release)
     latest = None
-    raw_res = re.search(r'\.module.*', clean_tag)
+    raw_res = re.search(r'\.module.*', release)
     if raw_res:
         raw_part = raw_res.group()
         latest = re.search(r'\.\d*$', raw_part)
-    result = re.sub(r'\.module.*', '', clean_tag)
+    result = re.sub(r'\.module.*', '', release)
     if latest is not None:
         result += latest.group()
     return result
@@ -52,17 +52,12 @@ def parse_git_ref(pattern: str, git_ref: str):
         return match.groups()[-1]
     else:
         return
-    
+
 
 def parse_rpm_nevra(rpm_name: str):
     clean_rpm_name = re.sub('.rpm$', '', rpm_name)
     hawkey_nevra = hawkey.split_nevra(clean_rpm_name)
     return hawkey_nevra
-
-
-def clean_release(release):
-    release = re.sub(r"\.module.*$", "", release)
-    return re.sub(r"\.el\d+.*$", "", release)
 
 
 def parse_tap_output(text: bytes) -> list:

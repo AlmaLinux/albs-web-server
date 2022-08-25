@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session, selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, ErrataPackageStatus
-from alws.crud.errata import clean_release
 from alws.errors import (
     ArtifactConversionError,
     ArtifactChecksumError,
@@ -24,7 +23,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
-from alws.utils.parsing import parse_rpm_nevra
+from alws.utils.parsing import parse_rpm_nevra, clean_release
 from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
 
@@ -275,11 +274,10 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             src_name = parse_rpm_nevra(rpm_info['rpm_sourcerpm']).name
         else:
             src_name = rpm_info['name']
-        release = clean_release(rpm_info['release'])
+        clean_rpm_release = clean_release(rpm_info['release'])
         conditions = [
             models.ErrataPackage.name == rpm_info['name'],
             models.ErrataPackage.version == rpm_info['version'],
-            models.ErrataPackage.release.like(f'%{release}%')
         ]
         if rpm_info['arch'] != 'noarch':
             conditions.append(
@@ -289,6 +287,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             models.ErrataPackage
         ).where(sqlalchemy.and_(*conditions)))
         for errata_package in errata_packages.scalars().all():
+            if clean_rpm_release != clean_release(errata_package.release):
+                continue
             errata_package.source_srpm = src_name
             await db.run_sync(
                 append_errata_package,
