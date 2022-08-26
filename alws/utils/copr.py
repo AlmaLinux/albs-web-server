@@ -16,15 +16,15 @@ __all__ = [
 
 def generate_repo_config(
     repo: Repository,
+    product_name: str,
     ownername: str,
 ) -> str:
     # we should clean "http" protocol from host url
     clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
-    clean_base_url = re.sub(rf'-{repo.arch}-dr/$', '-$basearch-dr/', repo.url)
     config_template = (
-        f"[copr:{clean_host_name}:{ownername}:{repo.name}]\n"
-        f"name=Copr repo for {repo.name} owned by {ownername}\n"
-        f"baseurl={clean_base_url}\n"
+        f"[copr:{clean_host_name}:{ownername}:{product_name}]\n"
+        f"name=Copr repo for {product_name} {repo.arch} owned by {ownername}\n"
+        f"baseurl={repo.url}\n"
         "type=rpm-md\n"
         "skip_if_unavailable=True\n"
         "gpgcheck=0\n"
