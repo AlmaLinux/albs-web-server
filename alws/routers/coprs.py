@@ -1,6 +1,6 @@
 import typing
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -60,7 +60,6 @@ async def get_dnf_repo_config(
     arch: str,
     db: database.Session = Depends(get_db),
 ):
-    full_name = f'{ownername}/{name}'
     chroot = f'{platform}-{arch}'
     clean_chroot = get_clean_copr_chroot(chroot)
     db_product = await db.execute(
@@ -74,10 +73,17 @@ async def get_dnf_repo_config(
     )
     db_product = db_product.scalars().first()
     if not db_product:
-        return f'Copr dir {full_name} doesn`t exist'
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Product {name} for user {ownername} is not found'
+        )
     for product_repo in db_product.repositories:
         if product_repo.debug or arch != product_repo.arch:
             continue
         if product_repo.name.lower().endswith(clean_chroot):
-            return generate_repo_config(product_repo, ownername)
-    return f'Chroot {chroot} doesn`t exist in {full_name}'
+            return generate_repo_config(
+                product_repo, db_product.name, ownername)
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Didn't find matching repositories in {name} for chroot {chroot}"
+    )
