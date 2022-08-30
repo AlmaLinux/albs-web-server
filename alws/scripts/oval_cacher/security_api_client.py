@@ -81,6 +81,19 @@ class SecurityApiClient:
         )
         return CVRF(**(await self.make_request(request))["cvrfdoc"])
 
+    def _get_record_id(self, definition: dict) -> str:
+        def_id = re.search(
+            r"^RH\w{2}-\d+:\d+", definition["metadata"]["title"]
+        )
+        if def_id:
+            return def_id.group()
+        for ref in definition["metadata"]["references"]:
+            match = re.search(r"^(RH|AL)\w{2}-\d+:\d+", ref["id"])
+            if match:
+                result = match.group()
+                return re.sub("^AL", "RH", result)
+        raise ValueError("Unable to get definition id from: %s", definition)
+
     async def load_oval_xml_cache(self, distr_version: str) -> dict:
         distr_version_to_oval_xml_links = {
             "8": [
@@ -104,9 +117,7 @@ class SecurityApiClient:
                 definition["metadata"]["title"] = re.sub(
                     "^AL", "RH", definition["metadata"]["title"]
                 )
-                def_id = re.search(
-                    r"^RH\w{2}-\d+:\d+", definition["metadata"]["title"]
-                ).group()
+                def_id = self._get_record_id(definition)
                 result["definitions"][def_id] = definition
             for key in ("tests", "objects", "states", "variables"):
                 for item in dict_oval[key]:
