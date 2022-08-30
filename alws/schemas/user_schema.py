@@ -11,6 +11,7 @@ class LoginGithub(BaseModel):
     code: str
 
 
+# TODO: Check and remove if really not needed anymore
 class LoginResponse(BaseModel):
 
     id: int
@@ -27,9 +28,19 @@ class User(BaseModel):
     id: int
     username: str
     email: str
+    is_active: bool
+    is_superuser: bool
 
     class Config:
         orm_mode = True
+
+
+class UserUpdate(BaseModel):
+
+    id: int
+    is_active: typing.Optional[bool] = None
+    is_verified: typing.Optional[bool] = None
+    is_superuser: typing.Optional[bool] = None
 
 
 class UserOpResult(BaseModel):
