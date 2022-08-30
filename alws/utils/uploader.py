@@ -4,7 +4,10 @@ import re
 import typing
 import urllib.parse
 
+from aiohttp.client_exceptions import ClientResponseError
+
 from alws.config import settings
+from alws.errors import UploadError
 from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
@@ -82,11 +85,11 @@ class MetadataUploader:
         new_version_href = await self.pulp.get_repo_latest_version(repo_href)
         try:
             await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
-        except Exception:
+        except Exception as exc:
             await self.pulp.delete_by_href(new_version_href,
                                            wait_for_result=True)
             logging.exception('Cannot restore packages in repo:')
-            raise
+            raise exc
         finally:
             await self.pulp.create_rpm_publication(repo_href)
 
@@ -100,12 +103,17 @@ class MetadataUploader:
             'name__contains': repo_name})
         repo_href = repo['pulp_href']
         updated_metadata = []
-        if module_content is not None:
-            module_content = await module_content.read()
-            await self.upload_modules(repo_href, module_content.decode())
-            updated_metadata.append('modules.yaml')
-        if comps_content is not None:
-            comps_content = await comps_content.read()
-            await self.upload_comps(repo_href, comps_content.decode())
-            updated_metadata.append('comps.xml')
+        try:
+            if module_content is not None:
+                module_content = await module_content.read()
+                await self.upload_modules(repo_href, module_content.decode())
+                updated_metadata.append("modules.yaml")
+            if comps_content is not None:
+                comps_content = await comps_content.read()
+                await self.upload_comps(repo_href, comps_content.decode())
+                updated_metadata.append("comps.xml")
+        except ClientResponseError as exc:
+            raise UploadError(exc.message, exc.status)
+        except Exception as exc:
+            raise UploadError(str(exc))
         return updated_metadata
