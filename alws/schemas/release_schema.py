@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from alws.schemas.user_schema import User
 from alws.schemas.platform_schema import Platform
@@ -29,8 +29,7 @@ class Release(BaseModel):
     id: int
     status: int
     build_ids: typing.List[int]
-    build_task_ids: typing.Optional[typing.List[int]] = \
-        Field(default_factory=list)
+    build_task_ids: typing.Optional[typing.List[int]] = []
     plan: typing.Optional[typing.Dict[str, typing.Any]]
     owner: User
     platform: Platform

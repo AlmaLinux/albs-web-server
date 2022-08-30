@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from alws.utils.debuginfo import is_debuginfo_rpm
 
@@ -80,7 +80,7 @@ class Task(BaseModel):
     is_cas_authenticated: bool = False
     is_secure_boot: typing.Optional[bool] = False
     repositories: typing.List[TaskRepo]
-    linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
+    linked_builds: typing.Optional[typing.List[int]] = []
     built_srpm_url: typing.Optional[str]
 
     class Config:
