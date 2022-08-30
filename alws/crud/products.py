@@ -11,12 +11,17 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.crud.user import get_user
-from alws.crud.teams import get_teams
+from alws.crud.teams import (
+    create_team,
+    create_team_roles,
+    get_teams,
+)
 from alws.database import Session
 from alws.errors import ProductError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
+from alws.schemas.team_schema import TeamCreate
 from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import create_product_repo
 
@@ -38,10 +43,6 @@ async def create_product(
     items_to_insert = []
     repo_tasks = []
 
-    team = await get_teams(db, team_id=payload.team_id)
-    if not team:
-        raise ProductError(f'Incorrect team ID: {payload.team_id}')
-
     owner = await get_user(db, user_id=payload.owner_id)
     if not owner:
         raise ProductError(f'Incorrect owner ID: {payload.owner_id}')
@@ -50,12 +51,21 @@ async def create_product(
     if product:
         raise ProductError(f'Product with name={payload.name} already exist')
 
-    if not can_perform(team, owner, actions.CreateProduct.name):
-        raise PermissionDenied(
-            'User has no permissions to create the product'
-        )
+    team_name = f'{payload.name}_team'
+    existing_team = await get_teams(db, name=team_name)
+    if existing_team:
+        raise ProductError(
+            f"Product's team name intersects with the existing team, "
+            f"which may lead to permissions issues")
 
-    product = models.Product(**payload.dict())
+    team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+    team_roles = await create_team_roles(db, team_name)
+    team = await create_team(db, team_payload, flush=True)
+
+    product_payload = payload.dict()
+    product_payload['team_id'] = team.id
+
+    product = models.Product(**product_payload)
     product.platforms = (await db.execute(
         select(models.Platform).where(
             models.Platform.name.in_([
@@ -92,7 +102,10 @@ async def create_product(
         items_to_insert.append(repo)
     items_to_insert.append(product)
 
+    owner.roles.extend(team_roles)
+
     db.add_all(items_to_insert)
+    db.add(owner)
     await db.flush()
     await db.refresh(product)
     return product
