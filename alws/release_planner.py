@@ -423,18 +423,34 @@ class BaseReleasePlanner(metaclass=ABCMeta):
 class CommunityReleasePlanner(BaseReleasePlanner):
 
     @staticmethod
+    def get_repo_pretty_name(repo_name: str) -> str:
+        arch_regex = re.compile(r'(i686|x86_64|aarch64|ppc64le|s390x)')
+        debug_part = '-debug'
+
+        pretty_name = re.search(
+            r'(\w+-\d+)-(\w+)(-debug)?', repo_name).group()
+
+        if not bool(arch_regex.search(pretty_name)):
+            arch_res = arch_regex.search(repo_name)
+            if bool(arch_res):
+                pretty_name += f'-{arch_res.group()}'
+
+        if debug_part in repo_name and debug_part not in pretty_name:
+            pretty_name += debug_part
+
+        return pretty_name
+
+    @staticmethod
     def get_production_repositories_mapping(
             product: models.Product,
             include_pulp_href: bool = False
     ) -> dict:
         result = {}
-        repo_name_regex = re.compile(
-            r'(?P<platform_name>\w+-\d+)-(?P<arch>[\w\d]+)(?P<debug>-debug)?')
 
         for repo in product.repositories:
             main_info = {
                 'id': repo.id,
-                'name': repo_name_regex.search(repo.name).group(),
+                'name': CommunityReleasePlanner.get_repo_pretty_name(repo.name),
                 'url': repo.url,
                 'arch': repo.arch,
                 'debug': repo.debug
