@@ -12,7 +12,6 @@ __all__ = ['ProductCreate', 'Product']
 
 class ProductCreate(BaseModel):
     name: str
-    team_id: int
     owner_id: int
     title: str
     description: typing.Optional[str]

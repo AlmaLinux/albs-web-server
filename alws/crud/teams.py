@@ -121,6 +121,7 @@ async def get_teams(
     session: Session,
     page_number: int = None,
     team_id: int = None,
+    name: str = None,
 ) -> typing.Union[typing.List[Team], Team]:
 
     def generate_query(count=False):
@@ -130,6 +131,8 @@ async def get_teams(
             selectinload(Team.roles).selectinload(UserRole.actions),
             selectinload(Team.products),
         )
+        if name:
+            query = query.where(Team.name == name)
         if count:
             query = select(func.count(Team.id))
         if page_number and not count:
