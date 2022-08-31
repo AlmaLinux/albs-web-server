@@ -127,16 +127,18 @@ class NoarchProcessor:
             if compared_pkg is None and not self.only_replace:
                 if is_modular or self.show_diff:
                     continue
-                packages_to_add.append(package_dict["pulp_href"])
+                if not self.only_check:
+                    packages_to_add.append(package_dict["pulp_href"])
                 self.logger.info(
                     add_msg, full_name, source_repo_name, destination_repo_name
                 )
                 continue
             if (
-                package_dict["sha256"] != compared_pkg["sha256"]
+                compared_pkg
+                and package_dict["sha256"] != compared_pkg["sha256"]
                 and not self.only_copy
             ):
-                if not self.show_diff:
+                if not self.only_check:
                     packages_to_remove.append(compared_pkg["pulp_href"])
                     packages_to_add.append(package_dict["pulp_href"])
                 self.logger.info(
@@ -284,7 +286,7 @@ def parse_args():
         default="product",
         help=(
             "Destination object type (platform/product), "
-            "default value is `product`",
+            "default value is `product`"
         ),
     )
     parser.add_argument(

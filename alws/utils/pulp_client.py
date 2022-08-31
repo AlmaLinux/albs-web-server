@@ -7,6 +7,8 @@ import urllib.parse
 from typing import List
 
 import aiohttp
+from aiohttp.client_exceptions import ClientResponseError
+from fastapi import status
 # TODO: Return retries for GET requests
 # from aiohttp_retry import RetryClient
 
@@ -645,7 +647,18 @@ class PulpClient:
             await asyncio.sleep(2)
             task = await self.request('GET', task_href)
         if task['state'] == 'failed':
-            raise Exception(f'Task {str(task)} has failed')
+            error = task.get('error')
+            error_msg = ""
+            if error:
+                description = error.get('description', '')
+                traceback = error.get('traceback', '')
+                if description:
+                    error_msg += f"\nDescription: {description}"
+                if traceback:
+                    error_msg += f"\nPulp traceback:\n{traceback}"
+            raise Exception(
+                f"Task {task['pulp_href']} has failed{error_msg}"
+            )
         return task
 
     async def list_updateinfo_records(
@@ -696,5 +709,10 @@ class PulpClient:
                     auth=self._auth
             ) as response:
                 response_json = await response.json()
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except ClientResponseError as exc:
+                    if exc.status == status.HTTP_400_BAD_REQUEST:
+                        exc.message += f": {str(response_json)}"
+                    raise exc
                 return response_json
