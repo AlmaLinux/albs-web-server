@@ -76,7 +76,6 @@ async def remove_user(user_id: int, db: Session):
     # we will just fail and return a generic error.
     # TODO: Add more fine grained checks and return an appropriate
     # reason why a user can't be removed
-    # TODO: Uncomment when ready
     try:
         await db.execute(delete(models.User).where(
             models.User.id == user_id))

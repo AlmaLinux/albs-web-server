@@ -28,6 +28,7 @@ router = APIRouter(
 async def get_all_users(db: database.Session = Depends(get_db)):
     return await user_crud.get_all_users(db)
 
+
 @router.put(
     '/{user_id}',
     response_model=user_schema.UserOpResult
@@ -37,41 +38,6 @@ async def modify_user(user_id: int, payload: user_schema.UserUpdate,
                       _=Depends(get_current_superuser)
                       ) -> user_schema.UserOpResult:
     await user_crud.update_user(db, user_id, payload)
-    return user_schema.UserOpResult(success=True)
-
-# TODO: Delete route
-@router.patch('/{user_id}/activate')
-async def activate_user(user_id: int, db: database.Session = Depends(get_db),
-                      _=Depends(get_current_superuser)
-                      ) -> user_schema.UserOpResult:
-    await user_crud.activate_user(user_id, db)
-    return user_schema.UserOpResult(success=True)
-
-
-# TODO: Delete route
-@router.patch('/{user_id}/deactivate')
-async def deactivate_user(user_id: int, db: database.Session = Depends(get_db),
-                          _=Depends(get_current_superuser)
-                          ) -> user_schema.UserOpResult:
-    await user_crud.deactivate_user(user_id, db)
-    return user_schema.UserOpResult(success=True)
-
-
-# TODO: Delete route
-@router.patch('/{user_id}/grant-superuser')
-async def activate_user(user_id: int, db: database.Session = Depends(get_db),
-                      _=Depends(get_current_superuser)
-                      ) -> user_schema.UserOpResult:
-    await user_crud.make_superuser(user_id, db)
-    return user_schema.UserOpResult(success=True)
-
-
-# TODO: Delete route
-@router.patch('/{user_id}/revoke-superuser')
-async def activate_user(user_id: int, db: database.Session = Depends(get_db),
-                      _=Depends(get_current_superuser)
-                      ) -> user_schema.UserOpResult:
-    await user_crud.make_usual_user(user_id, db)
     return user_schema.UserOpResult(success=True)
 
 

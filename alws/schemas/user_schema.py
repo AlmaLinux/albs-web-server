@@ -11,18 +11,6 @@ class LoginGithub(BaseModel):
     code: str
 
 
-# TODO: Check and remove if really not needed anymore
-class LoginResponse(BaseModel):
-
-    id: int
-    username: str
-    email: str
-    jwt_token: str
-
-    class Config:
-        orm_mode = True
-
-
 class User(BaseModel):
 
     id: int
@@ -44,5 +32,6 @@ class UserUpdate(BaseModel):
 
 
 class UserOpResult(BaseModel):
+
     success: bool
     message: typing.Optional[str] = None
