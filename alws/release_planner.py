@@ -96,7 +96,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     @abstractmethod
     async def execute_release_plan(
             self, release: models.Release
-    ) -> typing.List[str]:
+    ) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
         raise NotImplementedError()
 
     @staticmethod
@@ -395,7 +395,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
 
         builds_released = False
         try:
-            release_messages = await self.execute_release_plan(release)
+            release_messages, release_plan = await self.execute_release_plan(
+                release,
+            )
         except (EmptyReleasePlan, MissingRepository,
                 SignError, ReleaseLogicError) as e:
             message = f'Cannot commit release: {str(e)}'
@@ -411,7 +413,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             .where(models.Build.id.in_(release.build_ids))
             .values(release_id=release.id, released=builds_released)
         )
-        release.plan['last_log'] = message
+        release_plan['last_log'] = message
+        release.plan = release_plan
         self.db.add(release)
         await self.db.commit()
         await self.db.refresh(release)
@@ -504,7 +507,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
     async def execute_release_plan(
             self, release: models.Release
-    ) -> typing.List[str]:
+    ) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
         # for updating plan during executing, we should use deepcopy
         release_plan = copy.deepcopy(release.plan)
         if not release_plan.get('packages') or (
@@ -537,7 +540,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             for href in repository_modification_mapping.keys()
         ))
 
-        return []
+        return [], release_plan
 
     def get_production_pulp_repositories_names(
             self, product: models.Product = None,
@@ -1204,7 +1207,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
     async def execute_release_plan(
             self, release: models.Release
-    ) -> typing.List[str]:
+    ) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
         additional_messages = []
         authenticate_tasks = []
         packages_mapping = {}
@@ -1367,7 +1370,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     self.pulp_client.create_rpm_publication(repo.pulp_href))
         await asyncio.gather(*modify_tasks)
         await asyncio.gather(*publication_tasks)
-        return additional_messages
+        return additional_messages, release_plan
 
     async def update_release_plan(
             self, plan: dict,
