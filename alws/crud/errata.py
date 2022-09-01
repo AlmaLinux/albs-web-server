@@ -9,6 +9,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Union,
 )
 import uuid
 
@@ -997,12 +998,11 @@ async def release_errata_record(
         .where(models.ErrataRecord.id == record_id)
         .options(
             selectinload(models.ErrataRecord.references),
-            selectinload(models.ErrataRecord.packages).selectinload(
-                models.ErrataPackage.albs_packages
-            ),
-            selectinload(models.ErrataRecord.platform).selectinload(
-                models.Platform.repos
-            ),
+            selectinload(models.ErrataRecord.packages)
+            .selectinload(models.ErrataPackage.albs_packages)
+            .selectinload(models.ErrataToALBSPackage.build_artifact),
+            selectinload(models.ErrataRecord.platform)
+            .selectinload(models.Platform.repos),
         )
     )
     db_record: models.ErrataRecord = db_record.scalars().first()
@@ -1010,13 +1010,43 @@ async def release_errata_record(
         pulp, db_record.platform
     )
     repo_mapping = collections.defaultdict(list)
+
+    def get_nevra(
+        pkg: Union[models.ErrataPackage, models.ErrataToALBSPackage],
+    ) -> str:
+        # we should clean release before compare,
+        # because in ErrataPackage can be "raw" release part
+        release = clean_release(pkg.release)
+        return f"{pkg.epoch}:{pkg.name}-{pkg.version}-{release}.{pkg.arch}"
+
+    errata_packages = set()
+    albs_records_to_add = set()
     for package in db_record.packages:
+        errata_package_nevra = get_nevra(package)
         for albs_package in package.albs_packages:
-            if albs_package.status != ErrataPackageStatus.released:
+            if albs_package.status not in (
+                ErrataPackageStatus.released,
+                ErrataPackageStatus.approved,
+            ):
                 continue
-            if pulp_packages.get(albs_package.pulp_href):
-                for repo in pulp_packages[albs_package.pulp_href]:
+            albs_package_pulp_href = albs_package.get_pulp_href()
+            if pulp_packages.get(albs_package_pulp_href):
+                for repo in pulp_packages[albs_package_pulp_href]:
                     repo_mapping[repo].append(albs_package)
+                albs_package.status = ErrataPackageStatus.released
+                albs_package_nevra = get_nevra(albs_package)
+                albs_records_to_add.add(albs_package_nevra)
+        errata_packages.add(errata_package_nevra)
+
+    missing_packages = errata_packages.difference(albs_records_to_add)
+    if missing_packages:
+        msg = (
+            "Cannot release updateinfo record, "
+            "following packages is missing in platform repositories: "
+            + ", ".join(missing_packages)
+        )
+        raise ValueError(msg)
+
     tasks = []
     for repo_href, packages in repo_mapping.items():
         tasks.append(release_errata_packages(
@@ -1028,3 +1058,4 @@ async def release_errata_record(
             repo_href,
         ))
     await asyncio.gather(*tasks)
+    await db.commit()
