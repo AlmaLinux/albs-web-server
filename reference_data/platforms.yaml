@@ -1102,6 +1102,26 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: s390x
+      name: almalinux-8-plus
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/almalinux/8/plus/s390x/os/
+      export_path: almalinux/8/plus/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-plus-debuginfo
+      type: rpm
+      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/s390x/
+      export_path: vault/8/plus/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
 
 - name: AlmaLinux-9
   distr_type: rhel
