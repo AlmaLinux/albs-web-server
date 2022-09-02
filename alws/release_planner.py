@@ -994,12 +994,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         for weak_arch in strong_arches[pkg['arch']]:
                             second_key = (pkg['name'], pkg['version'],
                                           weak_arch, is_beta, is_devel)
-                            # if we've already found repos
-                            # we don't need to override them
-                            beholder_repos = beholder_cache.get(
-                                second_key, {}).get('repositories', [])
-                            if beholder_repos:
-                                continue
                             replaced_pkg = copy.deepcopy(pkg)
                             for repo in replaced_pkg['repositories']:
                                 if repo['arch'] == pkg['arch']:
@@ -1048,12 +1042,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     for weak_arch in strong_arches[pkg['arch']]:
                         second_key = (pkg['name'], pkg['version'], weak_arch,
                                       is_beta, is_devel)
-                        # if we've already found repos
-                        # we don't need to override them
-                        beholder_repos = beholder_cache.get(
-                            second_key, {}).get('repositories', [])
-                        if beholder_repos:
-                            continue
                         replaced_pkg = copy.deepcopy(pkg)
                         for repo in replaced_pkg['repositories']:
                             if repo['arch'] == pkg['arch']:
