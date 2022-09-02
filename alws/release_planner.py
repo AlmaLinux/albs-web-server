@@ -411,7 +411,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             .where(models.Build.id.in_(release.build_ids))
             .values(release_id=release.id, released=builds_released)
         )
-        release.plan['last_log'] = message
+        # for updating release plan, we should use deepcopy
+        release_plan = copy.deepcopy(release.plan)
+        release_plan['last_log'] = message
+        release.plan = release_plan
         self.db.add(release)
         await self.db.commit()
         await self.db.refresh(release)
@@ -521,20 +524,18 @@ class CommunityReleasePlanner(BaseReleasePlanner):
     async def execute_release_plan(
             self, release: models.Release
     ) -> typing.List[str]:
-        # for updating plan during executing, we should use deepcopy
-        release_plan = copy.deepcopy(release.plan)
-        if not release_plan.get('packages') or (
-                not release_plan.get('repositories')):
+        if not release.plan.get('packages') or (
+                not release.plan.get('repositories')):
             raise EmptyReleasePlan(
                 'Cannot execute plan with empty packages or repositories: '
-                '{packages}, {repositories}'.format_map(release_plan)
+                '{packages}, {repositories}'.format_map(release.plan)
             )
 
         repository_modification_mapping = defaultdict(list)
         db_repos_mapping = self.get_production_repositories_mapping(
             release.product, include_pulp_href=True)
 
-        for pkg in release_plan['packages']:
+        for pkg in release.plan['packages']:
             package = pkg['package']
             for repository in pkg['repositories']:
                 repo_key = (repository['arch'], repository['debug'])
@@ -543,6 +544,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                     package['artifact_href'])
 
         # TODO: Add support for modules releases
+        #       and checking existent packages in repos
 
         await asyncio.gather(*(
             self.pulp_client.modify_repository(href, add=packages)
@@ -1213,13 +1215,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         authenticate_tasks = []
         packages_mapping = {}
         packages_to_repo_layout = {}
-        # for updating plan during executing, we should use deepcopy
-        release_plan = copy.deepcopy(release.plan)
-        if not release_plan.get('packages') or (
-                not release_plan.get('repositories')):
+        if not release.plan.get('packages') or (
+                not release.plan.get('repositories')):
             raise EmptyReleasePlan(
                 'Cannot execute plan with empty packages or repositories: '
-                '{packages}, {repositories}'.format_map(release_plan)
+                '{packages}, {repositories}'.format_map(release.plan)
             )
         for build_id in release.build_ids:
             try:
@@ -1234,7 +1234,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         # check packages presence in prod repos
         self.base_platform = release.platform
-        for pkg_dict in release_plan['packages']:
+        for pkg_dict in release.plan['packages']:
             package = pkg_dict['package']
             is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
@@ -1247,14 +1247,14 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pkgs_from_repos,
             pkgs_in_repos,
         ) = await self.prepare_and_execute_async_tasks(
-            release_plan['packages'],
+            release.plan['packages'],
         )
-        release_plan['packages_from_repos'] = pkgs_from_repos
-        release_plan['packages_in_repos'] = pkgs_in_repos
+        release.plan['packages_from_repos'] = pkgs_from_repos
+        release.plan['packages_in_repos'] = pkgs_in_repos
         if self.codenotary_enabled:
             packages_mapping = dict(await asyncio.gather(*authenticate_tasks))
 
-        for package_dict in release_plan['packages']:
+        for package_dict in release.plan['packages']:
             package = package_dict['package']
             pkg_full_name = package['full_name']
             force_flag = package.get('force', False)
@@ -1295,7 +1295,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         prod_repo_modules_cache = {}
         added_modules = defaultdict(list)
-        for module in release_plan.get('modules', []):
+        for module in release.plan.get('modules', []):
             for repository in module['repositories']:
                 repo_name = repository['name']
                 repo_arch = repository['arch']
