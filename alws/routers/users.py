@@ -49,7 +49,7 @@ async def remove_user(user_id: int, db: database.Session = Depends(get_db),
         await user_crud.remove_user(user_id, db)
         return user_schema.UserOpResult(
             success=True,
-            message=f'Successfully removed user with id {user_id}')
+            message=f'User with id {user_id} has been queued for removal')
     except UserError as err:
         raise HTTPException(
             detail=str(err),

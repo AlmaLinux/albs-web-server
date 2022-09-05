@@ -1,12 +1,14 @@
 import typing
 
-from sqlalchemy import update, delete, or_
+from sqlalchemy import update, or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.crud import build as build_crud
+
+from alws.dramatiq import perform_user_removal
 from alws.errors import UserError
 from alws.schemas import user_schema
 
@@ -174,18 +176,6 @@ async def check_valuable_artifacts(user_id: int, db: Session):
     ]
     return valuable_artifacts
 
-async def remove_unvaluable_artifacts(user_id: int, db: Session):
-    # Remove builds
-    async with db.begin():
-        build_ids = (await db.execute(
-            select(models.Build.id).where(
-              models.Build.owner_id == user_id
-            )
-        )).scalars().all()
-
-    for build_id in build_ids:
-        await build_crud.remove_build_job(db, build_id)
-
 
 async def remove_user(user_id: int, db: Session):
     async with db.begin():
@@ -209,16 +199,10 @@ async def remove_user(user_id: int, db: Session):
             err = err + "".join(errors)
         raise UserError(err)
     else:
-        try:
-            # TODO - ALBS-620: When removing a user with a considerable
-            # amount of builds, this might take some time
-            await remove_unvaluable_artifacts(user_id, db)
-            await db.execute(delete(models.User).where(
-                models.User.id == user_id))
-            await db.commit()
-        except Exception as exc:
-            message = f'The user {user.username} could not be removed: {str(exc)}'
-            raise UserError(message) from exc
+        # ALBS-620: When removing a user with a considerable
+        # amount of builds, this might take some time
+        # For this reason, we are queing the removal of the users
+        perform_user_removal.send(user_id)
 
 async def update_user(
         db: Session, user_id: int,
