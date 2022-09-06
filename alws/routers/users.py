@@ -8,11 +8,11 @@ from fastapi import (
 )
 
 from alws import database
-from alws.auth import get_current_superuser
+from alws.auth import get_current_superuser, get_current_user
 from alws.crud import user as user_crud
 from alws.dependencies import get_db
 from alws.errors import UserError
-from alws.schemas import user_schema
+from alws.schemas import user_schema, role_schema
 
 
 router = APIRouter(
@@ -55,3 +55,36 @@ async def remove_user(user_id: int, db: database.Session = Depends(get_db),
             detail=str(err),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+@router.get(
+    '/{user_id}/roles',
+    response_model=typing.List[role_schema.Role]
+)
+async def get_user_roles(user_id: int,
+                         db: database.Session = Depends(get_db),
+                         _=Depends(get_current_user)
+                        ):
+    return await user_crud.get_user_roles(db, user_id)
+
+# TODO: Check for errors, respond accordingly
+@router.patch(
+    '/{user_id}/roles/add',
+    response_model=user_schema.UserOpResult
+)
+async def add_roles(user_id: int, roles_ids: typing.List[int],
+                    db: database.Session = Depends(get_db),
+                    _=Depends(get_current_superuser)
+                    ):
+    return await user_crud.add_roles(db, user_id, roles_ids)
+
+
+# TODO: Check for errors, respond accordingly
+@router.patch(
+    '/{user_id}/roles/remove',
+    response_model=user_schema.UserOpResult
+)
+async def remove_roles(user_id: int, roles_ids: typing.List[int],
+                       db: database.Session = Depends(get_db),
+                       _=Depends(get_current_superuser)
+                       ):
+    return await user_crud.remove_roles(db, user_id, roles_ids)

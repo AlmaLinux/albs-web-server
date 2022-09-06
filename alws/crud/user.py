@@ -1,6 +1,6 @@
 import typing
 
-from sqlalchemy import update, or_
+from sqlalchemy import update, delete, or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
@@ -215,3 +215,33 @@ async def update_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+async def get_user_roles(db: Session, user_id: int):
+    async with db.begin():
+        user = (await db.execute(
+            select(models.User).where(
+                models.User.id == user_id
+            ).options(
+                selectinload(models.User.roles)
+            )
+        )).scalars().first()
+    return user.roles
+
+# TODO: Check for errors
+async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
+    async with db.begin():
+        user = await get_user(db, user_id)
+        add_roles = (await db.execute(select(models.UserRole).where(
+            models.UserRole.id.in_(roles_ids))
+        )).scalars().all()
+        user.roles.extend(add_roles)
+        db.add(user)
+
+
+# TODO: Check for errors
+async def remove_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
+    async with db.begin():
+        await db.execute(delete(models.UserRoleMapping).where(
+            models.UserRoleMapping.c.role_id.in_(roles_ids),
+            models.UserRoleMapping.c.user_id == user_id
+        ))
