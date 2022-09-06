@@ -5,14 +5,14 @@ import datetime
 import urllib.parse
 
 import aiohttp.client_exceptions
-from pydantic import BaseModel, validator, Field, conlist
+from pydantic import BaseModel, validator, conlist
 
 from alws.config import settings
 from alws.constants import BuildTaskRefType
 from alws import models
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
-    download_modules_yaml, GiteaClient, ModulesYamlNotFoundError
+    download_modules_yaml, GiteaClient
 )
 from alws.utils.modularity import (
     ModuleWrapper,
@@ -20,7 +20,7 @@ from alws.utils.modularity import (
     RpmArtifact,
 )
 from alws.utils.parsing import (
-    clean_module_tag,
+    clean_release,
     get_clean_distr_name,
 )
 
@@ -86,8 +86,13 @@ class BuildTaskModuleRef(BaseModel):
 class BuildCreatePlatforms(BaseModel):
 
     name: str
-    arch_list: typing.List[typing.Literal['x86_64', 'i686', 'aarch64', 'ppc64le',
-                                          's390x']]
+    arch_list: typing.List[typing.Literal[
+        'x86_64',
+        'i686',
+        'aarch64',
+        'ppc64le',
+        's390x',
+    ]]
 
 
 class BuildCreate(BaseModel):
@@ -237,9 +242,10 @@ class Build(BaseModel):
     tasks: typing.List[BuildTask]
     owner: BuildOwner
     sign_tasks: typing.List[BuildSignTask]
-    linked_builds: typing.Optional[typing.List[int]] = Field(default_factory=list)
+    linked_builds: typing.Optional[typing.List[int]] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     platform_flavors: typing.List[PlatformFlavour]
+    released: bool
 
     @validator('linked_builds', pre=True)
     def linked_builds_validator(cls, v):
@@ -322,7 +328,7 @@ def compare_module_data(
         srpm = beholder_artifact['sourcerpm']
         beholder_tag_name = (f"{srpm['name']}-{srpm['version']}-"
                              f"{srpm['release']}")
-        beholder_tag_name = clean_module_tag(beholder_tag_name)
+        beholder_tag_name = clean_release(beholder_tag_name)
         if beholder_tag_name != tag_name:
             continue
         for package in beholder_artifact['packages']:
@@ -369,7 +375,7 @@ async def _get_module_ref(
             # we need only last part from tag to comparison
             # imports/c8-stream-rhel8/golang-1.16.7-1.module+el8.5.0+12+1aae3f
             tag_name = raw_tag_name.split('/')[-1]
-            clean_tag_name = clean_module_tag(tag_name)
+            clean_tag_name = clean_release(tag_name)
             pkgs_to_add = compare_module_data(
                 component_name, beholder_data, clean_tag_name)
             enabled = not pkgs_to_add

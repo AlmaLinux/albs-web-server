@@ -7,16 +7,16 @@ from alws.schemas.repository_schema import Repository
 from alws.schemas.team_schema import Team
 from alws.schemas.user_schema import User
 
-__all__ = ['ProductCreate']
+__all__ = ['ProductCreate', 'Product']
 
 
 class ProductCreate(BaseModel):
     name: str
-    team_id: int
     owner_id: int
     title: str
     description: typing.Optional[str]
     platforms: typing.List[Platform] = []
+    is_community: bool = True
 
 
 class ProductBuild(BaseModel):
@@ -36,6 +36,7 @@ class Product(BaseModel):
     platforms: typing.List[Platform] = []
     owner: User
     team: Team
+    is_community: bool
 
     class Config:
         orm_mode = True

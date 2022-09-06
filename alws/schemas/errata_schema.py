@@ -34,7 +34,7 @@ class ErrataReference(BaseErrataReference):
 
     class Config:
         orm_mode = True
-    
+
 
 class BaseErrataPackage(BaseModel):
     name: str
@@ -68,7 +68,7 @@ class ErrataPackage(BaseErrataPackage):
     id: int
     source_srpm: Optional[str]
     albs_packages: List[AlbsPackage]
-    
+
     class Config:
         orm_mode = True
 

@@ -16,15 +16,15 @@ __all__ = [
 
 def generate_repo_config(
     repo: Repository,
+    product_name: str,
     ownername: str,
 ) -> str:
     # we should clean "http" protocol from host url
     clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
-    clean_base_url = re.sub(rf'-{repo.arch}-dr/$', '-$basearch-dr/', repo.url)
     config_template = (
-        f"[copr:{clean_host_name}:{ownername}:{repo.name}]\n"
-        f"name=Copr repo for {repo.name} owned by {ownername}\n"
-        f"baseurl={clean_base_url}\n"
+        f"[copr:{clean_host_name}:{ownername}:{product_name}]\n"
+        f"name=Copr repo for {product_name} {repo.arch} owned by {ownername}\n"
+        f"baseurl={repo.url}\n"
         "type=rpm-md\n"
         "skip_if_unavailable=True\n"
         "gpgcheck=0\n"
@@ -84,5 +84,8 @@ async def create_product_repo(
     repo_name = (
         f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
     )
-    repo_url, repo_href = await pulp_client.create_build_rpm_repo(repo_name)
+    repo_url, repo_href = await pulp_client.create_rpm_repository(
+        repo_name, auto_publish=False, create_publication=True,
+        base_path_start='copr',
+    )
     return repo_name, repo_url, arch, repo_href, is_debug
