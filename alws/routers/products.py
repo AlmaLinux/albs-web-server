@@ -67,6 +67,7 @@ async def add_to_product(
 ):
     await products.modify_product(
         db, build_id, product, user.id, 'add')
+    return {'success': True}
 
 
 @public_router.post('/remove/{build_id}/{product}/',
