@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.dramatiq.user import perform_user_removal
 
+from alws.dramatiq import perform_user_removal
 from alws.errors import UserError
 from alws.schemas import user_schema
 
