@@ -21,6 +21,7 @@ async def main():
         for record in errata_records:
             clean_title = severity_regex.sub('', record.original_title)
             record.title = f'{record.id}: {clean_title} ({record.severity})'
+            record.oval_title = f'{record.id}: {clean_title} ({record.severity})'
             updated_records.append(record)
         db.add_all(updated_records)
         await db.commit()

@@ -1072,6 +1072,7 @@ class ErrataRecord(Base):
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    oval_title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
