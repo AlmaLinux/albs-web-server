@@ -1,3 +1,4 @@
+import datetime
 import typing
 
 from pydantic import BaseModel
@@ -34,9 +35,18 @@ class Release(BaseModel):
     owner: User
     platform: Platform
     product: ReleaseProduct
+    created_at: typing.Optional[datetime.datetime]
 
     class Config:
         orm_mode = True
+
+
+class ReleaseSearch(BaseModel):
+    package_name: typing.Optional[str]
+    module_name: typing.Optional[str]
+    product_id: typing.Optional[str]
+    platform_id: typing.Optional[int]
+    status: typing.Optional[int]
 
 
 class ReleaseResponse(BaseModel):

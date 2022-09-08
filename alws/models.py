@@ -3,6 +3,7 @@ import datetime
 import re
 
 import sqlalchemy
+from sqlalchemy.sql import func
 from fastapi_users.db import (
     SQLAlchemyBaseUserTable,
     SQLAlchemyBaseOAuthAccountTable,
@@ -318,8 +319,7 @@ class Build(PermissionsMixin, TeamMixin, Base):
     created_at = sqlalchemy.Column(
         sqlalchemy.DateTime,
         nullable=False,
-        # TODO: replace with sql function
-        default=datetime.datetime.utcnow
+        default=func.current_timestamp(),
     )
     tasks = relationship('BuildTask', back_populates='build')
     sign_tasks = relationship('SignTask', back_populates='build',
@@ -911,6 +911,11 @@ class Release(PermissionsMixin, TeamMixin, Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_ids = sqlalchemy.Column(
         sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False)
+    created_at = sqlalchemy.Column(
+        sqlalchemy.DateTime,
+        nullable=True,
+        default=func.current_timestamp(),
+    )
     build_task_ids = sqlalchemy.Column(
         sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=True)
     reference_platform_id = sqlalchemy.Column(
