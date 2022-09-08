@@ -280,6 +280,10 @@ async def remove_build_job(db: Session, build_id: int):
                 models.TestTask.id.in_(test_task_ids))
         )
         await db.execute(
+            delete(models.BuildTaskDependency).where(
+                models.BuildTaskDependency.c.build_task_dependency.in_(build_task_ids))
+        )
+        await db.execute(
             delete(models.BuildTask).where(
                 models.BuildTask.id.in_(build_task_ids))
         )
