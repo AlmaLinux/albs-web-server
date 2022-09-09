@@ -35,3 +35,7 @@ class UserOpResult(BaseModel):
 
     success: bool
     message: typing.Optional[str] = None
+
+class UserTeam(BaseModel):
+    id: int
+    name: str

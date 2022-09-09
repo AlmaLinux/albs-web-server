@@ -244,3 +244,15 @@ async def remove_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
             models.UserRoleMapping.c.role_id.in_(roles_ids),
             models.UserRoleMapping.c.user_id == user_id
         ))
+
+async def get_user_teams(db: Session, user_id: int):
+    async with db.begin():
+        user = (await db.execute(
+            select(models.User).where(
+                models.User.id == user_id
+            ).options(
+                selectinload(models.User.teams)
+            )
+        )).scalars().first()
+    response = [{'id': team.id, 'name': team.name} for team in user.teams]
+    return response

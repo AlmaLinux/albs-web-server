@@ -88,3 +88,13 @@ async def remove_roles(user_id: int, roles_ids: typing.List[int],
                        _=Depends(get_current_superuser)
                        ):
     return await user_crud.remove_roles(db, user_id, roles_ids)
+
+@router.get(
+    '/{user_id}/teams',
+    response_model=typing.List[user_schema.UserTeam]
+)
+async def get_user_teams(user_id: int,
+                         db: database.Session = Depends(get_db),
+                         _=Depends(get_current_user)
+                        ):
+    return await user_crud.get_user_teams(db, user_id)
