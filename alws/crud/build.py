@@ -222,7 +222,6 @@ async def remove_build_job(db: Session, build_id: int):
             )
         if build.released:
             raise BuildError(f"Build with {build_id} is released")
-        # TODO - ALBS-622: Take into account build_task_dependencies
         for bt in build.tasks:
             build_task_ids.append(bt.id)
             build_task_ref_ids.append(bt.ref_id)

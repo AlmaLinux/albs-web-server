@@ -226,7 +226,6 @@ async def get_user_roles(db: Session, user_id: int):
         )).scalars().first()
     return user.roles
 
-# TODO: Check for errors
 async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
     async with db.begin():
         user = await get_user(db, user_id)
@@ -237,7 +236,6 @@ async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
         db.add(user)
 
 
-# TODO: Check for errors
 async def remove_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
     async with db.begin():
         await db.execute(delete(models.UserRoleMapping).where(
