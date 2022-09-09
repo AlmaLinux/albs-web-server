@@ -1,6 +1,8 @@
 import asyncio
-from collections import defaultdict
+import logging
+import pprint
 import typing
+from collections import defaultdict
 
 from sqlalchemy import or_
 from sqlalchemy.future import select
@@ -31,6 +33,9 @@ __all__ = [
     'modify_product',
     'remove_product',
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 async def create_product(
@@ -213,10 +218,11 @@ async def get_existing_packages(
     )
 
 
-async def get_packages_to_add(
+async def get_packages(
     pulp_client: PulpClient,
     build_repo: models.Repository,
     dist_repo: models.Repository,
+    modification: str
 ) -> typing.Tuple[str, typing.List[str]]:
 
     def filter_by_arch(pkgs: typing.List[dict], repo_arch: str):
@@ -234,10 +240,28 @@ async def get_packages_to_add(
     search_by_href = set([pkg['pulp_href'] for pkg in dist_packages])
     build_packages = await get_existing_packages(pulp_client, build_repo)
     filtered_build_packages = filter_by_arch(build_packages, dist_repo.arch)
-    dedup_mapping = {pkg['location_href']: pkg['pulp_href']
-                     for pkg in filtered_build_packages}
-    final_packages = [href for href in dedup_mapping.values()
-                      if href not in search_by_href]
+    logger.debug('Packages in product repository %s:\n%s', dist_repo.name,
+                 pprint.pformat(dist_packages))
+    logger.debug('Set of packages HREFs for comparison '
+                 'with build artifacts:\n%s',
+                 pprint.pformat(search_by_href))
+    logger.debug('List of build packages in build repository %s:\n%s',
+                 build_repo.name, pprint.pformat(filtered_build_packages))
+    if modification == 'add':
+        dedup_mapping = {}
+        for pkg in filtered_build_packages:
+            if pkg['location_href'] in dedup_mapping:
+                continue
+            dedup_mapping[pkg['location_href']] = pkg['pulp_href']
+        logger.debug('Deduplication mapping for packages'
+                     'with the same name:\n%s', pprint.pformat(dedup_mapping))
+        final_packages = [href for href in dedup_mapping.values()
+                          if href not in search_by_href]
+    else:
+        final_packages = [pkg['pulp_href'] for pkg in filtered_build_packages
+                          if pkg['pulp_href'] in search_by_href]
+    logger.debug('Final list of packages to %s:\n%s', modification,
+                 pprint.pformat(final_packages))
     return dist_repo.pulp_href, final_packages
 
 
@@ -245,6 +269,7 @@ async def prepare_repo_modify_dict(
     db_build: models.Build,
     db_product: models.Product,
     pulp_client: PulpClient,
+    modification: str
 ) -> typing.Dict[str, typing.List[str]]:
 
     product_repo_mapping = {(repo.arch, repo.debug): repo
@@ -254,7 +279,7 @@ async def prepare_repo_modify_dict(
     tasks = []
     for repo in build_repos:
         dist_repo = product_repo_mapping.get((repo.arch, repo.debug))
-        tasks.append(get_packages_to_add(pulp_client, repo, dist_repo))
+        tasks.append(get_packages(pulp_client, repo, dist_repo, modification))
 
     results = await asyncio.gather(*tasks)
     modify.update(**dict(results))
@@ -314,15 +339,22 @@ async def modify_product(
 
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    modify = await prepare_repo_modify_dict(db_build, db_product, pulp_client)
+    modify = await prepare_repo_modify_dict(
+        db_build, db_product, pulp_client, modification)
     tasks = []
+    publish_tasks = []
     for key, value in modify.items():
         if modification == 'add':
             tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
         else:
             tasks.append(pulp_client.modify_repository(
                 remove=value, repo_to=key))
+        # We've changed products repositories to not invoke
+        # automatic publications, so now we need
+        # to manually publish them after modification
+        publish_tasks.append(pulp_client.create_rpm_publication(key))
     await asyncio.gather(*tasks)
+    await asyncio.gather(*publish_tasks)
 
     if modification == 'add':
         db_product.builds.append(db_build)
