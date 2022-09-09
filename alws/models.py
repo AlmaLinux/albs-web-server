@@ -258,6 +258,12 @@ class Repository(CustomRepoRepr, PermissionsMixin):
     export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
                                  nullable=False)
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        nullable=True
+    )
+    platform = relationship('Platform')
 
 
 class RepositoryRemote(CustomRepoRepr):
