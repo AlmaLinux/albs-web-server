@@ -60,6 +60,7 @@ async def make_usual_user(user_id: int, db: Session):
         models.User.id == user_id).values(is_superuser=False))
     await db.commit()
 
+
 async def check_valuable_artifacts(user_id: int, db: Session):
     # Check that the user doesn't own valuable artifacts
     # Related and potential valuable artifacts are:
@@ -179,6 +180,8 @@ async def check_valuable_artifacts(user_id: int, db: Session):
 async def remove_user(user_id: int, db: Session):
     async with db.begin():
         user = await get_user(db, user_id=user_id)
+        if not user:
+            raise UserError(f'User with ID {user_id} does not exist')
         valuable_artifacts = await check_valuable_artifacts(user_id, db)
 
     if valuable_artifacts:
@@ -199,9 +202,10 @@ async def remove_user(user_id: int, db: Session):
         raise UserError(err)
     else:
         # ALBS-620: When removing a user with a considerable
-        # amount of builds, this might take some time
-        # For this reason, we are queing the removal of the users
+        # amount of builds, this might take some time.
+        # For this reason, we are queuing the user removal process
         perform_user_removal.send(user_id)
+
 
 async def update_user(
         db: Session, user_id: int,
@@ -215,6 +219,7 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
 
+
 async def get_user_roles(db: Session, user_id: int):
     async with db.begin():
         user = (await db.execute(
@@ -224,7 +229,11 @@ async def get_user_roles(db: Session, user_id: int):
                 selectinload(models.User.roles)
             )
         )).scalars().first()
+    if not user:
+        raise UserError(f'User with ID {user_id} does not exist')
+
     return user.roles
+
 
 async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
     async with db.begin():
@@ -242,6 +251,7 @@ async def remove_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
             models.UserRoleMapping.c.role_id.in_(roles_ids),
             models.UserRoleMapping.c.user_id == user_id
         ))
+
 
 async def get_user_teams(db: Session, user_id: int):
     async with db.begin():

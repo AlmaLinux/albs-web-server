@@ -32,7 +32,7 @@ async def get_all_users(db: database.Session = Depends(get_db)):
 @router.put(
     '/{user_id}',
     response_model=user_schema.UserOpResult
-    ) -> user_schema.UserOpResult:
+    )
 async def modify_user(user_id: int, payload: user_schema.UserUpdate,
                       db: database.Session = Depends(get_db),
                       _=Depends(get_current_superuser)
@@ -77,11 +77,11 @@ async def get_user_roles(user_id: int,
 @router.patch(
     '/{user_id}/roles/add',
     response_model=user_schema.UserOpResult
-    ) -> user_schema.UserOpResult:
+    )
 async def add_roles(user_id: int, roles_ids: typing.List[int],
                     db: database.Session = Depends(get_db),
                     _=Depends(get_current_superuser)
-                    ):
+                    ) -> user_schema.UserOpResult:
     try:
         await user_crud.add_roles(db, user_id, roles_ids)
         return user_schema.UserOpResult(
@@ -97,11 +97,11 @@ async def add_roles(user_id: int, roles_ids: typing.List[int],
 @router.patch(
     '/{user_id}/roles/remove',
     response_model=user_schema.UserOpResult
-    ) -> user_schema.UserOpResult:
+    )
 async def remove_roles(user_id: int, roles_ids: typing.List[int],
                        db: database.Session = Depends(get_db),
                        _=Depends(get_current_superuser)
-                       ):
+                       ) -> user_schema.UserOpResult:
     try:
         await user_crud.remove_roles(db, user_id, roles_ids)
         return user_schema.UserOpResult(
