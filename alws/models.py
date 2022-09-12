@@ -259,6 +259,12 @@ class Repository(CustomRepoRepr, PermissionsMixin):
     export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
                                  nullable=False)
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('platforms.id'),
+        nullable=True
+    )
+    platform = relationship('Platform')
 
 
 class RepositoryRemote(CustomRepoRepr):
@@ -1077,6 +1083,7 @@ class ErrataRecord(Base):
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    oval_title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     original_title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     status = sqlalchemy.Column(sqlalchemy.Text, nullable=False)

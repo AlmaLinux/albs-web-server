@@ -272,13 +272,17 @@ async def prepare_repo_modify_dict(
     modification: str
 ) -> typing.Dict[str, typing.List[str]]:
 
-    product_repo_mapping = {(repo.arch, repo.debug): repo
+    product_repo_mapping = {(repo.arch, repo.debug, repo.platform.name): repo
                             for repo in db_product.repositories}
     modify = defaultdict(list)
     build_repos = [repo for repo in db_build.repos if repo.type == 'rpm']
     tasks = []
     for repo in build_repos:
-        dist_repo = product_repo_mapping.get((repo.arch, repo.debug))
+        dist_repo = product_repo_mapping.get(
+            (repo.arch, repo.debug, repo.platform.name)
+        )
+        if dist_repo is None:
+            continue
         tasks.append(get_packages(pulp_client, repo, dist_repo, modification))
 
     results = await asyncio.gather(*tasks)
@@ -288,10 +292,60 @@ async def prepare_repo_modify_dict(
         if task.status != BuildTaskStatus.COMPLETED:
             continue
         if task.rpm_module:
-            product_repo = product_repo_mapping.get((task.arch, False))
+            product_repo = product_repo_mapping.get(
+                (task.arch, False, task.platform.name)
+            )
+            if product_repo is None:
+                continue
             modify[product_repo.pulp_href].append(task.rpm_module.pulp_href)
 
     return modify
+
+
+async def set_platform_for_products_repos(
+        db: Session,
+        product: models.Product,
+) -> None:
+    repo_debug_dict = {
+        True: 'debug-dr',
+        False: 'dr',
+    }
+    # name of a product's repo:
+    # some-username-some-product-some-platform-x86_64-debug-dr
+    repos_per_platform = {
+        f"{product.owner.username}-{product.name}-{platform.name.lower()}-"
+        f"{repo.type}-{repo_debug_dict[repo.debug]}": platform
+        for repo in product.repositories for platform in product.platforms
+    }
+    # we do nothing if all repos have platform
+    if all(repo.platform for repo in product.repositories):
+        return
+    for repo in product.repositories:
+        repo.platform = repos_per_platform[repo.name]
+
+
+async def set_platform_for_build_repos(
+        db: Session,
+        build: models.Build,
+) -> None:
+    repo_debug_dict = {
+        True: 'debug-br',
+        False: 'br',
+    }
+    # name of a build's repo:
+    # some-platform-x86_64-some-build-id-debug-br
+    repos_per_platform = {
+        f"{task.platform.name}-{repo.arch}-{build.id}-"
+        f"{repo_debug_dict[repo.debug]}": task.platform
+        for repo in build.repos for task in build.tasks
+    }
+    # we do nothing if all repos have platform
+    if all(repo.platform for repo in build.repos):
+        return
+    for repo in build.repos:
+        if repo.type != 'rpm':
+            continue
+        repo.platform = repos_per_platform[repo.name]
 
 
 async def modify_product(
@@ -320,7 +374,11 @@ async def modify_product(
             ).options(
                 selectinload(models.Build.repos),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module),
+                    models.BuildTask.rpm_module
+                ),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.platform
+                ),
             ),
         )
         db_build = db_build.scalars().first()
@@ -332,13 +390,16 @@ async def modify_product(
                 raise ProductError(error_msg)
         if modification == 'remove' and not force:
             if db_build not in db_product.builds:
-                error_msg = f'Packages of build {build_id} cannot be removed ' \
-                            f'from {product} product ' \
+                error_msg = f'Packages of build {build_id} cannot ' \
+                            f'be removed from {product} product ' \
                             f'as they are not added there'
                 raise ProductError(error_msg)
 
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
+    await set_platform_for_products_repos(db=db, product=db_product)
+    await set_platform_for_build_repos(db=db, build=db_build)
+
     modify = await prepare_repo_modify_dict(
         db_build, db_product, pulp_client, modification)
     tasks = []
@@ -360,7 +421,10 @@ async def modify_product(
         db_product.builds.append(db_build)
     else:
         db_product.builds.remove(db_build)
-    db.add(db_product)
+    db.add_all([
+        db_product,
+        db_build,
+    ])
     try:
         await db.commit()
     except Exception:
