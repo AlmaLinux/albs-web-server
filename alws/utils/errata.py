@@ -41,7 +41,13 @@ def clean_errata_title(title: str, severity: str = '') -> str:
     title = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', title)
     title = re.sub(r'\s+\(.*\)$', '', title)
     title = re.sub(rf'^{severity}:\s+', '',  title, flags=re.IGNORECASE)
-    return title
+    return title.strip()
+
+
+def get_oval_title(title: str, id_: str, severity: str) -> str:
+    capitalized_severity = severity.lower().capitalize()
+    title = clean_errata_title(title)
+    return f'{id_}: {title} ({capitalized_severity})'
 
 
 def get_verbose_errata_title(title: str, severity: str) -> str:
@@ -51,7 +57,7 @@ def get_verbose_errata_title(title: str, severity: str) -> str:
         not title.startswith(f"{capitalized_severity}:")
         and capitalized_severity not in ('', 'None')
     ):
-        title = f"{capitalized_severity}: {title.strip()}"
+        title = f"{capitalized_severity}: {title}"
     return title
 
 

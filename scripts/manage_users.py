@@ -116,7 +116,9 @@ async def main() -> int:
         if remove_roles:
             roles_ids = [r.id for r in remove_roles]
             await db.execute(delete(models.UserRoleMapping).where(
-                models.UserRoleMapping.c.role_id.in_(roles_ids)))
+                models.UserRoleMapping.c.role_id.in_(roles_ids),
+                models.UserRoleMapping.c.user_id == user.id
+            ))
 
         db.add(user)
     return 0

@@ -9,7 +9,6 @@ from typing import (
     List,
     Optional,
     Tuple,
-    Union,
 )
 import uuid
 
@@ -26,6 +25,7 @@ from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
     clean_errata_title,
     get_nevra,
+    get_oval_title,
     get_verbose_errata_title,
 )
 from alws.utils.parsing import parse_rpm_nevra, clean_release
@@ -216,15 +216,19 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
         for criteria in record.original_criteria:
             criteria_node = CriteriaNode(criteria, None)
             criteria_node.simplify()
+        if record.oval_title:
+            title = record.oval_title
+        elif not record.oval_title and record.title:
+            title = record.title
+        else:
+            title = record.original_title
         definition = Definition.from_dict(
             {
                 "id": debrand_id(record.definition_id),
                 "version": record.definition_version,
                 "class": record.definition_class,
                 "metadata": {
-                    "title": record.title
-                    if record.title
-                    else record.original_title,
+                    "title": title,
                     "description": record.description
                     if record.description
                     else record.original_description,
@@ -424,6 +428,9 @@ async def update_errata_record(
             record.title = None
         else:
             record.title = update_record.title
+        if record.title:
+            record.oval_title = get_oval_title(
+                record.title, record.id, record.severity)
     if update_record.description is not None:
         if update_record.description == record.original_description:
             record.description = None
@@ -536,8 +543,9 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         value = re.sub(r"^RH", "AL", value)
         value = re.sub(r"RHEL", "AlmaLinux", value)
         setattr(errata, key, value)
+    alma_errata_id = re.sub(r"^RH", "AL", errata.id)
     db_errata = models.ErrataRecord(
-        id=re.sub(r"^RH", "AL", errata.id),
+        id=alma_errata_id,
         freezed=errata.freezed,
         platform_id=errata.platform_id,
         summary=None,
@@ -547,6 +555,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         description=None,
         original_description=errata.description,
         title=None,
+        oval_title=get_oval_title(errata.title, alma_errata_id, errata.severity),
         original_title=get_verbose_errata_title(errata.title, errata.severity),
         contact_mail=platform.contact_mail,
         status=errata.status,

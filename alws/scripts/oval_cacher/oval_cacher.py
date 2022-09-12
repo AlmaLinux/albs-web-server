@@ -3,7 +3,6 @@ import re
 import sys
 import logging
 
-from alws.scripts.oval_cacher.schema import OvalDefinition
 from alws.scripts.oval_cacher.albs_api import AlbsApiClient
 from alws.scripts.oval_cacher.config import config
 from alws.scripts.oval_cacher.security_api_client import SecurityApiClient
