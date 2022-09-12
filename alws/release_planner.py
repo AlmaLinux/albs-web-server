@@ -1454,7 +1454,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 blacklist_updateinfo.append(db_record.id)
                 errata_messages.append(
                     f"Skipping updateinfo {db_record.id} release, "
-                    f"following packages is missing in release: "
+                    f"the following packages are missing in release: "
                     f"{', '.join(missing_packages)}"
                 )
                 continue

@@ -18,10 +18,13 @@ SCHEMA_VERSION = '1.0'
 def get_nevra(
     pkg: Union[ErrataPackage, ErrataToALBSPackage],
     arch: str = None,
+    clean: bool = True,
 ) -> str:
     # we should clean release before compare,
     # because in ErrataPackage can be "raw" release part
-    release = clean_release(pkg.release)
+    release = pkg.release
+    if clean:
+        release = clean_release(pkg.release)
     # we can use here ErrataPackage arch instead of ErrataToALBSPackage arch,
     # because we match noarches with specific arches.
     # see alws.crud.errata.load_platform_packages()

@@ -1012,8 +1012,11 @@ async def release_errata_record(
 
     errata_packages = set()
     albs_records_to_add = set()
+    errata_package_names_mapping = {
+        'raw': {},
+        'albs': {},
+    }
     for package in db_record.packages:
-        errata_package_nevra = get_nevra(package)
         for albs_package in package.albs_packages:
             if albs_package.status not in (
                 ErrataPackageStatus.released,
@@ -1025,19 +1028,37 @@ async def release_errata_record(
                 for repo in pulp_packages[albs_package_pulp_href]:
                     repo_mapping[repo].append(albs_package)
                 albs_package.status = ErrataPackageStatus.released
-                albs_package_nevra = get_nevra(
+                clean_albs_pkg_nevra = get_nevra(
                     albs_package,
                     arch=albs_package.errata_package.arch,
                 )
-                albs_records_to_add.add(albs_package_nevra)
-        errata_packages.add(errata_package_nevra)
+                raw_albs_pkg_nevra = get_nevra(albs_package, clean=False)
+                albs_records_to_add.add(clean_albs_pkg_nevra)
+                errata_package_names_mapping['albs'][clean_albs_pkg_nevra] = (
+                    raw_albs_pkg_nevra
+                )
+
+        clean_errata_pkg_nevra = get_nevra(package)
+        raw_errata_pkg_nevra = get_nevra(package, clean=False)
+        errata_package_names_mapping['raw'][clean_errata_pkg_nevra] = (
+            raw_errata_pkg_nevra
+        )
+        errata_packages.add(clean_errata_pkg_nevra)
 
     missing_packages = errata_packages.difference(albs_records_to_add)
     if missing_packages:
+        missing_pkg_names = []
+        for missing_pkg in missing_packages:
+            full_name = errata_package_names_mapping['raw'][missing_pkg]
+            full_albs_name = errata_package_names_mapping['albs'].get(
+                missing_pkg
+            )
+            full_name = full_albs_name if full_albs_name else full_name
+            missing_pkg_names.append(full_name)
         msg = (
-            "Cannot release updateinfo record, following packages "
-            "is missing in platform repositories or have wrong status: "
-            + ", ".join(missing_packages)
+            "Cannot release updateinfo record, the following packages "
+            "are missing from platform repositories or have wrong status: "
+            + ", ".join(missing_pkg_names)
         )
         raise ValueError(msg)
 
