@@ -22,9 +22,7 @@ def get_nevra(
 ) -> str:
     # we should clean release before compare,
     # because in ErrataPackage can be "raw" release part
-    release = pkg.release
-    if clean:
-        release = clean_release(pkg.release)
+    release = clean_release(pkg.release) if clean else pkg.release
     # we can use here ErrataPackage arch instead of ErrataToALBSPackage arch,
     # because we match noarches with specific arches.
     # see alws.crud.errata.load_platform_packages()
