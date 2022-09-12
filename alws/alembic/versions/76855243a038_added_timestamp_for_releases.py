@@ -1,7 +1,7 @@
 """Added timestamp for releases
 
 Revision ID: 76855243a038
-Revises: ec505e94fd1a
+Revises: 6380c3315c6e
 Create Date: 2022-09-07 16:10:50.954834
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '76855243a038'
-down_revision = 'ec505e94fd1a'
+down_revision = '6380c3315c6e'
 branch_labels = None
 depends_on = None
 
