@@ -1,7 +1,7 @@
 import typing
 
 from sqlalchemy import update
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
 from alws import database, models
 from alws.auth import get_current_user
@@ -28,15 +28,18 @@ router = APIRouter(
     ],
 )
 async def get_releases(
-    request: Request,
     pageNumber: int = None,
+    product_id: int = None,
+    platform_id: int = None,
+    status: int = None,
     db: database.Session = Depends(get_db),
 ):
-    search_params = release_schema.ReleaseSearch(**request.query_params)
     return await r_crud.get_releases(
         db,
         page_number=pageNumber,
-        search_params=search_params,
+        product_id=product_id,
+        platform_id=platform_id,
+        status=status,
     )
 
 

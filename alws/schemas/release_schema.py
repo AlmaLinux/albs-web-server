@@ -41,14 +41,6 @@ class Release(BaseModel):
         orm_mode = True
 
 
-class ReleaseSearch(BaseModel):
-    package_name: typing.Optional[str]
-    module_name: typing.Optional[str]
-    product_id: typing.Optional[str]
-    platform_id: typing.Optional[int]
-    status: typing.Optional[int]
-
-
 class ReleaseResponse(BaseModel):
 
     releases: typing.List[Release]

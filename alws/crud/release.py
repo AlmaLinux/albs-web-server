@@ -22,7 +22,9 @@ async def get_releases(
     db: Session,
     page_number: typing.Optional[int] = None,
     release_id: int = None,
-    search_params: release_schema.ReleaseSearch = None,
+    product_id: int = None,
+    platform_id: int = None,
+    status: int = None,
 ) -> typing.Union[typing.List[models.Release], models.Release]:
 
     def generate_query(count=False):
@@ -35,26 +37,22 @@ async def get_releases(
             query = select(func.count(models.Release.id))
         if release_id:
             query = query.where(models.Release.id == release_id)
-        if search_params:
-            # These links could be helpful for filtering by JSON
-            # https://github.com/sqlalchemy/sqlalchemy/discussions/7991
-            # https://www.postgresql.org/docs/9.5/functions-json.html
-            # if search_params.package_name:
-            #     query = query.filter()
-            # if search_params.module_name:
-            #     query = query.filter()
-            if search_params.status:
-                query = query.filter(
-                    models.Release.status == search_params.status,
-                )
-            if search_params.product_id:
-                query = query.filter(
-                    models.Release.product_id == search_params.product_id,
-                )
-            if search_params.platform_id:
-                query = query.filter(
-                    models.Release.platform_id == search_params.platform_id,
-                )
+        # TODO: Add here filter by packages and modules
+        # These links could be helpful for filtering by JSON
+        # https://github.com/sqlalchemy/sqlalchemy/discussions/7991
+        # https://www.postgresql.org/docs/9.5/functions-json.html
+        if status:
+            query = query.filter(
+                models.Release.status == status,
+            )
+        if product_id:
+            query = query.filter(
+                models.Release.product_id == product_id,
+            )
+        if platform_id:
+            query = query.filter(
+                models.Release.platform_id == platform_id,
+            )
         if page_number and not count:
             query = query.slice(10 * page_number - 10, 10 * page_number)
         return query
