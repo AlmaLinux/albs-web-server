@@ -3,13 +3,31 @@ import re
 import copy
 import pathlib
 import itertools
-from typing import List
+from typing import List, Union
 
 import jinja2
 import createrepo_c as cr
 
+from alws.models import ErrataPackage, ErrataToALBSPackage
+from alws.utils.parsing import clean_release
+
 
 SCHEMA_VERSION = '1.0'
+
+
+def get_nevra(
+    pkg: Union[ErrataPackage, ErrataToALBSPackage],
+    arch: str = None,
+    clean: bool = True,
+) -> str:
+    # we should clean release before compare,
+    # because in ErrataPackage can be "raw" release part
+    release = clean_release(pkg.release) if clean else pkg.release
+    # we can use here ErrataPackage arch instead of ErrataToALBSPackage arch,
+    # because we match noarches with specific arches.
+    # see alws.crud.errata.load_platform_packages()
+    pkg_arch = arch if arch else pkg.arch
+    return f"{pkg.epoch}:{pkg.name}-{pkg.version}-{release}.{pkg_arch}"
 
 
 def clean_errata_title(title: str, severity: str = '') -> str:
@@ -21,7 +39,13 @@ def clean_errata_title(title: str, severity: str = '') -> str:
     title = re.sub(r'^AL.{2}-\d+:\d+:\s+', '', title)
     title = re.sub(r'\s+\(.*\)$', '', title)
     title = re.sub(rf'^{severity}:\s+', '',  title, flags=re.IGNORECASE)
-    return title
+    return title.strip()
+
+
+def get_oval_title(title: str, id_: str, severity: str) -> str:
+    capitalized_severity = severity.lower().capitalize()
+    title = clean_errata_title(title)
+    return f'{id_}: {title} ({capitalized_severity})'
 
 
 def get_verbose_errata_title(title: str, severity: str) -> str:
@@ -31,7 +55,7 @@ def get_verbose_errata_title(title: str, severity: str) -> str:
         not title.startswith(f"{capitalized_severity}:")
         and capitalized_severity not in ('', 'None')
     ):
-        title = f"{capitalized_severity}: {title.strip()}"
+        title = f"{capitalized_severity}: {title}"
     return title
 
 
