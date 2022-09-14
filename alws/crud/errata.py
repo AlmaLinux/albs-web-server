@@ -9,7 +9,6 @@ from typing import (
     List,
     Optional,
     Tuple,
-    Union,
 )
 import uuid
 
@@ -25,6 +24,7 @@ from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
     clean_errata_title,
+    get_nevra,
     get_oval_title,
     get_verbose_errata_title,
 )
@@ -800,9 +800,8 @@ async def release_errata_packages(
             select(models.BuildTaskArtifact)
             .where(query)
             .options(
-                selectinload(models.BuildTaskArtifact.build_task).selectinload(
-                    models.BuildTask.rpm_module
-                )
+                selectinload(models.BuildTaskArtifact.build_task)
+                .selectinload(models.BuildTask.rpm_module)
             )
         )
         db_pkg = db_pkg.scalars().first()
@@ -907,7 +906,8 @@ async def _load_platform_packages(
 async def prepare_updateinfo_mapping(
     db: AsyncSession,
     pulp: PulpClient,
-    package_hrefs: List[str]
+    package_hrefs: List[str],
+    blacklist_updateinfo: List[str],
 ) -> DefaultDict[
     str,
     List[Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]],
@@ -926,16 +926,14 @@ async def prepare_updateinfo_mapping(
             errata_pkgs = await db.execute(
                 select(models.ErrataToALBSPackage).where(
                     models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
-                    # we should release only approved bulletins
-                    models.ErrataToALBSPackage.status
-                    == ErrataPackageStatus.approved,
                 ).options(
                     selectinload(models.ErrataToALBSPackage.errata_package)
                 )
             )
             for errata_pkg in errata_pkgs.scalars().all():
-                errata_pkg.status = ErrataPackageStatus.released
-                errata = errata_pkg.errata_package.errata_record_id
+                errata_id = errata_pkg.errata_package.errata_record_id
+                if errata_id in blacklist_updateinfo:
+                    continue
                 pulp_pkg = await pulp.get_rpm_package(
                     db_pkg.href,
                     include_fields=[
@@ -943,7 +941,7 @@ async def prepare_updateinfo_mapping(
                         'location_href', 'sha256', 'rpm_sourcerpm'
                     ]
                 )
-                updateinfo_mapping[errata].append(
+                updateinfo_mapping[errata_id].append(
                     (db_pkg, pulp_pkg, errata_pkg),
                 )
     return updateinfo_mapping
@@ -1021,18 +1019,13 @@ async def release_errata_record(
     )
     repo_mapping = collections.defaultdict(list)
 
-    def get_nevra(
-        pkg: Union[models.ErrataPackage, models.ErrataToALBSPackage],
-    ) -> str:
-        # we should clean release before compare,
-        # because in ErrataPackage can be "raw" release part
-        release = clean_release(pkg.release)
-        return f"{pkg.epoch}:{pkg.name}-{pkg.version}-{release}.{pkg.arch}"
-
     errata_packages = set()
     albs_records_to_add = set()
+    errata_package_names_mapping = {
+        'raw': {},
+        'albs': {},
+    }
     for package in db_record.packages:
-        errata_package_nevra = get_nevra(package)
         for albs_package in package.albs_packages:
             if albs_package.status not in (
                 ErrataPackageStatus.released,
@@ -1044,16 +1037,37 @@ async def release_errata_record(
                 for repo in pulp_packages[albs_package_pulp_href]:
                     repo_mapping[repo].append(albs_package)
                 albs_package.status = ErrataPackageStatus.released
-                albs_package_nevra = get_nevra(albs_package)
-                albs_records_to_add.add(albs_package_nevra)
-        errata_packages.add(errata_package_nevra)
+                clean_albs_pkg_nevra = get_nevra(
+                    albs_package,
+                    arch=albs_package.errata_package.arch,
+                )
+                raw_albs_pkg_nevra = get_nevra(albs_package, clean=False)
+                albs_records_to_add.add(clean_albs_pkg_nevra)
+                errata_package_names_mapping['albs'][clean_albs_pkg_nevra] = (
+                    raw_albs_pkg_nevra
+                )
+
+        clean_errata_pkg_nevra = get_nevra(package)
+        raw_errata_pkg_nevra = get_nevra(package, clean=False)
+        errata_package_names_mapping['raw'][clean_errata_pkg_nevra] = (
+            raw_errata_pkg_nevra
+        )
+        errata_packages.add(clean_errata_pkg_nevra)
 
     missing_packages = errata_packages.difference(albs_records_to_add)
     if missing_packages:
+        missing_pkg_names = []
+        for missing_pkg in missing_packages:
+            full_name = errata_package_names_mapping['raw'][missing_pkg]
+            full_albs_name = errata_package_names_mapping['albs'].get(
+                missing_pkg
+            )
+            full_name = full_albs_name if full_albs_name else full_name
+            missing_pkg_names.append(full_name)
         msg = (
-            "Cannot release updateinfo record, "
-            "following packages is missing in platform repositories: "
-            + ", ".join(missing_packages)
+            "Cannot release updateinfo record, the following packages "
+            "are missing from platform repositories or have wrong status: "
+            + ", ".join(missing_pkg_names)
         )
         raise ValueError(msg)
 
