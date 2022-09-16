@@ -1194,8 +1194,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     repository_version=latest_repo_version,
                 )
             )
-            # TODO: maybe we should use this in
-            # alws.crud.errata.release_errata_record too
             # trying to append errata_packages if updateinfo already exist
             with get_pulp_db() as pulp_db:
                 append_update_packages_in_update_records(
@@ -1440,7 +1438,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # have pulp_href instead of albs_artifact_id
                 for albs_pkg in errata_pkg.albs_packages:
                     if (
-                        albs_pkg.status != ErrataPackageStatus.released
+                        albs_pkg.status == ErrataPackageStatus.released
                         and albs_pkg.pulp_href not in package_hrefs
                     ):
                         continue
