@@ -20,12 +20,35 @@ router = APIRouter(
 
 
 # TODO: add pulp db loader
-@router.get('/', response_model=typing.Union[
-    typing.List[release_schema.Release],
-    release_schema.ReleaseResponse])
-async def get_releases(pageNumber: int = None,
-                       db: database.Session = Depends(get_db)):
-    return await r_crud.get_releases(pageNumber, db)
+@router.get(
+    '/',
+    response_model=typing.Union[
+        typing.List[release_schema.Release],
+        release_schema.ReleaseResponse
+    ],
+)
+async def get_releases(
+    pageNumber: int = None,
+    product_id: int = None,
+    platform_id: int = None,
+    status: int = None,
+    db: database.Session = Depends(get_db),
+):
+    return await r_crud.get_releases(
+        db,
+        page_number=pageNumber,
+        product_id=product_id,
+        platform_id=platform_id,
+        status=status,
+    )
+
+
+@router.get('/{release_id}/', response_model=release_schema.Release)
+async def get_release(
+    release_id: int,
+    db: database.Session = Depends(get_db),
+):
+    return await r_crud.get_releases(db, release_id=release_id)
 
 
 @router.post('/new/', response_model=release_schema.Release)

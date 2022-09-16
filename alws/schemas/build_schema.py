@@ -245,6 +245,7 @@ class Build(BaseModel):
     linked_builds: typing.Optional[typing.List[int]] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
     platform_flavors: typing.List[PlatformFlavour]
+    release_id: typing.Optional[int]
     released: bool
 
     @validator('linked_builds', pre=True)

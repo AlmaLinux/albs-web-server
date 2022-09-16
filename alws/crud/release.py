@@ -19,24 +19,55 @@ __all__ = [
 
 
 async def get_releases(
-        page_number: typing.Optional[int],
-        db: Session
-) -> typing.List[models.Release]:
-    query = select(models.Release).options(
-        selectinload(models.Release.owner),
-        selectinload(models.Release.platform),
-        selectinload(models.Release.product),
-    ).order_by(models.Release.id.desc())
+    db: Session,
+    page_number: typing.Optional[int] = None,
+    release_id: int = None,
+    product_id: int = None,
+    platform_id: int = None,
+    status: int = None,
+) -> typing.Union[typing.List[models.Release], models.Release]:
+
+    def generate_query(count=False):
+        query = select(models.Release).options(
+            selectinload(models.Release.owner),
+            selectinload(models.Release.platform),
+            selectinload(models.Release.product),
+        ).order_by(models.Release.id.desc())
+        if count:
+            query = select(func.count(models.Release.id))
+        if release_id:
+            query = query.where(models.Release.id == release_id)
+        # TODO: Add here filter by packages and modules
+        # These links could be helpful for filtering by JSON
+        # https://github.com/sqlalchemy/sqlalchemy/discussions/7991
+        # https://www.postgresql.org/docs/9.5/functions-json.html
+        if status:
+            query = query.filter(
+                models.Release.status == status,
+            )
+        if product_id:
+            query = query.filter(
+                models.Release.product_id == product_id,
+            )
+        if platform_id:
+            query = query.filter(
+                models.Release.platform_id == platform_id,
+            )
+        if page_number and not count:
+            query = query.slice(10 * page_number - 10, 10 * page_number)
+        return query
+
+    if release_id:
+        return (await db.execute(generate_query())).scalars().first()
     if page_number:
-        query = query.slice(10 * page_number - 10, 10 * page_number)
-    release_result = await db.execute(query)
-    if page_number:
-        total_releases = await db.execute(func.count(models.Release.id))
-        total_releases = total_releases.scalar()
-        return {'releases': release_result.scalars().all(),
-                'total_releases': total_releases,
-                'current_page': page_number}
-    return release_result.scalars().all()
+        return {
+            'releases': (await db.execute(generate_query())).scalars().all(),
+            'total_releases': (
+                await db.execute(generate_query(count=True))
+            ).scalar(),
+            'current_page': page_number,
+        }
+    return (await db.execute(generate_query())).scalars().all()
 
 
 async def __get_product(db: Session, product_id: int) -> models.Product:
