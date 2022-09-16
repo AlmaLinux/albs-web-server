@@ -914,10 +914,10 @@ async def prepare_updateinfo_mapping(
     List[Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
-    for pkg in set(package_hrefs):
+    for pkg_href in set(package_hrefs):
         db_pkg_list = (await db.execute(
             select(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.href == pkg,
+                models.BuildTaskArtifact.href == pkg_href,
             ).options(
                 selectinload(models.BuildTaskArtifact.build_task)
                 .selectinload(models.BuildTask.rpm_module)
@@ -925,9 +925,10 @@ async def prepare_updateinfo_mapping(
         )).scalars().all()
         for db_pkg in db_pkg_list:
             errata_pkgs = await db.execute(
-                select(models.ErrataToALBSPackage).where(
+                select(models.ErrataToALBSPackage).where(or_(
                     models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
-                ).options(
+                    models.ErrataToALBSPackage.pulp_href == pkg_href,
+                )).options(
                     selectinload(models.ErrataToALBSPackage.errata_package)
                 )
             )
@@ -1092,7 +1093,11 @@ async def release_errata_record(
         latest_repo_version = await pulp.get_repo_latest_version(repo_href)
         errata_records = (
             await pulp.list_updateinfo_records(
-                id__in=list(updateinfo_mapping.keys()),
+                id__in=[
+                    record_id
+                    for record_id in updateinfo_mapping.keys()
+                    if record_id == db_record.id
+                ],
                 repository_version=latest_repo_version,
             )
         )
