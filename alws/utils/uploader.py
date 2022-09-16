@@ -77,7 +77,9 @@ class MetadataUploader:
 
         # we can't associate same packages in modules twice in one repo version
         # need to remove them before creating new modulemd
-        await self.pulp.modify_repository(repo_href, remove=modules_to_remove)
+        task_result = await self.pulp.modify_repository(
+            repo_href, remove=modules_to_remove,
+        )
         logging.debug(
             'Removed the following entities from repo "%s":\n%s',
             repo_href,
@@ -85,7 +87,15 @@ class MetadataUploader:
         )
         # if we fall during next modifying repository, we can delete this
         # repo version and rollback all changes that makes upload
-        new_version_href = await self.pulp.get_repo_latest_version(repo_href)
+        created_resources = task_result.get('created_resources', [])
+        if created_resources:
+            new_version_href = created_resources[0]
+        # not sure, but keep it for failsafe if we doesn't have new created
+        # repo version from modify task result
+        else:
+            new_version_href = await self.pulp.get_repo_latest_version(
+                repo_href,
+            )
 
         # when we deleting modulemd's, associated packages also removes
         # from repository, we need to add them in next repo version
@@ -93,8 +103,10 @@ class MetadataUploader:
             await self.pulp.get_by_href(new_version_href)
         )['content_summary']['removed']
         removed_pkgs_href = removed_content.get('rpm.package', {}).get('href')
-        async for pkg in self.iter_repo(removed_pkgs_href):
-            hrefs_to_add.append(pkg['pulp_href'])
+        # in case if early removed modules doesn't contains associated packages
+        if removed_pkgs_href:
+            async for pkg in self.iter_repo(removed_pkgs_href):
+                hrefs_to_add.append(pkg['pulp_href'])
 
         try:
             logging.debug(
