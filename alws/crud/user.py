@@ -40,25 +40,21 @@ async def get_all_users(db: Session) -> typing.List[models.User]:
 async def activate_user(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=True, is_active=True))
-    await db.commit()
 
 
 async def deactivate_user(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_verified=False, is_active=False))
-    await db.commit()
 
 
 async def make_superuser(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_superuser=True))
-    await db.commit()
 
 
 async def make_usual_user(user_id: int, db: Session):
     await db.execute(update(models.User).where(
         models.User.id == user_id).values(is_superuser=False))
-    await db.commit()
 
 
 async def check_valuable_artifacts(user_id: int, db: Session):
