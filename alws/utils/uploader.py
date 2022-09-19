@@ -87,12 +87,14 @@ class MetadataUploader:
         )
         # if we fall during next modifying repository, we can delete this
         # repo version and rollback all changes that makes upload
-        created_resources = task_result.get('created_resources', [])
-        if created_resources:
-            new_version_href = created_resources[0]
+        new_version_href = next((
+            resource
+            for resource in task_result.get('created_resources', [])
+            if re.search(rf"{repo_href}versions/\d+/$", resource)
+        ), None)
         # not sure, but keep it for failsafe if we doesn't have new created
         # repo version from modify task result
-        else:
+        if not new_version_href:
             new_version_href = await self.pulp.get_repo_latest_version(
                 repo_href,
             )
