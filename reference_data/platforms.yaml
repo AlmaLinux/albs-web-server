@@ -347,7 +347,7 @@
       priority: 10
     - arch: ppc64le
       name: almalinux-8-devel
-      export_path: almalinux/8/devel/ppc64le/
+      export_path: almalinux/8/devel/ppc64le/os/
       remote_url: https://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
       type: rpm
       debug: false
