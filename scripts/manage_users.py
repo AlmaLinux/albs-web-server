@@ -71,6 +71,9 @@ async def main() -> int:
             await action_crud.ensure_all_actions_exist(db)
             await role_crud.fix_roles_actions(db)
 
+        # ALBS-643: Use user crud update_user function
+        # to activate/deactivate and grant/revoke superuser
+        # permissions to users
         if arguments.verify:
             await user_crud.activate_user(user.id, db)
 

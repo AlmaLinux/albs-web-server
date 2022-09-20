@@ -31,6 +31,8 @@ event_loop = asyncio.get_event_loop()
 
 # Tasks import started from here
 from alws.dramatiq.build import start_build, build_done, create_log_repo
+# dramatiq.user needs to go before dramatiq.releases
+from alws.dramatiq.user import perform_user_removal
 from alws.dramatiq.releases import execute_release_plan
 from alws.dramatiq.sign_task import complete_sign_task
 from alws.dramatiq.tests import complete_test_task

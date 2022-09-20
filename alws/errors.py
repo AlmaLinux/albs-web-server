@@ -93,3 +93,6 @@ class UploadError(Exception):
 
 class PermissionDenied(Exception):
     pass
+
+class UserError(Exception):
+    pass

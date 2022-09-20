@@ -11,27 +11,31 @@ class LoginGithub(BaseModel):
     code: str
 
 
-class LoginResponse(BaseModel):
-
-    id: int
-    username: str
-    email: str
-    jwt_token: str
-
-    class Config:
-        orm_mode = True
-
-
 class User(BaseModel):
 
     id: int
     username: str
     email: str
+    is_active: bool
+    is_superuser: bool
 
     class Config:
         orm_mode = True
 
 
+class UserUpdate(BaseModel):
+
+    id: int
+    is_active: typing.Optional[bool] = None
+    is_verified: typing.Optional[bool] = None
+    is_superuser: typing.Optional[bool] = None
+
+
 class UserOpResult(BaseModel):
+
     success: bool
     message: typing.Optional[str] = None
+
+class UserTeam(BaseModel):
+    id: int
+    name: str
