@@ -20,6 +20,7 @@ from sqlalchemy.sql.expression import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
+from alws.dependencies import get_pulp_db
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
@@ -913,10 +914,10 @@ async def prepare_updateinfo_mapping(
     List[Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
-    for pkg in set(package_hrefs):
+    for pkg_href in set(package_hrefs):
         db_pkg_list = (await db.execute(
             select(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.href == pkg,
+                models.BuildTaskArtifact.href == pkg_href,
             ).options(
                 selectinload(models.BuildTaskArtifact.build_task)
                 .selectinload(models.BuildTask.rpm_module)
@@ -924,9 +925,10 @@ async def prepare_updateinfo_mapping(
         )).scalars().all()
         for db_pkg in db_pkg_list:
             errata_pkgs = await db.execute(
-                select(models.ErrataToALBSPackage).where(
+                select(models.ErrataToALBSPackage).where(or_(
                     models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
-                ).options(
+                    models.ErrataToALBSPackage.pulp_href == pkg_href,
+                )).options(
                     selectinload(models.ErrataToALBSPackage.errata_package)
                 )
             )
@@ -972,16 +974,21 @@ def append_update_packages_in_update_records(
             pulp_record: UpdateRecord = pulp_record.scalars().first()
             for _, pulp_pkg, pkg in packages:
                 already_released = False
-                for collection in pulp_record.collections:
-                    if already_released:
-                        break
-                    for package in collection.packages:
-                        if package.name == pulp_pkg['name']:
-                            already_released = True
-                            break
+                collection = pulp_record.collections[0]
+                collection_arch = re.search(
+                    r"i686|x86_64|aarch64|ppc64le|s390x",
+                    collection.name,
+                ).group()
+                if pulp_pkg['arch'] not in (collection_arch, 'noarch'):
+                    continue
+                already_released = next((
+                    package
+                    for package in collection.packages
+                    if package.filename == pulp_pkg['location_href']
+                ), None)
                 if already_released:
                     continue
-                pulp_record.collections[0].packages.append(UpdatePackage(
+                collection.packages.append(UpdatePackage(
                     name=pulp_pkg['name'],
                     filename=pulp_pkg['location_href'],
                     arch=pulp_pkg['arch'],
@@ -993,8 +1000,9 @@ def append_update_packages_in_update_records(
                     sum=pulp_pkg['sha256'],
                     sum_type=cr.checksum_type('sha256'),
                 ))
-                pulp_record.updated_date = datetime.datetime.now().strftime(
-                    '%Y-%m-%d %H:%M:%S'
+                pulp_record.updated_date = (
+                    datetime.datetime.now()
+                    .strftime('%Y-%m-%d %H:%M:%S')
                 )
 
 
@@ -1073,6 +1081,32 @@ async def release_errata_record(
 
     tasks = []
     for repo_href, packages in repo_mapping.items():
+        updateinfo_mapping = await prepare_updateinfo_mapping(
+            db=db,
+            pulp=pulp,
+            package_hrefs=[
+                pkg.get_pulp_href()
+                for pkg in packages
+            ],
+            blacklist_updateinfo=[],
+        )
+        latest_repo_version = await pulp.get_repo_latest_version(repo_href)
+        errata_records = (
+            await pulp.list_updateinfo_records(
+                id__in=[
+                    record_id
+                    for record_id in updateinfo_mapping.keys()
+                    if record_id == db_record.id
+                ],
+                repository_version=latest_repo_version,
+            )
+        )
+        with get_pulp_db() as pulp_db:
+            append_update_packages_in_update_records(
+                pulp_db=pulp_db,
+                errata_records=errata_records,
+                updateinfo_mapping=updateinfo_mapping,
+            )
         tasks.append(release_errata_packages(
             db,
             pulp,

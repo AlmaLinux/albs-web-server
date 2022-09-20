@@ -1194,8 +1194,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     repository_version=latest_repo_version,
                 )
             )
-            # TODO: maybe we should use this in
-            # alws.crud.errata.release_errata_record too
             # trying to append errata_packages if updateinfo already exist
             with get_pulp_db() as pulp_db:
                 append_update_packages_in_update_records(
@@ -1436,25 +1434,16 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             albs_packages_names = updateinfo_mapping[db_record.id]
             missing_packages = []
             for errata_pkg in db_record.packages:
-                # some packages in release can be released and
-                # have pulp_href instead of albs_artifact_id
-                for albs_pkg in errata_pkg.albs_packages:
-                    if (
-                        albs_pkg.status != ErrataPackageStatus.released
-                        and albs_pkg.pulp_href not in package_hrefs
-                    ):
-                        continue
-                    albs_pkg_nevra = get_nevra(albs_pkg, arch=errata_pkg.arch)
-                    albs_packages_names.append(albs_pkg_nevra)
-                nevra = get_nevra(errata_pkg)
-                if nevra in albs_packages_names:
+                clean_nevra = get_nevra(errata_pkg)
+                if clean_nevra in albs_packages_names:
                     continue
-                missing_packages.append(nevra)
+                missing_packages.append(get_nevra(errata_pkg, clean=False))
             if missing_packages:
                 blacklist_updateinfo.append(db_record.id)
                 errata_messages.append(
                     f"Skipping updateinfo {db_record.id} release, "
-                    f"the following packages are missing in release: "
+                    f"the following original packages from update record"
+                    f"are missing in release: "
                     f"{', '.join(missing_packages)}"
                 )
                 continue
