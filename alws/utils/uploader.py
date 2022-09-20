@@ -58,10 +58,7 @@ class MetadataUploader:
             if repo_type_href is None:
                 continue
             async for content in self.iter_repo(repo_type_href):
-                # when we deleting modulemd's, associated packages also removes
-                # from repository, we need to add them in next repo version
                 modules_to_remove.append(content['pulp_href'])
-                hrefs_to_add.extend(content.get('packages', []))
         artifact_href, _ = await self.pulp.upload_file(module_content)
         _index = IndexWrapper.from_template(module_content)
         module = next(_index.iter_modules())
@@ -77,13 +74,48 @@ class MetadataUploader:
             'dependencies': [],
         }
         hrefs_to_add.append(await self.pulp.create_module_by_payload(payload))
+
         # we can't associate same packages in modules twice in one repo version
         # need to remove them before creating new modulemd
-        await self.pulp.modify_repository(repo_href, remove=modules_to_remove)
+        task_result = await self.pulp.modify_repository(
+            repo_href, remove=modules_to_remove,
+        )
+        logging.debug(
+            'Removed the following entities from repo "%s":\n%s',
+            repo_href,
+            modules_to_remove,
+        )
         # if we fall during next modifying repository, we can delete this
         # repo version and rollback all changes that makes upload
-        new_version_href = await self.pulp.get_repo_latest_version(repo_href)
+        new_version_href = next((
+            resource
+            for resource in task_result.get('created_resources', [])
+            if re.search(rf"{repo_href}versions/\d+/$", resource)
+        ), None)
+        # not sure, but keep it for failsafe if we doesn't have new created
+        # repo version from modify task result
+        if not new_version_href:
+            new_version_href = await self.pulp.get_repo_latest_version(
+                repo_href,
+            )
+
+        # when we deleting modulemd's, associated packages also removes
+        # from repository, we need to add them in next repo version
+        removed_content = (
+            await self.pulp.get_by_href(new_version_href)
+        )['content_summary']['removed']
+        removed_pkgs_href = removed_content.get('rpm.package', {}).get('href')
+        # in case if early removed modules doesn't contains associated packages
+        if removed_pkgs_href:
+            async for pkg in self.iter_repo(removed_pkgs_href):
+                hrefs_to_add.append(pkg['pulp_href'])
+
         try:
+            logging.debug(
+                'Trying to add early removed packages in the repo "%s":\n%s',
+                repo_href,
+                hrefs_to_add,
+            )
             await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
         except Exception as exc:
             await self.pulp.delete_by_href(new_version_href,
