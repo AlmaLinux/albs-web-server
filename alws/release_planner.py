@@ -154,18 +154,19 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         pulp_packages = []
 
         builds_q = select(models.Build).where(
-            models.Build.id.in_(build_ids)).options(
-                selectinload(models.Build.platform_flavors),
-                selectinload(
-                    models.Build.source_rpms).selectinload(
-                    models.SourceRpm.artifact),
-                selectinload(
-                    models.Build.binary_rpms).selectinload(
-                    models.BinaryRpm.artifact),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
-                ),
-                selectinload(models.Build.repos)
+            models.Build.id.in_(build_ids)
+        ).options(
+            selectinload(models.Build.platform_flavors),
+            selectinload(models.Build.source_rpms)
+            .selectinload(models.SourceRpm.artifact),
+            selectinload(models.Build.binary_rpms)
+            .selectinload(models.BinaryRpm.artifact),
+            selectinload(models.Build.binary_rpms)
+            .selectinload(models.BinaryRpm.source_rpm)
+            .selectinload(models.SourceRpm.artifact),
+            selectinload(models.Build.tasks)
+            .selectinload(models.BuildTask.rpm_module),
+            selectinload(models.Build.repos),
         )
         build_result = await self.db.execute(builds_q)
         modules_to_release = defaultdict(list)
@@ -186,8 +187,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 if build_tasks and artifact_task_id not in build_tasks:
                     continue
                 artifact_name = rpm.artifact.name
-                if '.src.rpm' in artifact_name:
-                    src_rpm_names.append(artifact_name)
                 pkg_info = copy.deepcopy(pulp_artifacts[rpm.artifact.href])
                 pkg_info['is_beta'] = self.is_beta_build(build)
                 pkg_info['build_id'] = build.id
@@ -202,6 +201,13 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 pkg_info['task_arch'] = build_task.arch
                 pkg_info['force'] = False
                 pkg_info['force_not_notarized'] = False
+                source_rpm = getattr(rpm, 'source_rpm', None)
+                if source_rpm:
+                    source_name = source_rpm.artifact.name
+                if '.src.rpm' in artifact_name:
+                    src_rpm_names.append(artifact_name)
+                    source_name = artifact_name
+                pkg_info['source'] = source_name
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
                 if task.rpm_module and task.id in build_tasks:
@@ -871,10 +877,12 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         # then we should try find info by other versions
         if not predicted_package:
             beholder_keys = [
-                beholder_key for beholder_key in beholder_cache
+                (name, version, arch, beta, devel)
+                for name, version, arch, beta, devel in beholder_cache
                 if all((
-                    field in beholder_key
-                    for field in (pkg_name, pkg_arch, is_devel)
+                    pkg_name == name,
+                    pkg_arch == arch,
+                    is_devel == devel,
                 ))
             ]
             logging.debug('Still not predicted_package, beholder_keys: %s',
@@ -1073,7 +1081,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 continue
             await self.prepare_data_for_executing_async_tasks(
                 package, is_debug)
-            release_repositories = set()
+            release_repository_keys = set()
+            release_repositories = defaultdict(set)
             for is_devel in (False, True):
                 repositories = self.find_release_repos(
                     pkg_name=pkg_name,
@@ -1096,7 +1105,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_devel=is_devel,
                         beholder_cache=beholder_cache,
                     )
-                release_repositories.update(repositories)
+                release_repository_keys.update(repositories)
             pulp_repo_arch_location = [pkg_arch]
             if pkg_arch == 'noarch':
                 pulp_repo_arch_location = self.base_platform.arch_list
@@ -1105,7 +1114,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 'repositories': [],
                 'repo_arch_location': pulp_repo_arch_location,
             }
-            if not release_repositories:
+            if not release_repository_keys:
                 devel_repo = self.get_devel_repo(
                     arch=pkg_arch,
                     is_debug=is_debug,
@@ -1122,10 +1131,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
-            added_noarch_repos = set()
-            # for every repository we should add pkg_info
-            # for correct package location in UI
-            for release_repo_key in release_repositories:
+            for release_repo_key in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1137,20 +1143,23 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     )
                     continue
                 release_repo_name = release_repo['name']
-                if release_repo_name in added_noarch_repos:
-                    continue
-                copy_pkg_info = copy.deepcopy(pkg_info)
                 repo_arch_location = [release_repo['arch']]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == 'i686' and 'x86_64' in repo_arch_location:
                     repo_arch_location.append('i686')
                 if pkg_arch == 'noarch':
                     repo_arch_location = pulp_repo_arch_location
-                    added_noarch_repos.add(release_repo_name)
+                release_repositories[release_repo_name].update(
+                    repo_arch_location
+                )
+            # for every repository we should add pkg_info
+            # for correct package location in UI
+            for repo, repo_arches in release_repositories.items():
+                copy_pkg_info = copy.deepcopy(pkg_info)
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
-                    'repositories': [release_repo],
-                    'repo_arch_location': repo_arch_location,
+                    'repositories': [repo],
+                    'repo_arch_location': list(repo_arches),
                 })
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
