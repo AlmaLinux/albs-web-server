@@ -8,7 +8,9 @@ from sqlalchemy.sql.expression import func
 from alws import models
 
 from alws.dramatiq import perform_user_removal
-from alws.errors import UserError
+from alws.errors import UserError, PermissionDenied
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.schemas import user_schema
 
 
@@ -189,7 +191,8 @@ async def remove_user(user_id: int, db: Session):
             valuable_artifacts.remove('team_membership')
             errors.append('is a member of one or several teams')
         if valuable_artifacts:
-            errors.append(f'owns some valuable artifacts ({", ".join(valuable_artifacts)})')
+            errors.append(
+                f'owns some valuable artifacts ({", ".join(valuable_artifacts)})')
 
         if len(errors) == 2:
             err = err + " and ".join(errors)
@@ -230,10 +233,37 @@ async def get_user_roles(db: Session, user_id: int):
 
     return user.roles
 
+async def can_edit_teams_roles(db: Session,
+                               roles_ids: typing.List[int],
+                               user_id: int):
+    user = await get_user(db, user_id)
+    teams_ids = (await db.execute(select(models.TeamRoleMapping.c.team_id).where(
+        models.TeamRoleMapping.c.role_id.in_(roles_ids)).distinct(
+            models.TeamRoleMapping.c.team_id)
+    )).scalars().all()
+    for team_id in teams_ids:
+        team = (await db.execute(select(models.Team).where(
+            models.Team.id == team_id).options(
+                selectinload(models.Team.roles).selectinload(models.UserRole.actions),
+                selectinload(models.Team.owner)
+            )
+        )).scalars().first()
 
-async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
+        if not can_perform(team, user, actions.AssignTeamRole.name):
+            return False
+    return True
+
+
+
+async def add_roles(db: Session, user_id: int,
+                    roles_ids: typing.List[int],
+                    current_user_id: int):
     async with db.begin():
         user = await get_user(db, user_id)
+
+        if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+            raise PermissionDenied("The user has no permissions to edit teams user roles")
+
         add_roles = (await db.execute(select(models.UserRole).where(
             models.UserRole.id.in_(roles_ids))
         )).scalars().all()
@@ -241,8 +271,15 @@ async def add_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
         db.add(user)
 
 
-async def remove_roles(db: Session, user_id: int, roles_ids: typing.List[int]):
+async def remove_roles(db: Session, user_id: int,
+                       roles_ids: typing.List[int],
+                       current_user_id: int):
     async with db.begin():
+        user = await get_user(db, user_id)
+
+        if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+            raise PermissionDenied("The user has no permissions to edit teams user roles")
+
         await db.execute(delete(models.UserRoleMapping).where(
             models.UserRoleMapping.c.role_id.in_(roles_ids),
             models.UserRoleMapping.c.user_id == user_id

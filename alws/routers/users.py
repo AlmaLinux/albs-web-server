@@ -11,8 +11,9 @@ from alws import database
 from alws.auth import get_current_superuser, get_current_user
 from alws.crud import user as user_crud
 from alws.dependencies import get_db
-from alws.errors import UserError
+from alws.errors import UserError, PermissionDenied
 from alws.schemas import user_schema, role_schema
+from alws.models import User
 
 
 router = APIRouter(
@@ -80,14 +81,14 @@ async def get_user_roles(user_id: int,
     )
 async def add_roles(user_id: int, roles_ids: typing.List[int],
                     db: database.Session = Depends(get_db),
-                    _=Depends(get_current_superuser)
+                    current_user: User = Depends(get_current_user)
                     ) -> user_schema.UserOpResult:
     try:
-        await user_crud.add_roles(db, user_id, roles_ids)
+        await user_crud.add_roles(db, user_id, roles_ids, current_user.id)
         return user_schema.UserOpResult(
             success=True,
             message=f'Successfully added roles {roles_ids} to {user_id}')
-    except Exception as exc:
+    except (PermissionDenied, Exception) as exc:
         raise HTTPException(
             detail=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST
@@ -100,14 +101,14 @@ async def add_roles(user_id: int, roles_ids: typing.List[int],
     )
 async def remove_roles(user_id: int, roles_ids: typing.List[int],
                        db: database.Session = Depends(get_db),
-                       _=Depends(get_current_superuser)
+                       current_user: User = Depends(get_current_user)
                        ) -> user_schema.UserOpResult:
     try:
-        await user_crud.remove_roles(db, user_id, roles_ids)
+        await user_crud.remove_roles(db, user_id, roles_ids, current_user.id)
         return user_schema.UserOpResult(
             success=True,
             message=f'Successfully removed roles {roles_ids} from {user_id}')
-    except Exception as exc:
+    except (PermissionDenied, Exception) as exc:
         raise HTTPException(
             detail=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST
