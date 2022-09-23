@@ -1142,19 +1142,19 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         release_repo_key,
                     )
                     continue
-                release_repo_name = release_repo['name']
                 repo_arch_location = [release_repo['arch']]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == 'i686' and 'x86_64' in repo_arch_location:
                     repo_arch_location.append('i686')
                 if pkg_arch == 'noarch':
                     repo_arch_location = pulp_repo_arch_location
-                release_repositories[release_repo_name].update(
+                release_repositories[release_repo_key].update(
                     repo_arch_location
                 )
             # for every repository we should add pkg_info
             # for correct package location in UI
-            for repo, repo_arches in release_repositories.items():
+            for repo_key, repo_arches in release_repositories.items():
+                repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
