@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import logging
 import typing
 import traceback
@@ -20,7 +21,7 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import parse_rpm_nevra, clean_release
@@ -298,6 +299,21 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
+    def _is_srpm_filtered(srpm_info: dict, packages_info: dict, module: ModuleWrapper) -> bool:
+        logging.debug('SRPM info: %s', json.dumps(srpm_info, indent=4))
+        logging.debug('Packages info: %s', json.dumps(packages_info, indent=4))
+        if not srpm_info:
+            return False
+        if module.is_devel and all(
+            package_info['rpm_sourcerpm'] != srpm_info['location_href'] for package_info in packages_info
+        ):
+            return True
+        if not module.is_devel and any(
+            package_info['rpm_sourcerpm'] == srpm_info['location_href'] for package_info in packages_info
+        ):
+            return True
+        return False
+
     if module_index and rpms:
         pkg_fields = [
             'epoch',
@@ -325,10 +341,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
                     module.add_rpm_artifact(rpm_package)
-                if srpm_info and not module.is_devel and any(
-                        package_info['rpm_sourcerpm'] == srpm_info['location_href'] and
-                        not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
-                ):
+                if _is_srpm_filtered(srpm_info, packages_info, module):
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
