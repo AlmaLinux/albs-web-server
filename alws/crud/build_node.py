@@ -302,17 +302,18 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
-    def _is_srpm_filtered(srpm_info: dict, packages_info: dict, module: ModuleWrapper) -> bool:
-        logging.info('SRPM info: %s', json.dumps(srpm_info, indent=4))
+    def _is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
+        logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
-        if not srpm_info:
-            return False
+        if rpm_package['rpm_sourcerpm']:
+            # sRPM has that field empty
+            return True
         if module.is_devel and all(
-            package_info['rpm_sourcerpm'] != srpm_info['location_href'] for package_info in packages_info
+            package_info['rpm_sourcerpm'] != rpm_package['location_href'] for package_info in packages_info
         ):
             return True
         if not module.is_devel and any(
-            package_info['rpm_sourcerpm'] == srpm_info['location_href'] for package_info in packages_info
+            package_info['rpm_sourcerpm'] == rpm_package['location_href'] for package_info in packages_info
         ):
             return True
         return False
@@ -345,8 +346,9 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    module.add_rpm_artifact(rpm_package)
-                if _is_srpm_filtered(srpm_info, packages_info, module):
+                    if _is_srpm_included(rpm_package, packages_info, module):
+                        module.add_rpm_artifact(rpm_package)
+                if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
