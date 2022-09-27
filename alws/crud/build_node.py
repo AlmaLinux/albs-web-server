@@ -29,9 +29,6 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
 
 
-logging.basicConfig(level=logging.DEBUG)
-
-
 async def get_available_build_task(
             db: Session,
             request: build_node_schema.RequestTask
