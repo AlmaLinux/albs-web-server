@@ -299,7 +299,15 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         rpms.append(artifact)
 
     if module_index and rpms:
-        pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
+        pkg_fields = [
+            'epoch',
+            'name',
+            'version',
+            'release',
+            'arch',
+            'rpm_sourcerpm',
+            'location_href',
+        ]
         results = await asyncio.gather(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
             for rpm in rpms))
@@ -317,7 +325,10 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
                     module.add_rpm_artifact(rpm_package)
-                if srpm_info:
+                if srpm_info and not module.is_devel and any(
+                        package_info['rpm_sourcerpm'] == srpm_info['location_href'] and
+                        not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
+                ):
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
             raise ModuleUpdateError('Cannot update module: %s', str(e)) from e
