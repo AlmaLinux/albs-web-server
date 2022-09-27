@@ -306,11 +306,11 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             # sRPM has that field empty
             return True
         if module.is_devel and all(
-            package_info['rpm_sourcerpm'] != rpm_package['location_href'] for package_info in packages_info
+            package_info['rpm_sourcerpm'] != rpm_package['location_href'] for package_info in packages_info.values()
         ):
             return True
         if not module.is_devel and any(
-            package_info['rpm_sourcerpm'] == rpm_package['location_href'] for package_info in packages_info
+            package_info['rpm_sourcerpm'] == rpm_package['location_href'] for package_info in packages_info.values()
         ):
             return True
         return False
