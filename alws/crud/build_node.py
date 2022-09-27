@@ -300,8 +300,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         rpms.append(artifact)
 
     def _is_srpm_filtered(srpm_info: dict, packages_info: dict, module: ModuleWrapper) -> bool:
-        logging.debug('SRPM info: %s', json.dumps(srpm_info, indent=4))
-        logging.debug('Packages info: %s', json.dumps(packages_info, indent=4))
+        logging.info('SRPM info: %s', json.dumps(srpm_info, indent=4))
+        logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
         if not srpm_info:
             return False
         if module.is_devel and all(
