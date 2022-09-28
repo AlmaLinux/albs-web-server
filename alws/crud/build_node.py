@@ -319,6 +319,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             return True
         if module.is_devel and rpm_package['location_href'] not in srpms_dict:
             return True
+        return False
 
     if module_index and rpms:
         logging.info('RPMs: %s', rpms)
@@ -350,7 +351,9 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
                     if _is_srpm_included(rpm_package, packages_info, module):
-                        module.add_rpm_artifact(rpm_package)
+                        logging.info('RPM will be added: %s', rpm_package)
+                        logging.info('RPM is added: %s',
+                                     module.add_rpm_artifact(rpm_package))
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
