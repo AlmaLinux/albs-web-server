@@ -309,8 +309,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             package_info['rpm_sourcerpm'] == rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
         ):
             return True
-        if module.is_devel and not any(
-            package_info['rpm_sourcerpm'] == rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
+        if module.is_devel and not all(
+            package_info['rpm_sourcerpm'] != rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
         ):
             return True
         return False
