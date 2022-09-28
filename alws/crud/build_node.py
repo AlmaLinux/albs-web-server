@@ -350,10 +350,13 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    if _is_srpm_included(rpm_package, packages_info, module):
+                    if _is_included := is_srpm_included(rpm_package, packages_info, module):
                         logging.info('RPM will be added: %s', rpm_package)
                         logging.info('RPM is added: %s',
-                                     module.add_rpm_artifact(rpm_package))
+                                     module.add_rpm_artifact(
+                                         rpm_package,
+                                         devel=_is_included and module.is_devel
+                                     ))
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
