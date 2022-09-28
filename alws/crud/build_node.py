@@ -300,7 +300,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
-    def _is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
+    def is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
         logging.info('Module: %s is devel: %s', module.name, module.is_devel)
         logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
@@ -350,7 +350,8 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    if _is_included := is_srpm_included(rpm_package, packages_info, module):
+                    if _is_included := is_srpm_included(rpm_package,
+                                                        packages_info, module):
                         logging.info('RPM will be added: %s', rpm_package)
                         logging.info('RPM is added: %s',
                                      module.add_rpm_artifact(
