@@ -4,6 +4,7 @@ import json
 import logging
 import typing
 import traceback
+from collections import defaultdict
 
 import sqlalchemy
 from sqlalchemy import delete, insert, update
@@ -303,12 +304,17 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
         logging.info('Module: %s is devel: %s', module.name, module.is_devel)
+        srpms_dict = defaultdict(list)
+        for package_info in packages_info.values():
+            if not module.is_artifact_filtered(package_info):
+                srpms_dict[package_info['rpm_sourcerpm']].append(package_info)
         if rpm_package['arch'] != 'src':
             # sRPM has that field empty
             return True
-        return not module.is_devel and any(
-            package_info['rpm_sourcerpm'] == rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
-        )
+        if not module.is_devel and rpm_package['location_href'] in srpms_dict:
+            return True
+        if module.is_devel and rpm_package['location_href'] not in srpms_dict:
+            return True
 
     if module_index and rpms:
         logging.info('RPMs: %s', rpms)
