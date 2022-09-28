@@ -301,16 +301,20 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         rpms.append(artifact)
 
     def _is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
+        logging.info('Module: %s is devel: %s', module.name, module.is_devel)
         logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
-        logging.info('Module: %s is devel: %s', module.name, module.is_devel)
         srpms_dict = defaultdict(list)
         for package_info in packages_info.values():
             if not module.is_artifact_filtered(package_info):
+                logging.info('Key: %s', package_info['rpm_sourcerpm'])
+                logging.info('Value: %s', package_info)
                 srpms_dict[package_info['rpm_sourcerpm']].append(package_info)
         if rpm_package['arch'] != 'src':
             # sRPM has that field empty
             return True
+        logging.info('RPMs arch: %s', rpm_package['arch'])
+        logging.info('RPM in sRPMs dict: %s', rpm_package['location_href'] in srpms_dict)
         if not module.is_devel and rpm_package['location_href'] in srpms_dict:
             return True
         if module.is_devel and rpm_package['location_href'] not in srpms_dict:
