@@ -317,6 +317,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         return False
 
     if module_index and rpms:
+        logging.info('RPMs: %s', rpms)
         pkg_fields = [
             'epoch',
             'name',
