@@ -302,6 +302,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
     def _is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
         logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
+        logging.info('Module: %s is devel: %s', module.name, module.is_devel)
         if rpm_package['rpm_sourcerpm']:
             # sRPM has that field empty
             return True
