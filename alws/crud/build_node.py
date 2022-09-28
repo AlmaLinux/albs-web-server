@@ -303,18 +303,12 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
         logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
         logging.info('Module: %s is devel: %s', module.name, module.is_devel)
-        if rpm_package['rpm_sourcerpm']:
+        if rpm_package['arch'] != 'src':
             # sRPM has that field empty
             return True
-        if not module.is_devel and any(
+        return not module.is_devel and any(
             package_info['rpm_sourcerpm'] == rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
-        ):
-            return True
-        if module.is_devel and not all(
-            package_info['rpm_sourcerpm'] != rpm_package['location_href'] and not module.is_artifact_filtered(package_info) for package_info in packages_info.values()
-        ):
-            return True
-        return False
+        )
 
     if module_index and rpms:
         logging.info('RPMs: %s', rpms)
