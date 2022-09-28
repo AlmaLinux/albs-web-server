@@ -300,24 +300,27 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
-    def is_srpm_included(rpm_package: dict, packages_info: dict, module: ModuleWrapper) -> bool:
-        logging.info('Module: %s is devel: %s', module.name, module.is_devel)
-        logging.info('RPM package: %s', json.dumps(rpm_package, indent=4))
-        logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
-        srpms_dict = defaultdict(list)
-        for package_info in packages_info.values():
-            if not module.is_artifact_filtered(package_info):
-                logging.info('Key: %s', package_info['rpm_sourcerpm'])
-                logging.info('Value: %s', package_info)
-                srpms_dict[package_info['rpm_sourcerpm']].append(package_info)
-        if rpm_package['arch'] != 'src':
-            # sRPM has that field empty
+    def is_source_rpm_included(
+            rpm_pkg: dict,
+            pgks_info: dict,
+            current_module: ModuleWrapper
+    ) -> bool:
+        source_rpm_list = [
+            package_info['rpm_sourcerpm'] for package_info in pgks_info
+            if not current_module.is_artifact_filtered(package_info)
+        ]
+        # non-source RPM always can be added into a module
+        if rpm_pkg['arch'] != 'src':
             return True
-        logging.info('RPMs arch: %s', rpm_package['arch'])
-        logging.info('RPM in sRPMs dict: %s', rpm_package['location_href'] in srpms_dict)
-        if not module.is_devel and rpm_package['location_href'] in srpms_dict:
+        # we add source RPM to a non-devel module
+        # if it produced at least one RPM
+        if not current_module.is_devel and \
+                rpm_pkg['location_href'] in source_rpm_list:
             return True
-        if module.is_devel and rpm_package['location_href'] not in srpms_dict:
+        # we add source RPM to a devel module
+        # if it didn't produce any RPM
+        if current_module.is_devel and \
+                rpm_pkg['location_href'] not in source_rpm_list:
             return True
         return False
 
@@ -350,14 +353,16 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    if _is_included := is_srpm_included(rpm_package,
-                                                        packages_info, module):
-                        logging.info('RPM will be added: %s', rpm_package)
-                        logging.info('RPM is added: %s',
-                                     module.add_rpm_artifact(
-                                         rpm_package,
-                                         devel=_is_included and module.is_devel
-                                     ))
+                    if _is_included := is_source_rpm_included(rpm_package,
+                                                              packages_info,
+                                                              module):
+                        # a source RPM is devel if it should be included and
+                        # a module is devel
+                        is_devel_rpm = _is_included and module.is_devel
+                        module.add_rpm_artifact(
+                            rpm_package,
+                            devel=is_devel_rpm,
+                        )
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
