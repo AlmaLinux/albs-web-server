@@ -348,8 +348,6 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 srpm_info = await pulp_client.get_rpm_package(
                     db_srpm.href, include_fields=pkg_fields)
         try:
-            logging.info('SRPM info: %s', json.dumps(srpm_info, indent=4))
-            logging.info('Packages info: %s', json.dumps(packages_info, indent=4))
             for module in module_index.iter_modules():
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
