@@ -300,27 +300,23 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
-    def is_source_rpm_included(
+    def is_rpm_included(
             rpm_pkg: dict,
-            pgks_info: dict,
+            srpm_list: list,
             current_module: ModuleWrapper
     ) -> bool:
-        source_rpm_list = [
-            package_info['rpm_sourcerpm'] for package_info in pgks_info
-            if not current_module.is_artifact_filtered(package_info)
-        ]
         # non-source RPM always can be added into a module
         if rpm_pkg['arch'] != 'src':
             return True
         # we add source RPM to a non-devel module
         # if it produced at least one RPM
         if not current_module.is_devel and \
-                rpm_pkg['location_href'] in source_rpm_list:
+                rpm_pkg['location_href'] in srpm_list:
             return True
         # we add source RPM to a devel module
         # if it didn't produce any RPM
         if current_module.is_devel and \
-                rpm_pkg['location_href'] not in source_rpm_list:
+                rpm_pkg['location_href'] not in srpm_list:
             return True
         return False
 
@@ -349,11 +345,18 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                     db_srpm.href, include_fields=pkg_fields)
         try:
             for module in module_index.iter_modules():
+                source_rpm_list = [
+                    package_info['rpm_sourcerpm'] for package_info in
+                    packages_info
+                    if not module.is_artifact_filtered(package_info)
+                ]
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    if _is_included := is_source_rpm_included(rpm_package,
-                                                              packages_info,
-                                                              module):
+                    if _is_included := is_rpm_included(
+                            rpm_package,
+                            source_rpm_list,
+                            module,
+                    ):
                         # a source RPM is devel if it should be included and
                         # a module is devel
                         is_devel_rpm = _is_included and module.is_devel
