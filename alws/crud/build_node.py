@@ -1,8 +1,10 @@
 import asyncio
 import datetime
+import json
 import logging
 import typing
 import traceback
+from collections import defaultdict
 
 import sqlalchemy
 from sqlalchemy import delete, insert, update
@@ -20,7 +22,7 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import parse_rpm_nevra, clean_release
@@ -298,8 +300,37 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
             )
         rpms.append(artifact)
 
+    def is_rpm_included(
+            rpm_pkg: dict,
+            srpm_list: list,
+            current_module: ModuleWrapper
+    ) -> bool:
+        # non-source RPM always can be added into a module
+        if rpm_pkg['arch'] != 'src':
+            return True
+        # we add source RPM to a non-devel module
+        # if it produced at least one RPM
+        if not current_module.is_devel and \
+                rpm_pkg['location_href'] in srpm_list:
+            return True
+        # we add source RPM to a devel module
+        # if it didn't produce any RPM
+        if current_module.is_devel and \
+                rpm_pkg['location_href'] not in srpm_list:
+            return True
+        return False
+
     if module_index and rpms:
-        pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
+        logging.info('RPMs: %s', rpms)
+        pkg_fields = [
+            'epoch',
+            'name',
+            'version',
+            'release',
+            'arch',
+            'rpm_sourcerpm',
+            'location_href',
+        ]
         results = await asyncio.gather(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
             for rpm in rpms))
@@ -314,9 +345,25 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                     db_srpm.href, include_fields=pkg_fields)
         try:
             for module in module_index.iter_modules():
+                source_rpm_list = [
+                    package_info['rpm_sourcerpm'] for package_info in
+                    packages_info
+                    if not module.is_artifact_filtered(package_info)
+                ]
                 for rpm in rpms:
                     rpm_package = packages_info[rpm.href]
-                    module.add_rpm_artifact(rpm_package)
+                    if _is_included := is_rpm_included(
+                            rpm_package,
+                            source_rpm_list,
+                            module,
+                    ):
+                        # a source RPM is devel if it should be included and
+                        # a module is devel
+                        is_devel_rpm = _is_included and module.is_devel
+                        module.add_rpm_artifact(
+                            rpm_package,
+                            devel=is_devel_rpm,
+                        )
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)
         except Exception as e:
