@@ -77,6 +77,7 @@ class Exporter:
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
         self.pulp_system_user = 'pulp'
+        self.common_group = 'pulp-exports'
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
             os.path.expanduser('~/export.err'))
@@ -188,28 +189,12 @@ class Exporter:
                 parent_dir, 'repodata'))
             repodata_url = urllib.parse.urljoin(
                 exporter['repo_url'], 'repodata/')
+            if not os.path.exists(repodata_path):
+                os.makedirs(repodata_path)
             try:
-                local['sudo']['chown',
-                              f'{self.current_user}:{self.current_user}',
-                              f'{parent_dir}'].run()
-                if not os.path.exists(repodata_path):
-                    os.makedirs(repodata_path)
-                else:
-                    local['sudo']['chown', '-R',
-                                  f'{self.current_user}:{self.current_user}',
-                                  f'{repodata_path}'].run()
                 await self.download_repodata(repodata_path, repodata_url)
             except Exception as e:
                 self.logger.error('Cannot download repodata file: %s', str(e))
-            finally:
-                local['sudo'][
-                    'chown', '-R',
-                    f'{self.pulp_system_user}:{self.pulp_system_user}',
-                    repodata_path].run()
-                local['sudo'][
-                    'chown',
-                    f'{self.pulp_system_user}:{self.pulp_system_user}',
-                    parent_dir].run()
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
@@ -388,13 +373,6 @@ class Exporter:
         repo_ids = jmespath.search('packages[].repositories[].id',
                                    db_release.plan)
         repo_ids = list(set(repo_ids))
-        async with database.Session() as db:
-            db_repos = await db.execute(
-                select(models.Repository).where(sqlalchemy.and_(
-                    models.Repository.id.in_(repo_ids),
-                    models.Repository.production.is_(True),
-                ))
-            )
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
 
@@ -451,17 +429,9 @@ async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
                     ), None)
                     break
 
-        local['sudo']['chown', '-R',
-                      f'{exporter.current_user}:{exporter.current_user}',
-                      f'{repodata}'].run()
         tasks.append(exporter.repomd_signer(repodata, key_id))
 
     await asyncio.gather(*tasks)
-
-    for repodata_path in repodata_paths:
-        local['sudo']['chown', '-R',
-                      f'{exporter.current_user}:{exporter.current_user}',
-                      f'{repodata_path}'].run()
 
 
 def repo_post_processing(exporter: Exporter, repo_path: str):
@@ -475,12 +445,6 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
 
     result = True
     try:
-        local['sudo']['chown',
-                      f'{exporter.current_user}:{exporter.current_user}',
-                      f'{parent_dir}'].run()
-        local['sudo']['chown', '-R',
-                      f'{exporter.current_user}:{exporter.current_user}',
-                      f'{repodata}'].run()
         try:
             errata_file = find_metadata(str(repodata), 'updateinfo')
         except StopIteration:
@@ -496,15 +460,13 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
     except Exception as e:
         exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
-    finally:
-        local['sudo']['chown', '-R',
-                      f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                      f'{repodata}'].run()
-        local['sudo']['chown',
-                      f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                      f'{parent_dir}'].run()
 
     return result, errata_records, modern_errata_records
+
+
+def fix_export_path_permissions(user, group, custom_path: str = None):
+    path_to_fix = custom_path or str(settings.pulp_export_path)
+    local['sudo']['chown', '-R', f'{user}:{group}', path_to_fix].run()
 
 
 def main():
@@ -523,9 +485,8 @@ def main():
     )
     sync(exporter.delete_existing_exporters_from_pulp())
     exporter.logger.info('Fixing permissions before export')
-    local['sudo']['chown', '-R',
-                  f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                  f'{settings.pulp_export_path}'].run()
+    fix_export_path_permissions(
+        exporter.pulp_system_user, exporter.common_group)
     exporter.logger.info('Permissions are fixed')
 
     db_sign_keys = sync(exporter.get_sign_keys())
@@ -555,6 +516,8 @@ def main():
 
     errata_cache = []
     modern_errata_cache = {'data': []}
+    fix_export_path_permissions(
+        exporter.pulp_system_user, exporter.common_group)
     for exp_path in exported_paths:
         result, errata_records, modern_errata_records = repo_post_processing(
             exporter, exp_path
@@ -575,9 +538,8 @@ def main():
         exporter.logger.info('Starting export errata.json and oval.xml')
         errata_export_base_path = None
         try:
-            local['sudo']['chown', '-R',
-                          f'{exporter.current_user}:{exporter.current_user}',
-                          f'{settings.pulp_export_path}'].run()
+            fix_export_path_permissions(
+                exporter.pulp_system_user, exporter.common_group)
             errata_export_base_path = os.path.join(
                 settings.pulp_export_path, 'errata'
             )
@@ -608,10 +570,9 @@ def main():
                     fd.write(oval)
         finally:
             if errata_export_base_path:
-                local['sudo'][
-                    'chown', '-R',
-                    f'{exporter.pulp_system_user}:{exporter.pulp_system_user}',
-                    errata_export_base_path].run()
+                fix_export_path_permissions(
+                    exporter.pulp_system_user, exporter.common_group,
+                    custom_path=errata_export_base_path)
 
 
 if __name__ == '__main__':
