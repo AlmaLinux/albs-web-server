@@ -240,10 +240,13 @@ class PulpClient:
             async with session.get(repomd_url) as response:
                 repomd_xml = await response.text()
                 response.raise_for_status()
-            modules_path = re.search(
+            res = re.search(
                 r'repodata/[\w\d]+-modules.yaml',
                 repomd_xml
-            ).group()
+            )
+            if not res:
+                return
+            modules_path = res.group()
             modules_url = urllib.parse.urljoin(url, modules_path)
             async with session.get(modules_url) as response:
                 modules_yaml = await response.text()

@@ -1336,7 +1336,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if repo_module_index is None:
                     template = await self.pulp_client.get_repo_modules_yaml(
                         repo_url)
-                    repo_module_index = IndexWrapper.from_template(template)
+                    if not template:
+                        repo_module_index = IndexWrapper.from_template(template)
+                    else:
+                        repo_module_index = IndexWrapper()
                     prod_repo_modules_cache[repo_url] = repo_module_index
                 if repo_name not in packages_to_repo_layout:
                     packages_to_repo_layout[repo_name] = {}
