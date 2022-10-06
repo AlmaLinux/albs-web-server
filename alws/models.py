@@ -20,6 +20,7 @@ from alws.constants import (
     ErrataReferenceType,
     GenSignKeyStatus,
     ErrataReleaseStatus,
+    GenSignKeyStatus,
     Permissions,
     PermissionTriad,
     ReleaseStatus,

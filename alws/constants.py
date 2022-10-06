@@ -19,6 +19,7 @@ __all__ = [
     'ErrataReferenceType',
     'GenSignKeyStatus',
     'ErrataReleaseStatus',
+    'GenSignKeyStatus',
     'PackageNevra',
     'Permissions',
     'PermissionTriad',
