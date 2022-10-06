@@ -18,6 +18,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
+    GenSignKeyStatus,
     Permissions,
     PermissionTriad,
     ReleaseStatus,
@@ -863,6 +864,7 @@ class Product(PermissionsMixin, TeamMixin, Base):
         secondary=ProductBuilds,
         back_populates='products',
     )
+    sign_key = relationship('SignKey', back_populates='product', uselist=False)
 
     @property
     def full_name(self) -> str:
@@ -985,9 +987,9 @@ class SignKey(PermissionsMixin, Base):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True)
-    fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True)
-    public_url = sqlalchemy.Column(sqlalchemy.Text)
+    keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True, nullable=False)
+    fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True, nullable=False)
+    public_url = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     inserted = sqlalchemy.Column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow())
     platform_id = sqlalchemy.Column(
@@ -996,6 +998,12 @@ class SignKey(PermissionsMixin, Base):
                               name='sign_keys_platform_id_fkey'),
         nullable=True)
     platform = relationship('Platform', back_populates='sign_keys')
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('products.id',
+                              name='sign_keys_product_id_fkey'),
+        nullable=True)
+    product = relationship('Product', back_populates='sign_key')
     build_task_artifacts = relationship('BuildTaskArtifact',
                                         back_populates='sign_key')
     roles = relationship(
@@ -1026,6 +1034,26 @@ class SignTask(Base):
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+
+
+class SignKeyGenerationTask(Base):
+    __tablename__ = 'sign_key_generation_tasks'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('products.id', name='skgt_product_id_fkey'),
+        nullable=False
+    )
+    product = relationship('Product')
+    user_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey('users.id', name='skgt_user_id_fkey'),
+        nullable=False
+    )
+    user = relationship('User')
+    status = sqlalchemy.Column(sqlalchemy.Integer, default=GenSignKeyStatus.IDLE)
+    error_message = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
 
 
 class ExportTask(Base):

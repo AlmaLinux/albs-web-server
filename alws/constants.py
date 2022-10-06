@@ -17,6 +17,7 @@ __all__ = [
     'ExportStatus',
     'ErrataPackageStatus',
     'ErrataReferenceType',
+    'GenSignKeyStatus',
     'PackageNevra',
     'Permissions',
     'PermissionTriad',
@@ -97,6 +98,13 @@ class ReleaseStatus(enum.IntEnum):
 
 
 class SignStatus(enum.IntEnum):
+    IDLE = 1
+    IN_PROGRESS = 2
+    COMPLETED = 3
+    FAILED = 4
+
+
+class GenSignKeyStatus(enum.IntEnum):
     IDLE = 1
     IN_PROGRESS = 2
     COMPLETED = 3

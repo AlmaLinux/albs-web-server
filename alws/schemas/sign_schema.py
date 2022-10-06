@@ -7,9 +7,9 @@ from pydantic import BaseModel
 class SignKey(BaseModel):
     id: int
     name: str
-    description: str
+    description: typing.Optional[str] = None
     keyid: str
-    public_url: str
+    public_url: typing.Optional[str] = None
     inserted: datetime
     platform_id: typing.Optional[int] = None
 
@@ -19,10 +19,10 @@ class SignKey(BaseModel):
 
 class SignKeyCreate(BaseModel):
     name: str
-    description: str
+    description: typing.Optional[str] = None
     keyid: str
     fingerprint: str
-    public_url: str
+    public_url: typing.Optional[str] = None
     platform_id: typing.Optional[int] = None
 
 
@@ -105,3 +105,34 @@ class SyncSignTaskResponse(BaseModel):
 
 class SyncSignTaskError(BaseModel):
     error: str
+
+
+class CommunitySignKeyCreate(BaseModel):
+    product_id: int
+
+
+class GenSignKeyTask(BaseModel):
+    id: int
+    product_id: int
+    user_id: int
+    status: int
+    error_message: typing.Optional[str]
+
+    class Config:
+        orm_mode = True
+
+
+class AvailableGenSignKeyTask(BaseModel):
+    id: int
+    product_name: int
+    user_name: str
+    user_email: str
+
+
+class GenSignKeyTaskResult(BaseModel):
+    success: bool
+    error_message: typing.Optional[str]
+    sign_key_href: str
+    fingerprint: str
+    key_name: str
+    file_name: str

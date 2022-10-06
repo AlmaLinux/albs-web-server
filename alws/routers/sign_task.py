@@ -55,6 +55,22 @@ async def get_available_sign_task(
     return result
 
 
+@router.post(
+    '/get_gen_sign_key_task/',
+    response_model=typing.Union[dict, sign_schema.AvailableGenSignKeyTask])
+async def get_available_gen_sign_key_task(
+        db: database.Session = Depends(get_db)):
+    task = await sign_task.get_gen_key_task(db)
+    if not task:
+        return {}
+    return {
+        'id': task.id,
+        'product_name': task.product.name,
+        'user_name': task.user.username,
+        'user_email': task.user.email,
+    }
+
+
 @router.post('/{sign_task_id}/complete/',
              response_model=sign_schema.SignTaskCompleteResponse)
 async def complete_sign_task(
@@ -66,6 +82,17 @@ async def complete_sign_task(
     await db.commit()
     dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
     return {'success': True}
+
+
+@router.post('/community/{task_id}/complete/',
+             response_model=sign_schema.SignKey)
+async def complete_sign_key_generation(
+        task_id: int, payload: sign_schema.GenSignKeyTaskResult,
+        db: database.Session = Depends(get_db)):
+    sign_key = await sign_task.complete_gen_key_task(
+        db, task_id, payload.dict())
+    await db.commit()
+    return sign_key
 
 
 @router.post(

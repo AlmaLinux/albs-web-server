@@ -85,14 +85,19 @@ class UploadError(Exception):
     def __init__(
         self,
         detail,
-        status: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
     ):
         self.detail = detail
-        self.status = status
+        self.status = status_
 
 
 class PermissionDenied(Exception):
     pass
 
+
 class UserError(Exception):
+    pass
+
+
+class GenSignKeyError(Exception):
     pass

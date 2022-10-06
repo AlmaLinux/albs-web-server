@@ -9,15 +9,21 @@ from fastapi import (
 
 from alws import database
 from alws.auth import get_current_user
-from alws.crud import products
+from alws.crud import products, sign_task
 from alws.dependencies import get_db
 from alws.models import User
-from alws.schemas import product_schema
+from alws.schemas import product_schema, sign_schema
 
 
 public_router = APIRouter(
     prefix='/products',
     tags=['products'],
+)
+
+router = APIRouter(
+    prefix='/products',
+    tags=['products'],
+    dependencies=[Depends(get_current_user)]
 )
 
 
@@ -32,7 +38,7 @@ async def get_products(
         db, page_number=pageNumber, search_string=search_string)
 
 
-@public_router.post('/', response_model=product_schema.Product)
+@router.post('/', response_model=product_schema.Product)
 async def create_product(
     product: product_schema.ProductCreate,
     db: database.Session = Depends(get_db),
@@ -55,6 +61,24 @@ async def get_product(
             detail=f'Product with {product_id=} is not found'
         )
     return db_product
+
+
+@router.post('/{product_id}/create-sign-key/',
+             response_model=sign_schema.GenSignKeyTask)
+async def create_product_sign_key(
+        product_id: int,
+        db: database.Session = Depends(get_db),
+        user: User = Depends(get_current_user)
+):
+    product = await products.get_products(db, product_id=product_id)
+    if not product.is_community:
+        raise HTTPException(
+            status_code=400,
+            detail='Sign keys can be generated only for community products'
+        )
+    task = await sign_task.create_gen_key_task(db, user.id, product_id)
+    await db.commit()
+    return task
 
 
 @public_router.post('/add/{build_id}/{product}/',

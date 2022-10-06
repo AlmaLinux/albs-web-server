@@ -11,17 +11,21 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import SignStatus
+from alws.crud.user import get_user
+from alws.crud.products import get_products
+from alws.constants import GenSignKeyStatus, SignStatus
 from alws.database import Session
 from alws.errors import (
     BuildAlreadySignedError,
     DataNotFoundError,
+    GenSignKeyError,
     PermissionDenied,
     SignError
 )
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
+from alws.utils.copr import create_product_sign_key_repo
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
 
@@ -58,11 +62,7 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
                            user_id: int) \
         -> models.SignTask:
     async with db.begin():
-        user = (await db.execute(select(models.User).where(
-            models.User.id == user_id).options(
-            selectinload(models.User.roles)
-            .selectinload(models.UserRole.actions)
-        ))).scalars().first()
+        user = await get_user(db, user_id)
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
                 selectinload(models.Build.source_rpms),
@@ -368,3 +368,106 @@ async def verify_signed_build(db: Session, build_id: int,
                 f'Sign key with for pkg ID {rpm.id} is not matched '
                 f'by sign key for platform ID {platform_id}')
     return True
+
+
+async def create_gen_key_task(
+        db: Session, user_id: int, product_id: int
+) -> models.SignKeyGenerationTask:
+    user = await get_user(db, user_id)
+    product = await get_products(db, product_id=product_id)
+    if not can_perform(product, user, actions.UpdateProduct.name):
+        raise PermissionDenied('User does not have permissions '
+                               'to add sign key to the product')
+    task = models.SignKeyGenerationTask(user_id=user_id, product_id=product_id,
+                                        status=GenSignKeyStatus.IDLE)
+    db.add(task)
+    await db.flush()
+    await db.refresh(task)
+    return task
+
+
+async def get_gen_key_task(
+        db: Session) -> typing.Union[models.SignKeyGenerationTask, None]:
+    res = (await db.execute(select(models.SignKeyGenerationTask).where(
+        models.SignKeyGenerationTask.status == GenSignKeyStatus.IDLE).options(
+        selectinload(models.SignKeyGenerationTask.product),
+        selectinload(models.SignKeyGenerationTask.user),
+    ))
+           ).scalars().first()
+    if res:
+        await db.execute(update(models.SignKeyGenerationTask).where(
+            models.SignKeyGenerationTask.id == res.id).values(
+            status=GenSignKeyStatus.IN_PROGRESS))
+    return res
+
+
+async def complete_gen_key_task(
+        db: Session, task_id: int, result: dict
+) -> typing.Union[models.SignKey, None]:
+    # result structure:
+    # {
+    #     'success': True,
+    #     'error_message': '',
+    #     'sign_key_href': '/pulp/api/v3/artifacts...',
+    #     'key_name: 'some key name'
+    #     'fingerprint': 'FADCE12334',
+    #     'file_name': 'some key name'
+    # }
+    items_to_add = []
+    task = (await db.execute(select(models.SignKeyGenerationTask).where(
+        models.SignKeyGenerationTask.id == task_id).options(
+        selectinload(models.SignKeyGenerationTask.product).selectinload(
+            models.Product.repositories),
+        selectinload(models.SignKeyGenerationTask.product).selectinload(
+            models.Product.owner),
+        selectinload(models.SignKeyGenerationTask.product).selectinload(
+            models.Product.team).selectinload(models.Team.roles),
+    ))
+           ).scalars().first()
+    if not task:
+        raise GenSignKeyError(
+            f'Sign key generation task with id "{task_id}" is missing')
+    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
+                             settings.pulp_password)
+    if not result['success']:
+        await db.execute(update(models.SignKeyGenerationTask).where(
+            models.SignKeyGenerationTask.id == task_id).values(
+            status=GenSignKeyStatus.FAILED,
+            error_message=result['error_message']))
+        return
+    sign_key_repo = next(
+        (r for r in task.product.repositories if r.type == 'sign_key'), None)
+    key_file_name = result['file_name']
+    if not sign_key_repo:
+        repo_name, repo_url, repo_href = await create_product_sign_key_repo(
+            pulp_client, task.product.owner.username, task.product.name)
+        sign_key_repo = models.Repository(
+            name=repo_name,
+            url=repo_url,
+            arch='sign_key',
+            pulp_href=repo_href,
+            debug=False,
+            production=True
+        )
+        items_to_add.append(sign_key_repo)
+
+    await pulp_client.create_file(
+        key_file_name, result['sign_key_href'], sign_key_repo.pulp_href)
+
+    sign_key_url = urllib.parse.urljoin(sign_key_repo.url, key_file_name)
+    # Keyid is last 16 digits of the key full fingerprint
+    keyid = result['fingerprint'][-16:]
+    roles = [r for r in task.product.team.roles if 'signer' in r.name]
+    sign_key = models.SignKey(
+        name=result['key_name'],
+        keyid=keyid,
+        fingerprint=result['fingerprint'],
+        public_url=sign_key_url,
+        product_id=task.product_id
+    )
+    sign_key.roles = roles
+    items_to_add.append(sign_key)
+    db.add_all(items_to_add)
+    await db.flush()
+    await db.refresh(sign_key)
+    return sign_key

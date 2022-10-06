@@ -28,15 +28,26 @@ class PulpClient:
         self._auth = aiohttp.BasicAuth(self._username, self._password)
         self._current_transaction = None
 
-    async def create_log_repo(
-            self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
-        ENDPOINT = 'pulp/api/v3/repositories/file/file/'
+    async def create_file_repository(
+            self, name: str, distro_path_start: str) -> typing.Tuple[str, str]:
+        endpoint = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
-        response = await self.request('POST', ENDPOINT, json=payload)
+        response = await self.request('POST', endpoint, json=payload)
         repo_href = response['pulp_href']
         await self.create_file_publication(repo_href)
         distro = await self.create_file_distro(
             name, repo_href, base_path_start=distro_path_start)
+        return distro, repo_href
+
+    async def create_log_repo(
+            self, name: str, distro_path_start: str = 'build_logs'
+    ) -> typing.Tuple[str, str]:
+        distro, repo_href = await self.create_file_repository(name, distro_path_start)
+        return distro, repo_href
+
+    async def create_sign_key_repo(self, name) -> typing.Tuple[str, str]:
+        base_path = 'sign_keys'
+        distro, repo_href = await self.create_file_repository(name, base_path)
         return distro, repo_href
 
     async def create_rpm_repository(
