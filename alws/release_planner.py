@@ -182,6 +182,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 artifact_dict.pop('pulp_href'): artifact_dict
                 for artifact_dict in pulp_artifacts
             }
+            build_task_arch_map = {
+                task.id: task.arch for task in build.tasks
+            }
             for rpm in build_rpms:
                 artifact_task_id = rpm.artifact.build_task_id
                 if build_tasks and artifact_task_id not in build_tasks:
@@ -194,11 +197,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 pkg_info['cas_hash'] = rpm.artifact.cas_hash
                 pkg_info['href_from_repo'] = None
                 pkg_info['full_name'] = artifact_name
-                build_task = next(
-                    task for task in build.tasks
-                    if task.id == artifact_task_id
-                )
-                pkg_info['task_arch'] = build_task.arch
+                pkg_info['task_arch'] = build_task_arch_map[artifact_task_id]
                 pkg_info['force'] = False
                 pkg_info['force_not_notarized'] = False
                 source_rpm = getattr(rpm, 'source_rpm', None)
@@ -506,6 +505,8 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             repo_arch_location = [arch]
             if arch == 'noarch':
                 repo_arch_location = base_platform.arch_list
+            elif arch == 'i686' and pkg['task_arch'] == 'x86_64':
+                repo_arch_location.append('i686')
             plan_packages.append({
                 'package': pkg,
                 'repositories': repositories,
@@ -655,6 +656,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self,
         package: dict,
         is_debug: bool,
+        pulp_repos: dict
     ) -> None:
         # create collections for checking packages in repos
         if self.pkgs_nevra is None:
@@ -670,7 +672,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 self.clean_base_dist_name_lower = get_clean_distr_name(
                     self.base_platform.name).lower()
 
-            pulp_repos = await self.get_production_pulp_repositories()
             self.latest_repo_versions = []
             for repo in self.base_platform.repos:
                 pulp_repo_info = pulp_repos[repo.pulp_href]
@@ -807,6 +808,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
     ) -> dict:
         packages = []
         added_packages = set()
+        pulp_repos = await self.get_production_pulp_repositories()
         for package in pulp_packages:
             full_name = package['full_name']
             package_arch = package['arch']
@@ -815,7 +817,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(
-                package, is_debug)
+                package, is_debug, pulp_repos)
             devel_repo = self.get_devel_repo(
                 arch=package_arch,
                 is_debug=is_debug,
@@ -924,8 +926,25 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         prod_repos = []
         self.base_platform = base_platform
 
+        def update_beholder_cache(
+                _pkgs: typing.List[dict], _is_beta: bool, _is_devel: bool):
+
+            for pkg in _pkgs:
+                key = (pkg['name'], pkg['version'], pkg['arch'],
+                       _is_beta, _is_devel)
+                beholder_cache[key] = pkg
+                for weak_arch in strong_arches[pkg['arch']]:
+                    second_key = (pkg['name'], pkg['version'],
+                                  weak_arch, _is_beta, _is_devel)
+                    replaced_pkg = copy.deepcopy(pkg)
+                    for repo in replaced_pkg['repositories']:
+                        if repo['arch'] == pkg['arch']:
+                            repo['arch'] = weak_arch
+                    beholder_cache[second_key] = replaced_pkg
+
         pulp_packages, src_rpm_names, pulp_rpm_modules = (
             await self.get_pulp_packages(build_ids, build_tasks=build_tasks))
+        pulp_repos = await self.get_production_pulp_repositories()
 
         clean_base_dist_name = get_clean_distr_name(base_platform.name)
         if clean_base_dist_name is None:
@@ -1002,18 +1021,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 is_beta = distr['version'].endswith('-beta')
                 is_devel = module_response['name'].endswith('-devel')
                 for _packages in module_response['artifacts']:
-                    for pkg in _packages['packages']:
-                        key = (pkg['name'], pkg['version'], pkg['arch'],
-                               is_beta, is_devel)
-                        beholder_cache[key] = pkg
-                        for weak_arch in strong_arches[pkg['arch']]:
-                            second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, is_beta, is_devel)
-                            replaced_pkg = copy.deepcopy(pkg)
-                            for repo in replaced_pkg['repositories']:
-                                if repo['arch'] == pkg['arch']:
-                                    repo['arch'] = weak_arch
-                            beholder_cache[second_key] = replaced_pkg
+                    update_beholder_cache(
+                        _packages['packages'], is_beta, is_devel)
                 module_repo = module_response['repository']
                 repo_name = self.repo_name_regex.search(
                     module_repo['name']).groupdict()['name']
@@ -1050,18 +1059,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             is_beta = distr['version'].endswith('-beta')
             is_devel = False
             for pkg_list in beholder_response.get('packages', {}):
-                for pkg in pkg_list['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'],
-                           is_beta, is_devel)
-                    beholder_cache[key] = pkg
-                    for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'], weak_arch,
-                                      is_beta, is_devel)
-                        replaced_pkg = copy.deepcopy(pkg)
-                        for repo in replaced_pkg['repositories']:
-                            if repo['arch'] == pkg['arch']:
-                                repo['arch'] = weak_arch
-                        beholder_cache[second_key] = replaced_pkg
+                update_beholder_cache(
+                    pkg_list['packages'], is_beta, is_devel)
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -1077,10 +1076,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             full_name = package['full_name']
             is_beta = package.pop('is_beta')
             is_debug = is_debuginfo_rpm(pkg_name)
+            task_arch = package['task_arch']
             if full_name in added_packages:
                 continue
             await self.prepare_data_for_executing_async_tasks(
-                package, is_debug)
+                package, is_debug, pulp_repos)
             release_repository_keys = set()
             release_repositories = defaultdict(set)
             for is_devel in (False, True):
@@ -1144,7 +1144,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 repo_arch_location = [release_repo['arch']]
                 # we should add i686 arch for correct multilib showing in UI
-                if pkg_arch == 'i686' and 'x86_64' in repo_arch_location:
+                if pkg_arch == 'i686' and task_arch == 'x86_64':
                     repo_arch_location.append('i686')
                 if pkg_arch == 'noarch':
                     repo_arch_location = pulp_repo_arch_location
@@ -1260,11 +1260,12 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         # check packages presence in prod repos
         self.base_platform = release.platform
+        pulp_repos = await self.get_production_pulp_repositories()
         for pkg_dict in release.plan['packages']:
             package = pkg_dict['package']
             is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
-                package, is_debug)
+                package, is_debug, pulp_repos)
             if self.codenotary_enabled:
                 authenticate_tasks.append(
                     self.authenticate_package(package['sha256'])
@@ -1476,11 +1477,12 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
     ) -> dict:
         updated_plan = plan.copy()
         self.base_platform = release.platform
+        pulp_repos = await self.get_production_pulp_repositories()
         for pkg_dict in plan['packages']:
             package = pkg_dict['package']
             is_debug = is_debuginfo_rpm(package['name'])
             await self.prepare_data_for_executing_async_tasks(
-                package, is_debug)
+                package, is_debug, pulp_repos)
         (
             pkgs_from_repos, pkgs_in_repos
         ) = await self.prepare_and_execute_async_tasks(plan['packages'])
