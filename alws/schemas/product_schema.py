@@ -6,6 +6,7 @@ from alws.schemas.platform_schema import Platform
 from alws.schemas.repository_schema import Repository
 from alws.schemas.team_schema import Team
 from alws.schemas.user_schema import User
+from alws.schemas.sign_schema import SignKey
 
 __all__ = ['ProductCreate', 'Product']
 
@@ -32,6 +33,7 @@ class Product(BaseModel):
     title: typing.Optional[str]
     description: typing.Optional[str]
     builds: typing.List[ProductBuild] = []
+    sign_key: typing.Optional[SignKey] = None
     repositories: typing.List[Repository] = []
     platforms: typing.List[Platform] = []
     owner: User
