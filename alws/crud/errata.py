@@ -794,18 +794,6 @@ async def release_errata_packages(
     released_names = set()
     for errata_pkg in packages:
         pulp_pkg = await pulp_client.get_by_href(errata_pkg.get_pulp_href())
-        query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
-        if errata_pkg.albs_artifact_id is not None:
-            query = models.BuildTaskArtifact.id == errata_pkg.albs_artifact_id
-        db_pkg = await db.execute(
-            select(models.BuildTaskArtifact)
-            .where(query)
-            .options(
-                selectinload(models.BuildTaskArtifact.build_task)
-                .selectinload(models.BuildTask.rpm_module)
-            )
-        )
-        db_pkg = db_pkg.scalars().first()
         if errata_pkg.errata_package.reboot_suggested:
             reboot_suggested = True
         if pulp_pkg["name"] in released_names:
@@ -825,6 +813,22 @@ async def release_errata_packages(
                 "sum_type": "sha256",
             }
         )
+        if rpm_module:
+            continue
+        query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
+        if errata_pkg.albs_artifact_id is not None:
+            query = models.BuildTaskArtifact.id == errata_pkg.albs_artifact_id
+        db_pkg = await db.execute(
+            select(models.BuildTaskArtifact)
+            .where(query)
+            .options(
+                selectinload(models.BuildTaskArtifact.build_task)
+                .selectinload(models.BuildTask.rpm_module)
+            )
+        )
+        db_pkg = db_pkg.scalars().first()
+        if not db_pkg:
+            continue
         db_module = db_pkg.build_task.rpm_module
         if db_module is not None:
             rpm_module = {
