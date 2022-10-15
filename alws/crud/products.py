@@ -314,7 +314,7 @@ async def set_platform_for_products_repos(
     # some-username-some-product-some-platform-x86_64-debug-dr
     repos_per_platform = {
         f"{product.owner.username}-{product.name}-{platform.name.lower()}-"
-        f"{repo.type}-{repo_debug_dict[repo.debug]}": platform
+        f"{repo.arch}-{repo_debug_dict[repo.debug]}": platform
         for repo in product.repositories for platform in product.platforms
     }
     # we do nothing if all repos have platform
