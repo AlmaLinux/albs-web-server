@@ -680,19 +680,36 @@ async def build_done(db: Session, pulp: PulpClient,
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
         models.BuildTaskArtifact.type == 'rpm'))
-    db_srpm_name = None
+
+    def get_srpm_instance(
+        db_srpms: typing.List[models.SourceRpm],
+        build_task: models.BuildTask,
+        srpm_name: str = '',
+    ) -> typing.Optional[models.SourceRpm]:
+        srpm = None
+        for db_srpm in db_srpms:
+            if db_srpm.artifact.name == srpm_name:
+                srpm = db_srpm
+                break
+            if (
+                build_task.built_srpm_url
+                and db_srpm.artifact.name in build_task.built_srpm_url
+            ):
+                srpm = db_srpm
+                break
+        return srpm
+
     srpm = None
+    db_srpms = (await db.execute(
+        select(models.SourceRpm)
+        .where(models.SourceRpm.build_id == build_task.build_id)
+        .options(selectinload(models.SourceRpm.artifact))
+    )).scalars().all()
+
     for rpm in rpms_result.scalars().all():
         if rpm.name.endswith('.src.rpm'):
-            db_srpm_name = rpm.name
             # retrieve already created instance of model SourceRpm
-            db_srpm = await db.execute(select(
-                models.SourceRpm, models.BuildTaskArtifact).where(
-                models.SourceRpm.build_id == build_task.build_id,
-                models.SourceRpm.artifact_id == models.BuildTaskArtifact.id,
-                models.BuildTaskArtifact.name == db_srpm_name,
-            ))
-            srpm = db_srpm.scalars().first()
+            srpm = get_srpm_instance(db_srpms, build_task, rpm.name)
             if build_task.built_srpm_url is not None and srpm is not None:
                 continue
         # if build task is excluded or failed, we don't need to create
@@ -709,6 +726,10 @@ async def build_done(db: Session, pulp: PulpClient,
             binary_rpm.build = build_task.build
             binary_rpms.append(binary_rpm)
 
+    # TODO: ALBS-705: Temporary solution that fixes integrity error with missing srpm,
+    #       we need to investigate why src artifact sometimes is missing
+    if not srpm:
+        srpm = get_srpm_instance(db_srpms, build_task)
     if srpm:
         if build_task.built_srpm_url is None:
             db.add(srpm)
