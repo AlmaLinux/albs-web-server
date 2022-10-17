@@ -15,6 +15,7 @@ class Repository(BaseModel):
     type: str
     debug: typing.Optional[bool]
     production: typing.Optional[bool]
+    mock_enabled: typing.Optional[bool]
     pulp_href: typing.Optional[str]
 
     class Config:
@@ -28,6 +29,7 @@ class RepositoryCreate(BaseModel):
     type: str
     debug: bool
     production: bool = False
+    mock_enabled: bool = True
     pulp_href: typing.Optional[str]
 
 
@@ -39,11 +41,13 @@ class RepositorySearch(BaseModel):
     debug: typing.Optional[bool]
     production: typing.Optional[bool]
     pulp_href: typing.Optional[str]
+    mock_enabled: typing.Optional[bool]
 
 
 class RepositoryUpdate(BaseModel):
     production: typing.Optional[bool]
     export_path: typing.Optional[str]
+    mock_enabled: bool = True
 
 
 class RepositorySync(BaseModel):

@@ -382,6 +382,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -472,6 +473,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos-debuginfo
       arch: i686
       type: rpm
@@ -862,6 +864,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-nfv
       type: rpm
@@ -2397,6 +2400,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-9-raspberrypi
       arch: src
       type: rpm
@@ -2407,6 +2411,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-9-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
@@ -2417,3 +2422,4 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false

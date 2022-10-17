@@ -13,6 +13,7 @@ class TaskRepo(BaseModel):
     name: str
     url: str
     priority: int
+    mock_enabled: bool = True
 
     class Config:
         orm_mode = True

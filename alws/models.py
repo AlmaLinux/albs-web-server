@@ -253,6 +253,9 @@ class Repository(CustomRepoRepr, PermissionsMixin):
     url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
+    mock_enabled = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=True, nullable=True,
+    )
     production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
                                    nullable=True)
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
