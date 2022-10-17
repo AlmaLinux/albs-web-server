@@ -850,6 +850,39 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             'modules': rpm_modules,
         }
 
+    @staticmethod
+    def update_beholder_cache(
+        beholder_cache: dict,
+        packages: typing.List[dict],
+        strong_arches: dict,
+        is_beta: bool,
+        is_devel: bool,
+    ):
+
+        def generate_key(pkg_arch: str = None) -> typing.Tuple:
+            arch = pkg_arch if pkg_arch else pkg['arch']
+            return (pkg['name'], pkg['version'], arch, is_beta, is_devel)
+
+        for pkg in packages:
+            key = generate_key()
+            beholder_cache[key] = pkg
+            for weak_arch in strong_arches[pkg['arch']]:
+                second_key = generate_key(pkg_arch=weak_arch)
+                # if we've already found repos for i686 arch
+                # we don't need to override them,
+                # because there can be multilib info
+                beholder_repos = (
+                    beholder_cache.get(second_key, {})
+                    .get('repositories', [])
+                )
+                if beholder_repos and weak_arch == 'i686':
+                    continue
+                replaced_pkg = copy.deepcopy(pkg)
+                for repo in replaced_pkg['repositories']:
+                    if repo['arch'] == pkg['arch']:
+                        repo['arch'] = weak_arch
+                beholder_cache[second_key] = replaced_pkg
+
     def find_release_repos(
         self,
         pkg_name: str,
@@ -1002,18 +1035,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 is_beta = distr['version'].endswith('-beta')
                 is_devel = module_response['name'].endswith('-devel')
                 for _packages in module_response['artifacts']:
-                    for pkg in _packages['packages']:
-                        key = (pkg['name'], pkg['version'], pkg['arch'],
-                               is_beta, is_devel)
-                        beholder_cache[key] = pkg
-                        for weak_arch in strong_arches[pkg['arch']]:
-                            second_key = (pkg['name'], pkg['version'],
-                                          weak_arch, is_beta, is_devel)
-                            replaced_pkg = copy.deepcopy(pkg)
-                            for repo in replaced_pkg['repositories']:
-                                if repo['arch'] == pkg['arch']:
-                                    repo['arch'] = weak_arch
-                            beholder_cache[second_key] = replaced_pkg
+                    self.update_beholder_cache(
+                        beholder_cache,
+                        _packages['packages'],
+                        strong_arches,
+                        is_beta,
+                        is_devel,
+                    )
                 module_repo = module_response['repository']
                 repo_name = self.repo_name_regex.search(
                     module_repo['name']).groupdict()['name']
@@ -1050,18 +1078,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             is_beta = distr['version'].endswith('-beta')
             is_devel = False
             for pkg_list in beholder_response.get('packages', {}):
-                for pkg in pkg_list['packages']:
-                    key = (pkg['name'], pkg['version'], pkg['arch'],
-                           is_beta, is_devel)
-                    beholder_cache[key] = pkg
-                    for weak_arch in strong_arches[pkg['arch']]:
-                        second_key = (pkg['name'], pkg['version'], weak_arch,
-                                      is_beta, is_devel)
-                        replaced_pkg = copy.deepcopy(pkg)
-                        for repo in replaced_pkg['repositories']:
-                            if repo['arch'] == pkg['arch']:
-                                repo['arch'] = weak_arch
-                        beholder_cache[second_key] = replaced_pkg
+                self.update_beholder_cache(
+                    beholder_cache,
+                    pkg_list['packages'],
+                    strong_arches,
+                    is_beta,
+                    is_devel,
+                )
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
