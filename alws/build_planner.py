@@ -3,6 +3,7 @@ import asyncio
 import typing
 import collections
 import itertools
+import re
 
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.future import select
@@ -25,7 +26,6 @@ from alws.utils.modularity import (
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.parsing import get_clean_distr_name, parse_git_ref
 from alws.utils.pulp_client import PulpClient
-
 
 __all__ = ['BuildPlanner']
 
@@ -189,6 +189,30 @@ class BuildPlanner:
         allowed_arches = (task_arch, 'src', 'noarch')
         index = IndexWrapper.from_template(task.modules_yaml)
 
+        # This sorting and filtering is needed due to s390x artifacts.
+        # Source RPMs there have higher module_index hence they get
+        # into modules for other architectures where they are not needed.
+        # On the other hand, sources with lesser module_index hop into s390x
+        # modules.yaml metadata which is also wrong. This filtering allows
+        # to catch those source artifacts and filter them out.
+        src_bin_mapping = collections.defaultdict(set)
+        allowed_artifacts = set()
+        module_id_regex = re.compile('\+(?P<module_id>\d+)\+')
+        for ref in task.refs:
+            if ref.enabled or not ref.added_artifacts:
+                continue
+            for artifact in ref.added_artifacts:
+                parsed_artifact = RpmArtifact.from_str(artifact)
+                module_id = module_id_regex.search(
+                    parsed_artifact.release).groupdict().get('module_id', '')
+                if parsed_artifact.arch in allowed_arches:
+                    src_bin_mapping[module_id].add(parsed_artifact)
+
+        for id_, artifacts in src_bin_mapping.items():
+            if all((i.arch == 'src' for i in artifacts)):
+                continue
+            allowed_artifacts.update(artifacts)
+
         for module in index.iter_modules():
             for ref in task.refs:
                 if ref.enabled:
@@ -197,7 +221,8 @@ class BuildPlanner:
                 else:
                     for artifact in ref.added_artifacts:
                         parsed_artifact = RpmArtifact.from_str(artifact)
-                        if parsed_artifact.arch in allowed_arches:
+                        if (parsed_artifact.arch in allowed_arches
+                                and parsed_artifact in allowed_artifacts):
                             module.add_rpm_artifact(parsed_artifact.as_dict())
                         else:
                             module.remove_rpm_artifact(artifact)
