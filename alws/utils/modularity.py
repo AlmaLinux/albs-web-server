@@ -50,6 +50,9 @@ class RpmArtifact(BaseModel):
     epoch: typing.Optional[int]
     arch: str
 
+    def __hash__(self):
+        return hash(self.as_artifact())
+
     def as_artifact(self):
         epoch = self.epoch if self.epoch else '0'
         return f'{self.name}-{epoch}:{self.version}-{self.release}.{self.arch}'
