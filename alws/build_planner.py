@@ -4,7 +4,6 @@ import typing
 import collections
 import itertools
 import re
-from collections import defaultdict
 
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.future import select
@@ -196,7 +195,7 @@ class BuildPlanner:
         # On the other hand, sources with lesser module_index hop into s390x
         # modules.yaml metadata which is also wrong. This filtering allows
         # to catch those source artifacts and filter them out.
-        src_bin_mapping = defaultdict(set)
+        src_bin_mapping = collections.defaultdict(set)
         allowed_artifacts = set()
         module_id_regex = re.compile('\+(?P<module_id>\d+)\+')
         for ref in task.refs:
@@ -210,7 +209,7 @@ class BuildPlanner:
                     src_bin_mapping[module_id].add(parsed_artifact)
 
         for id_, artifacts in src_bin_mapping.items():
-            if len(artifacts) == 1 and all([i.arch == 'src' for i in artifacts]):
+            if all((i.arch == 'src' for i in artifacts)):
                 continue
             allowed_artifacts.update(artifacts)
 
