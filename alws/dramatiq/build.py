@@ -1,4 +1,3 @@
-import logging
 from typing import Dict, Any
 
 import dramatiq
@@ -8,7 +7,7 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
-from alws.crud import build_node as build_node_crud, platform_flavors, test
+from alws.crud import build_node as build_node_crud, test
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
@@ -24,7 +23,7 @@ from alws.dependencies import get_db
 from alws.dramatiq import event_loop
 
 
-__all__ = ['start_build', 'build_done']
+__all__ = ['start_build', 'build_done', 'create_log_repo']
 
 
 def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
@@ -105,7 +104,7 @@ async def _check_build_and_completed_tasks(
             )
         )).scalar()
 
-        return completed_tasks==build_tasks
+        return completed_tasks == build_tasks
 
 
 async def _all_build_tasks_completed(db: Session, build_task_id: int) -> bool:
@@ -117,6 +116,7 @@ async def _all_build_tasks_completed(db: Session, build_task_id: int) -> bool:
 @dramatiq.actor(
     max_retries=0,
     priority=0,
+    queue_name='builds',
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def start_build(build_id: int, build_request: Dict[str, Any]):
