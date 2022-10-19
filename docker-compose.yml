@@ -100,12 +100,47 @@ services:
       - "./reference_data:/code/reference_data"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
-                      dramatiq --threads 1 alws.dramatiq.build'
+                      dramatiq alws.dramatiq --threads 1 -Q default'
     restart: on-failure
     depends_on:
       - db
       - pulp
-      - web_server
+      - rabbitmq
+
+  task_queue_builds:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      /wait_for_it.sh rabbitmq:5672 &&
+                      dramatiq alws.dramatiq --threads 1 -Q builds'
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
+      - rabbitmq
+
+  task_queue_releases:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      /wait_for_it.sh rabbitmq:5672 &&
+                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases'
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
       - rabbitmq
 
   frontend:

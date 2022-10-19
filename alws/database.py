@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 from alws.config import settings
 
 
-__all__ = ['Base', 'Session', 'engine']
+__all__ = ['Base', 'Session', 'SyncSession', 'PulpSession', 'engine']
 
 
 DATABASE_URL = settings.database_url

@@ -5,7 +5,7 @@ Dramatiq new tasks how-to:
     2. If you wrote a new function tasks, you should import it here,
        dramatiq knows only about tasks imported in this __init__.py
     3. Try to think about task priority a bit. Default value is 0 (very high),
-       and it's important for all tasks which involves user interraction
+       and it's important for all tasks which involves user interaction
        to have priority 0.
     4. If you need to use async function in your dramatiq task - ALWAYS use
        loop from this __init__.py, since creating multiple loops for tasks
