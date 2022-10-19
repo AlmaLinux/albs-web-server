@@ -1,4 +1,7 @@
 import pwd
+import re
+import shutil
+
 import aiohttp
 import argparse
 import asyncio
@@ -56,23 +59,50 @@ def parse_args():
                         required=False, help='List of arches to export')
     parser.add_argument('-id', '--release-id', type=int,
                         required=False, help='Extract repos by release_id')
+    parser.add_argument('-c', '--cache-dir', type=str,
+                        default='~/.cache/pulp_exporter',
+                        required=False, help='Repodata cache directory')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        default=False, required=False, help='Verbose output')
     return parser.parse_args()
+
+
+async def fix_permissions(user: str, group: str, custom_path: str = None,
+                          recursive: bool = True):
+    path_to_fix = custom_path or str(settings.pulp_export_path)
+    cmds = ['sudo', 'chown']
+    if recursive:
+        cmds.append('-R')
+    cmds.extend([f'{user}:{group}', path_to_fix])
+    process = await asyncio.create_subprocess_exec(*cmds)
+    await process.communicate()
+
+
+def sync_fix_permissions(user: str, group: str, custom_path: str = None,
+                         recursive: bool = True):
+    path_to_fix = custom_path or str(settings.pulp_export_path)
+    args = ['chown']
+    if recursive:
+        args.append('-R')
+    args.extend([f'{user}:{group}', path_to_fix])
+    local['sudo'].run(args=args)
 
 
 class Exporter:
     def __init__(
         self,
-        pulp_client,
+        pulp_client: PulpClient,
+        repodata_cache_dir: str,
+        verbose: bool = False
     ):
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
-            level=logging.INFO,
+            level=logging.DEBUG if verbose else logging.INFO,
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         self.logger = logging.getLogger('packages-exporter')
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
-        self.modifyrepo_c = local['modifyrepo_c']
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
@@ -83,6 +113,14 @@ class Exporter:
             os.path.expanduser('~/export.err'))
         if os.path.exists(self.export_error_file):
             os.remove(self.export_error_file)
+        self.repodata_cache_dir = os.path.abspath(
+            os.path.expanduser(repodata_cache_dir))
+        self.checksums_cache_dir = os.path.join(
+            self.repodata_cache_dir, 'checksums')
+        if not os.path.exists(self.repodata_cache_dir):
+            os.makedirs(self.repodata_cache_dir)
+        if not os.path.exists(self.checksums_cache_dir):
+            os.makedirs(self.checksums_cache_dir)
         self.known_subkeys = {}
         if os.path.exists(KNOWN_SUBKEYS_CONFIG):
             with open(KNOWN_SUBKEYS_CONFIG, 'rt') as f:
@@ -108,7 +146,35 @@ class Exporter:
             get_publications: bool = False
     ):
 
-        export_data = []
+        async def get_exporter_data(
+                repository: models.Repository) -> typing.Tuple[str, dict]:
+            export_path = str(Path(
+                settings.pulp_export_path, repository.export_path, 'Packages'))
+            exporter_name = f'{repository.name}-{repository.arch}-debug' \
+                if repository.debug else f'{repository.name}-{repository.arch}'
+            fs_exporter_href = await self.pulp_client.create_filesystem_exporter(
+                exporter_name, export_path)
+
+            repo_latest_version = await self.pulp_client.get_repo_latest_version(
+                repository.pulp_href
+            )
+            repo_exporter_dict = {
+                'repo_id': repository.id,
+                'repo_url': repository.url,
+                'repo_latest_version': repo_latest_version,
+                'exporter_name': exporter_name,
+                'export_path': export_path,
+                'exporter_href': fs_exporter_href
+            }
+            if get_publications:
+                publications = await self.pulp_client.get_rpm_publications(
+                    repository_version_href=repo_latest_version,
+                    include_fields=['pulp_href']
+                )
+                if publications:
+                    publication_href = publications[0].get('pulp_href')
+                    repo_exporter_dict['publication_href'] = publication_href
+            return fs_exporter_href, repo_exporter_dict
 
         async with database.Session() as db:
             query = select(models.Repository).where(
@@ -116,36 +182,10 @@ class Exporter:
             result = await db.execute(query)
             repositories = list(result.scalars().all())
 
-        for repo in repositories:
-            export_path = str(Path(
-                settings.pulp_export_path, repo.export_path, 'Packages'))
-            exporter_name = f'{repo.name}-{repo.arch}-debug' if repo.debug \
-                else f'{repo.name}-{repo.arch}'
-            fs_exporter_href = await self.pulp_client.create_filesystem_exporter(
-                exporter_name, export_path)
+        results = await asyncio.gather(
+            *(get_exporter_data(repo) for repo in repositories))
 
-            repo_latest_version = await self.pulp_client.get_repo_latest_version(
-                repo.pulp_href
-            )
-            repo_exporter_dict = {
-                'repo_id': repo.id,
-                'repo_url': repo.url,
-                'repo_latest_version': repo_latest_version,
-                'exporter_name': exporter_name,
-                'export_path': export_path,
-                'exporter_href': fs_exporter_href
-            }
-            if get_publications:
-                publications = self.pulp_client.get_rpm_publications(
-                    repository_version_href=repo_latest_version,
-                    include_fields=['pulp_href']
-                )
-                if publications:
-                    publication_href = publications[0].get('pulp_href')
-                    repo_exporter_dict['publication_href'] = publication_href
-
-            export_data.append(repo_exporter_dict)
-        return export_data
+        return list(dict(results).values())
 
     async def sign_repomd_xml(self, data):
         endpoint = 'sign-tasks/sync_sign_task/'
@@ -168,33 +208,46 @@ class Exporter:
             self.logger.info('Downloading repodata from %s', link)
             await download_file(link, os.path.join(repodata_path, file_name))
 
+    async def _export_repository(self, exporter: dict) -> typing.Optional[str]:
+        self.logger.info('Exporting repository using following data: %s',
+                         str(exporter))
+        export_path = exporter['export_path']
+        href = exporter['exporter_href']
+        repository_version = exporter['repo_latest_version']
+        await self.pulp_client.export_to_filesystem(
+            href, repository_version)
+        parent_dir = str(Path(export_path).parent)
+        if not os.path.exists(parent_dir):
+            self.logger.info('Repository %s directory is absent',
+                             exporter['exporter_name'])
+            return
+
+        await fix_permissions(self.current_user, self.common_group,
+                              custom_path=parent_dir, recursive=False)
+        repodata_path = os.path.abspath(os.path.join(
+            parent_dir, 'repodata'))
+        repodata_url = urllib.parse.urljoin(
+            exporter['repo_url'], 'repodata/')
+        if not os.path.exists(repodata_path):
+            os.makedirs(repodata_path)
+        else:
+            await fix_permissions(
+                self.current_user, self.common_group,
+                custom_path=repodata_path)
+            shutil.rmtree(repodata_path)
+            os.makedirs(repodata_path)
+        try:
+            await self.download_repodata(repodata_path, repodata_url)
+        except Exception as e:
+            self.logger.error('Cannot download repodata file: %s', str(e))
+
+        return export_path
+
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
-        exported_paths = []
-        for exporter in exporters:
-            self.logger.info('Exporting repository using following data: %s',
-                             str(exporter))
-            export_path = exporter['export_path']
-            exported_paths.append(export_path)
-            href = exporter['exporter_href']
-            repository_version = exporter['repo_latest_version']
-            await self.pulp_client.export_to_filesystem(
-                href, repository_version)
-            parent_dir = str(Path(export_path).parent)
-            if not os.path.exists(parent_dir):
-                self.logger.info('Repository %s directory is absent',
-                                 exporter['exporter_name'])
-                continue
-            repodata_path = os.path.abspath(os.path.join(
-                parent_dir, 'repodata'))
-            repodata_url = urllib.parse.urljoin(
-                exporter['repo_url'], 'repodata/')
-            if not os.path.exists(repodata_path):
-                os.makedirs(repodata_path)
-            try:
-                await self.download_repodata(repodata_path, repodata_url)
-            except Exception as e:
-                self.logger.error('Cannot download repodata file: %s', str(e))
+        results = await asyncio.gather(
+            *(self._export_repository(e) for e in exporters))
+        exported_paths = [i for i in results if i]
         return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id):
@@ -355,8 +408,9 @@ class Exporter:
                     self.logger.error('Path %s does not exist', repo_path)
                     continue
                 self.check_rpms_signature(repo_path, db_platform.sign_keys)
-            self.logger.info('All repositories exported in following paths:\n%s',
-                             '\n'.join((str(path) for path in exported_paths)))
+            self.logger.debug(
+                'All repositories exported in following paths:\n%s',
+                '\n'.join((str(path) for path in exported_paths)))
         return final_export_paths, platforms_dict
 
     async def export_repos_from_release(
@@ -376,29 +430,33 @@ class Exporter:
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
 
-    async def delete_existing_exporters_from_pulp(self):
-        self.logger.info('Searching for existing exporters')
-        deleted_exporters = []
-        existing_exporters = await self.pulp_client.list_filesystem_exporters()
-        for exporter in existing_exporters:
-            try:
-                await self.pulp_client.delete_filesystem_exporter(
-                    exporter['pulp_href'])
-                deleted_exporters.append(exporter['name'])
-            except:
-                self.logger.info('Exporter %s does not exist',
-                                 exporter['name'])
-        self.logger.info('Search for exporters is done')
-        if deleted_exporters:
-            self.logger.info(
-                'Following exporters, has been deleted from pulp:\n%s',
-                '\n'.join(str(i) for i in deleted_exporters),
-            )
-
     def regenerate_repo_metadata(self, repo_path):
-        _, stdout, _ = self.createrepo_c.run(
-            args=['--update', '--keep-all-metadata', repo_path],
-        )
+        partial_path = re.sub(
+            str(settings.pulp_export_path), '', str(repo_path)).strip('/')
+        repodata_path = os.path.join(repo_path, 'repodata')
+        repo_repodata_cache = os.path.join(
+            self.repodata_cache_dir, partial_path)
+        sync_fix_permissions(
+            self.current_user, self.common_group, custom_path=repo_path,
+            recursive=False)
+        args = ['--update', '--keep-all-metadata',
+                '--cachedir', self.checksums_cache_dir]
+        if os.path.exists(repo_repodata_cache):
+            args.extend(['--update-md-path', repo_repodata_cache])
+        args.append(repo_path)
+        _, stdout, _ = self.createrepo_c.run(args=args)
+
+        # Cache newly generated repodata into folder for future re-use
+        cache_repodata_dir = os.path.join(repo_repodata_cache, 'repodata')
+        if not os.path.exists(repo_repodata_cache):
+            os.makedirs(repo_repodata_cache)
+        else:
+            # Remove previous repodata before copying new ones
+            if os.path.exists(cache_repodata_dir):
+                shutil.rmtree(cache_repodata_dir)
+
+        shutil.copytree(repodata_path, cache_repodata_dir)
+
         self.logger.info(stdout)
 
 
@@ -434,39 +492,38 @@ async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
     await asyncio.gather(*tasks)
 
 
-def repo_post_processing(exporter: Exporter, repo_path: str):
+def extract_errata(repo_path: str):
+    errata_records = []
+    modern_errata_records = []
+    if not os.path.exists(repo_path):
+        return errata_records, modern_errata_records
+
     path = Path(repo_path)
     parent_dir = path.parent
     repodata = parent_dir / 'repodata'
-    errata_records = []
-    modern_errata_records = {'data': []}
-    if not os.path.exists(repo_path):
-        return None, errata_records, modern_errata_records
+    errata_file = find_metadata(str(repodata), 'updateinfo')
+    if not errata_file:
+        return errata_records, modern_errata_records
+
+    for record in iter_updateinfo(errata_file):
+        errata_records.append(extract_errata_metadata(record))
+        modern_errata_records.extend(
+            extract_errata_metadata_modern(record)['data'])
+    return errata_records, modern_errata_records
+
+
+def repo_post_processing(exporter: Exporter, repo_path: str):
+    path = Path(repo_path)
+    parent_dir = path.parent
 
     result = True
     try:
-        try:
-            errata_file = find_metadata(str(repodata), 'updateinfo')
-        except StopIteration:
-            pass
-        else:
-            for record in iter_updateinfo(errata_file):
-                errata_records.append(extract_errata_metadata(record))
-                modern_errata_records = merge_errata_records_modern(
-                    modern_errata_records,
-                    extract_errata_metadata_modern(record)
-                )
         exporter.regenerate_repo_metadata(parent_dir)
     except Exception as e:
         exporter.logger.exception('Post-processing failed: %s', str(e))
         result = False
 
-    return result, errata_records, modern_errata_records
-
-
-def fix_export_path_permissions(user, group, custom_path: str = None):
-    path_to_fix = custom_path or str(settings.pulp_export_path)
-    local['sudo']['chown', '-R', f'{user}:{group}', path_to_fix].run()
+    return result
 
 
 def main():
@@ -480,14 +537,11 @@ def main():
         settings.pulp_user,
         settings.pulp_password,
     )
-    exporter = Exporter(
-        pulp_client=pulp_client,
-    )
-    sync(exporter.delete_existing_exporters_from_pulp())
-    exporter.logger.info('Fixing permissions before export')
-    fix_export_path_permissions(
+    exporter = Exporter(pulp_client, args.cache_dir, verbose=args.verbose)
+    exporter.logger.debug('Fixing permissions before export')
+    sync_fix_permissions(
         exporter.pulp_system_user, exporter.common_group)
-    exporter.logger.info('Permissions are fixed')
+    exporter.logger.debug('Permissions are fixed')
 
     db_sign_keys = sync(exporter.get_sign_keys())
     if args.release_id:
@@ -510,26 +564,44 @@ def main():
 
     try:
         local['sudo']['find', settings.pulp_export_path, '-type', 'f', '-name',
-                      '*snippet', '-exec', 'rm', '-f', '{}', '+'].run()
+                      '*snippet', '-o', '-name', 'modules.yaml', '-exec',
+                      'rm', '-f', '{}', '+'].run()
     except Exception:
         pass
 
     errata_cache = []
     modern_errata_cache = {'data': []}
-    fix_export_path_permissions(
-        exporter.pulp_system_user, exporter.common_group)
-    for exp_path in exported_paths:
-        result, errata_records, modern_errata_records = repo_post_processing(
-            exporter, exp_path
-        )
+
+    for repo_path in exported_paths:
+        exporter.logger.info('%s post-processing started', repo_path)
+        result = repo_post_processing(exporter, repo_path)
         if result:
-            exporter.logger.info('%s post-processing is successful', exp_path)
+            exporter.logger.info(
+                '%s post-processing is successful', repo_path)
         else:
-            exporter.logger.error('%s post-processing has failed', exp_path)
-        errata_cache = merge_errata_records(errata_cache, errata_records)
-        modern_errata_cache = merge_errata_records_modern(
-            modern_errata_cache, modern_errata_records
-        )
+            exporter.logger.error(
+                '%s post-processing has failed', repo_path)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        errata_futures = {
+            executor.submit(extract_errata, exp_path): exp_path
+            for exp_path in exported_paths
+        }
+
+        exporter.logger.debug('Starting errata extraction')
+        for future in as_completed(errata_futures):
+            repo_path = errata_futures[future]
+            errata_records, modern_errata_records = future.result()
+            if errata_records or modern_errata_records:
+                exporter.logger.info(
+                    'Extracted errata records from %s', repo_path)
+
+                errata_cache = merge_errata_records(
+                    errata_cache, errata_records)
+                modern_errata_cache = merge_errata_records_modern(
+                    modern_errata_cache, {'data': modern_errata_records}
+                )
+        exporter.logger.debug('Errata extraction completed')
 
     sync(sign_repodata(exporter, exported_paths, platforms_dict, db_sign_keys,
                        key_id_by_platform=key_id_by_platform))
@@ -538,8 +610,8 @@ def main():
         exporter.logger.info('Starting export errata.json and oval.xml')
         errata_export_base_path = None
         try:
-            fix_export_path_permissions(
-                exporter.pulp_system_user, exporter.common_group)
+            sync_fix_permissions(
+                exporter.pulp_system_user, exporter.common_group, recursive=False)
             errata_export_base_path = os.path.join(
                 settings.pulp_export_path, 'errata'
             )
@@ -552,8 +624,10 @@ def main():
                 html_path = os.path.join(platform_path, 'html')
                 if not os.path.exists(html_path):
                     os.mkdir(html_path)
+                exporter.logger.debug('Generating HTML errata pages')
                 for record in errata_cache:
                     generate_errata_page(record, html_path)
+                exporter.logger.debug('HTML pages are generated')
                 for item in errata_cache:
                     item['issued_date'] = {
                         '$date': int(item['issued_date'].timestamp() * 1000)
@@ -561,16 +635,20 @@ def main():
                     item['updated_date'] = {
                         '$date': int(item['updated_date'].timestamp() * 1000)
                     }
+                exporter.logger.debug('Dumping errata data into JSON')
                 with open(os.path.join(platform_path, 'errata.json'), 'w') as fd:
                     json.dump(errata_cache, fd)
                 with open(os.path.join(platform_path, 'errata.full.json'), 'w') as fd:
                     json.dump(modern_errata_cache, fd)
+                exporter.logger.debug('JSON dump is done')
+                exporter.logger.debug('Generating OVAL data')
                 oval = sync(exporter.get_oval_xml(platform))
                 with open(os.path.join(platform_path, 'oval.xml'), 'w') as fd:
                     fd.write(oval)
+                exporter.logger.debug('OVAL is generated')
         finally:
             if errata_export_base_path:
-                fix_export_path_permissions(
+                sync_fix_permissions(
                     exporter.pulp_system_user, exporter.common_group,
                     custom_path=errata_export_base_path)
 

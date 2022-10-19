@@ -127,9 +127,9 @@ def debrand_comment(comment: str, distro_version: str) -> str:
 def find_metadata(repodata_dir, key) -> str:
     repomd = cr.Repomd(os.path.join(repodata_dir, 'repomd.xml'))
     path = next(
-        item.location_href
-        for item in repomd.records
-        if item.type == key
+        (item.location_href
+         for item in repomd.records
+         if item.type == key), None
     )
     return os.path.join(repodata_dir, os.path.basename(path))
 

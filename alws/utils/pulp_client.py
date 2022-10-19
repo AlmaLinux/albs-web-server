@@ -538,15 +538,33 @@ class PulpClient:
             return result
         return task
 
-    async def create_filesystem_exporter(self, fse_name: str, fse_path: str,
-                                         fse_method: str = 'hardlink'):
+    async def find_filesystem_exporter(self, exporter_name: str):
+        endpoint = 'pulp/api/v3/exporters/core/filesystem/'
+        params = {'name': exporter_name}
+        result = await self.request('GET', endpoint, params=params)
+        if len(result['results']) == 0:
+            return None
+        return result['results'][0]
+
+    async def create_filesystem_exporter(
+            self, exporter_name: str, export_path: str,
+            export_method: str = 'hardlink'):
         endpoint = 'pulp/api/v3/exporters/core/filesystem/'
 
+        name = f'{exporter_name}-{export_method}'
         params = {
-            'name': fse_name,
-            'path': fse_path,
-            'method': fse_method
+            'name': name,
+            'path': export_path,
+            'method': export_method
         }
+        existing_exporter = await self.find_filesystem_exporter(name)
+        if existing_exporter:
+            if (existing_exporter['method'] != export_method
+                    or existing_exporter['path'] != export_path):
+                await self.update_filesystem_exporter(
+                    existing_exporter['pulp_href'], name, export_path,
+                    fse_method=export_method)
+            return existing_exporter['pulp_href']
         result = await self.request('POST', endpoint, json=params)
         return result['pulp_href']
 
