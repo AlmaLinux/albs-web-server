@@ -933,7 +933,8 @@ async def prepare_updateinfo_mapping(
                     models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
                     models.ErrataToALBSPackage.pulp_href == pkg_href,
                 )).options(
-                    selectinload(models.ErrataToALBSPackage.errata_package)
+                    selectinload(models.ErrataToALBSPackage.errata_package),
+                    selectinload(models.ErrataToALBSPackage.build_artifact)
                 )
             )
             for errata_pkg in errata_pkgs.scalars().all():
