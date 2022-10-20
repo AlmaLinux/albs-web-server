@@ -279,6 +279,7 @@ class ModuleRef(BaseModel):
     enabled: bool = True
     added_artifacts: typing.Optional[list] = []
     mock_options: dict
+    ref_type: int
 
 
 class ModulePreview(BaseModel):
