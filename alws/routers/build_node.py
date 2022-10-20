@@ -72,11 +72,11 @@ async def get_task(
     if built_srpm_url is not None:
         built_srpm_url = "{}/pulp/content/builds/{}".format(
             settings.pulp_host, task.built_srpm_url)
-        srpm_hash = next(
+        srpm_hash = next((
             artifact.cas_hash
             for artifact in task.artifacts
             if artifact.name.endswith('.src.rpm')
-        )
+        ), None)
     response = {
         'id': task.id,
         'arch': task.arch,
@@ -105,6 +105,12 @@ async def get_task(
             for repo in flavour.repos:
                 if repo.arch == task.arch:
                     response['repositories'].append(repo)
+
+    # mock_enabled flag can be None for old build/flavour/platform repos
+    for repo in response['repositories']:
+        if repo.mock_enabled is None:
+            repo.mock_enabled = True
+
     if task.build.mock_options:
         response['platform'].add_mock_options(task.build.mock_options)
     if task.mock_options:
