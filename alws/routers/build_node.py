@@ -10,7 +10,7 @@ from alws.config import settings
 from alws.crud import build_node
 from alws.dependencies import get_db
 from alws.schemas import build_node_schema
-from alws.constants import BuildTaskStatus
+from alws.constants import BuildTaskStatus, BuildTaskRefType
 
 
 router = APIRouter(
@@ -106,10 +106,14 @@ async def get_task(
                 if repo.arch == task.arch:
                     response['repositories'].append(repo)
 
+    # TODO: Get rid of this fixes when all affected builds would be processed
     # mock_enabled flag can be None for old build/flavour/platform repos
     for repo in response['repositories']:
         if repo.mock_enabled is None:
             repo.mock_enabled = True
+    # ref_type can be None for old modular builds
+    if task.ref.ref_type is None:
+        task.ref.ref_type = BuildTaskRefType.GIT_BRANCH
 
     if task.build.mock_options:
         response['platform'].add_mock_options(task.build.mock_options)
