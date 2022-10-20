@@ -171,7 +171,7 @@ async def delete_advisories_from_wrong_repos():
                     if errata_id not in albs_errata_cache[platform] and \
                             errata_id in albs_errata_cache[opposite_platform]:
                         logging.info(
-                            f"Removing {errata_id}:{errata_href} as it "
+                            f"Removing {errata_id}:{errata_href} from {repo_name} as it "
                             f"doesn't belong to {platform} but {opposite_platform}"
                         )
                         # pulp_href looks like "/pulp/api/v3/content/rpm/advisories/de779b2a-d4e3-4884-93a5-f91fcf37576c/"
@@ -215,7 +215,7 @@ async def delete_wrong_packages():
 
 
 async def delete_packages_prefix():
-    logging.info("Deleting 'Packages/' prefix from filenames")
+    logging.info("Removing 'Packages/' prefix from filenames")
     pulp = pulp_client.PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
@@ -227,6 +227,7 @@ async def delete_packages_prefix():
 
         for pkg in advisory_pkgs:
             if pkg.filename.startswith("Packages/"):
+                logging.info(f"Removing 'Packages/' prefix from {pkg.filename} filename")
                 pkg.filename = pkg.filename.replace("Packages/", "")
 
         pulp_db.commit()
