@@ -79,14 +79,14 @@ def add_build_task_dependencies(db: Session, task: models.BuildTask,
     task.dependencies.append(last_task)
 
 
-def generate_restart_tasks_query(build_id: int):
+def generate_restart_tasks_query(build_id: int, parallel: bool = False):
+    condition = models.BuildTask.status == BuildTaskStatus.FAILED
+    if parallel:
+        condition = models.BuildTask.status <= BuildTaskStatus.FAILED
     query = (
         select(models.BuildTask)
         .where(
-            sqlalchemy.and_(
-                models.BuildTask.build_id == build_id,
-                models.BuildTask.status == BuildTaskStatus.FAILED
-            ),
+            sqlalchemy.and_(models.BuildTask.build_id == build_id, condition)
         )
         .order_by(models.BuildTask.index, models.BuildTask.id)
     )
@@ -95,7 +95,9 @@ def generate_restart_tasks_query(build_id: int):
 
 async def update_failed_build_items_in_parallel(db: Session, build_id: int):
     async with db.begin():
-        failed_tasks = await db.execute(generate_restart_tasks_query(build_id))
+        failed_tasks = await db.execute(
+            generate_restart_tasks_query(build_id, parallel=True)
+        )
         tasks_cache = {}
         for task in failed_tasks.scalars().all():
             idx = task.index
@@ -109,12 +111,18 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
         for task_index, index_dict in tasks_cache.items():
             current_idx = tasks_indexes.index(task_index)
             first_index_dep = None
+            completed_index_tasks = [
+                task for task in index_dict.values()
+                if task.status == BuildTaskStatus.COMPLETED
+            ]
             for key in sorted(
                 list(index_dict.keys()),
                 key=lambda x: x[1] == "i686",
                 reverse=True,
             ):
                 task = index_dict[key]
+                if task.status != BuildTaskStatus.FAILED:
+                    continue
                 task.status = BuildTaskStatus.IDLE
                 task.ts = None
                 if first_index_dep:
@@ -130,7 +138,9 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
                             add_build_task_dependencies, task, dep
                         )
                     idx -= 1
-                if first_index_dep is None:
+                # if at least one task in index is completed,
+                # we shouldn't wait first task completion
+                if first_index_dep is None and not completed_index_tasks:
                     first_index_dep = task
         await db.commit()
 
