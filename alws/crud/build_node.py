@@ -133,7 +133,9 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
                 while idx >= 0:
                     prev_task_index = tasks_indexes[idx]
                     dep = tasks_cache.get(prev_task_index, {}).get(key)
-                    if dep:
+                    # dependency.status can be completed because
+                    # we stores in cache completed tasks
+                    if dep and dep.status == BuildTaskStatus.IDLE:
                         await db.run_sync(
                             add_build_task_dependencies, task, dep
                         )
