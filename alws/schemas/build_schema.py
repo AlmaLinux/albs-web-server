@@ -93,6 +93,7 @@ class BuildCreatePlatforms(BaseModel):
         'ppc64le',
         's390x',
     ]]
+    parallel_mode_enabled: bool
 
 
 class BuildCreate(BaseModel):

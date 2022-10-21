@@ -97,6 +97,15 @@ async def restart_failed_build_items(build_id: int,
     return await build_node.update_failed_build_items(db, build_id)
 
 
+@router.patch(
+    '/{build_id}/parallel-restart-failed', response_model=build_schema.Build
+)
+async def parallel_restart_failed_build_items(
+        build_id: int, db: database.Session = Depends(get_db)
+):
+    return await build_node.update_failed_build_items_in_parallel(db, build_id)
+
+
 @router.delete('/{build_id}/remove', status_code=status.HTTP_204_NO_CONTENT)
 async def remove_build(build_id: int, db: database.Session = Depends(get_db)):
     try:

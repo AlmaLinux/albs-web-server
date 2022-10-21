@@ -52,9 +52,8 @@ class BuildPlanner:
         )
         self._build = build
         self._task_index = 0
-        self._request_platforms = {
-            platform.name: platform.arch_list for platform in platforms
-        }
+        self._request_platforms = {}
+        self._parallel_modes = {}
         self._platforms = []
         self._platform_flavors = []
         self._modules_by_target = collections.defaultdict(list)
@@ -62,6 +61,9 @@ class BuildPlanner:
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
         self._is_secure_boot = is_secure_boot
+        for platform in platforms:
+            self._request_platforms[platform.name] = platform.arch_list
+            self._parallel_modes[platform.name] = platform.parallel_mode_enabled
         self.load_platforms()
         if platform_flavors:
             self.load_platform_flavors(platform_flavors)
@@ -82,11 +84,10 @@ class BuildPlanner:
 
     def load_platform_flavors(self, flavors):
         db_flavors = self._db.execute(
-            select(models.PlatformFlavour).where(
-                models.PlatformFlavour.id.in_(flavors)
-        ).options(
-            selectinload(models.PlatformFlavour.repos)
-        )).scalars().all()
+            select(models.PlatformFlavour)
+            .where(models.PlatformFlavour.id.in_(flavors))
+            .options(selectinload(models.PlatformFlavour.repos))
+        ).scalars().all()
         if db_flavors:
             self._platform_flavors = db_flavors
 
@@ -389,6 +390,8 @@ class BuildPlanner:
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
             arch_tasks = []
+            first_ref_dep = None
+            is_parallel = self._parallel_modes[platform.name]
             arch_list = self._request_platforms[platform.name]
             if 'i686' in arch_list and arch_list.index('i686') != 0:
                 arch_list.remove('i686')
@@ -429,11 +432,16 @@ class BuildPlanner:
                 )
                 task_key = (platform.name, arch)
                 self._tasks_cache[task_key].append(build_task)
+                if first_ref_dep and is_parallel:
+                    build_task.dependencies.append(first_ref_dep)
                 if self._task_index > 0:
                     dep = self._tasks_cache[task_key][self._task_index - 1]
                     build_task.dependencies.append(dep)
-                for dep in arch_tasks:
-                    build_task.dependencies.append(dep)
+                if not is_parallel:
+                    for dep in arch_tasks:
+                        build_task.dependencies.append(dep)
+                if first_ref_dep is None:
+                    first_ref_dep = build_task
                 arch_tasks.append(build_task)
                 self._build.tasks.append(build_task)
         self._task_index += 1
