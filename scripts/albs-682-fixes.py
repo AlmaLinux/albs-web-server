@@ -1,5 +1,5 @@
 # Script: albs-682-pulp-fixes.py
-# Authors: 
+# Authors:
 # - Daniil Anfimov <danfimov@cloudlinux.com>
 # - Javier Hernández <jhernandez@cloudlinux.com>
 #
@@ -17,7 +17,7 @@
 # scripts folder as it uses modules inside the repo.
 # REMEMBER: Do any backup before running the script in
 # production just in case anything goes wrong.
-# 
+#
 import asyncio
 import logging
 import typing
@@ -50,31 +50,100 @@ logging.basicConfig(
     ],
 )
 
-albs_errata_cache = {
-    "AlmaLinux-8": [],
-    "AlmaLinux-9": []
-}
+albs_errata_cache = {"AlmaLinux-8": [], "AlmaLinux-9": []}
 
 
 async def prepare_albs_errata_cache():
     logging.info("Collecting errata records from ALBS DB")
     with SyncSession() as albs_db:
-        albs_records = albs_db.execute(select(ErrataRecord).options(
-            selectinload(ErrataRecord.platform)
-        ))
+        albs_records = albs_db.execute(
+            select(ErrataRecord).options(selectinload(ErrataRecord.platform))
+        )
         for errata in albs_records.scalars().all():
             albs_errata_cache[errata.platform.name].append(errata.id)
     logging.info("Finished collecting errata records from ALBS DB")
 
 
+async def prepare_albs_packages_cache(
+    albs_record: ErrataRecord,
+    pulp: pulp_client.PulpClient,
+) -> typing.Dict[str, typing.Any]:
+    albs_packages_cache = {}
+    pulp_pkg_fields = [
+        "name",
+        "location_href",
+        "arch",
+        "version",
+        "pulp_href",
+        "pkgId",
+        "release",
+        "epoch",
+        "rpm_sourcerpm",
+        "sha256",
+        "checksum_type",
+    ]
+    logging.info("Collecting pulp_packages for record %s", albs_record.id)
+    for package in albs_record.packages:
+        for albs_package in package.albs_packages:
+            reboot_suggested = albs_package.errata_package.reboot_suggested
+            pulp_pkg = await pulp.get_rpm_package(
+                albs_package.get_pulp_href(),
+                include_fields=pulp_pkg_fields,
+            )
+            pulp_pkg["reboot_suggested"] = reboot_suggested
+            location_href = re.sub(r"^Packages/", "", pulp_pkg["location_href"])
+            pulp_pkg["location_href"] = location_href
+            albs_packages_cache[location_href] = pulp_pkg
+    return albs_packages_cache
+
+
+async def delete_unmatched_packages():
+    pulp = pulp_client.PulpClient(
+        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    )
+    with PulpSession() as pulp_db, SyncSession() as albs_db, pulp_db.begin():
+        albs_records = albs_db.execute(select(ErrataRecord))
+        for albs_record in albs_records.scalars().all():
+            # we shouldn't delete unmatched packages
+            # for records that were generated in old BS
+            if str(albs_record.updated_date) < "2022-06-27":
+                continue
+            logging.info("Start fixing pulp_packages for %s", albs_record.id)
+            albs_packages_cache = await prepare_albs_packages_cache(
+                albs_record,
+                pulp,
+            )
+            pulp_records = pulp_db.execute(
+                select(UpdateRecord).where(UpdateRecord.id == albs_record.id)
+            )
+            for record in pulp_records.scalars().all():
+                for collection in record.collections:
+                    for pulp_pkg in collection.packages:
+                        if pulp_pkg.filename in albs_packages_cache:
+                            continue
+                        logging.info(
+                            "Deleting package from %s: %s",
+                            albs_record.id,
+                            pulp_pkg.filename,
+                        )
+                        pulp_db.execute(
+                            delete(UpdatePackage).where(
+                                UpdatePackage.pulp_id == pulp_pkg.pulp_id
+                            )
+                        )
+                        pulp_db.flush()
+        pulp_db.commit()
+
 
 async def delete_pulp_advisory(pulp_href_id):
     with PulpSession() as pulp_db, pulp_db.begin():
-        pulp_record = pulp_db.execute(
-            select(UpdateRecord).where(
-                UpdateRecord.content_ptr_id == pulp_href_id
+        pulp_record = (
+            pulp_db.execute(
+                select(UpdateRecord).where(UpdateRecord.content_ptr_id == pulp_href_id)
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         for collection in pulp_record.collections:
             for pkg in collection.packages:
                 pulp_db.delete(pkg)
@@ -102,7 +171,9 @@ async def delete_advisories_from_wrong_repos():
         try:
             repo_version = await pulp.get_repo_latest_version(repo.pulp_href)
         except Exception:
-            logging.exception("Cannot get latest repo_version for %s", f"{repo.name}-{repo.arch}")
+            logging.exception(
+                "Cannot get latest repo_version for %s", f"{repo.name}-{repo.arch}"
+            )
         return repo, repo_version
 
     async def list_errata_pulp(repo_href: str) -> dict:
@@ -150,11 +221,9 @@ async def delete_advisories_from_wrong_repos():
         )
         for db_platform in db_platforms:
             if db_platform.distr_version == "8":
-                distr_release = "el8"
                 platform = "AlmaLinux-8"
                 opposite_platform = "AlmaLinux-9"
             else:
-                distr_release = "el9"
                 platform = "AlmaLinux-9"
                 opposite_platform = "AlmaLinux-8"
 
@@ -165,14 +234,17 @@ async def delete_advisories_from_wrong_repos():
                 if not repo or not repo_href:
                     continue
                 repo_errata = await list_errata_pulp(repo_href)
-                repo_name = f"{repo.name}-{repo.arch}"
 
                 for errata_id, errata_href in repo_errata.items():
-                    if errata_id not in albs_errata_cache[platform] and \
-                            errata_id in albs_errata_cache[opposite_platform]:
+                    if (
+                        errata_id not in albs_errata_cache[platform]
+                        and errata_id in albs_errata_cache[opposite_platform]
+                    ):
                         logging.info(
-                            f"Removing {errata_id}:{errata_href} from {repo_name} as it "
-                            f"doesn't belong to {platform} but {opposite_platform}"
+                            "Removing %s as it doesn't belong to %s but %s",
+                            f"{errata_id}:{errata_href}",
+                            platform,
+                            opposite_platform,
                         )
                         # pulp_href looks like "/pulp/api/v3/content/rpm/advisories/de779b2a-d4e3-4884-93a5-f91fcf37576c/"
                         # and we only need the id
@@ -185,19 +257,18 @@ async def delete_wrong_packages():
     with PulpSession() as pulp_db, SyncSession() as albs_db, pulp_db.begin():
         albs_records = albs_db.execute(select(ErrataRecord))
         for albs_record in albs_records.scalars().all():
-            distr_version = albs_db.execute(select(Platform.distr_version).where(
-                Platform.id == albs_record.platform_id
-            )).scalars().first()
-
+            distr_version = albs_record.platform.distr_version
             # It is safe to make it this way since a release string
             # won't have git refs that include the character "l" :P
             albs_record_release = "el" + str(distr_version)
 
-            pulp_records = pulp_db.execute(
-                select(UpdateRecord).where(
-                    UpdateRecord.id == albs_record.id
+            pulp_records = (
+                pulp_db.execute(
+                    select(UpdateRecord).where(UpdateRecord.id == albs_record.id)
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for pulp_record in pulp_records:
                 if pulp_record is None:
@@ -215,19 +286,12 @@ async def delete_wrong_packages():
 
 
 async def delete_packages_prefix():
-    logging.info("Removing 'Packages/' prefix from filenames")
-    pulp = pulp_client.PulpClient(
-        settings.pulp_host, settings.pulp_user, settings.pulp_password
-    )
-
+    logging.info("Deleting 'Packages/' prefix from filenames")
     with PulpSession() as pulp_db, pulp_db.begin():
-        advisory_pkgs = pulp_db.execute(
-            select(UpdatePackage)
-        ).scalars().all()
+        advisory_pkgs = pulp_db.execute(select(UpdatePackage)).scalars().all()
 
         for pkg in advisory_pkgs:
             if pkg.filename.startswith("Packages/"):
-                logging.info(f"Removing 'Packages/' prefix from {pkg.filename} filename")
                 pkg.filename = pkg.filename.replace("Packages/", "")
 
         pulp_db.commit()
@@ -240,7 +304,7 @@ async def update_pulp_repo(repo, pulp):
     if not pulp_repo:
         return
     await pulp.create_rpm_publication(pulp_repo["pulp_href"])
-    logging.info(f"Updating for repo {repo} is done")
+    logging.info("Updating for repo %s is done", repo_name)
 
 
 async def update_pulp_repos():
@@ -248,9 +312,7 @@ async def update_pulp_repos():
     pulp = pulp_client.PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    platforms = yaml.safe_load(
-        open("reference_data/platforms.yaml", "r").read()
-    )
+    platforms = yaml.safe_load(open("reference_data/platforms.yaml", "r").read())
     tasks = []
     for platform in platforms:
         for repo in platform["repositories"]:
@@ -270,9 +332,12 @@ async def main():
     await delete_wrong_packages()
     await delete_packages_prefix()
 
+    await delete_unmatched_packages()
+
     # We need to re-publicate the repos
     # after the modifications we just made
     await update_pulp_repos()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
