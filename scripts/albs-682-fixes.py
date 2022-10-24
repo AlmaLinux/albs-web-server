@@ -102,12 +102,13 @@ async def delete_unmatched_packages():
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
     with PulpSession() as pulp_db, SyncSession() as albs_db, pulp_db.begin():
-        albs_records = albs_db.execute(select(ErrataRecord))
-        for albs_record in albs_records.scalars().all():
+        albs_records = albs_db.execute(
+            select(ErrataRecord)
             # we shouldn't delete unmatched packages
             # for records that were generated in old BS
-            if str(albs_record.updated_date) < "2022-06-27":
-                continue
+            .where(ErrataRecord.updated_date >= "2022-06-27")
+        )
+        for albs_record in albs_records.scalars().all():
             logging.info("Start fixing pulp_packages for %s", albs_record.id)
             albs_packages_cache = await prepare_albs_packages_cache(
                 albs_record,
@@ -286,12 +287,15 @@ async def delete_wrong_packages():
 
 
 async def delete_packages_prefix():
-    logging.info("Deleting 'Packages/' prefix from filenames")
+    logging.info("Removing 'Packages/' prefix from filenames")
     with PulpSession() as pulp_db, pulp_db.begin():
         advisory_pkgs = pulp_db.execute(select(UpdatePackage)).scalars().all()
 
         for pkg in advisory_pkgs:
             if pkg.filename.startswith("Packages/"):
+                logging.info(
+                    "Removing 'Packages/' prefix from %s filename", pkg.filename
+                )
                 pkg.filename = pkg.filename.replace("Packages/", "")
 
         pulp_db.commit()
