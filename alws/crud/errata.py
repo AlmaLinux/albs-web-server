@@ -20,6 +20,7 @@ from sqlalchemy.sql.expression import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
+from alws.constants import ErrataReleaseStatus
 from alws.dependencies import get_pulp_db
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
@@ -39,6 +40,7 @@ from alws.config import settings
 from alws.constants import (
     ErrataReferenceType,
     ErrataPackageStatus,
+    ErrataReleaseStatus,
 )
 from alws.pulp_models import UpdateRecord, UpdatePackage, UpdateCollection
 from alws.utils.errata import (
@@ -375,7 +377,8 @@ async def load_platform_packages(
     for_release: bool = False,
 ):
     cache = {}
-    # TODO:
+    # With this minimal length for lists, we will evade
+    # errors with large query path in requests
     max_list_len = 10
     pkg_fields = ",".join(
         (
@@ -568,6 +571,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         id=alma_errata_id,
         freezed=errata.freezed,
         platform_id=errata.platform_id,
+        release_status=ErrataReleaseStatus.NOT_RELEASED,
         summary=None,
         solution=None,
         issued_date=errata.issued_date,
@@ -698,6 +702,7 @@ async def list_errata_records(
     title: Optional[str] = None,
     platform: Optional[str] = None,
     cve_id: Optional[str] = None,
+    status: Optional[ErrataReleaseStatus] = None,
 ):
     options = []
     if compact:
@@ -735,6 +740,8 @@ async def list_errata_records(
             query = query.filter(models.ErrataRecord.platform_id == platform)
         if cve_id:
             query = query.filter(models.ErrataRecord.cves.like(f"%{cve_id}%"))
+        if status:
+            query = query.filter(models.ErrataRecord.release_status == status)
         if page and not count:
             query = query.slice(10 * page - 10, 10 * page)
         return query
@@ -1021,7 +1028,12 @@ def append_update_packages_in_update_records(
                 )
 
 
-async def release_errata_record(db: AsyncSession, pulp: PulpClient, record_id: str):
+async def release_errata_record(db: AsyncSession, record_id: str):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
     db_record = await db.execute(
         select(models.ErrataRecord)
         .where(models.ErrataRecord.id == record_id)
@@ -1129,4 +1141,6 @@ async def release_errata_record(db: AsyncSession, pulp: PulpClient, record_id: s
             )
         )
     await asyncio.gather(*tasks)
+    db_record.release_status = ErrataReleaseStatus.RELEASED
+    db_record.last_release_log = "Succesfully released"
     await db.commit()

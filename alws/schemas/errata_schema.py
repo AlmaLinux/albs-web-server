@@ -3,6 +3,7 @@ from typing import List, Any, Optional
 
 from pydantic import BaseModel, validator
 
+from alws.constants import ErrataReleaseStatus
 from alws.models import ErrataPackageStatus
 
 
@@ -105,6 +106,8 @@ class ErrataRecord(BaseErrataRecord):
     original_title: str
     description: Optional[str]
     original_description: str
+    release_status: Optional[ErrataReleaseStatus]
+    last_release_log: Optional[str]
 
     class Config:
         orm_mode = True
@@ -144,5 +147,4 @@ class UpdateErrataRequest(BaseModel):
 
 
 class ReleaseErrataRecordResponse(BaseModel):
-    ok: bool
-    error: Optional[str]
+    message: str

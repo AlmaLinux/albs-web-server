@@ -125,6 +125,24 @@ services:
       - pulp
       - rabbitmq
 
+  task_queue_errata:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      /wait_for_it.sh rabbitmq:5672 &&
+                      dramatiq alws.dramatiq --threads 1 -Q errata'
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
+      - rabbitmq
+
   task_queue_releases:
     image: albs-task-queue:latest
     env_file:
