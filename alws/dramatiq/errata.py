@@ -29,6 +29,9 @@ async def _release_errata_record(record_id: str):
         await release_errata_record(session, record_id)
         logging.info("Record %s succesfully released", record_id)
     except Exception as exc:
+        # Before saving release log and status,
+        # we should rollback session changes manually
+        await session.rollback()
         await session.execute(
             update(ErrataRecord)
             .where(ErrataRecord.id == record_id)
