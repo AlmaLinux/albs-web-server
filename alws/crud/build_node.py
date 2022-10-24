@@ -177,7 +177,12 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
     pulp_repo = await pulp_client.get_log_repository(repo_name)
     if pulp_repo:
         pulp_href = pulp_repo['pulp_href']
-        repo_url = (await pulp_client.get_log_distro(repo_name))['base_url']
+        distro = await pulp_client.get_log_distro(repo_name)
+        if not distro:
+            repo_url = await pulp_client.create_file_distro(
+                repo_name, pulp_href)
+        else:
+            repo_url = distro['base_url']
     else:
         repo_url, pulp_href = await pulp_client.create_log_repo(repo_name)
     if await log_repo_exists(db, task):
