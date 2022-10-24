@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import typing
@@ -92,6 +93,36 @@ class BeholderClient:
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)
+
+    async def get_module_artifacts(
+            self, platform_name: str, platform_version: str,
+            module_name: str, module_stream: str, arch: str):
+        result = {}
+        params = {'match': 'closest'}
+        for m_name in (module_name, f'{module_name}-devel'):
+            endpoint = (f'/api/v1/distros/{platform_name}/'
+                        f'{platform_version}/module/{m_name}/'
+                        f'{module_stream}/{arch}')
+            try:
+                response = await self.get(endpoint, params=params)
+                artifacts = {}
+                for component in response['artifacts']:
+                    if (not component.get('packages')
+                            or not component.get('sourcerpm')):
+                        continue
+                    packages = copy.copy(component['packages'])
+                    srpm = copy.copy(component['sourcerpm'])
+
+                    epoch = next(i['epoch'] for i in packages)
+                    srpm['epoch'] = epoch
+                    srpm['arch'] = 'src'
+                    packages.append(srpm)
+                    artifacts[srpm['name']] = packages
+
+                result[m_name] = artifacts
+            except Exception:
+                pass
+        return result
 
     async def get(self, endpoint: str,
                   headers: dict = None, params: dict = None):

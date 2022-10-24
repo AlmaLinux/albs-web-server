@@ -1,8 +1,8 @@
-import logging
 import asyncio
-import typing
 import collections
 import itertools
+import logging
+import typing
 import re
 
 from sqlalchemy.orm import Session, selectinload
@@ -184,56 +184,68 @@ class BuildPlanner:
 
         return multilib_artifacts
 
+    @staticmethod
+    async def get_prebuilt_module_artifacts(
+            task: build_schema.BuildTaskModuleRef,
+            platform_name: str, platform_version: str, task_arch: str,
+    ) -> dict:
+        beholder = BeholderClient(
+            settings.beholder_host, token=settings.beholder_token)
+        clean_name = get_clean_distr_name(platform_name)
+        arch = task_arch
+        if task_arch == 'i686':
+            arch = 'x86_64'
+        artifacts = await beholder.get_module_artifacts(
+            clean_name, platform_version, task.module_name,
+            task.module_stream, arch)
+        reprocessed = {}
+        for module_name, projects in artifacts.items():
+            reprocessed[module_name] = {}
+            for project_name, packages in projects.items():
+                new_packages = []
+                for pkg in packages:
+                    if pkg['arch'] == 'x86_64' and task_arch == 'i686':
+                        pkg['arch'] = 'i686'
+                    new_packages.append(pkg)
+                reprocessed[module_name][project_name] = new_packages
+        return reprocessed
+
     async def prepare_module_index(
-            self, task: build_schema.BuildTaskModuleRef, task_arch: str
+            self, platform: models.Platform,
+            task: build_schema.BuildTaskModuleRef, task_arch: str
     ) -> IndexWrapper:
         allowed_arches = (task_arch, 'src', 'noarch')
         index = IndexWrapper.from_template(task.modules_yaml)
+        # Clean up all artifacts from module for re-population
+        for module in index.iter_modules():
+            for artifact in module.get_rpm_artifacts():
+                module.remove_rpm_artifact(artifact)
 
-        # This sorting and filtering is needed due to s390x artifacts.
-        # Source RPMs there have higher module_index hence they get
-        # into modules for other architectures where they are not needed.
-        # On the other hand, sources with lesser module_index hop into s390x
-        # modules.yaml metadata which is also wrong. This filtering allows
-        # to catch those source artifacts and filter them out.
-        src_bin_mapping = collections.defaultdict(set)
-        allowed_artifacts = set()
-        module_id_regex = re.compile('\+(?P<module_id>\d+)\+')
-        for ref in task.refs:
-            if ref.enabled or not ref.added_artifacts:
-                continue
-            for artifact in ref.added_artifacts:
-                parsed_artifact = RpmArtifact.from_str(artifact)
-                module_id = module_id_regex.search(
-                    parsed_artifact.release).groupdict().get('module_id', '')
-                if parsed_artifact.arch in allowed_arches:
-                    src_bin_mapping[module_id].add(parsed_artifact)
-
-        for id_, artifacts in src_bin_mapping.items():
-            if all((i.arch == 'src' for i in artifacts)):
-                continue
-            allowed_artifacts.update(artifacts)
+        # Refill modules index with data from beholder
+        built_artifacts = await self.get_prebuilt_module_artifacts(
+            task, platform.name, platform.distr_version, task_arch)
 
         for module in index.iter_modules():
             for ref in task.refs:
                 if ref.enabled:
-                    for artifact in ref.added_artifacts:
-                        module.remove_rpm_artifact(artifact)
-                else:
-                    for artifact in ref.added_artifacts:
-                        parsed_artifact = RpmArtifact.from_str(artifact)
-                        if (parsed_artifact.arch in allowed_arches
-                                and parsed_artifact in allowed_artifacts):
-                            module.add_rpm_artifact(parsed_artifact.as_dict())
-                        else:
-                            module.remove_rpm_artifact(artifact)
+                    continue
+
+                project_name = ref.url.split('/')[-1].strip()
+                project_name = re.sub(r'\.git$', '', project_name)
+                project_built_artifacts = built_artifacts.get(
+                    module.name, {}).get(project_name, [])
+                if not project_built_artifacts:
+                    continue
+                for artifact in project_built_artifacts:
+                    if artifact['arch'] in allowed_arches:
+                        module.add_rpm_artifact(artifact)
 
         if task_arch == 'x86_64':
             # FIXME: For now we have only 1 platform, so pass multilib findings
             #  accordingly
             multilib_artifacts = await self.get_multilib_artifacts(
                 task, has_devel=index.has_devel_module())
-            multilib_artifacts = multilib_artifacts[self._platforms[0].name]
+            multilib_artifacts = multilib_artifacts[platform.name]
             await MultilibProcessor.update_module_index(
                 index, task.module_name, task.module_stream,
                 multilib_artifacts
@@ -307,7 +319,8 @@ class BuildPlanner:
             if task.module_version:
                 module_version = int(task.module_version)
             for arch in self._request_platforms[platform.name]:
-                module_index = await self.prepare_module_index(task, arch)
+                module_index = await self.prepare_module_index(
+                    platform, task, arch)
                 module = module_index.get_module(
                     task.module_name, task.module_stream)
                 module.add_module_dependencies_from_mock_defs(
