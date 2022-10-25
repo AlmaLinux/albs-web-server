@@ -32,7 +32,7 @@ from alws.errors import (
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import release_schema
-from alws.constants import ErrataPackageStatus
+from alws.constants import ErrataPackageStatus, ErrataReleaseStatus
 from alws.utils.errata import get_nevra
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
@@ -1253,6 +1253,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     self.base_platform,
                     repo_pulp_href,
                 ))
+                db_record.release_status = ErrataReleaseStatus.RELEASED
+                db_record.last_release_log = "Successfully released"
                 for errata_pkg in errata_packages:
                     errata_pkg.status = ErrataPackageStatus.released
         await asyncio.gather(*async_tasks)
