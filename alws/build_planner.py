@@ -447,9 +447,11 @@ class BuildPlanner:
                 self._tasks_cache[task_key].append(build_task)
                 if first_ref_dep and is_parallel:
                     build_task.dependencies.append(first_ref_dep)
-                if self._task_index > 0:
-                    dep = self._tasks_cache[task_key][self._task_index - 1]
+                idx = self._task_index - 1
+                while idx >= 0:
+                    dep = self._tasks_cache[task_key][idx]
                     build_task.dependencies.append(dep)
+                    idx -= 1
                 if not is_parallel:
                     for dep in arch_tasks:
                         build_task.dependencies.append(dep)
