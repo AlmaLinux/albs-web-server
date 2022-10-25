@@ -428,7 +428,9 @@ async def load_platform_packages(
                     for arch in arch_list:
                         if not cache[short_pkg_name].get(arch):
                             cache[short_pkg_name][arch] = []
-                    cache[short_pkg_name][arch].append(pkg)
+                        if pkg in cache[short_pkg_name][arch]:
+                            continue
+                        cache[short_pkg_name][arch].append(pkg)
 
     tasks = []
     for repo in platform.repos:
@@ -528,6 +530,7 @@ async def search_for_albs_packages(
         )
         if (
             pulp_rpm_package["arch"] != errata_package.arch
+            and pulp_rpm_package["arch"] != "noarch"
             or clean_pulp_package_name != clean_package_name
         ):
             continue
