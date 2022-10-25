@@ -18,6 +18,7 @@ __all__ = [
     'ErrataPackageStatus',
     'ErrataReferenceType',
     'GenSignKeyStatus',
+    'ErrataReleaseStatus',
     'PackageNevra',
     'Permissions',
     'PermissionTriad',
@@ -88,6 +89,13 @@ class ErrataReferenceType(enum.Enum):
     rhsa = 'rhsa'
     self_ref = 'self'
     bugzilla = 'bugzilla'
+
+
+class ErrataReleaseStatus(enum.Enum):
+    NOT_RELEASED = "not released"
+    IN_PROGRESS = "in progress"
+    RELEASED = "released"
+    FAILED = "failed"
 
 
 class ReleaseStatus(enum.IntEnum):

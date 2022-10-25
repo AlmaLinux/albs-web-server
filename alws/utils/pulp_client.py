@@ -625,11 +625,18 @@ class PulpClient:
         repository_data = await self.request('GET', repo_href)
         return repository_data.get('latest_version_href')
 
-    async def iter_repo_packages(self, version_href: str,
-                                 limit: int = 1000, fields=None):
+    async def iter_repo_packages(
+        self,
+        version_href: str,
+        limit: int = 1000,
+        fields=None,
+        search_params: dict = None,
+    ):
         payload = {'repository_version': version_href, 'limit': limit}
         if fields is not None:
             payload['fields'] = fields
+        if search_params:
+            payload.update(search_params)
         response = await self.request(
             'get', 'pulp/api/v3/content/rpm/packages/', params=payload
         )

@@ -6,12 +6,12 @@ from fastapi import (
 )
 
 from alws import database
-from alws.config import settings
 from alws.auth import get_current_user
-from alws.dependencies import get_db
-from alws.schemas import errata_schema
 from alws.crud import errata as errata_crud
-from alws.utils.pulp_client import PulpClient
+from alws.constants import ErrataReleaseStatus
+from alws.dependencies import get_db
+from alws.dramatiq import release_errata
+from alws.schemas import errata_schema
 
 router = APIRouter(
     prefix="/errata", tags=["errata"], dependencies=[Depends(get_current_user)]
@@ -56,6 +56,7 @@ async def list_errata_records(
     title: Optional[str] = None,
     platformId: Optional[int] = None,
     cveId: Optional[str] = None,
+    status: Optional[ErrataReleaseStatus] = None,
     db: database.Session = Depends(get_db),
 ):
     return await errata_crud.list_errata_records(
@@ -65,6 +66,7 @@ async def list_errata_records(
         title=title,
         platform=platformId,
         cve_id=cveId,
+        status=status,
     )
 
 
@@ -112,11 +114,5 @@ async def release_errata_record(
     record_id: str,
     db: database.Session = Depends(get_db),
 ):
-    pulp = PulpClient(
-        settings.pulp_host, settings.pulp_user, settings.pulp_password
-    )
-    try:
-        await errata_crud.release_errata_record(db, pulp, record_id)
-        return {"ok": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    release_errata.send(record_id)
+    return {"message": "Release updateinfo record has been started"}
