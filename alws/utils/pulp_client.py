@@ -624,7 +624,7 @@ class PulpClient:
         payload = {'repository_version': version_href, 'limit': limit}
         if fields is not None:
             payload['fields'] = fields
-        if search_params is not None:
+        if search_params:
             payload.update(search_params)
         response = await self.request(
             'get', 'pulp/api/v3/content/rpm/packages/', params=payload

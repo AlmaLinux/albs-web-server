@@ -136,7 +136,7 @@ services:
       - "./alws:/code/alws"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
-                      dramatiq alws.dramatiq --threads 1 -Q errata'
+                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q errata'
     restart: on-failure
     depends_on:
       - db
