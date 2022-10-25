@@ -18,6 +18,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
+    ErrataReleaseStatus,
     Permissions,
     PermissionTriad,
     ReleaseStatus,
@@ -1076,6 +1077,11 @@ class ErrataRecord(Base):
         nullable=False
     )
     platform = relationship('Platform')
+    release_status = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataReleaseStatus),
+        nullable=True,
+    )
+    last_release_log = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     summary = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     solution = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
 
