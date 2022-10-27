@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import typing
 import urllib.parse
 from concurrent.futures import as_completed, ThreadPoolExecutor
@@ -100,6 +101,7 @@ class Exporter:
             level=logging.DEBUG if verbose else logging.INFO,
             datefmt='%Y-%m-%d %H:%M:%S'
         )
+        self._temp_dir = tempfile.gettempdir()
         self.logger = logging.getLogger('packages-exporter')
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
@@ -214,8 +216,13 @@ class Exporter:
         export_path = exporter['export_path']
         href = exporter['exporter_href']
         repository_version = exporter['repo_latest_version']
-        await self.pulp_client.export_to_filesystem(
-            href, repository_version)
+        try:
+            await self.pulp_client.export_to_filesystem(
+                href, repository_version)
+        except Exception:
+            self.logger.exception('Cannot export repository via %s',
+                                  str(exporter))
+            return
         parent_dir = str(Path(export_path).parent)
         if not os.path.exists(parent_dir):
             self.logger.info('Repository %s directory is absent',
@@ -434,6 +441,16 @@ class Exporter:
         partial_path = re.sub(
             str(settings.pulp_export_path), '', str(repo_path)).strip('/')
         repodata_path = os.path.join(repo_path, 'repodata')
+        # We need to save downloaded modules metadata in order to include it
+        # correctly while using cached repodata
+        modules_path = None
+        modules_temp_path = None
+        modules = find_metadata(repodata_path, 'modules')
+        if modules:
+            modules_path = os.path.join(repodata_path, modules)
+            modules_temp_path = os.path.join(
+                self._temp_dir, os.path.basename(modules))
+            shutil.copyfile(modules_path, modules_temp_path)
         repo_repodata_cache = os.path.join(
             self.repodata_cache_dir, partial_path)
         sync_fix_permissions(
@@ -445,6 +462,27 @@ class Exporter:
             args.extend(['--update-md-path', repo_repodata_cache])
         args.append(repo_path)
         _, stdout, _ = self.createrepo_c.run(args=args)
+
+        # Regenerate module metadata
+        if modules_path and modules_temp_path:
+            try:
+                self.logger.info(
+                    'Regenerating module metadata for %s', repo_path)
+                new_modules = find_metadata(repodata_path, 'modules')
+                if new_modules:
+                    os.remove(os.path.join(repodata_path, new_modules))
+                if os.path.exists(modules_path):
+                    os.remove(modules_path)
+                shutil.copyfile(modules_temp_path, modules_path)
+                _, stdout, _ = self.createrepo_c.run(
+                    args=('--update', '--keep-all-metadata', repo_path))
+                self.logger.debug(stdout)
+                self.logger.info('Module metadata regeneration is finished')
+            finally:
+                if modules_path:
+                    os.remove(modules_path)
+                if modules_temp_path:
+                    os.remove(modules_temp_path)
 
         # Cache newly generated repodata into folder for future re-use
         cache_repodata_dir = os.path.join(repo_repodata_cache, 'repodata')
