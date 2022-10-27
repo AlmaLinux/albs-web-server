@@ -729,7 +729,7 @@ async def list_errata_records(
         query = select(func.count(models.ErrataRecord.id))
         if not count:
             query = select(models.ErrataRecord).options(*options)
-            query = query.order_by(models.ErrataRecord.updated_date.desc())
+            query = query.order_by(models.ErrataRecord.id.desc())
         if errata_id:
             query = query.filter(models.ErrataRecord.id.like(f"%{errata_id}%"))
         if title:
