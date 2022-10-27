@@ -131,7 +131,7 @@ def find_metadata(repodata_dir, key) -> str:
          for item in repomd.records
          if item.type == key), None
     )
-    return os.path.join(repodata_dir, os.path.basename(path))
+    return os.path.join(repodata_dir, os.path.basename(path)) if path else None
 
 
 def iter_updateinfo(filename: str):
