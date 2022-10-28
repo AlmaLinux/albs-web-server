@@ -9,17 +9,20 @@ from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
 
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
-    db_flavour = models.PlatformFlavour(name=flavour.name,
-                                        modularity=flavour.modularity)
+    db_flavour = models.PlatformFlavour(
+        name=flavour.name, modularity=flavour.modularity
+    )
     for repo in flavour.repositories:
-        db_repo = await db.execute(select(models.Repository).where(
-            sqlalchemy.and_(
-                models.Repository.name == repo.name,
-                models.Repository.arch == repo.arch,
-                models.Repository.type == repo.type,
-                models.Repository.debug == repo.debug,
+        db_repo = await db.execute(
+            select(models.Repository).where(
+                sqlalchemy.and_(
+                    models.Repository.name == repo.name,
+                    models.Repository.arch == repo.arch,
+                    models.Repository.type == repo.type,
+                    models.Repository.debug == repo.debug,
+                )
             )
-        ))
+        )
         db_repo = db_repo.scalars().first()
         if not db_repo:
             db_repo = models.Repository(**repo.dict())
@@ -27,19 +30,38 @@ async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
         db_flavour.repos.append(db_repo)
     db.add(db_flavour)
     await db.commit()
-    db_flavour = await db.execute(select(models.PlatformFlavour).where(
-        models.PlatformFlavour.name == flavour.name
-    ).options(selectinload(models.PlatformFlavour.repos)))
+    db_flavour = await db.execute(
+        select(models.PlatformFlavour)
+        .where(models.PlatformFlavour.name == flavour.name)
+        .options(selectinload(models.PlatformFlavour.repos))
+    )
     return db_flavour.scalars().all()
 
 
 async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
-    db_flavour = await find_flavour_by_id(db, flavour.id)
-    for key in ('name', 'modularity'):
+    db_flavour = await find_flavour_by_name(db, flavour.name)
+    for key in ("name", "modularity", "data"):
         if getattr(flavour, key):
             setattr(db_flavour, key, getattr(flavour, key))
+    for repo in flavour.repositories:
+        db_repo = await db.execute(
+            select(models.Repository).where(
+                sqlalchemy.and_(
+                    models.Repository.name == repo.name,
+                    models.Repository.arch == repo.arch,
+                    models.Repository.type == repo.type,
+                    models.Repository.debug == repo.debug,
+                )
+            )
+        )
+        db_repo = db_repo.scalars().first()
+        if not db_repo:
+            db_repo = models.Repository(**repo.dict())
+            db.add(db_repo)
+        db_flavour.repos.append(db_repo)
+    db.add(db_flavour)
     await db.commit()
-    return await find_flavour_by_id(db, flavour.id)
+    return await find_flavour_by_name(db, flavour.name)
 
 
 async def list_flavours(db, ids: List[int] = None) -> List[models.PlatformFlavour]:
@@ -52,8 +74,10 @@ async def list_flavours(db, ids: List[int] = None) -> List[models.PlatformFlavou
     return flavors.scalars().all()
 
 
-async def find_flavour_by_id(db, flavour_id: int):
-    db_flavour = await db.execute(select(models.PlatformFlavour).where(
-        models.PlatformFlavour.id == flavour_id
-    ).options(selectinload(models.PlatformFlavour.repos)))
+async def find_flavour_by_name(db, flavour_name: str):
+    db_flavour = await db.execute(
+        select(models.PlatformFlavour)
+        .where(models.PlatformFlavour.name == flavour_name)
+        .options(selectinload(models.PlatformFlavour.repos))
+    )
     return db_flavour.scalars().first()

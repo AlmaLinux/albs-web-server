@@ -102,6 +102,10 @@ async def get_task(
                 response['repositories'].append(repo)
     if task.build.platform_flavors:
         for flavour in task.build.platform_flavors:
+            if flavour.data['mock']['macros']:
+                response['platform'].data['mock']['macros'].update(
+                    flavour.data['mock']['macros']
+                )
             for repo in flavour.repos:
                 if repo.arch == task.arch:
                     response['repositories'].append(repo)
