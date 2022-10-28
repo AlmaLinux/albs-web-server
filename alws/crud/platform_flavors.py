@@ -10,7 +10,9 @@ from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
     db_flavour = models.PlatformFlavour(
-        name=flavour.name, modularity=flavour.modularity
+        name=flavour.name,
+        modularity=flavour.modularity,
+        data=flavour.data,
     )
     for repo in flavour.repositories:
         db_repo = await db.execute(
