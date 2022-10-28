@@ -44,7 +44,7 @@ async def build_done(
     # We're setting build task timestamp to 3 hours upwards, so
     # dramatiq can have a time to complete task and build node
     # won't rebuild task again and again while it's in the queue
-    # in the future this probably should be handled somehow better 
+    # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.now() + datetime.timedelta(hours=3)
     await db.commit()
     if not await build_node.log_repo_exists(db, build_task):
@@ -102,10 +102,11 @@ async def get_task(
                 response['repositories'].append(repo)
     if task.build.platform_flavors:
         for flavour in task.build.platform_flavors:
-            if flavour.data['mock']['macros']:
-                response['platform'].data['mock']['macros'].update(
-                    flavour.data['mock']['macros']
-                )
+            if flavour.data:
+                if flavour.data['mock']['macros']:
+                    response['platform'].data['mock']['macros'].update(
+                        flavour.data['mock']['macros']
+                    )
             for repo in flavour.repos:
                 if repo.arch == task.arch:
                     response['repositories'].append(repo)
