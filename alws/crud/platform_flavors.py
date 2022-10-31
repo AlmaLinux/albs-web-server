@@ -42,6 +42,8 @@ async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
 
 async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
     db_flavour = await find_flavour_by_name(db, flavour.name)
+    if not db_flavour:
+        return
     for key in ("name", "modularity", "data"):
         if getattr(flavour, key):
             setattr(db_flavour, key, getattr(flavour, key))

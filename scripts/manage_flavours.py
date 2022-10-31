@@ -22,22 +22,6 @@ def parse_args():
         "manage_flavours", description="Flavor manage script. Creates flavors"
     )
     parser.add_argument(
-        "-R",
-        "--no-remotes",
-        action="store_true",
-        default=False,
-        required=False,
-        help="Disable creation of flavors remotes",
-    )
-    parser.add_argument(
-        "-S",
-        "--no-sync",
-        action="store_true",
-        default=False,
-        required=False,
-        help="Do not sync flavors with " "corresponding remotes",
-    )
-    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -65,13 +49,12 @@ def parse_args():
 
 async def update_flavour(flavour_data: dict, logger: logging.Logger):
     async with database.Session() as db:
-        flavour = await pf_crud.find_flavour_by_name(db, flavour_data["name"])
-        if not flavour:
-            logger.error("Flavor %s does not exist", flavour_data["name"])
-            return
         data = platform_flavors_schema.UpdateFlavour(**flavour_data)
-        await pf_crud.update_flavour(db, data)
-    logger.info("Flavor %s update is completed", flavour_data["name"])
+        flavor = await pf_crud.update_flavour(db, data)
+        if not flavor:
+            logger.error("Flavor %s is does not exist", flavour_data["name"])
+        else:
+            logger.info("Flavor %s update is completed", flavour_data["name"])
 
 
 async def add_flavor(flavor_data: dict, logger: logging.Logger):
@@ -103,7 +86,6 @@ def main():
             continue
         logger.info("Start add flavor: %s", flavor_data["name"])
         sync(add_flavor(flavor_data, logger))
-
 
 
 if __name__ == "__main__":
