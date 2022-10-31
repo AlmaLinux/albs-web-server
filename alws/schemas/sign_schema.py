@@ -88,6 +88,7 @@ class SignTaskComplete(BaseModel):
     error_message: typing.Optional[str]
     log_href: typing.Optional[str]
     packages: typing.Optional[typing.List[SignedRpmInfo]]
+    stats: typing.Optional[dict]
 
 
 class SignTaskCompleteResponse(BaseModel):

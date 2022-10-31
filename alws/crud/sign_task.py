@@ -200,6 +200,11 @@ async def complete_sign_task(
             sign_task_id: int,
             payload: sign_schema.SignTaskComplete
         ) -> models.SignTask:
+    if getattr(payload, 'stats', None) and isinstance(payload.stats, dict):
+        stats = payload.stats.copy()
+    else:
+        stats = {}
+    start_time = datetime.datetime.utcnow()
     async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
@@ -319,6 +324,11 @@ async def complete_sign_task(
             build.signed = False
         sign_task.log_href = payload.log_href
         sign_task.error_message = payload.error_message
+
+        finish_time = datetime.datetime.utcnow()
+        stats['web_server_processing_time'] = int(
+            (finish_time - start_time).total_seconds())
+        sign_task.stats = stats
 
         db.add(sign_task)
         db.add(build)
