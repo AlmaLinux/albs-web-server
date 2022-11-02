@@ -281,6 +281,7 @@ class BuildPlanner:
             if task.module_version:
                 module_version = int(task.module_version)
             mock_enabled_modules = mock_options.get('module_enable', [])[:]
+            # Take first task mock_options becouse it duplicates on each tasks
             if task.refs:
                 mock_enabled_modules.extend(
                     task.refs[0].mock_options.get("module_enable", [])
