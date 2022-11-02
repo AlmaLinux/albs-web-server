@@ -1,4 +1,4 @@
-from typing import List, Optional
+import typing
 
 from pydantic import BaseModel
 
@@ -8,24 +8,26 @@ from alws.schemas.repository_schema import RepositoryCreate, Repository
 class CreateFlavour(BaseModel):
 
     name: str
-    modularity: Optional[dict] = None
-    repositories: List[RepositoryCreate]
+    modularity: typing.Optional[dict] = None
+    repositories: typing.List[RepositoryCreate]
+    data: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 class UpdateFlavour(BaseModel):
 
-    id: int
-    name: Optional[str] = None
-    modularity: Optional[dict] = None
-    repositories: Optional[List[RepositoryCreate]] = None
+    name: str
+    modularity: typing.Optional[dict] = None
+    repositories: typing.Optional[typing.List[RepositoryCreate]] = None
+    data: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
 class FlavourResponse(BaseModel):
 
     id: int
     name: str
-    repos: List[Repository]
-    modularity: Optional[dict]
+    repos: typing.List[Repository]
+    modularity: typing.Optional[dict]
+    data: typing.Optional[typing.Dict[str, typing.Any]]
 
     class Config:
         orm_mode = True

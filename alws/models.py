@@ -1064,6 +1064,7 @@ class PlatformFlavour(PermissionsMixin, Base):
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     modularity = sqlalchemy.Column(JSONB, nullable=True)
     repos = relationship('Repository', secondary=FlavourRepo)
+    data = sqlalchemy.Column(JSONB, nullable=True)
 
 
 # Errata/OVAL related tables
