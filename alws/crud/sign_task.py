@@ -186,6 +186,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             }
         )
     sign_task_payload['packages'] = packages
+    await db.commit()
     return sign_task_payload
 
 
