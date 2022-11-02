@@ -58,29 +58,43 @@ async def get_product(
 
 
 @public_router.post('/add/{build_id}/{product}/',
-                    response_model=typing.Dict[str, bool])
+                    response_model=product_schema.ProductOpResult)
 async def add_to_product(
     product: str,
     build_id: int,
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    await products.modify_product(
-        db, build_id, product, user.id, 'add')
-    return {'success': True}
+    try:
+        await products.modify_product(
+            db, build_id, product, user.id, 'add')
+        return product_schema.ProductOpResult(
+            success=True,
+            message=f'Build {build_id} is being added to product {product}')
+    except Exception as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @public_router.post('/remove/{build_id}/{product}/',
-                    response_model=typing.Dict[str, bool])
+                    response_model=product_schema.ProductOpResult)
 async def remove_from_product(
     product: str,
     build_id: int,
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    await products.modify_product(
-        db, build_id, product, user.id, 'remove')
-    return {'success': True}
+    try:
+        await products.modify_product(
+            db, build_id, product, user.id, 'remove')
+        return product_schema.ProductOpResult(
+            success=True,
+            message=f'Build {build_id} is being removed from product {product}')
+    except Exception as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @public_router.delete('/{product_id}/remove/',
