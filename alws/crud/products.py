@@ -213,7 +213,6 @@ async def modify_product(
     product: str,
     user_id: int,
     modification: str,
-    force: bool = False, # TODO: Ask Daniil about this flag
 ):
 
     async with db.begin():
@@ -242,12 +241,12 @@ async def modify_product(
         )
         db_build = db_build.scalars().first()
 
-        if modification == 'add' and not force:
+        if modification == 'add':
             if db_build in db_product.builds:
                 error_msg = f"Can't add build {build_id} to {product} " \
                             f"as it's already part of the product"
                 raise ProductError(error_msg)
-        if modification == 'remove' and not force:
+        if modification == 'remove':
             if db_build not in db_product.builds:
                 error_msg = f"Can't remove build {build_id} " \
                             f"from {product} as it's not part " \
