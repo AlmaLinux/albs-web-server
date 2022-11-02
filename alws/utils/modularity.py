@@ -130,54 +130,60 @@ class ModuleWrapper:
         runtime_context = self.cacl_runtime_context()
         hashes = '{0}:{1}'.format(build_context, runtime_context)
         return hashlib.sha1(hashes.encode('utf-8')).hexdigest()[:8]
+    def get_name_and_stream(self, module) -> typing.Tuple[str, str]:
+        if not ":" in module:
+            return module, ""
+        module_dep = module.split(":")
+        if len(module_dep) != 2:
+            logging.error("Incorrect build-time dependency definition: %s", module)
+            return
+        module_name, module_stream = module_dep
+        return module_name, module_stream
 
-    def add_module_dependencies_from_mock_defs(self, mock_modules: list = None):
+    # Add stream to dependency from frontend
+    def add_module_dependencies_from_mock_defs(self, enabled_modules: dict):
         old_deps = Modulemd.Dependencies()
         new_deps = Modulemd.Dependencies()
-        modules = []
-        if mock_modules:
-            for module in mock_modules:
-                module_dep = module.split(':')
-                if len(module_dep) != 2:
-                    logging.error(
-                        'Incorrect build-time dependency definition: %s',
-                        module)
-                    continue
-                module_name, module_stream = module_dep
-                modules.append((module_name, module_stream))
+        new_buildtime_modules = []
+        new_runtime_modules = []
+        if enabled_modules:
+            for module in enabled_modules["buildtime"]:
+                new_buildtime_modules.append(self.get_name_and_stream(module))
+            for module in enabled_modules["runtime"]:
+                new_runtime_modules.append(self.get_name_and_stream(module))
+
         if self._stream.get_dependencies():
             old_deps = self._stream.get_dependencies()[0]
+            old_buildtime = old_deps.get_buildtime_modules()
+            old_runtime = old_deps.get_runtime_modules()
 
-        # Override build time modules if needed
-        added_build_deps = []
-        for old_dep in old_deps.get_buildtime_modules():
-            streams = old_deps.get_buildtime_streams(old_dep)
-            if modules:
-                for module in modules:
-                    if old_dep == module[0] and not streams:
-                        new_deps.add_buildtime_stream(module[0], module[1])
-                        added_build_deps.append(old_dep)
+        # Override build time modules
+        if new_buildtime_modules:
+            for name, stream in new_buildtime_modules:
+                if name in old_buildtime:
+                    if stream:
+                        new_deps.add_buildtime_stream(name, stream)
+                    else:
+                        new_deps.set_empty_buildtime_dependencies_for_module(name)
 
-        for old_dep in old_deps.get_buildtime_modules():
-            streams = old_deps.get_buildtime_streams(old_dep)
-            if old_dep not in added_build_deps:
-                for stream in streams:
-                    new_deps.add_buildtime_stream(old_dep, stream)
+        for module in old_buildtime:
+            if module == "platform":
+                for stream in old_deps.get_buildtime_streams(module):
+                    new_deps.add_buildtime_stream(module, stream)
 
-        # Override runtime modules if needed
-        added_runtime_deps = []
-        for old_dep in old_deps.get_runtime_modules():
-            streams = old_deps.get_runtime_streams(old_dep)
-            for module in modules:
-                if old_dep == module[0] and not streams:
-                    new_deps.add_runtime_stream(module[0], module[1])
-                    added_runtime_deps.append(old_dep)
+        # Override runtime modules
+        if new_runtime_modules:
+            for name, stream  in new_runtime_modules:
+                if name in old_runtime:
+                    if stream:
+                        new_deps.add_runtime_stream(name, stream)
+                    else:
+                        new_deps.set_empty_runtime_dependencies_for_module(name)
 
-        for old_dep in old_deps.get_runtime_modules():
-            streams = old_deps.get_runtime_streams(old_dep)
-            if old_dep not in added_runtime_deps:
-                for stream in streams:
-                    new_deps.add_runtime_stream(old_dep, stream)
+        for module in old_runtime:
+            if module == "platform":
+                for stream in old_deps.get_runtime_streams(module):
+                    new_deps.add_runtime_stream(module, stream)
 
         self._stream.clear_dependencies()
         self._stream.add_dependencies(new_deps)
@@ -301,6 +307,34 @@ class ModuleWrapper:
                     continue
                 for stream in dep.get_buildtime_streams(module):
                     yield module, stream
+
+    # Returns all module build and runtime dependencies with/without stream
+    def get_all_build_deps(self):
+        deps = {"buildtime": [], "runtime": []}
+        for dep in self._stream.get_dependencies():
+            for module in dep.get_buildtime_modules():
+                if module == "platform":
+                    continue
+                if module == self.name:
+                    continue
+                streams = dep.get_buildtime_streams(module)
+                if not streams:
+                    deps["buildtime"].append(f"{module}:")
+                    continue
+                for stream in streams:
+                    deps["buildtime"].append(f"{module}:{stream}")
+            for module in dep.get_runtime_modules():
+                if module == "platform":
+                    continue
+                if module == self.name:
+                    continue
+                streams = dep.get_runtime_streams(module)
+                if not streams:
+                    deps["runtime"].append(f"{module}:")
+                    continue
+                for stream in streams:
+                    deps["runtime"].append(f"{module}:{stream}")
+        return deps
 
     @property
     def nsvca(self) -> str:

@@ -280,21 +280,18 @@ class BuildPlanner:
             )
             if task.module_version:
                 module_version = int(task.module_version)
+            mock_enabled_modules = mock_options.get('module_enable', [])[:]
+            if task.refs:
+                mock_enabled_modules.extend(
+                    task.refs[0].mock_options.get("module_enable", [])
+                )
             for arch in self._request_platforms[platform.name]:
                 module_index = await self.prepare_module_index(task, arch)
                 module = module_index.get_module(
                     task.module_name, task.module_stream)
                 module.add_module_dependencies_from_mock_defs(
-                    mock_modules=mock_options.get('module_enable', []))
-                # TODO: Rework to be able to set enabled modules from UI,
-                #  including ability to disable default modules from template
-                mock_options['module_enable'] = [
-                    f'{module.name}:{module.stream}'
-                ]
-                mock_options['module_enable'] += [
-                    f'{dep_name}:{dep_stream}'
-                    for dep_name, dep_stream in module.iter_dependencies()
-                ]
+                    enabled_modules=task.enabled_modules)
+                mock_options['module_enable'] = mock_enabled_modules
                 module.version = module_version
                 module.context = module.generate_new_context()
                 module.arch = arch
@@ -310,9 +307,6 @@ class BuildPlanner:
                     devel_module.arch = module.arch
                     devel_module.set_arch_list(
                         self._request_platforms[platform.name]
-                    )
-                    mock_options['module_enable'].append(
-                        f'{devel_module.name}:{devel_module.stream}'
                     )
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
@@ -359,8 +353,10 @@ class BuildPlanner:
         parsed_dist_macro = None
         if ref.git_ref is not None:
             parsed_dist_macro = parse_git_ref(r'(el[\d]+_[\d]+)', ref.git_ref)
-        if not mock_options or not mock_options.get('definitions', False):
+        if not mock_options:
             mock_options = {'definitions': {}}
+        if 'definitions' not in mock_options:
+            mock_options['definitions'] = {}
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
             arch_tasks = []

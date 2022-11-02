@@ -80,6 +80,7 @@ class BuildTaskModuleRef(BaseModel):
     module_platform_version: str
     module_version: typing.Optional[str] = None
     modules_yaml: str
+    enabled_modules: dict
     refs: typing.List[BuildTaskRef]
 
 
@@ -287,6 +288,7 @@ class ModulePreview(BaseModel):
     modules_yaml: str
     module_name: str
     module_stream: str
+    enabled_modules: dict
     git_ref: typing.Optional[str]
 
 
@@ -485,7 +487,8 @@ async def get_module_refs(
             beholder_data=beholder_results,
         ))
     result = await asyncio.gather(*component_tasks)
+    enabled_modules = module.get_all_build_deps()
     modules = [module.render()]
     if devel_module:
         modules.append(devel_module.render())
-    return result, modules
+    return result, modules, enabled_modules
