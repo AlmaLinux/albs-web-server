@@ -1,13 +1,10 @@
 import argparse
 import asyncio
+import datetime
 import logging
-import os
-import sys
 import urllib.parse
 
 import aiohttp
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -23,14 +20,15 @@ def parse_args():
     parser = argparse.ArgumentParser(
         "errata-releaser",
         description="Releases updateinfo records through ALBS API",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "-d",
         "--date",
         type=str,
-        default="2022-11-01",
+        default=datetime.date.today().strftime("%Y-%m-%d"),
         required=False,
-        help="Date for start releasing (default: '2022-11-01')",
+        help="Date for start releasing",
     )
     parser.add_argument(
         "-u",
@@ -38,7 +36,7 @@ def parse_args():
         type=str,
         default="http://web_server:8000/api/v1/",
         required=False,
-        help="ALBS URL (default: 'http://web_server:8000/api/v1/')",
+        help="ALBS URL",
     )
     parser.add_argument(
         "-t",
@@ -53,14 +51,14 @@ def parse_args():
         action="store_true",
         default=False,
         required=False,
-        help="Approves records that contains proposal packages (disabled by default)",
+        help="Approves records that contains proposal packages",
     )
     parser.add_argument(
         "--check",
         action="store_true",
         default=False,
         required=False,
-        help="Check records and their packages that can be released (disabled by default)",
+        help="Check records and their packages that can be released",
     )
     return parser.parse_args()
 
@@ -131,10 +129,7 @@ class AlbsAPI:
             if not source:
                 continue
             for albs_pkg in pkg["albs_packages"]:
-                if (
-                    albs_pkg["status"] != "proposal"
-                    or not albs_pkg["build_id"]
-                ):
+                if albs_pkg["status"] != "proposal" or not albs_pkg["build_id"]:
                     continue
                 result.append(
                     {
