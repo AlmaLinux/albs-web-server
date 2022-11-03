@@ -96,7 +96,8 @@ async def get_builds(
         selectinload(models.Build.sign_tasks),
         selectinload(models.Build.tasks).selectinload(
             models.BuildTask.rpm_module),
-        selectinload(models.Build.platform_flavors)
+        selectinload(models.Build.platform_flavors),
+        selectinload(models.Build.products)
     ).distinct(models.Build.id)
 
     pulp_params = {

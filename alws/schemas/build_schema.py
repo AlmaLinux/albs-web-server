@@ -237,6 +237,15 @@ class PlatformFlavour(BaseModel):
         orm_mode = True
 
 
+class Product(BaseModel):
+
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 class Build(BaseModel):
 
     id: int
@@ -249,6 +258,7 @@ class Build(BaseModel):
     platform_flavors: typing.List[PlatformFlavour]
     release_id: typing.Optional[int]
     released: bool
+    products: typing.Optional[typing.List[Product]] = []
 
     @validator('linked_builds', pre=True)
     def linked_builds_validator(cls, v):

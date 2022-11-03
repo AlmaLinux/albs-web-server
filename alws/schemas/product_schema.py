@@ -7,7 +7,7 @@ from alws.schemas.repository_schema import Repository
 from alws.schemas.team_schema import Team
 from alws.schemas.user_schema import User
 
-__all__ = ['ProductCreate', 'Product']
+__all__ = ['ProductCreate', 'Product', 'ProductOpResult']
 
 
 class ProductCreate(BaseModel):
@@ -46,3 +46,9 @@ class ProductResponse(BaseModel):
     products: typing.List[Product]
     total_products: typing.Optional[int]
     current_page: typing.Optional[int]
+
+
+class ProductOpResult(BaseModel):
+
+    success: bool
+    message: typing.Optional[str] = None
