@@ -6,55 +6,26 @@
   contact_mail: packager@centos.org 
   copyright: Copyright {{ year }} CentOS
   test_dist_name: centos7
+  # modularity is a concept introduced in CentOS8, left this block
+  # only for compatibility with current build logic 
   modularity:
-    #? I cant find CentOS alternative for modified_packages.yml ?#
     modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a8/modified_packages.yml'
     packages_git: 'https://git.centos.org/projects/rpms/%2A'
-    #? what tag to use here ?#
     git_tag_prefix:
-      modified: a8
-      non_modified: c8
+      modified: a7
+      non_modified: c7
     versions:
-      - name: '7.0'
-        version_prefix: '70000'
-        dist_prefix: 'el7.0.0'
-      - name: '7.1'
-        version_prefix: '70100'
-        dist_prefix: 'el7.1.0'
-      - name: '7.2'
-        version_prefix: '70200'
-        dist_prefix: 'el7.2.0'
-      - name: '7.3'
-        version_prefix: '70300'
-        dist_prefix: 'el7.3.0'
-      - name: '7.4'
-        version_prefix: '70400'
-        dist_prefix: 'el7.4.0'
-      - name: '7.5'
-        version_prefix: '70500'
-        dist_prefix: 'el7.5.0'
-      - name: '7.6'
-        version_prefix: '70600'
-        dist_prefix: 'el7.6.0'
-      - name: '7.7'
-        version_prefix: '70700'
-        dist_prefix: 'el7.7.0'
-      - name: '7.8'
-        version_prefix: '70800'
-        dist_prefix: 'el7.8.0'
        - name: '7.9'
         version_prefix: '70900'
         dist_prefix: 'el7.9.0'
-
   type: rpm
-  
   arch_list:
     - x86_64
     - aarch64
   copy_priority_arches:
     - x86_64
     - aarch64
-  #? I ve removed weak_arch_list since we dont work with those architectures ?# 
+  weak_arch_list:
   data:
     definitions:
       distribution: CentOS7
@@ -62,11 +33,9 @@
       packager: CentOS Packaging Team <packager@centos.org>
       vendor: CentOS
     mock:
-      chroot_setup_cmd: 'install bash bzip2 coreutils cloudlinux-release '
-                         'findutils gawk grep gzip info redhat-rpm-config '
-                            'sed shadow-utils tar unzip util-linux-ng which '
-                            'xz yum git'
-      #? I now sure how it will work since CentOS7 uses yum
+      chroot_setup_cmd: install bash bzip2 coreutils cloudlinux-release 
+        findutils gawk grep gzip info redhat-rpm-config 
+        sed shadow-utils tar unzip util-linux-ng which xz yum git
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
@@ -94,14 +63,13 @@
     yum:
       best: false
       module_platform_id: platform:el7
-  #? There are no repos for aarch64 ?#
   repositories:
     - arch: x86_64
       name: centos-7-baseos
       type: rpm
       remote_url: http://mirror.centos.org/centos/7/os/x86_64/
       export_path: centos/7/os/x86_64/
-      production: true
+      production: false
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
@@ -110,7 +78,25 @@
       type: rpm
       remote_url: http://mirror.centos.org/centos/7/updates/x86_64/
       export_path: centos/7/updates/x86_64/
-      production: true
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: centos-7-baseos
+      type: rpm
+      remote_url: http://mirror.centos.org/altarch/7/os/aarch64/
+      export_path: altarch/7/os/aarch64/
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: aarch64
+      name: centos-7-updates
+      type: rpm
+      remote_url: http://mirror.centos.org/altarch/7/updates/aarch64/
+      export_path: altarch/7/updates/aarch64/
+      production: false
       debug: false
       remote_sync_policy: on_demand
       repository_sync_policy: additive
