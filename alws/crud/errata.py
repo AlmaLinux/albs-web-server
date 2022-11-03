@@ -1111,6 +1111,7 @@ async def release_errata_record(db: AsyncSession, record_id: str):
         raise ValueError(msg)
 
     tasks = []
+    publish_tasks = []
     for repo_href, packages in repo_mapping.items():
         updateinfo_mapping = await prepare_updateinfo_mapping(
             db=db,
@@ -1143,7 +1144,9 @@ async def release_errata_record(db: AsyncSession, record_id: str):
                 repo_href,
             )
         )
+        publish_tasks.append(pulp.create_rpm_publication(repo_href))
     await asyncio.gather(*tasks)
+    await asyncio.gather(*publish_tasks)
     db_record.release_status = ErrataReleaseStatus.RELEASED
     db_record.last_release_log = "Succesfully released"
     await db.commit()
