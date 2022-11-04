@@ -5,7 +5,7 @@ import datetime
 import urllib.parse
 
 import aiohttp.client_exceptions
-from pydantic import BaseModel, validator, conlist
+from pydantic import BaseModel, AnyHttpUrl, validator, conlist
 
 from alws.config import settings
 from alws.constants import BuildTaskRefType
@@ -30,7 +30,7 @@ __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 class BuildTaskRef(BaseModel):
 
-    url: str
+    url: AnyHttpUrl
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[int]
     git_commit_hash: typing.Optional[str]
