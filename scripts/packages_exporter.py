@@ -99,7 +99,9 @@ class Exporter:
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
             level=logging.DEBUG if verbose else logging.INFO,
-            datefmt='%Y-%m-%d %H:%M:%S'
+            datefmt='%Y-%m-%d %H:%M:%S',
+            handlers=[logging.FileHandler(filename='packages-exporter.log', mode='a'),
+                      logging.StreamHandler(stream=sys.stdout)]
         )
         self._temp_dir = tempfile.gettempdir()
         self.logger = logging.getLogger('packages-exporter')
