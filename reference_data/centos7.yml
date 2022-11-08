@@ -2,22 +2,9 @@
 - name: CentOS7
   distr_type: rhel
   distr_version: '7'
-  #? is this email correct ?#
-  contact_mail: packager@centos.org 
-  copyright: Copyright {{ year }} CentOS
-  test_dist_name: centos7
-  # modularity is a concept introduced in CentOS8, left this block
-  # only for compatibility with current build logic 
-  modularity:
-    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a8/modified_packages.yml'
-    packages_git: 'https://git.centos.org/projects/rpms/%2A'
-    git_tag_prefix:
-      modified: a7
-      non_modified: c7
-    versions:
-       - name: '7.9'
-        version_prefix: '70900'
-        dist_prefix: 'el7.9.0'
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
+  test_dist_name: centos
   type: rpm
   arch_list:
     - x86_64
@@ -28,41 +15,20 @@
   weak_arch_list:
   data:
     definitions:
-      distribution: CentOS7
-      #? is this teamname/email correct ?#
-      packager: CentOS Packaging Team <packager@centos.org>
-      vendor: CentOS
+      distribution: AlmaLinux
+      packager: AlmaLinux Packaging Team <packager@almalinux.org>
+      vendor: AlmaLinux
     mock:
       chroot_setup_cmd: install bash bzip2 coreutils cloudlinux-release 
         findutils gawk grep gzip info redhat-rpm-config 
         sed shadow-utils tar unzip util-linux-ng which xz yum git
-      dnf_common_opts:
-        - --setopt=deltarpm=False
-        - --allowerasing
-        - --nobest
-        - --setopt=install_weak_deps=False
-      dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: yum
       releasever: '7'
       environment:
         DFLTCC: '0'
       use_bootstrap_container: false
-      macros:
-        "%__pesign_cert": "%pe_signing_cert"
-        "%__pesign_client_cert": "%pe_signing_cert"
-        "%__pesign_client_token": "%pe_signing_token"
-        "%__pesign_token": "-t %pe_signing_token"
-        "%pe_signing_cert": "'Cloud Linux Software, Inc'"
-        "%pe_signing_token": "'profil standardowy'"
-        "%_pesign": "/usr/local/bin/pesign"
-        "%_pesign_client": "/usr/local/bin/pesign-client"
-        "%with_modsign": "1"
-        "%modsign_os": "centos7"
     mock_dist: el7
     timeout: 43200
-    yum:
-      best: false
-      module_platform_id: platform:el7
   repositories:
     - arch: x86_64
       name: centos-7-baseos
