@@ -58,8 +58,17 @@ class BuildTaskStatus(enum.IntEnum):
     EXCLUDED = 4
 
     @classmethod
-    def is_finished(cls, status):
+    def is_finished(cls, status: int):
         return status not in (cls.IDLE, cls.STARTED)
+
+    @classmethod
+    def get_status_by_text(cls, text: str):
+        status = cls.COMPLETED
+        if text == "failed":
+            status = cls.FAILED
+        elif text == "excluded":
+            status = cls.EXCLUDED
+        return status
 
 
 class TestTaskStatus(enum.IntEnum):
