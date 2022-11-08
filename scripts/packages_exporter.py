@@ -47,8 +47,6 @@ LOG_DIR = Path.home() / 'exporter_logs'
 LOGGER_NAME = "packages-exporter"
 LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
 
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         'packages_exporter',
@@ -109,6 +107,7 @@ class Exporter:
             handlers=[logging.FileHandler(filename=LOG_FILE, mode='a'),
                       logging.StreamHandler(stream=sys.stdout)]
         )
+        os.makedirs(LOG_DIR, exist_ok = True)
         
         self._temp_dir = tempfile.gettempdir()
         self.logger = logging.getLogger(LOGGER_NAME)
