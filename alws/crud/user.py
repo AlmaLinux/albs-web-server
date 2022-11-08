@@ -7,7 +7,6 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 
-from alws.dramatiq import perform_user_removal
 from alws.errors import UserError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
@@ -203,6 +202,7 @@ async def remove_user(user_id: int, db: Session):
         # ALBS-620: When removing a user with a considerable
         # amount of builds, this might take some time.
         # For this reason, we are queuing the user removal process
+        from alws.dramatiq import perform_user_removal
         perform_user_removal.send(user_id)
 
 
