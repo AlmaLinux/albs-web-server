@@ -83,7 +83,8 @@ async def create_small_sign_task(
     task_payload = {
         'task_id': task_id,
         'content': payload.content,
-        'key_id': payload.pgp_keyid
+        'key_id': payload.pgp_keyid,
+        'sig_type': payload.sig_type,
     }
     pubsub = redis.pubsub()
     await pubsub.subscribe(task_id)
