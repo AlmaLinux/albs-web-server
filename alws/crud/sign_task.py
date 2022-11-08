@@ -186,6 +186,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             }
         )
     sign_task_payload['packages'] = packages
+    await db.commit()
     return sign_task_payload
 
 
@@ -200,6 +201,48 @@ async def complete_sign_task(
             sign_task_id: int,
             payload: sign_schema.SignTaskComplete
         ) -> models.SignTask:
+
+    async def __process_single_package(
+            pkg: sign_schema.SignedRpmInfo) -> typing.Tuple[str, dict]:
+        rpm_pkg = await pulp_client.get_rpm_packages(
+            include_fields=['pulp_href', 'sha256'],
+            sha256=pkg.sha256
+        )
+        sha256 = None
+        if rpm_pkg:
+            new_pkg_href = rpm_pkg[0]['pulp_href']
+            sha256 = rpm_pkg[0]['sha256']
+        else:
+            new_pkg_href = await pulp_client.create_rpm_package(
+                pkg.name, pkg.href)
+            if new_pkg_href:
+                package_info = await pulp_client.get_rpm_package(
+                    new_pkg_href, include_fields=['sha256'])
+                sha256 = package_info['sha256']
+        return pkg.name, {'id': pkg.id, 'href': new_pkg_href, 'sha256': sha256,
+                          'original_sha256': pkg.sha256}
+
+    async def __failed_post_processing(
+            task: models.SignTask, statistics: dict) -> models.SignTask:
+        finish_time = datetime.datetime.utcnow()
+        statistics['web_server_processing_time'] = int(
+            (finish_time - start_time).total_seconds())
+        task.stats = statistics
+        task.status = SignStatus.FAILED
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
+        return task
+
+    if getattr(payload, 'stats', None) and isinstance(payload.stats, dict):
+        stats = payload.stats.copy()
+    else:
+        stats = {}
+
+    start_time = datetime.datetime.utcnow()
+    similar_rpms_mapping = defaultdict(list)
+    packages_to_add = defaultdict(list)
+
     async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
@@ -215,15 +258,8 @@ async def complete_sign_task(
         binary_rpms = binary_rpms.scalars().all()
 
         all_rpms = source_rpms + binary_rpms
-        all_rpms_mapping = {r.id: r for r in all_rpms}
-        srpms_mapping = defaultdict(list)
-        srpm_hrefs = [srpm.artifact.href for srpm in source_rpms]
-        db_srpm_build_artifacts = await db.execute(
-            select(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.href.in_(srpm_hrefs))
-        )
-        for db_srpm_artifact in db_srpm_build_artifacts.scalars().all():
-            srpms_mapping[db_srpm_artifact.href].append(db_srpm_artifact)
+        for rpm in all_rpms:
+            similar_rpms_mapping[rpm.artifact.name].append(rpm)
         modified_items = []
         repo_mapping = await __get_build_repos(
             db, payload.build_id, build=build)
@@ -245,13 +281,9 @@ async def complete_sign_task(
             return sign_task
 
         if payload.packages:
-            sorted_packages = sorted(payload.packages, key=lambda p: p.id)
-            dedup_mapping = {p.name: p for p in sorted_packages}
-            dedup_ids = defaultdict(set)
-            for package in sorted_packages:
-                dedup_ids[package.name].add((package.id, package.arch))
-            packages_to_add = {}
-            for package in dedup_mapping.values():
+            # Check packages sign fingerprint, if it's not matching then
+            # fast-fail the process
+            for package in payload.packages:
                 # Check that package fingerprint matches the requested
                 if package.fingerprint != sign_task.sign_key.fingerprint:
                     logging.error('Package %s is signed with a wrong GPG key %s, '
@@ -259,57 +291,62 @@ async def complete_sign_task(
                                   package.fingerprint,
                                   sign_task.sign_key.fingerprint)
                     sign_failed = True
-                    continue
-                for pkg_id, pkg_arch in dedup_ids[package.name]:
-                    db_package = all_rpms_mapping[pkg_id]
-                    debug = is_debuginfo_rpm(package.name)
-                    repo = repo_mapping[(pkg_arch, debug)]
-                    rpm_pkg = await pulp_client.get_rpm_packages(
-                        include_fields=['pulp_href', 'sha256'],
-                        sha256=package.sha256
-                    )
-                    if rpm_pkg:
-                        new_pkg_href = rpm_pkg[0]['pulp_href']
-                        sha256 = rpm_pkg[0]['sha256']
-                    else:
-                        new_pkg_href = await pulp_client.create_rpm_package(
-                            package.name, package.href)
-                        package_info = await pulp_client.get_rpm_package(
-                            new_pkg_href, include_fields=['sha256'])
-                        sha256 = package_info['sha256']
-                    if new_pkg_href is None:
-                        logging.error('Package %s href is missing', str(package))
-                        sign_failed = True
-                        continue
-                    if not sha256:
-                        logging.error('Package %s sha256 checksum is missing',
-                                      str(package))
-                        sign_failed = True
-                        continue
-                    if sha256 != package.sha256:
-                        logging.error('Package %s checksum differs')
-                    if repo.pulp_href not in packages_to_add:
-                        packages_to_add[repo.pulp_href] = []
-                    packages_to_add[repo.pulp_href].append(new_pkg_href)
-                    # we should update href and add sign key
-                    # for every srpm in project
-                    db_sprms = srpms_mapping.get(db_package.artifact.href, [])
-                    for db_sprm in db_sprms:
-                        db_sprm.href = new_pkg_href
-                        db_sprm.sign_key = sign_task.sign_key
-                        db_sprm.cas_hash = package.cas_hash
-                        modified_items.append(db_sprm)
-                    db_package.artifact.href = new_pkg_href
-                    db_package.artifact.sign_key = sign_task.sign_key
-                    db_package.artifact.cas_hash = package.cas_hash
-                    modified_items.append(db_package)
-                    modified_items.append(db_package.artifact)
+                    break
+            if sign_failed:
+                sign_task = await __failed_post_processing(sign_task, stats)
+                return sign_task
 
-            tasks = []
-            for repo_href, packages in packages_to_add.items():
-                tasks.append(pulp_client.modify_repository(
-                    repo_href, add=packages))
-            await asyncio.gather(*tasks)
+            # Map packages to architectures to add them into proper repositories
+            package_arches_mapping = defaultdict(set)
+            # Make mapping for conversion (name-href mapping)
+            packages_to_convert = {}
+            for package in payload.packages:
+                package_arches_mapping[package.name].add(package.arch)
+                if package.name not in packages_to_convert:
+                    packages_to_convert[package.name] = package
+
+            results = await asyncio.gather(*(
+                __process_single_package(package)
+                for package in packages_to_convert.values()
+            ))
+            converted_packages = dict(results)
+
+            for pkg_name, pkg_info in converted_packages.items():
+                new_href = pkg_info['href']
+                if not pkg_info['href']:
+                    logging.error('Package %s href is missing', pkg_name)
+                    sign_failed = True
+                    break
+                if not pkg_info['sha256']:
+                    logging.error('Package %s sha256 checksum is missing',
+                                  pkg_name)
+                    sign_failed = True
+                    break
+                if pkg_info['sha256'] != pkg_info['original_sha256']:
+                    logging.error('Package %s checksum differs', pkg_name)
+                    sign_failed = True
+                    break
+
+                debug = is_debuginfo_rpm(pkg_name)
+                for db_pkg in similar_rpms_mapping.get(pkg_name, []):
+                    db_pkg.artifact.href = new_href
+                    db_pkg.artifact.sign_key = sign_task.sign_key
+                    db_pkg.artifact.cas_hash = package.cas_hash
+                    modified_items.append(db_pkg)
+                    modified_items.append(db_pkg.artifact)
+
+                for arch in package_arches_mapping.get(pkg_name, []):
+                    repo = repo_mapping[(arch, debug)]
+                    packages_to_add[repo.pulp_href].append(new_href)
+
+            if sign_failed:
+                sign_task = await __failed_post_processing(sign_task, stats)
+                return sign_task
+
+            await asyncio.gather(*(
+                pulp_client.modify_repository(repo_href, add=packages)
+                for repo_href, packages in packages_to_add.items()
+            ))
 
         if payload.success and not sign_failed:
             sign_task.status = SignStatus.COMPLETED
@@ -319,6 +356,11 @@ async def complete_sign_task(
             build.signed = False
         sign_task.log_href = payload.log_href
         sign_task.error_message = payload.error_message
+
+        finish_time = datetime.datetime.utcnow()
+        stats['web_server_processing_time'] = int(
+            (finish_time - start_time).total_seconds())
+        sign_task.stats = stats
 
         db.add(sign_task)
         db.add(build)

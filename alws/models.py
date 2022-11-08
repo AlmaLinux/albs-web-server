@@ -1027,6 +1027,7 @@ class SignTask(Base):
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    stats = sqlalchemy.Column(JSONB, nullable=True)
 
 
 class ExportTask(Base):
