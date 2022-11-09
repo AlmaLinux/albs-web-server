@@ -14,6 +14,7 @@ import typing
 import urllib.parse
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from pathlib import Path
+from time import time
 
 import jmespath
 import sqlalchemy
@@ -42,7 +43,9 @@ from alws.utils.errata import (
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
     '~/config/known_subkeys.json'))
-
+LOG_DIR = Path.home() / 'exporter_logs'
+LOGGER_NAME = "packages-exporter"
+LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -96,13 +99,18 @@ class Exporter:
         repodata_cache_dir: str,
         verbose: bool = False
     ):
+
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
             level=logging.DEBUG if verbose else logging.INFO,
-            datefmt='%Y-%m-%d %H:%M:%S'
+            datefmt='%Y-%m-%d %H:%M:%S',
+            handlers=[logging.FileHandler(filename=LOG_FILE, mode='a'),
+                      logging.StreamHandler(stream=sys.stdout)]
         )
+        os.makedirs(LOG_DIR, exist_ok = True)
+        
         self._temp_dir = tempfile.gettempdir()
-        self.logger = logging.getLogger('packages-exporter')
+        self.logger = logging.getLogger(LOGGER_NAME)
         self.pulp_client = pulp_client
         self.createrepo_c = local['createrepo_c']
         self.headers = {
