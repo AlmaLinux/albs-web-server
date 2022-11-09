@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from alws.config import settings
 
@@ -15,7 +15,11 @@ __all__ = ['Base', 'Session', 'SyncSession', 'PulpSession', 'engine']
 
 DATABASE_URL = settings.database_url
 
-engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
+engine = create_async_engine(
+    DATABASE_URL, poolclass=AsyncAdaptedQueuePool,
+    pool_size=10, max_overflow=5, pool_pre_ping=True, pool_recycle=1200,
+    echo_pool=True
+)
 sync_engine = create_engine(
     settings.sync_database_url, pool_pre_ping=True, pool_recycle=3600
 )
