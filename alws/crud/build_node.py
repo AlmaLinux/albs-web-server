@@ -591,7 +591,7 @@ async def __update_built_srpm_url(
             .where(
                 models.BuildTask.id != build_task.id,
                 models.BuildTask.ref_id == build_task.ref_id,
-                models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                models.BuildTask.status == BuildTaskStatus.IDLE,
             )
         )
         uncompleted_tasks_ids = uncompleted_tasks_ids.scalars().all()
@@ -653,6 +653,50 @@ async def __update_built_srpm_url(
             await db.execute(insert(models.BuildTaskArtifact), insert_values)
 
 
+async def fast_fail_other_tasks_by_ref(
+    db: Session,
+    current_task: models.BuildTask,
+):
+    build_tasks = await db.execute(
+        select(models.BuildTask)
+        .where(
+            models.BuildTask.id != current_task.id,
+            models.BuildTask.ref_id == current_task.ref_id,
+        )
+    )
+    build_tasks = build_tasks.scalars().all()
+    uncompleted_tasks = [
+        task
+        for task in build_tasks
+        if task.status == BuildTaskStatus.IDLE
+    ]
+    # if build_done raised exception in first arch of project,
+    # we need to stop building the project and
+    # fast-fail the uncompleted tasks
+    if len(build_tasks) != len(uncompleted_tasks):
+        return
+    fast_fail_msg = (
+        f"Fast failed: build processing failed in the initial "
+        f"architecture ({current_task.arch}). Please refer to the inital "
+        f"architecture build logs for more information about the failure."
+    )
+    uncompleted_tasks_ids = [task.id for task in uncompleted_tasks]
+    await db.execute(
+        update(models.BuildTask)
+        .where(
+            models.BuildTask.id.in_(uncompleted_tasks_ids),
+        )
+        .values(status=BuildTaskStatus.FAILED, error=fast_fail_msg)
+    )
+    await db.execute(
+        delete(models.BuildTaskDependency)
+        .where(
+            models.BuildTaskDependency.c.build_task_dependency.in_(uncompleted_tasks_ids),
+        )
+    )
+
+
+
 async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     success = True
     pulp = PulpClient(
@@ -662,20 +706,22 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
     )
     logging.info("Start processing build_task: %d", request.task_id)
     try:
-        async with db.begin():
-            async with pulp.begin():
-                build_task = await build_done(db, pulp, request)
+        async with db.begin(), pulp.begin():
+            build_task = await build_done(db, pulp, request)
             await db.commit()
     except Exception:
         logging.exception('Build done failed:')
         success = False
-        update_query = update(models.BuildTask).where(
-            models.BuildTask.id == request.task_id,
-        ).values(status=BuildTaskStatus.FAILED, error=traceback.format_exc())
-        await db.execute(update_query)
+        build_task = await db.execute(
+            select(models.BuildTask)
+            .where(models.BuildTask.id == request.task_id)
+        )
+        build_task = build_task.scalars().first()
+        build_task.status = BuildTaskStatus.FAILED
+        build_task.error = traceback.format_exc()
+        await fast_fail_other_tasks_by_ref(db, build_task)
     else:
         async with db.begin():
-            logging.info('Processing update srpm for task: %d', request.task_id)
             await __update_built_srpm_url(db, build_task, request)
             await db.commit()
     finally:
@@ -751,7 +797,7 @@ async def build_done(db: Session, pulp: PulpClient,
             srpm = models.SourceRpm()
             srpm.artifact = rpm
             srpm.build = build_task.build
-        else:
+        if not rpm.name.endswith('.src.rpm'):
             binary_rpm = models.BinaryRpm()
             binary_rpm.artifact = rpm
             binary_rpm.build = build_task.build
