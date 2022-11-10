@@ -9,6 +9,7 @@ from starlette.exceptions import ExceptionMiddleware
 
 from alws import routers
 from alws.auth import AuthRoutes
+from alws.database import engine
 from alws.auth.backend import CookieBackend
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
@@ -36,6 +37,9 @@ app.add_middleware(ExceptionMiddleware, handlers=handlers)
 
 @app.on_event('startup')
 async def startup():
+    # This is needed to acquire a correct database connection pool
+    # after forking from a main process
+    await engine.dispose()
     global scheduler, terminate_event, graceful_terminate_event
     scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
     asyncio.create_task(scheduler.run())

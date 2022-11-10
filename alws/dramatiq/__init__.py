@@ -17,6 +17,7 @@ import dramatiq
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 
 from alws.config import settings
+from alws.database import engine
 
 rabbitmq_broker = RabbitmqBroker(
     url=f'amqp://'
@@ -27,6 +28,9 @@ rabbitmq_broker = RabbitmqBroker(
 )
 dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
+# This is needed to acquire a correct database connection pool
+# after forking from a main process
+event_loop.run_until_complete(engine.dispose())
 
 
 # Tasks import started from here
