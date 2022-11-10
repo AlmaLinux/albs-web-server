@@ -91,6 +91,16 @@ class BuildPlanner:
         if db_flavors:
             self._platform_flavors = db_flavors
 
+    def is_beta_build(self):
+        if not self._platform_flavors:
+            return False
+        found = False
+        for flavor in self._platform_flavors:
+            if bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
+                found = True
+                break
+        return found
+
     async def create_build_repo(
                 self,
                 platform: models.Platform,
@@ -185,7 +195,54 @@ class BuildPlanner:
         return multilib_artifacts
 
     @staticmethod
+    def merge_beta_module_artifacts(stable: dict, beta: dict) -> dict:
+        # Fast decisions before doing the merge
+        if not stable and not beta:
+            return {}
+        elif stable and not beta:
+            return stable
+        elif not stable and beta:
+            return beta
+
+        merged = {}
+
+        for module_name, projects in stable.items():
+            # If no updates for modules then just copy stable data in result
+            if not beta.get(module_name, {}):
+                merged[module_name] = projects
+                continue
+
+            new_projects = {}
+            beta_projects = beta[module_name]
+            for proj_name, packages in projects.items():
+                # If no updates for packages in beta data
+                # then just copy data in result
+                if not beta_projects.get(proj_name, []):
+                    new_projects[proj_name] = packages
+                    continue
+
+                new_packages = []
+                for stable_pkg in packages:
+                    update_found = False
+                    stable_pkg_name = stable_pkg['name']
+                    stable_pkg_arch = stable_pkg['arch']
+                    for beta_pkg in beta_projects[proj_name]:
+                        if (stable_pkg_name == beta_pkg['name']
+                                and stable_pkg_arch == beta_pkg['arch']):
+                            update_found = True
+                            new_packages.append(beta_pkg)
+                            break
+                    if not update_found:
+                        new_packages.append(stable_pkg)
+
+                new_projects[proj_name] = new_packages
+
+            merged[module_name] = new_projects
+
+        return merged
+
     async def get_prebuilt_module_artifacts(
+            self,
             task: build_schema.BuildTaskModuleRef,
             platform_name: str, platform_version: str, task_arch: str,
     ) -> dict:
@@ -198,6 +255,17 @@ class BuildPlanner:
         artifacts = await beholder.get_module_artifacts(
             clean_name, platform_version, task.module_name,
             task.module_stream, arch)
+
+        # Include data from beta flavor for partial updates
+        if self.is_beta_build():
+            beta_artifacts = await beholder.get_module_artifacts(
+                f'{clean_name}-beta', platform_version, task.module_name,
+                task.module_stream, arch
+            )
+            if beta_artifacts:
+                artifacts = self.merge_beta_module_artifacts(
+                    artifacts, beta_artifacts)
+
         reprocessed = {}
         for module_name, projects in artifacts.items():
             reprocessed[module_name] = {}

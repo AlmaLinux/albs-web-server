@@ -1,7 +1,8 @@
 import asyncio
-import typing
-import logging
 import datetime
+import logging
+import re
+import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
@@ -459,6 +460,13 @@ async def get_module_refs(
             name=f'{task.git_repo_name}-devel',
             stream=task.module_stream_from_ref()
         )
+
+    has_beta_flafor = False
+    for flavor in flavors:
+        if bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
+            has_beta_flafor = True
+            break
+
     checking_tasks = []
     if platform_arches is None:
         platform_arches = []
@@ -479,6 +487,14 @@ async def get_module_refs(
             )
             checking_tasks.append(get_module_data_from_beholder(
                 beholder_client, endpoint, arch, devel=module_is_devel))
+
+            if has_beta_flafor:
+                endpoint = (
+                    f'/api/v1/distros/{clean_dist_name}-beta/{distr_ver}'
+                    f'/module/{_module.name}/{_module.stream}/{request_arch}/'
+                )
+                checking_tasks.append(get_module_data_from_beholder(
+                    beholder_client, endpoint, arch, devel=module_is_devel))
     beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
