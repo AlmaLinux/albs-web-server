@@ -375,7 +375,7 @@
     - name: almalinux-8-raspberrypi
       arch: aarch64
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/8/raspberrypi/aarch64/os/
+      remote_url: https://repo.almalinux.org/almalinux/8/raspberrypi/aarch64/os/
       export_path: almalinux/8/raspberrypi/aarch64/os/
       production: true
       debug: false
@@ -466,7 +466,7 @@
     - name: almalinux-8-raspberrypi
       arch: src
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/raspberrypi/Source/
+      remote_url: https://repo.almalinux.org/vault/8/raspberrypi/Source/
       export_path: vault/8/raspberrypi/Source/
       production: true
       debug: false
@@ -767,7 +767,7 @@
     - arch: aarch64
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/8/plus/aarch64/os/
+      remote_url: https://repo.almalinux.org/almalinux/8/plus/aarch64/os/
       export_path: almalinux/8/plus/aarch64/os/
       production: true
       debug: false
@@ -777,7 +777,7 @@
     - arch: ppc64le
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/8/plus/ppc64le/os/
+      remote_url: https://repo.almalinux.org/almalinux/8/plus/ppc64le/os/
       export_path: almalinux/8/plus/ppc64le/os/
       production: true
       debug: false
@@ -787,7 +787,7 @@
     - arch: x86_64
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/8/plus/x86_64/os/
+      remote_url: https://repo.almalinux.org/almalinux/8/plus/x86_64/os/
       export_path: almalinux/8/plus/x86_64/os/
       production: true
       debug: false
@@ -797,7 +797,7 @@
     - arch: i686
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/i686/os/
+      remote_url: https://repo.almalinux.org/vault/8/plus/i686/os/
       export_path: vault/8/plus/i686/os/
       production: true
       debug: false
@@ -807,7 +807,7 @@
     - arch: src
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/Source/
+      remote_url: https://repo.almalinux.org/vault/8/plus/Source/
       export_path: vault/8/plus/Source/
       production: true
       debug: false
@@ -817,7 +817,7 @@
     - arch: aarch64
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/plus/debug/aarch64/
       export_path: vault/8/plus/debug/aarch64/
       production: true
       debug: true
@@ -827,7 +827,7 @@
     - arch: ppc64le
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/8/plus/debug/ppc64le/
       export_path: vault/8/plus/debug/ppc64le/
       production: true
       debug: true
@@ -837,7 +837,7 @@
     - arch: x86_64
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/8/plus/debug/x86_64/
       export_path: vault/8/plus/debug/x86_64/
       production: true
       debug: true
@@ -847,7 +847,7 @@
     - arch: i686
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/i686/
+      remote_url: https://repo.almalinux.org/vault/8/plus/debug/i686/
       export_path: vault/8/plus/debug/i686/
       production: true
       debug: true
@@ -857,7 +857,7 @@
     - name: almalinux-8-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/raspberrypi/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/8/raspberrypi/debug/aarch64/
       export_path: vault/8/raspberrypi/debug/aarch64/
       production: true
       debug: true
@@ -1108,7 +1108,7 @@
     - arch: s390x
       name: almalinux-8-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/8/plus/s390x/os/
+      remote_url: https://repo.almalinux.org/almalinux/8/plus/s390x/os/
       export_path: almalinux/8/plus/s390x/os/
       production: true
       debug: false
@@ -1118,7 +1118,7 @@
     - arch: s390x
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/8/plus/debug/s390x/
+      remote_url: https://repo.almalinux.org/vault/8/plus/debug/s390x/
       export_path: vault/8/plus/debug/s390x/
       production: true
       debug: true
@@ -1413,7 +1413,7 @@
     - arch: s390x
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/devel/s390x/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/devel/s390x/os/
       export_path: almalinux/9/devel/s390x/os/
       production: true
       debug: false
@@ -1423,7 +1423,7 @@
     - arch: x86_64
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/devel/x86_64/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/devel/x86_64/os/
       export_path: almalinux/9/devel/x86_64/os/
       production: true
       debug: false
@@ -1433,7 +1433,7 @@
     - arch: ppc64le
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/devel/ppc64le/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/devel/ppc64le/os/
       export_path: almalinux/9/devel/ppc64le/os/
       production: true
       debug: false
@@ -1443,7 +1443,7 @@
     - arch: i686
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/devel/i686/os/
+      remote_url: https://repo.almalinux.org/vault/9/devel/i686/os/
       export_path: vault/9/devel/i686/os/
       production: true
       debug: false
@@ -1453,7 +1453,7 @@
     - arch: aarch64
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/devel/aarch64/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/devel/aarch64/os/
       export_path: almalinux/9/devel/aarch64/os/
       production: true
       debug: false
@@ -1463,7 +1463,7 @@
     - arch: src
       name: almalinux-9-devel
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/devel/Source/
+      remote_url: https://repo.almalinux.org/vault/9/devel/Source/
       export_path: vault/9/devel/Source/
       production: true
       debug: false
@@ -2503,7 +2503,7 @@
     - arch: aarch64
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/plus/aarch64/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/plus/aarch64/os/
       export_path: almalinux/9/plus/aarch64/os/
       production: true
       debug: false
@@ -2513,7 +2513,7 @@
     - arch: ppc64le
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/plus/ppc64le/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/plus/ppc64le/os/
       export_path: almalinux/9/plus/ppc64le/os/
       production: true
       debug: false
@@ -2523,7 +2523,7 @@
     - arch: x86_64
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/plus/x86_64/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/plus/x86_64/os/
       export_path: almalinux/9/plus/x86_64/os/
       production: true
       debug: false
@@ -2533,7 +2533,7 @@
     - arch: s390x
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/plus/s390x/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/plus/s390x/os/
       export_path: almalinux/9/plus/s390x/os/
       production: true
       debug: false
@@ -2543,7 +2543,7 @@
     - arch: i686
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/i686/os/
+      remote_url: https://repo.almalinux.org/vault/9/plus/i686/os/
       export_path: vault/9/plus/i686/os/
       production: true
       debug: false
@@ -2553,7 +2553,7 @@
     - arch: src
       name: almalinux-9-plus
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/Source/
+      remote_url: https://repo.almalinux.org/vault/9/plus/Source/
       export_path: vault/9/plus/Source/
       production: true
       debug: false
@@ -2563,7 +2563,7 @@
     - arch: aarch64
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/9/plus/debug/aarch64/
       export_path: vault/9/plus/debug/aarch64/
       production: true
       debug: true
@@ -2573,7 +2573,7 @@
     - arch: ppc64le
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/ppc64le/
+      remote_url: https://repo.almalinux.org/vault/9/plus/debug/ppc64le/
       export_path: vault/9/plus/debug/ppc64le/
       production: true
       debug: true
@@ -2583,7 +2583,7 @@
     - arch: x86_64
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/x86_64/
+      remote_url: https://repo.almalinux.org/vault/9/plus/debug/x86_64/
       export_path: vault/9/plus/debug/x86_64/
       production: true
       debug: true
@@ -2593,7 +2593,7 @@
     - arch: s390x
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/s390x/
+      remote_url: https://repo.almalinux.org/vault/9/plus/debug/s390x/
       export_path: vault/9/plus/debug/s390x/
       production: true
       debug: true
@@ -2603,7 +2603,7 @@
     - arch: i686
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/plus/debug/i686/
+      remote_url: https://repo.almalinux.org/vault/9/plus/debug/i686/
       export_path: vault/9/plus/debug/i686/
       production: true
       debug: true
@@ -2613,7 +2613,7 @@
     - name: almalinux-9-raspberrypi
       arch: aarch64
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/almalinux/9/raspberrypi/aarch64/os/
+      remote_url: https://repo.almalinux.org/almalinux/9/raspberrypi/aarch64/os/
       export_path: almalinux/9/raspberrypi/aarch64/os/
       production: true
       debug: false
@@ -2624,7 +2624,7 @@
     - name: almalinux-9-raspberrypi
       arch: src
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/raspberrypi/Source/
+      remote_url: https://repo.almalinux.org/vault/9/raspberrypi/Source/
       export_path: vault/9/raspberrypi/Source/
       production: true
       debug: false
@@ -2635,7 +2635,7 @@
     - name: almalinux-9-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: https://rsync.repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
+      remote_url: https://repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
       export_path: vault/9/raspberrypi/debug/aarch64/
       production: true
       debug: true
