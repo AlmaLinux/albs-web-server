@@ -1125,6 +1125,226 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: i686
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/i686/os/
+      export_path: vault/8/SAP/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAP/x86_64/os/
+      export_path: almalinux/8/SAP/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: ppc64le
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAP/ppc64le/os/
+      export_path: almalinux/8/SAP/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: aarch64
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAP/aarch64/os/
+      export_path: almalinux/8/SAP/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAP/s390x/os/
+      export_path: almalinux/8/SAP/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: src
+      name: almalinux-8-sap
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/Source/
+      export_path: vault/8/SAP/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-sap-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/debug/i686/
+      export_path: vault/8/SAP/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-sap-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/debug/x86_64/
+      export_path: vault/8/SAP/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: ppc64le
+      name: almalinux-8-sap-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/debug/ppc64le/
+      export_path: vault/8/SAP/debug/ppc64le/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: aarch64
+      name: almalinux-8-sap-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/debug/aarch64/
+      export_path: vault/8/SAP/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-sap-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAP/debug/s390x/
+      export_path: vault/8/SAP/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/i686/os/
+      export_path: vault/8/SAPHANA/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAPHANA/x86_64/os/
+      export_path: almalinux/8/SAPHANA/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: ppc64le
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAPHANA/ppc64le/os/
+      export_path: almalinux/8/SAPHANA/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: aarch64
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAPHANA/aarch64/os/
+      export_path: almalinux/8/SAPHANA/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/almalinux/8/SAPHANA/s390x/os/
+      export_path: almalinux/8/SAPHANA/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: src
+      name: almalinux-8-saphana
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/Source/
+      export_path: vault/8/SAPHANA/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: i686
+      name: almalinux-8-saphana-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/debug/i686/
+      export_path: vault/8/SAPHANA/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: x86_64
+      name: almalinux-8-saphana-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/debug/x86_64/
+      export_path: vault/8/SAPHANA/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: ppc64le
+      name: almalinux-8-saphana-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/debug/ppc64le/
+      export_path: vault/8/SAPHANA/debug/ppc64le/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: aarch64
+      name: almalinux-8-saphana-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/debug/aarch64/
+      export_path: vault/8/SAPHANA/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: s390x
+      name: almalinux-8-saphana-debuginfo
+      type: rpm
+      remote_url: http://rsync.repo.almalinux.org/vault/8/SAPHANA/debug/s390x/
+      export_path: vault/8/SAPHANA/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
 
 - name: AlmaLinux-9
   distr_type: rhel
