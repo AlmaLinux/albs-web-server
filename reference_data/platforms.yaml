@@ -8,8 +8,8 @@
   reference_platforms:
     - 'CentOSStream8'
   modularity:
-    modified_packages_url: 'http://git.almalinux.org/almalinux/modified_packages/raw/branch/a8/modified_packages.yml'
-    packages_git: 'http://git.almalinux.org/rpms/'
+    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a8/modified_packages.yml'
+    packages_git: 'https://git.almalinux.org/rpms/'
     git_tag_prefix:
       modified: a8
       non_modified: c8
@@ -1355,8 +1355,8 @@
   reference_platforms:
     - 'CentOSStream9'
   modularity:
-    modified_packages_url: 'http://git.almalinux.org/almalinux/modified_packages/raw/branch/a9/modified_packages.yml'
-    packages_git: 'http://git.almalinux.org/rpms/'
+    modified_packages_url: 'https://git.almalinux.org/almalinux/modified_packages/raw/branch/a9/modified_packages.yml'
+    packages_git: 'https://git.almalinux.org/rpms/'
     git_tag_prefix:
       modified: a9
       non_modified: c9
