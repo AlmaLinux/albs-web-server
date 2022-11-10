@@ -28,10 +28,6 @@ rabbitmq_broker = RabbitmqBroker(
 )
 dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
-# This is needed to acquire a correct database connection pool
-# after forking from a main process
-event_loop.run_until_complete(engine.dispose())
-
 
 # Tasks import started from here
 from alws.dramatiq.build import start_build, build_done, create_log_repo
