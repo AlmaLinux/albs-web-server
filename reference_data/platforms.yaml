@@ -348,7 +348,7 @@
     - arch: ppc64le
       name: almalinux-8-devel
       export_path: almalinux/8/devel/ppc64le/os/
-      remote_url: http://repo.almalinux.org/development/almalinux/8/devel/ppc64le/os/
+      remote_url: http://repo.almalinux.org/almalinux/8/devel/ppc64le/os/
       type: rpm
       debug: false
       remote_sync_policy: on_demand
@@ -365,13 +365,7 @@
       repository_sync_policy: additive
       production: true
       priority: 10
-    - arch: ppc64le
-      name: alma8-distribution-ppc64le
-      remote_url: http://build.almalinux.org/pulp/content/builds/almalinux8-AlmaLinux-8-ppc64le-dr/
-      type: rpm
-      production: false
-      debug: false
-      priority: 10
+      mock_enabled: false
     - name: almalinux-8-raspberrypi
       arch: aarch64
       type: rpm
@@ -484,6 +478,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-appstream-debuginfo
       arch: i686
       type: rpm
@@ -494,6 +489,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-powertools-debuginfo
       arch: i686
       type: rpm
@@ -504,6 +500,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -514,6 +511,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -524,6 +522,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -534,6 +533,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -544,6 +544,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos-debuginfo
       arch: x86_64
       type: rpm
@@ -554,6 +555,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-appstream-debuginfo
       arch: x86_64
       type: rpm
@@ -564,6 +566,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-powertools-debuginfo
       arch: x86_64
       type: rpm
@@ -574,6 +577,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -584,6 +588,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -594,6 +599,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -604,6 +610,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -614,6 +621,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -624,6 +632,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -634,6 +643,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos-debuginfo
       arch: aarch64
       type: rpm
@@ -644,6 +654,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-appstream-debuginfo
       arch: aarch64
       type: rpm
@@ -654,6 +665,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-powertools-debuginfo
       arch: aarch64
       type: rpm
@@ -664,6 +676,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -674,6 +687,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -684,6 +698,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -694,6 +709,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -704,6 +720,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos-debuginfo
       arch: ppc64le
       type: rpm
@@ -714,6 +731,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-appstream-debuginfo
       arch: ppc64le
       type: rpm
@@ -724,6 +742,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-powertools-debuginfo
       arch: ppc64le
       type: rpm
@@ -734,6 +753,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -744,6 +764,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -754,6 +775,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -764,6 +786,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-plus
       type: rpm
@@ -824,6 +847,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-plus-debuginfo
       type: rpm
@@ -834,6 +858,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-plus-debuginfo
       type: rpm
@@ -844,6 +869,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-plus-debuginfo
       type: rpm
@@ -854,6 +880,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
@@ -885,6 +912,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-nfv
       type: rpm
@@ -915,6 +943,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-rt
       type: rpm
@@ -935,6 +964,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-rt
       type: rpm
@@ -965,6 +995,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-baseos
       type: rpm
@@ -1045,6 +1076,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-appstream-debuginfo
       arch: s390x
       type: rpm
@@ -1055,6 +1087,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-8-powertools-debuginfo
       arch: s390x
       type: rpm
@@ -1065,6 +1098,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-highavailability-debuginfo
       type: rpm
@@ -1075,6 +1109,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
@@ -1085,6 +1120,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-devel-debuginfo
       type: rpm
@@ -1095,6 +1131,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-extras-debuginfo
       type: rpm
@@ -1105,6 +1142,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-plus
       type: rpm
@@ -1115,6 +1153,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-plus-debuginfo
       type: rpm
@@ -1125,6 +1164,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-sap
       type: rpm
@@ -1195,6 +1235,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-sap-debuginfo
       type: rpm
@@ -1205,6 +1246,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-sap-debuginfo
       type: rpm
@@ -1215,6 +1257,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-sap-debuginfo
       type: rpm
@@ -1225,6 +1268,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-sap-debuginfo
       type: rpm
@@ -1235,6 +1279,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-8-saphana
       type: rpm
@@ -1305,6 +1350,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-8-saphana-debuginfo
       type: rpm
@@ -1315,6 +1361,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-8-saphana-debuginfo
       type: rpm
@@ -1325,6 +1372,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-8-saphana-debuginfo
       type: rpm
@@ -1335,6 +1383,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-8-saphana-debuginfo
       type: rpm
@@ -1345,6 +1394,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
 
 - name: AlmaLinux-9
   distr_type: rhel
@@ -1480,6 +1530,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-devel-debuginfo
       type: rpm
@@ -1490,6 +1541,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-devel-debuginfo
       type: rpm
@@ -1500,6 +1552,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-devel-debuginfo
       type: rpm
@@ -1510,6 +1563,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-devel-debuginfo
       type: rpm
@@ -1520,6 +1574,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-appstream
       type: rpm
@@ -1590,6 +1645,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-appstream-debuginfo
       type: rpm
@@ -1600,6 +1656,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-appstream-debuginfo
       type: rpm
@@ -1610,6 +1667,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-appstream-debuginfo
       type: rpm
@@ -1620,6 +1678,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-appstream-debuginfo
       type: rpm
@@ -1630,6 +1689,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-baseos
       type: rpm
@@ -1700,6 +1760,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-baseos-debuginfo
       type: rpm
@@ -1710,6 +1771,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-baseos-debuginfo
       type: rpm
@@ -1720,6 +1782,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-baseos-debuginfo
       type: rpm
@@ -1730,6 +1793,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-baseos-debuginfo
       type: rpm
@@ -1740,6 +1804,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-highavailability
       type: rpm
@@ -1810,6 +1875,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-highavailability-debuginfo
       type: rpm
@@ -1820,6 +1886,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-highavailability-debuginfo
       type: rpm
@@ -1830,6 +1897,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-highavailability-debuginfo
       type: rpm
@@ -1840,6 +1908,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-highavailability-debuginfo
       type: rpm
@@ -1850,6 +1919,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-resilientstorage
       type: rpm
@@ -1920,6 +1990,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
@@ -1930,6 +2001,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
@@ -1940,6 +2012,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
@@ -1950,6 +2023,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
@@ -1960,6 +2034,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-extras
       type: rpm
@@ -2030,6 +2105,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-extras-debuginfo
       type: rpm
@@ -2040,6 +2116,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-extras-debuginfo
       type: rpm
@@ -2050,6 +2127,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-extras-debuginfo
       type: rpm
@@ -2060,6 +2138,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-extras-debuginfo
       type: rpm
@@ -2070,6 +2149,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-crb
       type: rpm
@@ -2140,6 +2220,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-crb-debuginfo
       type: rpm
@@ -2150,6 +2231,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-crb-debuginfo
       type: rpm
@@ -2160,6 +2242,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-crb-debuginfo
       type: rpm
@@ -2170,6 +2253,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-crb-debuginfo
       type: rpm
@@ -2180,6 +2264,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-nfv
       type: rpm
@@ -2200,6 +2285,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-nfv
       type: rpm
@@ -2230,6 +2316,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-rt
       type: rpm
@@ -2250,6 +2337,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-rt
       type: rpm
@@ -2280,6 +2368,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-sap
       type: rpm
@@ -2350,6 +2439,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-sap-debuginfo
       type: rpm
@@ -2360,6 +2450,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-sap-debuginfo
       type: rpm
@@ -2370,6 +2461,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-sap-debuginfo
       type: rpm
@@ -2380,6 +2472,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-sap-debuginfo
       type: rpm
@@ -2390,6 +2483,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-saphana
       type: rpm
@@ -2460,6 +2554,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-saphana-debuginfo
       type: rpm
@@ -2470,6 +2565,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-saphana-debuginfo
       type: rpm
@@ -2480,6 +2576,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-saphana-debuginfo
       type: rpm
@@ -2490,6 +2587,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-saphana-debuginfo
       type: rpm
@@ -2500,6 +2598,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-9-plus
       type: rpm
@@ -2570,6 +2669,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: ppc64le
       name: almalinux-9-plus-debuginfo
       type: rpm
@@ -2580,6 +2680,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: x86_64
       name: almalinux-9-plus-debuginfo
       type: rpm
@@ -2590,6 +2691,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: s390x
       name: almalinux-9-plus-debuginfo
       type: rpm
@@ -2600,6 +2702,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - arch: i686
       name: almalinux-9-plus-debuginfo
       type: rpm
@@ -2610,6 +2713,7 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+      mock_enabled: false
     - name: almalinux-9-raspberrypi
       arch: aarch64
       type: rpm
