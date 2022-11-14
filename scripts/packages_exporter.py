@@ -451,14 +451,15 @@ class Exporter:
         repodata_path = os.path.join(repo_path, 'repodata')
         # We need to save downloaded modules metadata in order to include it
         # correctly while using cached repodata
-        modules_path = None
+        old_modules_path = None
+        new_modules_path = None
         modules_temp_path = None
         modules = find_metadata(repodata_path, 'modules')
         if modules:
-            modules_path = os.path.join(repodata_path, modules)
+            old_modules_path = os.path.join(repodata_path, modules)
             modules_temp_path = os.path.join(
                 self._temp_dir, os.path.basename(modules))
-            shutil.copyfile(modules_path, modules_temp_path)
+            shutil.copyfile(old_modules_path, modules_temp_path)
         repo_repodata_cache = os.path.join(
             self.repodata_cache_dir, partial_path)
         sync_fix_permissions(
@@ -472,23 +473,24 @@ class Exporter:
         _, stdout, _ = self.createrepo_c.run(args=args)
 
         # Regenerate module metadata
-        if modules_path and modules_temp_path:
+        if old_modules_path and modules_temp_path:
             try:
                 self.logger.info(
                     'Regenerating module metadata for %s', repo_path)
                 new_modules = find_metadata(repodata_path, 'modules')
                 if new_modules:
-                    os.remove(os.path.join(repodata_path, new_modules))
-                if os.path.exists(modules_path):
-                    os.remove(modules_path)
-                shutil.copyfile(modules_temp_path, modules_path)
+                    new_modules_path = os.path.join(repodata_path, new_modules)
+                    os.remove(new_modules_path)
+                if os.path.exists(old_modules_path):
+                    os.remove(old_modules_path)
+                shutil.copyfile(modules_temp_path, old_modules_path)
                 _, stdout, _ = self.createrepo_c.run(
                     args=('--update', '--keep-all-metadata', repo_path))
                 self.logger.debug(stdout)
                 self.logger.info('Module metadata regeneration is finished')
             finally:
-                if modules_path:
-                    os.remove(modules_path)
+                if old_modules_path and old_modules_path != new_modules_path:
+                    os.remove(old_modules_path)
                 if modules_temp_path:
                     os.remove(modules_temp_path)
 
