@@ -2,6 +2,7 @@ import asyncio
 import re
 import copy
 import logging
+import traceback
 import typing
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
@@ -408,6 +409,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         except (EmptyReleasePlan, MissingRepository,
                 SignError, ReleaseLogicError) as e:
             message = f'Cannot commit release: {str(e)}'
+            release.status = ReleaseStatus.FAILED
+        except Exception:
+            message = f"Cannot commit release:\n{traceback.format_exc()}"
             release.status = ReleaseStatus.FAILED
         else:
             message = 'Successfully committed release'
