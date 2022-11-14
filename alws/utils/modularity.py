@@ -191,6 +191,12 @@ class ModuleWrapper:
         self._stream.clear_dependencies()
         self._stream.add_dependencies(new_deps)
 
+    def add_module_dependency_to_devel_module(self, module):
+        deps = self._stream.get_dependencies()[0]
+        deps.add_runtime_stream(module.name, module.stream)
+        self._stream.clear_dependencies()
+        self._stream.add_dependencies(deps)
+
     def get_build_deps(self) -> dict:
         build_deps = {}
         # try to extract a detailed requirements list from the
