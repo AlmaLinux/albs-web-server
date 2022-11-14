@@ -1,6 +1,7 @@
 from typing import Dict, Any
 
 import dramatiq
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
@@ -33,6 +34,27 @@ def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
 
 
 async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
+    has_modules = any((isinstance(t, build_schema.BuildTaskModuleRef)
+                       for t in build_request.tasks))
+    module_build_index = {}
+
+    if has_modules:
+        with SyncSession() as db, db.begin():
+            platforms = db.execute(select(models.Platform).where(
+                models.Platform.name.in_(
+                    [p.name for p in build_request.platforms]))
+            ).scalars().all()
+            for platform in platforms:
+                db.execute(update(models.Platform).where(
+                    models.Platform.id == platform.id).values(
+                    {'module_build_index': models.Platform.module_build_index + 1}))
+                db.add(platform)
+            db.flush()
+            for platform in platforms:
+                module_build_index[platform.name] = platform.module_build_index
+            db.commit()
+            db.close()
+
     with SyncSession() as db:
         with db.begin():
             build = _sync_fetch_build(db, build_id)
@@ -42,6 +64,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 platforms=build_request.platforms,
                 platform_flavors=build_request.platform_flavors,
                 is_secure_boot=build_request.is_secure_boot,
+                module_build_index=module_build_index
             )
             for task in build_request.tasks:
                 await planner.add_task(task)
@@ -52,6 +75,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
             db.flush()
             await planner.init_build_repos()
             db.commit()
+        db.close()
 
 
 async def _build_done(request: build_node_schema.BuildDone):

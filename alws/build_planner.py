@@ -39,6 +39,7 @@ class BuildPlanner:
                 platforms: typing.List[build_schema.BuildCreatePlatforms],
                 platform_flavors: typing.Optional[typing.List[int]],
                 is_secure_boot: bool,
+                module_build_index: typing.Optional[dict],
             ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -57,7 +58,7 @@ class BuildPlanner:
         self._platforms = []
         self._platform_flavors = []
         self._modules_by_target = collections.defaultdict(list)
-        self._module_build_index = {}
+        self._module_build_index = module_build_index or {}
         self._module_modified_cache = {}
         self._tasks_cache = collections.defaultdict(list)
         self._is_secure_boot = is_secure_boot
@@ -413,10 +414,9 @@ class BuildPlanner:
                 if modules:
                     module = modules[0]
                     build_index = self._module_build_index.get(platform.name)
-                    if build_index is None:
-                        platform.module_build_index += 1
-                        build_index = platform.module_build_index
-                        self._module_build_index[platform.name] = build_index
+                    if not build_index:
+                        raise ValueError(
+                            f'Build index for {platform.name} is not defined')
                     platform_dist = modularity_version['dist_prefix']
                     dist_macro = calc_dist_macro(
                         module.name,
