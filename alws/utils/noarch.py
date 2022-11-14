@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import logging
 import typing
@@ -131,11 +132,12 @@ async def save_noarch_packages(
     db.add_all(new_noarch_artifacts)
     await db.flush()
 
-    for repo_href, content_dict in repos_to_update.items():
-        await pulp_client.modify_repository(
-            repo_to=repo_href,
-            add=content_dict['add'],
-            remove=content_dict['remove'],
-        )
+    await asyncio.gather(*(
+        pulp_client.modify_repository(
+            repo_href, add=content_dict['add'],
+            remove=content_dict['remove'])
+        for repo_href, content_dict in repos_to_update.items()
+    ))
+
     logging.info("Noarch packages processing is finished")
     return new_binary_rpms
