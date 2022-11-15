@@ -1,9 +1,12 @@
 import asyncio
 import collections
+from contextlib import asynccontextmanager
 import datetime
+import logging
 import re
 from typing import (
     Any,
+    Awaitable,
     DefaultDict,
     Dict,
     List,
@@ -14,14 +17,13 @@ import uuid
 
 import createrepo_c as cr
 import jinja2
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, update
 from sqlalchemy.orm import selectinload, load_only, Session
 from sqlalchemy.sql.expression import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
-from alws.constants import ErrataReleaseStatus
-from alws.dependencies import get_pulp_db
+from alws.dependencies import get_pulp_db, get_db
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
@@ -359,23 +361,25 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
     return oval.dump_to_string()
 
 
-def prepare_search_params(errata_record: models.ErrataRecord) -> Dict[str, List[str]]:
-    search_params = collections.defaultdict(set)
+def prepare_search_params(
+    errata_record: models.ErrataRecord,
+) -> DefaultDict[str, List[str]]:
+    search_params = collections.defaultdict(list)
     for package in errata_record.packages:
         for attr in ("name", "version", "epoch"):
             value = str(getattr(package, attr))
-            search_params[attr].add(value)
-    for key, values in search_params.items():
-        search_params[key] = list(values)
+            if value in search_params[attr]:
+                continue
+            search_params[attr].append(value)
     return search_params
 
 
 async def load_platform_packages(
     platform: models.Platform,
-    search_params: DefaultDict[str, set],
+    search_params: DefaultDict[str, List[str]],
     pulp: PulpClient,
     for_release: bool = False,
-):
+) -> Dict[str, Any]:
     cache = {}
     # With this minimal length for lists, we will evade
     # errors with large query path in requests
@@ -396,6 +400,8 @@ async def load_platform_packages(
 
     async def _callback(pulp_href: str):
         latest_version = await pulp.get_repo_latest_version(pulp_href)
+        if not latest_version:
+            return
         request_params = {"epoch__in": ",".join(search_params["epoch"])}
         for pkg_names in slice_list(list(search_params["name"]), max_list_len):
             request_params["name__in"] = ",".join(pkg_names)
@@ -703,7 +709,7 @@ async def list_errata_records(
     compact: Optional[bool] = False,
     errata_id: Optional[str] = None,
     title: Optional[str] = None,
-    platform: Optional[str] = None,
+    platform: Optional[int] = None,
     cve_id: Optional[str] = None,
     status: Optional[ErrataReleaseStatus] = None,
 ):
@@ -791,12 +797,13 @@ async def update_package_status(
 
 
 async def release_errata_packages(
-    db: AsyncSession,
+    session: AsyncSession,
     pulp_client: PulpClient,
     record: models.ErrataRecord,
     packages: List[models.ErrataToALBSPackage],
     platform: models.Platform,
     repo_href: str,
+    publish: bool = True,
 ):
     repo = await pulp_client.get_by_href(repo_href)
     released_record = await pulp_client.list_updateinfo_records(
@@ -840,7 +847,7 @@ async def release_errata_packages(
         query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
         if errata_pkg.albs_artifact_id is not None:
             query = models.BuildTaskArtifact.id == errata_pkg.albs_artifact_id
-        db_pkg = await db.execute(
+        db_pkg = await session.execute(
             select(models.BuildTaskArtifact)
             .where(query)
             .options(
@@ -902,7 +909,8 @@ async def release_errata_packages(
         "reboot_suggested": reboot_suggested,
     }
     await pulp_client.add_errata_record(pulp_record, repo_href)
-    await pulp_client.create_rpm_publication(repo_href)
+    if publish:
+        await pulp_client.create_rpm_publication(repo_href)
 
 
 async def prepare_updateinfo_mapping(
@@ -1031,42 +1039,22 @@ def append_update_packages_in_update_records(
                 )
 
 
-async def release_errata_record(db: AsyncSession, record_id: str):
-    pulp = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    db_record = await db.execute(
-        select(models.ErrataRecord)
-        .where(models.ErrataRecord.id == record_id)
-        .options(
-            selectinload(models.ErrataRecord.references),
-            selectinload(models.ErrataRecord.packages)
-            .selectinload(models.ErrataPackage.albs_packages)
-            .selectinload(models.ErrataToALBSPackage.build_artifact),
-            selectinload(models.ErrataRecord.platform).selectinload(
-                models.Platform.repos
-            ),
-        )
-    )
-    db_record: models.ErrataRecord = db_record.scalars().first()
-    search_params = prepare_search_params(db_record)
-    pulp_packages = await load_platform_packages(
-        db_record.platform,
-        search_params,
-        pulp,
-        for_release=True,
-    )
+def get_albs_packages_from_record(
+    record: models.ErrataRecord,
+    pulp_packages: Dict[str, Any],
+) -> DefaultDict[str, List[models.ErrataToALBSPackage]]:
     repo_mapping = collections.defaultdict(list)
-
     errata_packages = set()
-    albs_records_to_add = set()
-    errata_package_names_mapping = {
+    albs_packages = set()
+    pkg_names_mapping = {
         "raw": {},
         "albs": {},
     }
-    for package in db_record.packages:
+    for package in record.packages:
+        clean_pkg_nevra = get_nevra(package)
+        raw_pkg_nevra = get_nevra(package, clean=False)
+        pkg_names_mapping["raw"][clean_pkg_nevra] = raw_pkg_nevra
+        errata_packages.add(clean_pkg_nevra)
         for albs_package in package.albs_packages:
             if albs_package.status not in (
                 ErrataPackageStatus.released,
@@ -1077,30 +1065,20 @@ async def release_errata_record(db: AsyncSession, record_id: str):
             if pulp_packages.get(albs_package_pulp_href):
                 for repo in pulp_packages[albs_package_pulp_href]:
                     repo_mapping[repo].append(albs_package)
-                albs_package.status = ErrataPackageStatus.released
-                clean_albs_pkg_nevra = get_nevra(
+                clean_pkg_nevra = get_nevra(
                     albs_package,
                     arch=albs_package.errata_package.arch,
                 )
-                raw_albs_pkg_nevra = get_nevra(albs_package, clean=False)
-                albs_records_to_add.add(clean_albs_pkg_nevra)
-                errata_package_names_mapping["albs"][
-                    clean_albs_pkg_nevra
-                ] = raw_albs_pkg_nevra
+                raw_pkg_nevra = get_nevra(albs_package, clean=False)
+                albs_packages.add(clean_pkg_nevra)
+                pkg_names_mapping["albs"][clean_pkg_nevra] = raw_pkg_nevra
 
-        clean_errata_pkg_nevra = get_nevra(package)
-        raw_errata_pkg_nevra = get_nevra(package, clean=False)
-        errata_package_names_mapping["raw"][
-            clean_errata_pkg_nevra
-        ] = raw_errata_pkg_nevra
-        errata_packages.add(clean_errata_pkg_nevra)
-
-    missing_packages = errata_packages.difference(albs_records_to_add)
+    missing_packages = errata_packages.difference(albs_packages)
     if missing_packages:
         missing_pkg_names = []
         for missing_pkg in missing_packages:
-            full_name = errata_package_names_mapping["raw"][missing_pkg]
-            full_albs_name = errata_package_names_mapping["albs"].get(missing_pkg)
+            full_name = pkg_names_mapping["raw"][missing_pkg]
+            full_albs_name = pkg_names_mapping["albs"].get(missing_pkg)
             full_name = full_albs_name if full_albs_name else full_name
             missing_pkg_names.append(full_name)
         msg = (
@@ -1109,44 +1087,207 @@ async def release_errata_record(db: AsyncSession, record_id: str):
             + ", ".join(missing_pkg_names)
         )
         raise ValueError(msg)
+    return repo_mapping
 
-    tasks = []
+
+async def process_errata_release_for_repos(
+    db_record: models.ErrataRecord,
+    repo_mapping: DefaultDict[str, List[models.ErrataToALBSPackage]],
+    session: AsyncSession,
+    pulp: PulpClient,
+    publish: bool = True,
+) -> Optional[List[Awaitable]]:
+    release_tasks = []
     publish_tasks = []
     for repo_href, packages in repo_mapping.items():
+        pkg_hrefs = []
+        for pkg in packages:
+            pkg.status = ErrataPackageStatus.released
+            pkg_hrefs.append(pkg.get_pulp_href())
         updateinfo_mapping = await prepare_updateinfo_mapping(
-            db=db,
+            db=session,
             pulp=pulp,
-            package_hrefs=[pkg.get_pulp_href() for pkg in packages],
+            package_hrefs=pkg_hrefs,
             blacklist_updateinfo=[],
         )
         latest_repo_version = await pulp.get_repo_latest_version(repo_href)
-        errata_records = await pulp.list_updateinfo_records(
-            id__in=[
-                record_id
-                for record_id in updateinfo_mapping.keys()
-                if record_id == db_record.id
-            ],
-            repository_version=latest_repo_version,
-        )
-        with get_pulp_db() as pulp_db:
-            append_update_packages_in_update_records(
-                pulp_db=pulp_db,
-                errata_records=errata_records,
-                updateinfo_mapping=updateinfo_mapping,
+        if latest_repo_version:
+            errata_records = await pulp.list_updateinfo_records(
+                id__in=[
+                    record_id
+                    for record_id in updateinfo_mapping.keys()
+                    if record_id == db_record.id
+                ],
+                repository_version=latest_repo_version,
             )
-        tasks.append(
+            with get_pulp_db() as pulp_db:
+                append_update_packages_in_update_records(
+                    pulp_db=pulp_db,
+                    errata_records=errata_records,
+                    updateinfo_mapping=updateinfo_mapping,
+                )
+        release_tasks.append(
             release_errata_packages(
-                db,
+                session,
                 pulp,
                 db_record,
                 packages,
                 db_record.platform,
                 repo_href,
+                publish=publish,
             )
         )
-        publish_tasks.append(pulp.create_rpm_publication(repo_href))
-    await asyncio.gather(*tasks)
+        if publish:
+            publish_tasks.append(pulp.create_rpm_publication(repo_href))
+    if not publish:
+        return release_tasks
+    await asyncio.gather(*release_tasks)
     await asyncio.gather(*publish_tasks)
-    db_record.release_status = ErrataReleaseStatus.RELEASED
-    db_record.last_release_log = "Succesfully released"
-    await db.commit()
+
+
+def generate_query_for_release(records_ids: List[str]):
+    query = (
+        select(models.ErrataRecord)
+        .where(models.ErrataRecord.id.in_(records_ids))
+        .options(
+            selectinload(models.ErrataRecord.references),
+            selectinload(models.ErrataRecord.packages)
+            .selectinload(models.ErrataPackage.albs_packages)
+            .selectinload(models.ErrataToALBSPackage.build_artifact),
+            selectinload(models.ErrataRecord.platform)
+            .selectinload(models.Platform.repos),
+        )
+        .with_for_update()
+    )
+    return query
+
+
+async def release_errata_record(record_id: str):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    async with asynccontextmanager(get_db)() as session:
+        await session.execute(
+            update(models.ErrataRecord)
+            .where(models.ErrataRecord.id == record_id)
+            .values(
+                release_status=ErrataReleaseStatus.IN_PROGRESS,
+                last_release_log=None,
+            )
+        )
+        await session.commit()
+    async with asynccontextmanager(get_db)() as session:
+        session: AsyncSession
+        db_record = await session.execute(
+            generate_query_for_release([record_id]),
+        )
+        db_record: Optional[models.ErrataRecord] = db_record.scalars().first()
+        if not db_record:
+            logging.info("Record with %s id doesn't exists", record_id)
+            return
+
+        logging.info("Record release %s has been started", record_id)
+        search_params = prepare_search_params(db_record)
+        pulp_packages = await load_platform_packages(
+            db_record.platform,
+            search_params,
+            pulp,
+            for_release=True,
+        )
+        try:
+            repo_mapping = get_albs_packages_from_record(db_record, pulp_packages)
+        except Exception as exc:
+            db_record.release_status = ErrataReleaseStatus.FAILED
+            db_record.last_release_log = str(exc)
+            logging.exception("Cannot release %s record:", record_id)
+            await session.commit()
+            return
+
+        await process_errata_release_for_repos(
+            db_record,
+            repo_mapping,
+            session,
+            pulp,
+        )
+        db_record.release_status = ErrataReleaseStatus.RELEASED
+        db_record.last_release_log = "Succesfully released"
+        await session.commit()
+    logging.info("Record %s succesfully released", record_id)
+
+
+async def bulk_errata_records_release(records_ids: List[str]):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    release_tasks = []
+    repos_to_publish = []
+    async with asynccontextmanager(get_db)() as session:
+        await session.execute(
+            update(models.ErrataRecord)
+            .where(models.ErrataRecord.id.in_(records_ids))
+            .values(
+                release_status=ErrataReleaseStatus.IN_PROGRESS,
+                last_release_log=None,
+            )
+        )
+        await session.commit()
+
+    async with asynccontextmanager(get_db)() as session:
+        session: AsyncSession
+        db_records = await session.execute(
+            generate_query_for_release(records_ids),
+        )
+        db_records: List[models.ErrataRecord] = db_records.scalars().all()
+        if not db_records:
+            logging.info(
+                "Cannot find records by the following ids: %s",
+                records_ids,
+            )
+            return
+
+        logging.info(
+            "Starting bulk errata release, the following records are locked: %s",
+            [rec.id for rec in db_records],
+        )
+        for db_record in db_records:
+            logging.info("Preparing data for %s", db_record.id)
+            search_params = prepare_search_params(db_record)
+            pulp_packages = await load_platform_packages(
+                db_record.platform,
+                search_params,
+                pulp,
+                for_release=True,
+            )
+            try:
+                repo_mapping = get_albs_packages_from_record(db_record, pulp_packages)
+            except Exception as exc:
+                db_record.release_status = ErrataReleaseStatus.FAILED
+                db_record.last_release_log = str(exc)
+                logging.exception("Cannot prepare data for %s:", db_record.id)
+                continue
+
+            tasks = await process_errata_release_for_repos(
+                db_record,
+                repo_mapping,
+                session,
+                pulp,
+                publish=False,
+            )
+            db_record.release_status = ErrataReleaseStatus.RELEASED
+            db_record.last_release_log = "Succesfully released"
+            if not tasks:
+                continue
+            repos_to_publish.extend(repo_mapping.keys())
+            release_tasks.extend(tasks)
+        await session.commit()
+    logging.info("Executing release tasks")
+    await asyncio.gather(*release_tasks)
+    logging.info("Executing publication tasks")
+    await asyncio.gather(
+        *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
+    )
+    logging.info("Bulk release is finished")

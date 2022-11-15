@@ -25,7 +25,7 @@ class BaseErrataReference(BaseModel):
     title: Optional[str] = None
     cve: Optional[BaseErrataCVE] = None
 
-    @validator('ref_type', pre=True)
+    @validator("ref_type", pre=True)
     def validator_ref_type(cls, value):
         return str(value)
 
@@ -57,7 +57,7 @@ class AlbsPackage(BaseModel):
     name: Optional[str]
     status: str
 
-    @validator('status', pre=True)
+    @validator("status", pre=True)
     def status_validator(cls, status):
         return status.value
 

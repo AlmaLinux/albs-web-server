@@ -17,8 +17,10 @@ __all__ = [
 ]
 
 
-def slice_list(source_list: list,
-               max_len: int) -> typing.Generator[typing.List[str], None, None]:
+def slice_list(
+    source_list: list,
+    max_len: int,
+) -> typing.Generator[typing.List[str], None, None]:
     return (
         source_list[i:i + max_len]
         for i in range(0, len(source_list), max_len)
