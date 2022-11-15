@@ -17,7 +17,6 @@ import dramatiq
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 
 from alws.config import settings
-from alws.database import engine
 
 rabbitmq_broker = RabbitmqBroker(
     url=f'amqp://'
