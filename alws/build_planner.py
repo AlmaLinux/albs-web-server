@@ -96,8 +96,7 @@ class BuildPlanner:
             return False
         found = False
         for flavor in self._platform_flavors:
-            if bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
-                found = True
+            if found := bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
                 break
         return found
 
