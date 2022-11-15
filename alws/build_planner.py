@@ -340,7 +340,7 @@ class BuildPlanner:
                     self._request_platforms[platform.name]
                 )
                 module_index.add_module(module)
-                if module_index.has_devel_module():
+                if module_index.has_devel_module() and not module.is_devel:
                     devel_module = module_index.get_module(
                         f'{task.module_name}-devel', task.module_stream)
                     devel_module.version = module.version
@@ -349,6 +349,8 @@ class BuildPlanner:
                     devel_module.set_arch_list(
                         self._request_platforms[platform.name]
                     )
+                    devel_module.add_module_dependency_to_devel_module(
+                        module=module)
                 module_pulp_href, sha256 = await self._pulp_client.create_module(
                     module_index.render(),
                     module.name,
