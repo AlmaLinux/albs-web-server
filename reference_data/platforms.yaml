@@ -1447,7 +1447,6 @@
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
-        - --nobest
         - --setopt=install_weak_deps=False
       dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: dnf
@@ -1463,7 +1462,7 @@
     mock_dist: el9
     timeout: 43200
     yum:
-      best: false
+      best: true
       module_platform_id: platform:el9
   repositories:
     - arch: s390x
