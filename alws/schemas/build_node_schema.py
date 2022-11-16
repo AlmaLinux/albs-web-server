@@ -56,7 +56,9 @@ class TaskPlatform(BaseModel):
                 self.data['mock'][k] = list(set(self.data['mock'][k]))
             elif k == 'yum_exclude':
                 old_exclude = self.data['yum'].get('exclude', '')
-                self.data['yum']['exclude'] = f'{old_exclude} {" ".join(v)}'
+                full_exclude = f'{old_exclude} {" ".join(v)}'.strip()
+                self.data['yum']['exclude'] = \
+                    full_exclude if full_exclude else None
             elif k in ('with', 'without'):
                 for i in v:
                     self.data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
