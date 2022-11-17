@@ -102,7 +102,7 @@ class BeholderClient:
         for m_name in (module_name, f'{module_name}-devel'):
             endpoint = (f'/api/v1/distros/{platform_name}/'
                         f'{platform_version}/module/{m_name}/'
-                        f'{module_stream}/{arch}')
+                        f'{module_stream}/{arch}/')
             try:
                 response = await self.get(endpoint, params=params)
                 artifacts = {}
