@@ -1290,4 +1290,4 @@ async def bulk_errata_records_release(records_ids: List[str]):
     await asyncio.gather(
         *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
     )
-    logging.info("Bulk release is finished")
+    logging.info("Bulk errata release is finished")
