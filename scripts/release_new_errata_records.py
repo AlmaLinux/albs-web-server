@@ -46,19 +46,18 @@ def parse_args():
         help="JWT token for ALBS web server",
     )
     parser.add_argument(
-        "-a",
-        "--auto-approve",
-        action="store_true",
-        default=False,
-        required=False,
-        help="Approves records that contains proposal packages",
-    )
-    parser.add_argument(
         "--check",
         action="store_true",
         default=False,
         required=False,
         help="Check records and their packages that can be released",
+    )
+    parser.add_argument(
+        "--bulk",
+        action="store_true",
+        default=False,
+        required=False,
+        help="Bulk records release",
     )
     return parser.parse_args()
 
@@ -100,7 +99,7 @@ class AlbsAPI:
         self,
         record_id: str,
     ):
-        endpoint = f"errata/release_record/{record_id}"
+        endpoint = f"errata/release_record/{record_id}/"
         request = aiohttp.request(
             "post",
             urllib.parse.urljoin(self.base_url, endpoint),
@@ -108,22 +107,21 @@ class AlbsAPI:
         )
         return await self.make_request(request)
 
-    async def update_package_statuses(
+    async def bulk_records_release(
         self,
-        packages: list,
+        records_ids: list[str],
     ):
-        endpoint = "errata/update_package_status/"
+        endpoint = "errata/bulk_release_records/"
         request = aiohttp.request(
             "post",
             urllib.parse.urljoin(self.base_url, endpoint),
             headers=self.headers,
-            json=packages,
+            json=records_ids,
         )
         return await self.make_request(request)
 
-    def check_package_statuses(self, record: dict) -> list:
+    def check_package_statuses(self, record: dict) -> list[dict]:
         result = []
-        record_id = record["id"]
         for pkg in record["packages"]:
             source = pkg["source_srpm"]
             if not source:
@@ -131,14 +129,7 @@ class AlbsAPI:
             for albs_pkg in pkg["albs_packages"]:
                 if albs_pkg["status"] != "proposal" or not albs_pkg["build_id"]:
                     continue
-                result.append(
-                    {
-                        "errata_record_id": record_id,
-                        "build_id": albs_pkg["build_id"],
-                        "source": source,
-                        "status": "approved",
-                    }
-                )
+                result.append(albs_pkg)
         return result
 
 
@@ -156,19 +147,30 @@ async def main():
         "Total amount not released records: %d",
         len(not_released_records),
     )
+    records_ids = []
     for record in not_released_records:
         record_id = record["id"]
         not_approved_packages = albs_api.check_package_statuses(record)
         if not_approved_packages:
-            logging.info("Record %s contains proposal packages", record_id)
+            logging.info(
+                "Record %s contains proposal packages: %s",
+                record_id,
+                str(not_approved_packages),
+            )
         if args.check:
             logging.info("Record %s can be scheduled for release", record_id)
             continue
-        if not_approved_packages and args.auto_approve:
-            logging.info("Updating package statuses for %s", record_id)
-            await albs_api.update_package_statuses(not_approved_packages)
+        if args.bulk:
+            records_ids.append(record_id)
+            continue
         await albs_api.release_record(record_id)
         logging.info("Record %s scheduled for release", record_id)
+    if args.bulk:
+        await albs_api.bulk_records_release(records_ids)
+        logging.info(
+            "Following records scheduled for release: %s",
+            str(records_ids),
+        )
 
 
 if __name__ == "__main__":

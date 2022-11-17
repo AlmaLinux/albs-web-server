@@ -4,13 +4,14 @@ from fastapi import (
     APIRouter,
     Depends,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import database
 from alws.auth import get_current_user
 from alws.crud import errata as errata_crud
 from alws.constants import ErrataReleaseStatus
 from alws.dependencies import get_db
-from alws.dramatiq import release_errata
+from alws.dramatiq import bulk_errata_release, release_errata
 from alws.schemas import errata_schema
 
 router = APIRouter(
@@ -20,8 +21,7 @@ router = APIRouter(
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
 async def create_errata_record(
-    errata: errata_schema.BaseErrataRecord,
-    db: database.Session = Depends(get_db)
+    errata: errata_schema.BaseErrataRecord, db: database.Session = Depends(get_db)
 ):
     record = await errata_crud.create_errata_record(
         db,
@@ -82,11 +82,10 @@ async def update_errata_record(
 async def list_all_errata_records(
     db: database.Session = Depends(get_db),
 ):
+    records = await errata_crud.list_errata_records(db, compact=True)
     return [
         {"id": record.id, "updated_date": record.updated_date}
-        for record in (
-            await errata_crud.list_errata_records(db, compact=True)
-        )["records"]
+        for record in records["records"]
     ]
 
 
@@ -99,20 +98,31 @@ async def update_package_status(
     db: database.Session = Depends(get_db),
 ):
     try:
-        return {
-            "ok": bool(await errata_crud.update_package_status(db, packages))
-        }
+        return {"ok": bool(await errata_crud.update_package_status(db, packages))}
     except ValueError as e:
         return {"ok": False, "error": e.message}
 
 
 @router.post(
-    '/release_record/{record_id}/',
+    "/release_record/{record_id}/",
     response_model=errata_schema.ReleaseErrataRecordResponse,
 )
 async def release_errata_record(
     record_id: str,
-    db: database.Session = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ):
+    db_record = await errata_crud.get_errata_record(session, record_id)
+    if not db_record:
+        return {"message": f"Record {record_id} doesn't exists"}
+    if db_record.release_status == ErrataReleaseStatus.IN_PROGRESS:
+        return {"message": f"Record {record_id} already in progress"}
     release_errata.send(record_id)
-    return {"message": "Release updateinfo record has been started"}
+    return {"message": f"Release updateinfo record {record_id} has been started"}
+
+
+@router.post("/bulk_release_records/")
+async def bulk_release_errata_records(records_ids: List[str]):
+    bulk_errata_release.send(records_ids)
+    return {
+        "message": f"Following records scheduled for release: {', '.join(records_ids)}"
+    }
