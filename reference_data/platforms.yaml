@@ -380,6 +380,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - name: almalinux-8-azure
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/cloud/aarch64/azure/
+      export_path: almalinux/8/cloud/aarch64/azure/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -465,6 +476,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/8/raspberrypi/Source/
       export_path: vault/8/raspberrypi/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-azure
+      arch: src
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/Source/azure/
+      export_path: vault/8/cloud/Source/azure/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -889,6 +911,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/8/raspberrypi/debug/aarch64/
       export_path: vault/8/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-azure-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/aarch64/azure/
+      export_path: vault/8/cloud/debug/aarch64/azure/
       production: true
       debug: true
       remote_sync_policy: on_demand
