@@ -109,7 +109,7 @@ class AlbsAPI:
 
     async def bulk_records_release(
         self,
-        records_ids: list[str],
+        records_ids: list,
     ):
         endpoint = "errata/bulk_release_records/"
         request = aiohttp.request(
@@ -120,7 +120,7 @@ class AlbsAPI:
         )
         return await self.make_request(request)
 
-    def check_package_statuses(self, record: dict) -> list[dict]:
+    def check_package_statuses(self, record: dict):
         result = []
         for pkg in record["packages"]:
             source = pkg["source_srpm"]
