@@ -93,6 +93,24 @@ def generate_restart_tasks_query(build_id: int, parallel: bool = False):
     return query
 
 
+async def __drop_srpm_if_all_arches_failed(db: Session, task: models.BuildTask):
+    tasks_with_same_ref = (await db.execute(select(
+        models.BuildTask).where(
+            models.BuildTask.build_id == task.build_id,
+            models.BuildTask.ref_id == task.ref_id
+        )
+    )).scalars().all()
+
+    failed_tasks = [
+        task for task in tasks_with_same_ref
+        if task.status >= BuildTaskStatus.FAILED
+    ]
+
+    if (len(tasks_with_same_ref) == len(failed_tasks)):
+        for task in failed_tasks:
+            task.built_srpm_url = None
+
+
 async def update_failed_build_items_in_parallel(db: Session, build_id: int):
     async with db.begin():
         failed_tasks = await db.execute(
@@ -123,6 +141,8 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
                 task = index_dict[key]
                 if task.status != BuildTaskStatus.FAILED:
                     continue
+                if task.built_srpm_url:
+                    await __drop_srpm_if_all_arches_failed(db, task)
                 task.status = BuildTaskStatus.IDLE
                 task.ts = None
                 if first_index_dep:
@@ -147,11 +167,14 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
         await db.commit()
 
 
+
 async def update_failed_build_items(db: Session, build_id: int):
     async with db.begin():
         last_task = None
         failed_tasks = await db.execute(generate_restart_tasks_query(build_id))
         for task in failed_tasks.scalars():
+            if task.built_srpm_url:
+                await __drop_srpm_if_all_arches_failed(db, task)
             task.status = BuildTaskStatus.IDLE
             task.ts = None
             if last_task is not None:
