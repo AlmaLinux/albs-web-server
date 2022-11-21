@@ -116,15 +116,14 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
         for task_index, index_dict in tasks_cache.items():
             current_idx = tasks_indexes.index(task_index)
             first_index_dep = None
-            completed_index_tasks = [
-                task for task in index_dict.values()
-                if task.status == BuildTaskStatus.COMPLETED
-            ]
 
-            failed_tasks = [
-                task for task in index_dict.values()
-                if task.status == BuildTaskStatus.FAILED
-            ]
+            completed_index_tasks = []
+            failed_tasks = []
+            for task in index_dict.values():
+                if task.status == BuildTaskStatus.COMPLETED:
+                    completed_index_tasks.append(task)
+                elif task.status == BuildTaskStatus.FAILED:
+                    failed_tasks.append(task)
 
             drop_srpm = False
             if len(failed_tasks) == len(index_dict):
@@ -139,7 +138,7 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
                 if task.status != BuildTaskStatus.FAILED:
                     continue
                 if task.built_srpm_url and drop_srpm:
-                    task.built_srpm = None
+                    task.built_srpm_url = None
                 task.status = BuildTaskStatus.IDLE
                 task.ts = None
                 if first_index_dep:
@@ -168,6 +167,7 @@ async def update_failed_build_items(db: Session, build_id: int):
     async with db.begin():
         failed_tasks_matrix = await get_failed_build_tasks_matrix(db, build_id)
 
+        last_task = None
         for tasks_dicts in failed_tasks_matrix.values():
             failed_tasks = [
                 task for task in tasks_dicts.values()
@@ -177,7 +177,6 @@ async def update_failed_build_items(db: Session, build_id: int):
             if len(failed_tasks) == len(tasks_dicts):
                 drop_srpm = True
 
-            last_task = None
             for task in failed_tasks:
                 if task.built_srpm_url and drop_srpm:
                     task.built_srpm_url = None
