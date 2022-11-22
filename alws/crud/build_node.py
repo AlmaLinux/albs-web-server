@@ -79,42 +79,56 @@ def add_build_task_dependencies(db: Session, task: models.BuildTask,
     task.dependencies.append(last_task)
 
 
-def generate_restart_tasks_query(build_id: int, parallel: bool = False):
-    condition = models.BuildTask.status == BuildTaskStatus.FAILED
-    if parallel:
-        condition = models.BuildTask.status <= BuildTaskStatus.FAILED
-    query = (
+async def get_failed_build_tasks_matrix(db: Session, build_id: int):
+    build_tasks = await db.execute(
         select(models.BuildTask)
         .where(
-            sqlalchemy.and_(models.BuildTask.build_id == build_id, condition)
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status <= BuildTaskStatus.FAILED
         )
         .order_by(models.BuildTask.index, models.BuildTask.id)
     )
-    return query
+
+    tasks_matrix = {}
+    for task in build_tasks.scalars().all():
+        idx = task.index
+        platform_id = task.platform_id
+        arch = task.arch
+        matrix_key = (platform_id, arch)
+        if idx not in tasks_matrix:
+            tasks_matrix[idx] = defaultdict(dict)
+        tasks_matrix[idx][matrix_key] = task
+
+    failed_matrix = {}
+    for idx in tasks_matrix:
+        for matrix_key in tasks_matrix[idx]:
+            if tasks_matrix[idx][matrix_key].status == BuildTaskStatus.FAILED:
+                failed_matrix[len(failed_matrix)] = tasks_matrix[idx]
+                break
+
+    return failed_matrix
 
 
 async def update_failed_build_items_in_parallel(db: Session, build_id: int):
     async with db.begin():
-        failed_tasks = await db.execute(
-            generate_restart_tasks_query(build_id, parallel=True)
-        )
-        tasks_cache = {}
-        for task in failed_tasks.scalars().all():
-            idx = task.index
-            platform_id = task.platform_id
-            arch = task.arch
-            cache_key = (platform_id, arch)
-            if idx not in tasks_cache:
-                tasks_cache[idx] = defaultdict(dict)
-            tasks_cache[idx][cache_key] = task
+        tasks_cache = await get_failed_build_tasks_matrix(db, build_id)
         tasks_indexes = list(tasks_cache.keys())
         for task_index, index_dict in tasks_cache.items():
             current_idx = tasks_indexes.index(task_index)
             first_index_dep = None
-            completed_index_tasks = [
-                task for task in index_dict.values()
-                if task.status == BuildTaskStatus.COMPLETED
-            ]
+
+            completed_index_tasks = []
+            failed_tasks = []
+            for task in index_dict.values():
+                if task.status == BuildTaskStatus.COMPLETED:
+                    completed_index_tasks.append(task)
+                elif task.status == BuildTaskStatus.FAILED:
+                    failed_tasks.append(task)
+
+            drop_srpm = False
+            if len(failed_tasks) == len(index_dict):
+                drop_srpm = True
+
             for key in sorted(
                 list(index_dict.keys()),
                 key=lambda x: x[1] == "i686",
@@ -123,6 +137,8 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
                 task = index_dict[key]
                 if task.status != BuildTaskStatus.FAILED:
                     continue
+                if task.built_srpm_url and drop_srpm:
+                    task.built_srpm_url = None
                 task.status = BuildTaskStatus.IDLE
                 task.ts = None
                 if first_index_dep:
@@ -149,14 +165,26 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
 
 async def update_failed_build_items(db: Session, build_id: int):
     async with db.begin():
+        failed_tasks_matrix = await get_failed_build_tasks_matrix(db, build_id)
+
         last_task = None
-        failed_tasks = await db.execute(generate_restart_tasks_query(build_id))
-        for task in failed_tasks.scalars():
-            task.status = BuildTaskStatus.IDLE
-            task.ts = None
-            if last_task is not None:
-                await db.run_sync(add_build_task_dependencies, task, last_task)
-            last_task = task
+        for tasks_dicts in failed_tasks_matrix.values():
+            failed_tasks = [
+                task for task in tasks_dicts.values()
+                if task.status == BuildTaskStatus.FAILED
+            ]
+            drop_srpm = False
+            if len(failed_tasks) == len(tasks_dicts):
+                drop_srpm = True
+
+            for task in failed_tasks:
+                if task.built_srpm_url and drop_srpm:
+                    task.built_srpm_url = None
+                task.status = BuildTaskStatus.IDLE
+                task.ts = None
+                if last_task is not None:
+                    await db.run_sync(add_build_task_dependencies, task, last_task)
+                last_task = task
         await db.commit()
 
 
