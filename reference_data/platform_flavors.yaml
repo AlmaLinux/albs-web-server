@@ -232,3 +232,45 @@
       production: false
       debug: false
       priority: 5
+
+- name: dotnet-build
+  data:
+    mock:
+      macros:
+        "%centos": "0"
+  repositories:
+    - name: dotnet-build
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-i686-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: dotnet-build
+      arch: x86_64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: dotnet-build
+      arch: aarch64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-aarch64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: dotnet-build
+      arch: ppc64le
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-ppc64le-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: dotnet-build
+      arch: s390x
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-s390x-dr/
+      production: false
+      debug: false
+      priority: 10
