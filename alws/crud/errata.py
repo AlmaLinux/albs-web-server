@@ -842,7 +842,7 @@ async def release_errata_packages(
                 "sum_type": "sha256",
             }
         )
-        if rpm_module:
+        if rpm_module or ".module_el" not in pulp_pkg["release"]:
             continue
         query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
         if errata_pkg.albs_artifact_id is not None:
@@ -866,7 +866,10 @@ async def release_errata_packages(
                 "stream": db_module.stream,
                 "version": int(db_module.version),
                 "context": db_module.context,
-                "arch": db_module.arch,
+                # we use here repository arch, because looking by
+                # noarch package (that can be refered to other arch)
+                # we can get module with different arch
+                "arch": arch,
             }
     collection_name = (
         f"{platform.name.lower()}-for-{arch}-{repo_stage}-"
