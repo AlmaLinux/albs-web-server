@@ -1,7 +1,9 @@
-import io
-import re
-import json
 import asyncio
+import io
+import json
+import math
+import re
+import os
 import typing
 import urllib.parse
 from typing import List
@@ -203,6 +205,42 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources']
 
+    async def upload_local_file(self, file_path: str, sha256: str,
+                                chunk_size: int = 52428800):
+        file_size = os.path.getsize(file_path)
+        chunks = math.ceil(file_size / chunk_size)
+        start = 0
+        upload_href = (await self.request(
+            'POST', 'pulp/api/v3/uploads/', json={'size': file_size}
+        ))['pulp_href']
+        try:
+            with open(file_path, 'rb') as f:
+                for i in range(chunks):
+                    chunk = io.BytesIO(f.read(chunk_size))
+                    chunk.name = f'{file_path.strip("/").replace("/", "_")}_{i}'
+                    payload = {'file': chunk}
+                    if chunk_size >= file_size:
+                        stop = file_size - 1
+                    else:
+                        stop = start + chunk_size - 1
+                        if stop >= file_size:
+                            stop = file_size - 1
+                    headers = {
+                        'Content-Range': f'bytes {start}-{stop}/{file_size}'
+                    }
+                    await self.request(
+                        'PUT', upload_href, data=payload, headers=headers
+                    )
+                    start += chunk_size
+        except Exception:
+            await self.request('DELETE', upload_href, raw=True)
+        else:
+            task = await self.request(
+                'POST', f'{upload_href}commit/', json={'sha256': sha256}
+            )
+            task_result = await self.wait_for_task(task['task'])
+            return task_result['created_resources'][0]
+
     async def _upload_file(self, content, sha256):
         response = await self.request(
             'POST', 'pulp/api/v3/uploads/', json={'size': len(content)}
@@ -383,7 +421,7 @@ class PulpClient:
     async def get_files(self, include_fields: typing.List[str] = None,
                         exclude_fields: typing.List[str] = None,
                         **params) -> list:
-        endpoint = 'pulp/api/v3/content/file/files'
+        endpoint = 'pulp/api/v3/content/file/files/'
         response = await self.__get_content_info(
             endpoint, include_fields=include_fields,
             exclude_fields=exclude_fields, **params)
@@ -720,8 +758,8 @@ class PulpClient:
     async def request(
         self, method: str, endpoint: str, pure_url: bool = False,
         params: dict = None, json: dict = None, data: dict = None,
-        headers: dict = None
-    ):
+        headers: dict = None, raw: bool = False
+    ) -> dict:
         if pure_url:
             full_url = endpoint
         else:
@@ -736,6 +774,8 @@ class PulpClient:
                     headers=headers,
                     auth=self._auth
             ) as response:
+                if raw:
+                    return {'result': await response.text()}
                 response_json = await response.json()
                 try:
                     response.raise_for_status()
