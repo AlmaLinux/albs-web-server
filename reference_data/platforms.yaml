@@ -61,7 +61,7 @@
       environment:
         DFLTCC: '0'
       use_bootstrap_container: false
-      macros:
+      secure_boot_macros:
         "%__pesign_cert": "%pe_signing_cert"
         "%__pesign_client_cert": "%pe_signing_cert"
         "%__pesign_client_token": "%pe_signing_token"
@@ -1485,7 +1485,7 @@
       package_manager: dnf
       releasever: '9'
       use_bootstrap_container: false
-      macros:
+      secure_boot_macros:
         "%pe_signing_cert": "Cloud Linux Software, Inc"
         "%pe_signing_token": "profil standardowy"
         "%_pesign": "/usr/local/bin/pesign"
