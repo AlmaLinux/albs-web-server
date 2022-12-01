@@ -25,7 +25,7 @@ def parse_args(args):
     parser = argparse.ArgumentParser(PROG_NAME)
     parser.add_argument('-r', '--repository-name', required=True, type=str)
     parser.add_argument('-p', '--packages', nargs='+', required=True,
-                        action='extend', type=str)
+                        type=str)
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
     return parser.parse_args(args)
 

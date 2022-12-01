@@ -10,8 +10,10 @@ __all__ = [
     'DEFAULT_PRODUCT',
     'DEFAULT_TEAM',
     'DRAMATIQ_TASK_TIMEOUT',
+    'DEFAULT_FILE_CHUNK_SIZE',
     'REQUEST_TIMEOUT',
     'SYSTEM_USER_NAME',
+    'UPLOAD_FILE_CHUNK_SIZE',
     'BuildTaskStatus',
     'BuildTaskRefType',
     'ExportStatus',
@@ -31,6 +33,8 @@ __all__ = [
 
 REQUEST_TIMEOUT = 60  # 1 minute
 DRAMATIQ_TASK_TIMEOUT = 36000000  # 10 hours in milliseconds
+DEFAULT_FILE_CHUNK_SIZE = 1048576  # 1 MB
+UPLOAD_FILE_CHUNK_SIZE = 52428800  # 50 MB
 SYSTEM_USER_NAME = 'base_user'
 DEFAULT_PRODUCT = 'AlmaLinux'
 DEFAULT_TEAM = 'almalinux'
