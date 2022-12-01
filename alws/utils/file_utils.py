@@ -3,6 +3,8 @@ import hashlib
 
 from typing import BinaryIO
 
+from alws.constants import DEFAULT_FILE_CHUNK_SIZE
+
 
 async def download_file(url: str, dest: BinaryIO):
     """
@@ -25,7 +27,8 @@ async def download_file(url: str, dest: BinaryIO):
             dest.write(content)
 
 
-async def download_big_file(url: str, dest: BinaryIO, chunk_size: int = 1048576):
+async def download_big_file(url: str, dest: BinaryIO,
+                            chunk_size: int = DEFAULT_FILE_CHUNK_SIZE):
     """
     Download file by url and write it to destination
 

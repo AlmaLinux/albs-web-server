@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import logging
 import math
 import re
 import os
@@ -14,7 +15,8 @@ from fastapi import status
 # TODO: Return retries for GET requests
 # from aiohttp_retry import RetryClient
 
-from alws.utils.file_utils import hash_content
+from alws.constants import UPLOAD_FILE_CHUNK_SIZE
+from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
 
 
@@ -187,7 +189,7 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0], sha256
 
-    async def check_if_artifact_exists(self, sha256: str) -> str:
+    async def check_if_artifact_exists(self, sha256: str) -> typing.Optional[str]:
         ENDPOINT = 'pulp/api/v3/artifacts/'
         payload = {
             'sha256': sha256
@@ -195,6 +197,7 @@ class PulpClient:
         response = await self.request('GET', ENDPOINT, params=payload)
         if response['count']:
             return response['results'][0]['pulp_href']
+        return None
 
     async def upload_comps(self, data: dict) -> typing.List[str]:
         """
@@ -205,8 +208,8 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources']
 
-    async def upload_local_file(self, file_path: str, sha256: str,
-                                chunk_size: int = 52428800):
+    async def _upload_local_file(self, file_path: str, sha256: str,
+                                 chunk_size: int = UPLOAD_FILE_CHUNK_SIZE):
         file_size = os.path.getsize(file_path)
         chunks = math.ceil(file_size / chunk_size)
         start = 0
@@ -233,6 +236,7 @@ class PulpClient:
                     )
                     start += chunk_size
         except Exception:
+            logging.exception('Exception during the file upload', exc_info=True)
             await self.request('DELETE', upload_href, raw=True)
         else:
             task = await self.request(
@@ -265,12 +269,33 @@ class PulpClient:
         task_result = await self.wait_for_task(task['task'])
         return task_result['created_resources'][0]
 
-    async def upload_file(self, content=None):
-        file_sha256 = hash_content(content)
-        reference = await self.check_if_artifact_exists(file_sha256)
-        if not reference:
-            reference = await self._upload_file(content, file_sha256)
-        return reference, file_sha256
+    async def upload_file(self, content=None, file_path: str = None,
+                          sha256: str = None):
+        # Check content already exists
+        if not sha256:
+            if content:
+                sha256 = hash_content(content)
+            elif file_path:
+                sha256 = hash_file(file_path, hash_type='sha256')
+
+        if not sha256:
+            raise ValueError('Cannot get SHA256 checksum for the upload')
+
+        reference = await self.check_if_artifact_exists(sha256)
+
+        # Return existing content
+        if reference and sha256:
+            return reference, sha256
+
+        # Create new content
+        if content:
+            reference = await self._upload_file(content, sha256)
+        elif file_path:
+            reference = await self._upload_local_file(file_path, sha256)
+        else:
+            raise NotImplementedError('Other upload flows are not supported')
+
+        return reference, sha256
 
     async def get_repo_modules_yaml(self, url: str):
         repomd_url = urllib.parse.urljoin(url, 'repodata/repomd.xml')

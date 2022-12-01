@@ -6,6 +6,8 @@ import pprint
 import sys
 import tempfile
 
+from alws.utils.parsing import parse_rpm_nevra
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws.utils.file_utils import download_big_file, hash_file
@@ -40,6 +42,7 @@ async def async_main(args, work_dir, logger):
 
     for link in args.package_links:
         file_name = os.path.basename(link.strip())
+        nevra = parse_rpm_nevra(file_name)
         file_path = os.path.join(work_dir, file_name)
         logger.info('Downloading %s...', link)
         with open(file_path, 'wb') as f:
@@ -54,19 +57,35 @@ async def async_main(args, work_dir, logger):
             logger.debug('Check that such RPM package already exists: %s',
                          file_name)
             rpms = await pulp_client.get_rpm_packages(
-                include_fields=['sha256', 'pulp_href'], sha256=checksum)
+                include_fields=['sha256', 'pulp_href', 'artifact'],
+                sha256=checksum)
             if rpms:
                 logger.debug('RPM package %s already exists', file_name)
-                rpm_href = rpms[0]['pulp_href']
+                rpm_href = next(
+                    (i['pulp_href'] for i in rpms
+                     if i['artifact'] == artifact_href), None
+                )
             else:
-                logger.debug('Creating RPM package for %s', file_name)
-                rpm_href = await pulp_client.create_rpm_package(
-                    file_name, artifact_href)
+                logger.debug('Check RPM by NEVRA...')
+                rpms = await pulp_client.get_rpm_packages(
+                    include_fields=['sha256', 'pulp_href', 'artifact'],
+                    name=nevra.name, version=nevra.version,
+                    release=nevra.release, arch=nevra.arch,
+                    epoch=nevra.epoch)
+                if rpms:
+                    rpm_href = next(
+                        (i['pulp_href'] for i in rpms
+                         if i['artifact'] == artifact_href), None
+                    )
+                else:
+                    logger.debug('Creating RPM package for %s', file_name)
+                    rpm_href = await pulp_client.create_rpm_package(
+                        file_name, artifact_href)
             rpm_package_hrefs.append(rpm_href)
         else:
             logger.info('Uploading %s to Pulp', file_path)
-            artifact_href = await pulp_client.upload_local_file(
-                file_path, checksum)
+            artifact_href, _ = await pulp_client.upload_file(
+                file_path=file_path, sha256=checksum)
             rpm_href = await pulp_client.create_rpm_package(
                 file_name, artifact_href)
             logger.info('%s upload is finished', file_path)
