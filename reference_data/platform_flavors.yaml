@@ -274,3 +274,20 @@
       production: false
       debug: false
       priority: 10
+
+- name: remi-9
+  repositories:
+    - name: remi
+      arch: x86_64
+      type: rpm
+      url: https://rpms.remirepo.net/enterprise/9/remi/x86_64/
+      production: false
+      debug: false
+      priority: 10
+    - name: remi
+      arch: aarch64
+      type: rpm
+      url: https://rpms.remirepo.net/enterprise/9/remi/aarch64/
+      production: false
+      debug: false
+      priority: 10
