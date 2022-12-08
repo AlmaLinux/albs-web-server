@@ -292,30 +292,30 @@
       debug: false
       priority: 10
 
-- name: openqa
+- name: openqa-almalinux-9
   repositories:
-    - name: remi
+    - name: openqa-almalinux-9
       arch: x86_64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-openqa-almalinux-9-x86_64-dr/
       production: false
       debug: false
       priority: 10
-    - name: remi
+    - name: openqa-almalinux-9
       arch: aarch64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-openqa-almalinux-9-aarch64-dr/
       production: false
       debug: false
       priority: 10
-    - name: remi
+    - name: openqa-almalinux-9
       arch: s390x
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-openqa-almalinux-9-s390x-dr/
       production: false
       debug: false
       priority: 10
-    - name: remi
+    - name: openqa-almalinux-9
       arch: ppc64le
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-openqa-almalinux-9-ppc64le-dr/
