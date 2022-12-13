@@ -6,7 +6,6 @@ import traceback
 import typing
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-import itertools
 
 from cas_wrapper import CasWrapper
 from sqlalchemy import update, or_
@@ -21,7 +20,6 @@ from alws.crud import (
     sign_task,
     user as user_crud,
 )
-from alws.dependencies import get_pulp_db
 from alws.errors import (
     DataNotFoundError,
     EmptyReleasePlan,
@@ -33,18 +31,12 @@ from alws.errors import (
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import release_schema
-from alws.constants import ErrataPackageStatus, ErrataReleaseStatus
-from alws.utils.errata import get_nevra
+from alws.constants import ErrataPackageStatus
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
-from alws.crud.errata import (
-    append_update_packages_in_update_records,
-    prepare_updateinfo_mapping,
-    release_errata_packages,
-)
 
 
 __all__ = [
@@ -1203,66 +1195,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             'repositories': prod_repos,
         }
 
-    async def process_errata_release(
-        self,
-        errata_dict: typing.Dict[str, typing.List[str]],
-        blacklist_updateinfo: typing.List[str],
-    ):
-        async_tasks = []
-        for repo_pulp_href, package_hrefs in errata_dict.items():
-            updateinfo_mapping = await prepare_updateinfo_mapping(
-                self.db,
-                self.pulp_client,
-                package_hrefs,
-                blacklist_updateinfo,
-            )
-            if not updateinfo_mapping:
-                continue
-
-            latest_repo_version = (
-                await self.pulp_client.get_repo_latest_version(
-                    repo_pulp_href,
-                )
-            )
-            errata_records = (
-                await self.pulp_client.list_updateinfo_records(
-                    id__in=list(updateinfo_mapping.keys()),
-                    repository_version=latest_repo_version,
-                )
-            )
-            # trying to append errata_packages if updateinfo already exist
-            with get_pulp_db() as pulp_db:
-                append_update_packages_in_update_records(
-                    pulp_db, errata_records, updateinfo_mapping,
-                )
-            db_records = await self.db.execute(
-                select(models.ErrataRecord).options(
-                    selectinload(models.ErrataRecord.references)
-                ),
-            )
-            db_records = {
-                record.id: record
-                for record in db_records.scalars().all()
-            }
-            for record_id, packages in updateinfo_mapping.items():
-                db_record: models.ErrataRecord = db_records[record_id]
-                if db_record.platform_id != self.base_platform.id:
-                    continue
-                errata_packages = [item[-1] for item in packages]
-                async_tasks.append(release_errata_packages(
-                    self.db,
-                    self.pulp_client,
-                    db_record,
-                    errata_packages,
-                    self.base_platform,
-                    repo_pulp_href,
-                ))
-                db_record.release_status = ErrataReleaseStatus.RELEASED
-                db_record.last_release_log = "Successfully released"
-                for errata_pkg in errata_packages:
-                    errata_pkg.status = ErrataPackageStatus.released
-        await asyncio.gather(*async_tasks)
-
     async def execute_release_plan(
             self, release: models.Release
     ) -> typing.List[str]:
@@ -1406,7 +1338,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         modify_tasks = []
         publication_tasks = []
-        errata_dict = defaultdict(list)
         for repository_name, arches in packages_to_repo_layout.items():
             for arch, packages in arches.items():
                 # TODO: we already have all repos in self.base_platform.repos,
@@ -1424,28 +1355,23 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         f'or doesn\'t have pulp_href field')
                 modify_tasks.append(self.pulp_client.modify_repository(
                     repo.pulp_href, add=packages))
-                errata_dict[repo.pulp_href].extend(packages)
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self.pulp_client.create_rpm_publication(repo.pulp_href))
-        errata_messages, blacklist_updateinfo = (
-            await self.check_errata_packages_before_release(
-                list(itertools.chain.from_iterable(errata_dict.values())),
-            )
-        )
-        await self.process_errata_release(errata_dict, blacklist_updateinfo)
-        additional_messages.extend(errata_messages)
         await asyncio.gather(*modify_tasks)
         await asyncio.gather(*publication_tasks)
         return additional_messages
 
-    async def check_errata_packages_before_release(
+    async def check_released_errata_packages(
         self,
-        package_hrefs: typing.List[str],
-    ) -> typing.Tuple[typing.List[str], typing.List[str]]:
-        errata_messages, blacklist_updateinfo = [], []
-        updateinfo_mapping = defaultdict(list)
-
+        release: models.Release,
+    ):
+        if release.status != ReleaseStatus.COMPLETED:
+            return
+        package_hrefs = [
+            package['package']['artifact_href']
+            for package in release.plan['packages']
+        ]
         subquery = select(models.BuildTaskArtifact.id).where(
             models.BuildTaskArtifact.href.in_(package_hrefs)
         ).scalar_subquery()
@@ -1455,49 +1381,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
                 models.ErrataToALBSPackage.pulp_href.in_(package_hrefs),
             ))
-            .options(selectinload(models.ErrataToALBSPackage.errata_package))
         )
         for albs_pkg in albs_pkgs.scalars().all():
-            errata_id = albs_pkg.errata_package.errata_record_id
-            updateinfo_mapping[errata_id].append(
-                get_nevra(albs_pkg, arch=albs_pkg.errata_package.arch)
-            )
-
-        db_records = await self.db.execute(
-            select(models.ErrataRecord)
-            .where(models.ErrataRecord.id.in_(set(updateinfo_mapping.keys())))
-            .options(
-                selectinload(models.ErrataRecord.packages)
-                .selectinload(models.ErrataPackage.albs_packages)
-            )
-        )
-        for db_record in db_records.scalars().all():
-            albs_packages_names = updateinfo_mapping[db_record.id]
-            missing_packages = []
-            for errata_pkg in db_record.packages:
-                clean_nevra = get_nevra(errata_pkg)
-                if clean_nevra in albs_packages_names:
-                    continue
-                missing_packages.append(get_nevra(errata_pkg, clean=False))
-            if missing_packages:
-                blacklist_updateinfo.append(db_record.id)
-                errata_messages.append(
-                    f"Skipping updateinfo {db_record.id} release, "
-                    f"the following original packages from update record"
-                    f"are missing in release: "
-                    f"{', '.join(missing_packages)}"
-                )
-                continue
-
-        if errata_messages:
-            errata_messages.append(
-                "If you want to release updateinfo, you can:\n"
-                "- include all packages from updateinfo in release;\n"
-                "- release missing packages in repositories and after that "
-                "use `Release updateinfo` button."
-            )
-
-        return errata_messages, blacklist_updateinfo
+            albs_pkg.status = ErrataPackageStatus.released
+        await self.db.commit()
 
     async def update_release_plan(
             self, plan: dict,
@@ -1516,6 +1403,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         updated_plan['packages_from_repos'] = pkgs_from_repos
         updated_plan['packages_in_repos'] = pkgs_in_repos
         return updated_plan
+
+    async def commit_release(
+        self,
+        release_id: int,
+        user_id: int,
+    ) -> typing.Tuple[models.Release, str]:
+        release, message = await super().commit_release(release_id, user_id)
+        await self.check_released_errata_packages(release)
+        return release, message
 
 
 def get_releaser_class(
