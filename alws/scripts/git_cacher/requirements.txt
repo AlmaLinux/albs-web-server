@@ -1,3 +1,4 @@
 aiohttp
 aioredis
 pydantic
+sentry-sdk==1.12.1
