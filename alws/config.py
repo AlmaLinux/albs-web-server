@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     frontend_baseurl: str = 'http://localhost:8080'
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
 
+    sentry_environment: str = 'dev'
+    sentry_dsn: typing.Optional[str]
+    sentry_traces_sample_rate: float = 0.2
+
     @property
     def codenotary_enabled(self) -> bool:
         return bool(self.cas_api_key) and bool(self.cas_signer_id)

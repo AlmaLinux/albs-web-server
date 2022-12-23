@@ -4,6 +4,8 @@ import importlib
 import logging
 import threading
 
+import sentry_sdk
+
 from fastapi import FastAPI
 from starlette.exceptions import ExceptionMiddleware
 
@@ -24,6 +26,14 @@ ROUTERS = [importlib.import_module(f'alws.routers.{module}')
 APP_PREFIX = '/api/v1'
 AUTH_PREFIX = APP_PREFIX + '/auth'
 AUTH_TAG = 'auth'
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.sentry_environment,
+    )
+
 
 app = FastAPI()
 scheduler = None
