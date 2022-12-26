@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     alts_token: str
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
 
+    test_task_scheduler_enabled: bool = False
+
     package_beholder_enabled: bool = True
     beholder_host: typing.Optional[str] = 'http://beholder-web:5000'
     beholder_token: typing.Optional[str]
