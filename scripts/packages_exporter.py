@@ -24,6 +24,7 @@ from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from syncer import sync
+import sentry_sdk
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -46,6 +47,7 @@ KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser(
 LOG_DIR = Path.home() / 'exporter_logs'
 LOGGER_NAME = "packages-exporter"
 LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -92,6 +94,16 @@ def sync_fix_permissions(user: str, group: str, custom_path: str = None,
     local['sudo'].run(args=args)
 
 
+def init_sentry():
+    if not settings.sentry_dsn:
+        return
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.sentry_environment,
+    )
+
+
 class Exporter:
     def __init__(
         self,
@@ -107,8 +119,8 @@ class Exporter:
             handlers=[logging.FileHandler(filename=LOG_FILE, mode='a'),
                       logging.StreamHandler(stream=sys.stdout)]
         )
-        os.makedirs(LOG_DIR, exist_ok = True)
-        
+        os.makedirs(LOG_DIR, exist_ok=True)
+
         self._temp_dir = tempfile.gettempdir()
         self.logger = logging.getLogger(LOGGER_NAME)
         self.pulp_client = pulp_client
@@ -576,6 +588,7 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
 
 def main():
     args = parse_args()
+    init_sentry()
 
     platforms_dict = {}
     key_id_by_platform = None
