@@ -11,7 +11,7 @@ from starlette.exceptions import ExceptionMiddleware
 
 from alws import routers
 from alws.auth import AuthRoutes
-from alws.auth.backend import CookieBackend
+from alws.auth.backend import CookieBackend, BearerBackend
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
@@ -93,5 +93,12 @@ app.include_router(
         requires_verification=False
     ),
     prefix=AUTH_PREFIX + '/associate/github',
+    tags=[AUTH_TAG],
+)
+app.include_router(
+    AuthRoutes.get_auth_router(
+        BearerBackend
+    ),
+    prefix=AUTH_PREFIX,
     tags=[AUTH_TAG],
 )
