@@ -21,9 +21,9 @@ class Config(pydantic.BaseSettings):
         'rpms': 'rpms_gitea_cache',
         'modules': 'modules_gitea_cache'
     }
-    sentry_environment: str = "dev"
-    sentry_dsn: str = ""
-    sentry_traces_sample_rate: float = 0.2
+    cacher_sentry_environment: str = "dev"
+    cacher_sentry_dsn: str = ""
+    cacher_sentry_traces_sample_rate: float = 0.2
 
 
 async def load_redis_cache(redis, cache_key):
@@ -91,11 +91,11 @@ async def run(config, redis_client, gitea_client, organization):
 
 async def main():
     config = Config()
-    if config.sentry_dsn:
+    if config.cacher_sentry_dsn:
         sentry_sdk.init(
-            dsn=config.sentry_dsn,
-            traces_sample_rate=config.sentry_traces_sample_rate,
-            environment=config.sentry_environment,
+            dsn=config.cacher_sentry_dsn,
+            traces_sample_rate=config.cacher_sentry_traces_sample_rate,
+            environment=config.cacher_sentry_environment,
         )
     logger = setup_logger()
     redis_client = aioredis.from_url(config.redis_url)
