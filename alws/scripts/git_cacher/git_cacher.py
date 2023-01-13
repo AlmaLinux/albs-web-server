@@ -49,7 +49,7 @@ def setup_logger():
     return logger
 
 
-async def run(config, redis_client, gitea_client, organization):
+async def run(config, logger, redis_client, gitea_client, organization):
     cache = await load_redis_cache(
         redis_client, config.git_cache_keys[organization]
     )
@@ -57,6 +57,9 @@ async def run(config, redis_client, gitea_client, organization):
     to_index = []
     git_names = set()
     for repo in await gitea_client.list_repos(organization):
+        if repo['empty'] is True:
+            logger.warning(f"Skipping empty repo {repo['html_url']}")
+            continue
         repo_name = repo['full_name']
         git_names.add(repo_name)
         repo_meta = {
@@ -103,8 +106,8 @@ async def main():
     while True:
         logger.info('Checking cache for updates')
         await asyncio.gather(
-            run(config, redis_client, gitea_client, 'rpms'),
-            run(config, redis_client, gitea_client, 'modules')
+            run(config, logger, redis_client, gitea_client, 'rpms'),
+            run(config, logger, redis_client, gitea_client, 'modules')
         )
         await asyncio.sleep(600)
 
