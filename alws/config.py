@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     redis_url: str = 'redis://redis:6379'
 
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
+    test_database_url: str = 'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
     sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
 
     github_client: str
