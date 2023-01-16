@@ -6,7 +6,7 @@
 #
 # Description: This script remove unnecessery versions of repositories in pulp:
 # - Delete no more than 3 versions of production repositories
-# - Delete no more than 1 versions of build repositories
+# - Delete no more than 2 versions of build repositories
 #
 # Usage: This script requires direct access to both Pulp
 # and Build System DBs. For configuration issues ask in
@@ -166,7 +166,7 @@ async def main():
         if pulp_repo["pulp_href"] in prod_repos_href:
             retain_repo_versions = 3
         else:
-            retain_repo_versions = 1
+            retain_repo_versions = 2
         await remove_unnecessery_versions(
             pulp_client=pulp_client,
             min_retain_repo_versions=retain_repo_versions,
