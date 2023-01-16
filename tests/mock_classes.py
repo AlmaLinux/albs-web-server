@@ -35,7 +35,9 @@ class BaseAsyncTestCase(unittest.IsolatedAsyncioTestCase):
         settings.jwt_secret,
         "HS256",
     )
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+    }
 
     async def get_session(self):
         async with AsyncSession(self.engine) as session:
@@ -68,8 +70,8 @@ class BaseAsyncTestCase(unittest.IsolatedAsyncioTestCase):
     @pytest.fixture(autouse=True)
     def mock_create_repo(self, monkeypatch):
         async def func(*args, **kwargs):
-            repo_url = 'mock_url'
-            repo_href = 'mock_href'
+            repo_url = "mock_url"
+            repo_href = "mock_href"
             return repo_url, repo_href
 
         monkeypatch.setattr(PulpClient, "create_rpm_repository", func)

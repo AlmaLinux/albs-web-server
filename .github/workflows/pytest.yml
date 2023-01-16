@@ -1,0 +1,39 @@
+name: pytest
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+        name: Check out repository
+      - name: Create dirs
+        run: |
+          mkdir -p /home/runner/work/albs-web-server/alts
+          mkdir -p /home/runner/work/albs-web-server/albs-frontend
+          mkdir -p /home/runner/work/albs-web-server/albs-node
+          mkdir -p /home/runner/work/albs-web-server/albs-sign-node
+      - name: Add env file
+        run: |
+          touch ./vars.env
+          echo ALTS_TOKEN="secret" >> ./vars.env
+          echo GITHUB_CLIENT="secret" >> ./vars.env
+          echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
+          echo POSTGRES_PASSWORD="password" >> ./vars.env
+          echo JWT_SECRET="secret" >> ./vars.env
+          echo POSTGRES_DB="test-almalinux-bs" >> ./vars.env
+          echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
+      - uses: isbang/compose-action@v1.4.1
+        name: Run docker-compose
+        with:
+          up-flags: "--build --no-deps"
+          down-flags: "--volumes"
+          services: |
+            db
+            web_server
+      - name: Run tests
+        run: docker-compose run --no-deps web_server bash -c 'source env/bin/activate && pytest -v'
