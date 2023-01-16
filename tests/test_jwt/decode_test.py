@@ -7,7 +7,6 @@ from alws.utils import jwt_utils
 class TestJWTToken(unittest.TestCase):
 
     def test_decode_JWT_token(self):
-        return
         initial_JWT_token = jwt_utils.generate_JWT_token(
             {'user_id': 1}, 'sector', 'HS256')
         decoded_JWT_token = jwt_utils.decode_JWT_token(
@@ -17,7 +16,6 @@ class TestJWTToken(unittest.TestCase):
         self.assertEqual(decoded_JWT_token['identity'], identity, message)
 
     def test_fail_decode_JWT_token(self):
-        return
         initial_JWT_token = jwt_utils.generate_JWT_token(
             {'user_id': 1}, 'sector', 'HS256')
         with self.assertRaises(InvalidSignatureError):

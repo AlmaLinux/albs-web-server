@@ -4,8 +4,8 @@ from tests.mock_classes import BaseAsyncTestCase
 
 
 class TestCrudClass(BaseAsyncTestCase):
-    def test_empty_tasks(self):
-        response = self.make_request(
+    async def test_empty_tasks(self):
+        response = await self.make_request(
             "post",
             "/api/v1/build_node/ping",
             json={"active_tasks": []},
@@ -13,8 +13,8 @@ class TestCrudClass(BaseAsyncTestCase):
         message = "Empty active_tasks aren't pinged"
         self.assertEqual(response.status_code, status.HTTP_200_OK, message)
 
-    def test_ping(self):
-        response = self.make_request(
+    async def test_ping(self):
+        response = await self.make_request(
             "post",
             "/api/v1/build_node/ping",
             json={"active_tasks": [1, 2, 3]},
@@ -22,7 +22,7 @@ class TestCrudClass(BaseAsyncTestCase):
         message = "Tasks aren't pinged"
         self.assertEqual(response.status_code, status.HTTP_200_OK, message)
 
-    def test_platform_create(self):
+    async def test_platform_create(self):
         platform = {
             "name": "test_platform111",
             "type": "rpm",
@@ -42,7 +42,7 @@ class TestCrudClass(BaseAsyncTestCase):
             "data": {"test": "test"},
         }
 
-        response = self.make_request(
+        response = await self.make_request(
             "post",
             "/api/v1/platforms/",
             json=platform,
@@ -50,7 +50,7 @@ class TestCrudClass(BaseAsyncTestCase):
         message = f"platform isn't created, status_code: {response.status_code}"
         self.assertEqual(response.status_code, status.HTTP_200_OK, message)
 
-    def test_product_create(self):
+    async def test_product_create(self):
         data = {
             "name": "AlmaLinux",
             "owner_id": self.user_id,
@@ -74,11 +74,10 @@ class TestCrudClass(BaseAsyncTestCase):
             ],
             "is_community": True,
         }
-        response = self.make_request(
+        response = await self.make_request(
             "post",
             "/api/v1/products/",
             json=data,
         )
         message = f"product isn't created, status_code: {response.status_code}"
-        print(response.text)
         self.assertEqual(response.status_code, status.HTTP_200_OK, message)
