@@ -1,4 +1,4 @@
-# Script: remove_unnecessery_versions_of_repositories.py
+# Script: remove_unnecessary_versions_of_repositories.py
 # Author:
 # - Maxim Petukhov <mpetukhov@cloudlinux.com>
 #
@@ -14,7 +14,7 @@
 # This script should be placed inside albs-web-server
 # scripts folder as it uses modules inside the repo.
 # AFTER running the script PLEASE run "orphans/cleanup" in Pulp
-# to remove all orpgans artifacts.
+# to remove all orphans artifacts.
 # REMEMBER: Do Pulp storoge backup before running the script in
 # production just in case anything goes wrong.
 #
