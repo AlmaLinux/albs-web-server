@@ -1,4 +1,3 @@
-import asyncio
 import collections
 import itertools
 import logging
@@ -13,6 +12,7 @@ from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.config import settings
 from alws.schemas import build_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     GiteaClient,
@@ -146,7 +146,7 @@ class BuildPlanner:
                     'rpm',
                     is_debug=True
                 ))
-        await asyncio.gather(*tasks)
+        await gather_with_concurrency(*tasks)
 
     async def add_linked_builds(self, linked_build):
         self._build.linked_builds.append(linked_build)
