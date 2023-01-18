@@ -33,6 +33,7 @@ from alws import database
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatusEnum
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
 from alws.utils.errata import (
@@ -204,7 +205,7 @@ class Exporter:
             result = await db.execute(query)
             repositories = list(result.scalars().all())
 
-        results = await asyncio.gather(
+        results = await gather_with_concurrency(
             *(get_exporter_data(repo) for repo in repositories))
 
         return list(dict(results).values())
@@ -272,7 +273,7 @@ class Exporter:
 
     async def export_repositories(self, repo_ids: list) -> typing.List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
-        results = await asyncio.gather(
+        results = await gather_with_concurrency(
             *(self._export_repository(e) for e in exporters))
         exported_paths = [i for i in results if i]
         return exported_paths
@@ -549,7 +550,7 @@ async def sign_repodata(exporter: Exporter, exported_paths: typing.List[str],
 
         tasks.append(exporter.repomd_signer(repodata, key_id))
 
-    await asyncio.gather(*tasks)
+    await gather_with_concurrency(*tasks)
 
 
 def extract_errata(repo_path: str):

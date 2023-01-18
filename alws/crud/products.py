@@ -25,6 +25,7 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import create_product_repo
 
@@ -92,7 +93,7 @@ async def create_product(
         repo_tasks.append(create_product_repo(
             pulp_client, product.name, owner.username,
             platform_name, 'src', False))
-    task_results = await asyncio.gather(*repo_tasks)
+    task_results = await gather_with_concurrency(*repo_tasks)
 
     for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
         repo = models.Repository(
@@ -202,7 +203,7 @@ async def remove_product(
         delete_tasks.append(
             pulp_client.delete_by_href(product_distro["pulp_href"]),
         )
-    await asyncio.gather(*delete_tasks)
+    await gather_with_concurrency(*delete_tasks)
     await db.delete(db_product)
     await db.commit()
 

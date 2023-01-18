@@ -13,6 +13,7 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus, DRAMATIQ_TASK_TIMEOUT
 from alws.database import Session
 from alws.dramatiq import event_loop
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.pulp_client import PulpClient
 
 __all__ = ['perform_product_modification']
@@ -98,7 +99,7 @@ async def prepare_repo_modify_dict(
             continue
         tasks.append(get_packages(pulp_client, repo, dist_repo, modification))
 
-    results = await asyncio.gather(*tasks)
+    results = await gather_with_concurrency(*tasks)
     modify.update(**dict(results))
 
     for task in db_build.tasks:
@@ -217,8 +218,8 @@ async def _perform_product_modification(
         # automatic publications, so now we need
         # to manually publish them after modification
         publish_tasks.append(pulp_client.create_rpm_publication(key))
-    await asyncio.gather(*tasks)
-    await asyncio.gather(*publish_tasks)
+    await gather_with_concurrency(*tasks)
+    await gather_with_concurrency(*publish_tasks)
 
     if modification == 'add':
         db_product.builds.append(db_build)

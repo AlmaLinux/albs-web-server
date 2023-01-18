@@ -21,6 +21,7 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
@@ -317,7 +318,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         if not tasks:
             continue
         try:
-            results = await asyncio.gather(*tasks)
+            results = await gather_with_concurrency(*tasks)
         except Exception as e:
             logging.exception(
                 'Cannot create RPM packages for repo %s',
@@ -397,7 +398,7 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
 
     if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
-        results = await asyncio.gather(*(get_rpm_package_info(
+        results = await gather_with_concurrency(*(get_rpm_package_info(
             pulp_client, rpm.href, include_fields=pkg_fields)
             for rpm in rpms))
         packages_info = dict(results)
@@ -438,7 +439,7 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
     tasks = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
-        results = await asyncio.gather(*tasks)
+        results = await gather_with_concurrency(*tasks)
     except Exception as e:
         logging.exception('Cannot create log files for %s', str(repo))
         raise ArtifactConversionError(
