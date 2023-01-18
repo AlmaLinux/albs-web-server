@@ -73,7 +73,7 @@ async def get_old_unsigned_builds(logger: logging.Logger):
             models.Build.id.not_in(product_packages),
             models.Build.released.is_(False),
             models.Build.signed.is_(False),
-            models.Build.created_at <= datetime.date(2022, 12, 1),
+            models.Build.created_at <= datetime.date(2022, 1, 31),
         )
         builds = await db.execute(query)
     result = builds.scalars().all()
