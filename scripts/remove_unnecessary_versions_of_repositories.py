@@ -4,9 +4,9 @@
 #
 # Date: 13 Jan 2023
 #
-# Description: This script remove unnecessery versions of repositories in pulp:
-# - Delete no more than 3 versions of production repositories
-# - Delete no more than 2 versions of build repositories
+# Description: This script remove unnecessary versions of repositories in pulp:
+# - Delete no more than 3 versions of repositories
+# - Delete old unsigned builds
 #
 # Usage: This script requires direct access to both Pulp
 # and Build System DBs. For configuration issues ask in
@@ -26,16 +26,23 @@ import typing
 import re
 import logging
 import urllib.parse
-
+import datetime
+from sqlalchemy.future import select
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
+from alws import database
+from alws import models
+from alws.crud import build as build_crud
 from alws.utils.pulp_client import PulpClient
+from alws.errors import (
+    BuildError,
+    DataNotFoundError,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         "pulp_artifacts_remover",
-        description="Remove unnecessery versions of repositories in Pulp",
+        description="Remove unnecessary versions of repositories in Pulp",
     )
     parser.add_argument(
         "-v",
@@ -48,15 +55,56 @@ def parse_args():
     return parser.parse_args()
 
 
+# Get old unsigned, unreleased and unrelated builds
+async def get_old_unsigned_builds(logger: logging.Logger):
+    async with database.Session() as db:
+        build_dependency = select(
+            models.BuildDependency.c.build_dependency
+        ).scalar_subquery()
+        build_dependent = select(
+            models.BuildDependency.c.build_id
+        ).scalar_subquery()
+        product_packages = select(
+            models.ProductBuilds.c.build_id
+        ).scalar_subquery()
+        query = select(models.Build).where(
+            models.Build.id.not_in(build_dependency),
+            models.Build.id.not_in(build_dependent),
+            models.Build.id.not_in(product_packages),
+            models.Build.released.is_(False),
+            models.Build.signed.is_(False),
+            models.Build.created_at <= datetime.date(2022, 12, 1),
+        )
+        builds = await db.execute(query)
+    result = builds.scalars().all()
+    logger.debug("%s old unsigned builds received from DB", len(result))
+    return result
+
+
+async def remove_builds(builds: list, logger: logging.Logger):
+    for build in builds:
+        async with database.Session() as db:
+            try:
+                logger.debug("Delete build with id: %s", build.id)
+                await build_crud.remove_build_job(db, build.id)
+                logger.debug("Build with id %s has been deleted", build.id)
+            except DataNotFoundError as err:
+                logger.error(err)
+            except BuildError as err:
+                logger.error(err)
+
+
 # Change retain_repo_versions to min value and return it back
 # After changing the retain_repo_versions Pulp will remove unrelated versions
-async def remove_unnecessery_versions(
+async def remove_unnecessary_versions(
     pulp_client: PulpClient,
     min_retain_repo_versions: int,
     pulp_repo: dict,
     logger: logging.Logger,
 ):
     endpoint = pulp_repo["pulp_href"]
+    if min_retain_repo_versions > pulp_repo["retain_repo_versions"]:
+        return
     params = {"retain_repo_versions": min_retain_repo_versions}
     result = await pulp_client.request("PATCH", endpoint, json=params)
     logger.debug(
@@ -118,17 +166,23 @@ async def main():
     else:
         logging.basicConfig(level=logging.INFO)
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
+    logger.info("Get old unsigned builds")
+    builds = await get_old_unsigned_builds(logger)
+    logger.info("Remove old unsigned builds...")
+    await remove_builds(builds, logger)
+    logger.info("All old unsigned builds have been deleted")
+
     logger.info("Get all pulp repos")
     pulp_repos = await get_all_pulp_repositories(pulp_client, logger)
-    logger.info("Removing unnecessery versions of repositories...")
+    logger.info("Removing unnecessary versions of repositories...")
     for pulp_repo in pulp_repos:
-        await remove_unnecessery_versions(
+        await remove_unnecessary_versions(
             pulp_client=pulp_client,
             min_retain_repo_versions=3,
             pulp_repo=pulp_repo,
             logger=logger,
         )
-    logger.info("All unnecessery version of repositories is deleted")
+    logger.info("All unnecessary versions of repositories have been deleted")
 
 
 if __name__ == "__main__":
