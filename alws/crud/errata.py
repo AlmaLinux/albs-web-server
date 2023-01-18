@@ -35,16 +35,24 @@ from alws.utils.errata import (
 from alws.utils.parsing import (
     clean_release,
     parse_rpm_nevra,
-    slice_list,
 )
 from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import (
+    get_rpm_packages_from_repository,
+    get_uuid_from_pulp_href,
+)
 from alws.config import settings
 from alws.constants import (
     ErrataReferenceType,
     ErrataPackageStatus,
     ErrataReleaseStatus,
 )
-from alws.pulp_models import UpdateRecord, UpdatePackage, UpdateCollection
+from alws.pulp_models import (
+    UpdateRecord,
+    UpdatePackage,
+    UpdateCollection,
+    RpmPackage,
+)
 from alws.utils.errata import (
     debrand_id,
     debrand_affected_cpe_list,
@@ -377,73 +385,42 @@ def prepare_search_params(
 async def load_platform_packages(
     platform: models.Platform,
     search_params: DefaultDict[str, List[str]],
-    pulp: PulpClient,
     for_release: bool = False,
 ) -> Dict[str, Any]:
     cache = {}
-    # With this minimal length for lists, we will evade
-    # errors with large query path in requests
-    max_list_len = 10
-    pkg_fields = ",".join(
-        (
-            "name",
-            "version",
-            "release",
-            "epoch",
-            "arch",
-            "pulp_href",
-            "rpm_sourcerpm",
-        )
-    )
-    if for_release:
-        pkg_fields = ",".join(("pulp_href",))
-
-    async def _callback(pulp_href: str):
-        latest_version = await pulp.get_repo_latest_version(pulp_href)
-        if not latest_version:
-            return
-        request_params = {"epoch__in": ",".join(search_params["epoch"])}
-        for pkg_names in slice_list(list(search_params["name"]), max_list_len):
-            request_params["name__in"] = ",".join(pkg_names)
-            for pkg_versions in slice_list(search_params["version"], max_list_len):
-                request_params["version__in"] = ",".join(pkg_versions)
-                async for pkg in pulp.iter_repo_packages(
-                    latest_version,
-                    limit=25000,
-                    fields=pkg_fields,
-                    search_params=request_params,
-                ):
-                    if for_release:
-                        key = pkg["pulp_href"]
-                        if not cache.get(key):
-                            cache[key] = []
-                        cache[key].append(pulp_href)
-                        continue
-                    short_pkg_name = "-".join(
-                        (
-                            pkg["name"],
-                            pkg["version"],
-                            clean_release(pkg["release"]),
-                        )
-                    )
-                    if not cache.get(short_pkg_name):
-                        cache[short_pkg_name] = {}
-                    arch_list = [pkg["arch"]]
-                    if pkg["arch"] == "noarch":
-                        arch_list = platform.arch_list
-                    for arch in arch_list:
-                        if not cache[short_pkg_name].get(arch):
-                            cache[short_pkg_name][arch] = []
-                        if pkg in cache[short_pkg_name][arch]:
-                            continue
-                        cache[short_pkg_name][arch].append(pkg)
-
-    tasks = []
     for repo in platform.repos:
         if not repo.production:
             continue
-        tasks.append(_callback(repo.pulp_href))
-    await gather_with_concurrency(*tasks)
+        for pkg in get_rpm_packages_from_repository(
+            repo_id=get_uuid_from_pulp_href(repo.pulp_href),
+            pkg_names=search_params["name"],
+            pkg_versions=search_params["version"],
+            pkg_epochs=search_params["epoch"],
+        ):
+            if for_release:
+                key = pkg.pulp_href
+                if not cache.get(key):
+                    cache[key] = []
+                cache[key].append(repo.pulp_href)
+                continue
+            short_pkg_name = "-".join(
+                (
+                    pkg.name,
+                    pkg.version,
+                    clean_release(pkg.release),
+                )
+            )
+            if not cache.get(short_pkg_name):
+                cache[short_pkg_name] = {}
+            arch_list = [pkg.arch]
+            if pkg.arch == "noarch":
+                arch_list = platform.arch_list
+            for arch in arch_list:
+                if not cache[short_pkg_name].get(arch):
+                    cache[short_pkg_name][arch] = []
+                if pkg in cache[short_pkg_name][arch]:
+                    continue
+                cache[short_pkg_name][arch].append(pkg)
     return cache
 
 
@@ -485,15 +462,15 @@ async def search_for_albs_packages(
         errata_package.arch, []
     ):
         mapping = models.ErrataToALBSPackage(
-            pulp_href=prod_package["pulp_href"],
+            pulp_href=prod_package.pulp_href,
             status=ErrataPackageStatus.released,
-            name=prod_package["name"],
-            version=prod_package["version"],
-            release=prod_package["release"],
-            epoch=int(prod_package["epoch"]),
-            arch=prod_package["arch"],
+            name=prod_package.name,
+            version=prod_package.version,
+            release=prod_package.release,
+            epoch=int(prod_package.epoch),
+            arch=prod_package.arch,
         )
-        src_nevra = parse_rpm_nevra(prod_package["rpm_sourcerpm"])
+        src_nevra = parse_rpm_nevra(prod_package.rpm_sourcerpm)
         errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
@@ -506,51 +483,57 @@ async def search_for_albs_packages(
             models.BuildTaskArtifact.name.startswith(name_query),
         )
     )
-    result = await db.execute(query)
-    pulp = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    for package in result.scalars().all():
+    result = (await db.execute(query)).scalars().all()
+    pulp_pkg_ids = [get_uuid_from_pulp_href(pkg.href) for pkg in result]
+    pkg_fields = [
+        RpmPackage.content_ptr_id,
+        RpmPackage.name,
+        RpmPackage.epoch,
+        RpmPackage.version,
+        RpmPackage.release,
+        RpmPackage.arch,
+        RpmPackage.rpm_sourcerpm,
+    ]
+    with get_pulp_db() as pulp_db:
+        pulp_pkgs = (
+            pulp_db.execute(
+                select(RpmPackage)
+                .where(RpmPackage.content_ptr_id.in_(pulp_pkg_ids))
+                .options(load_only(*pkg_fields))
+            )
+            .scalars()
+            .all()
+        )
+    for package in result:
         try:
-            pulp_rpm_package = await pulp.get_rpm_package(
-                package.href,
-                include_fields=[
-                    "name",
-                    "version",
-                    "release",
-                    "epoch",
-                    "arch",
-                    "rpm_sourcerpm",
-                ],
+            pulp_rpm_package = next(
+                pkg for pkg in pulp_pkgs if pkg.pulp_href == package.href
             )
         except Exception:
             continue
         clean_pulp_package_name = "-".join(
             (
-                pulp_rpm_package["name"],
-                pulp_rpm_package["version"],
-                clean_release(pulp_rpm_package["release"]),
+                pulp_rpm_package.name,
+                pulp_rpm_package.version,
+                clean_release(pulp_rpm_package.release),
             )
         )
         if (
-            pulp_rpm_package["arch"] != errata_package.arch
-            and pulp_rpm_package["arch"] != "noarch"
+            pulp_rpm_package.arch not in (errata_package.arch, "noarch")
             or clean_pulp_package_name != clean_package_name
         ):
             continue
         mapping = models.ErrataToALBSPackage(
             albs_artifact_id=package.id,
             status=ErrataPackageStatus.proposal,
-            name=pulp_rpm_package["name"],
-            version=pulp_rpm_package["version"],
-            release=pulp_rpm_package["release"],
-            epoch=int(pulp_rpm_package["epoch"]),
-            arch=pulp_rpm_package["arch"],
+            name=pulp_rpm_package.name,
+            version=pulp_rpm_package.version,
+            release=pulp_rpm_package.release,
+            epoch=int(pulp_rpm_package.epoch),
+            arch=pulp_rpm_package.arch,
         )
         if errata_package.source_srpm is None:
-            nevra = parse_rpm_nevra(pulp_rpm_package["rpm_sourcerpm"])
+            nevra = parse_rpm_nevra(pulp_rpm_package.rpm_sourcerpm)
             errata_package.source_srpm = nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
@@ -662,7 +645,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         items_to_insert.append(self_ref)
     pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
     search_params = prepare_search_params(errata)
-    prod_repos_cache = await load_platform_packages(platform, search_params, pulp)
+    prod_repos_cache = await load_platform_packages(platform, search_params)
     for package in errata.packages:
         db_package = models.ErrataPackage(
             name=package.name,
@@ -1157,8 +1140,9 @@ def generate_query_for_release(records_ids: List[str]):
             selectinload(models.ErrataRecord.packages)
             .selectinload(models.ErrataPackage.albs_packages)
             .selectinload(models.ErrataToALBSPackage.build_artifact),
-            selectinload(models.ErrataRecord.platform)
-            .selectinload(models.Platform.repos),
+            selectinload(models.ErrataRecord.platform).selectinload(
+                models.Platform.repos
+            ),
         )
         .with_for_update()
     )
@@ -1196,7 +1180,6 @@ async def release_errata_record(record_id: str):
         pulp_packages = await load_platform_packages(
             db_record.platform,
             search_params,
-            pulp,
             for_release=True,
         )
         try:
@@ -1262,7 +1245,6 @@ async def bulk_errata_records_release(records_ids: List[str]):
             pulp_packages = await load_platform_packages(
                 db_record.platform,
                 search_params,
-                pulp,
                 for_release=True,
             )
             try:
