@@ -1,9 +1,7 @@
-import unittest
-
 from alws.schemas import build_node_schema
 
 
-class TestBuildNodeSchema(unittest.TestCase):
+class TestBuildNodeSchema:
     def test_is_debuginfo(self):
         test_artifact = build_node_schema.BuildDoneArtifact(
             name="test-debuginfo-1",
@@ -13,7 +11,7 @@ class TestBuildNodeSchema(unittest.TestCase):
             cas_hash=None,
         )
         message = "is_debuginfo don't work with correct data"
-        self.assertTrue(test_artifact.is_debuginfo, message)
+        assert test_artifact.is_debuginfo is True, message
 
     def test_false_is_debuginfo(self):
         test_artifact = build_node_schema.BuildDoneArtifact(
@@ -24,4 +22,4 @@ class TestBuildNodeSchema(unittest.TestCase):
             cas_hash=None,
         )
         message = "is_debuginfo don't work with incorrect data"
-        self.assertFalse(test_artifact.is_debuginfo, message)
+        assert test_artifact.is_debuginfo is False, message

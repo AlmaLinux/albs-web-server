@@ -11,7 +11,7 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
             json={"active_tasks": []},
         )
         message = "Empty active_tasks aren't pinged"
-        self.assertEqual(response.status_code, status.HTTP_200_OK, message)
+        assert response.status_code == status.HTTP_200_OK, message
 
     async def test_ping(self):
         response = await self.make_request(
@@ -20,4 +20,4 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
             json={"active_tasks": [1, 2, 3]},
         )
         message = "Tasks aren't pinged"
-        self.assertEqual(response.status_code, status.HTTP_200_OK, message)
+        assert response.status_code == status.HTTP_200_OK, message

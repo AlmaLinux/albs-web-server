@@ -1,26 +1,20 @@
-import unittest
-
 import pytest
 import httpx
 
 from alws.app import app
 from alws.config import settings
-from alws.database import Base
+
 from alws.dependencies import get_db
 from alws.utils import jwt_utils
+from tests.conftest import get_session
 from tests.constants import ADMIN_USER_ID
-from tests.mock_functions import engine, get_session, create_superuser
 
 
 @pytest.mark.anyio
-class BaseAsyncTestCase(unittest.IsolatedAsyncioTestCase):
-    user_id = ADMIN_USER_ID
-    token = None
-    headers = {}
-    monkeypatch = pytest.MonkeyPatch()
-    setup_functions = [create_superuser]
-    setattr_monkeypatchs = []
-    engine = engine
+class BaseAsyncTestCase:
+    user_id: int = ADMIN_USER_ID
+    token: str = ""
+    headers: dict = {}
 
     async def make_request(
         self,
@@ -43,36 +37,16 @@ class BaseAsyncTestCase(unittest.IsolatedAsyncioTestCase):
                 json=json,
             )
 
-    def init_user_credentials(self):
-        self.token = jwt_utils.generate_JWT_token(
-            str(self.user_id),
+    @classmethod
+    def setup_class(cls):
+        app.dependency_overrides[get_db] = get_session
+        cls.token = jwt_utils.generate_JWT_token(
+            str(cls.user_id),
             settings.jwt_secret,
             "HS256",
         )
-        self.headers.update(
+        cls.headers.update(
             {
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {cls.token}",
             }
         )
-
-    async def execute_setup_functions(self):
-        for function in self.setup_functions:
-            await function()
-
-    def execute_setattr_monkeypatchs(self):
-        for func in self.setattr_monkeypatchs:
-            self.monkeypatch.setattr(*func())
-
-    async def asyncSetUp(self):
-        app.dependency_overrides[get_db] = get_session
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        await self.execute_setup_functions()
-        self.init_user_credentials()
-        self.execute_setattr_monkeypatchs()
-
-    async def asyncTearDown(self):
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-        await self.engine.dispose()
-        self.monkeypatch.undo()

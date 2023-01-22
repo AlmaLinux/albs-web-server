@@ -36,4 +36,4 @@ jobs:
             db
             web_server
       - name: Run tests
-        run: docker-compose run --no-deps web_server bash -c 'source env/bin/activate && pytest -v'
+        run: docker-compose run --no-deps web_server bash -c 'source env/bin/activate && pytest -v --ignore alws/'

@@ -1,17 +1,9 @@
 from fastapi import status
 
 from tests.mock_classes import BaseAsyncTestCase
-from tests.mock_functions import (
-    create_base_platform,
-    create_superuser,
-    mock_create_repo,
-)
 
 
 class TestProductsEndpoints(BaseAsyncTestCase):
-    setup_functions = [create_base_platform, create_superuser]
-    setattr_monkeypatchs = [mock_create_repo]
-
     async def test_product_create(self):
         data = {
             "name": "AlmaLinux",
@@ -42,4 +34,4 @@ class TestProductsEndpoints(BaseAsyncTestCase):
             json=data,
         )
         message = f"product isn't created, status_code: {response.status_code}"
-        self.assertEqual(response.status_code, status.HTTP_200_OK, message)
+        assert response.status_code == status.HTTP_200_OK, message

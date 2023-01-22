@@ -30,4 +30,4 @@ class TestPlatformsEndpoints(BaseAsyncTestCase):
             json=platform,
         )
         message = f"platform isn't created, status_code: {response.status_code}"
-        self.assertEqual(response.status_code, status.HTTP_200_OK, message)
+        assert response.status_code == status.HTTP_200_OK, message
