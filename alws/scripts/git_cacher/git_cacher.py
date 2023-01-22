@@ -7,6 +7,7 @@ import aioredis
 import pydantic
 import sentry_sdk
 
+from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.gitea import GiteaClient
 
 
@@ -49,7 +50,7 @@ def setup_logger():
     return logger
 
 
-async def run(config, redis_client, gitea_client, organization):
+async def run(config, logger, redis_client, gitea_client, organization):
     cache = await load_redis_cache(
         redis_client, config.git_cache_keys[organization]
     )
@@ -57,6 +58,9 @@ async def run(config, redis_client, gitea_client, organization):
     to_index = []
     git_names = set()
     for repo in await gitea_client.list_repos(organization):
+        if repo['empty'] is True:
+            logger.warning(f"Skipping empty repo {repo['html_url']}")
+            continue
         repo_name = repo['full_name']
         git_names.add(repo_name)
         repo_meta = {
@@ -71,7 +75,7 @@ async def run(config, redis_client, gitea_client, organization):
         elif cache[repo_name]['updated_at'] != repo['updated_at']:
             cache[repo_name] = repo_meta
             to_index.append(repo_name)
-    results = await asyncio.gather(
+    results = await gather_with_concurrency(
         *list(gitea_client.index_repo(repo_name) for repo_name in to_index)
     )
     for result in results:
@@ -102,9 +106,9 @@ async def main():
     gitea_client = GiteaClient(config.gitea_host, logger)
     while True:
         logger.info('Checking cache for updates')
-        await asyncio.gather(
-            run(config, redis_client, gitea_client, 'rpms'),
-            run(config, redis_client, gitea_client, 'modules')
+        await gather_with_concurrency(
+            run(config, logger, redis_client, gitea_client, 'rpms'),
+            run(config, logger, redis_client, gitea_client, 'modules')
         )
         await asyncio.sleep(600)
 
