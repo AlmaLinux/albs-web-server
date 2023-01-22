@@ -1,10 +1,11 @@
 import unittest
+import pytest
 from jwt.exceptions import InvalidSignatureError
 
 from alws.utils import jwt_utils
 
 
-@unittest.skip("need to refactor")
+@pytest.mark.skip(reason="need to refactor")
 class TestJWTToken(unittest.TestCase):
     def test_decode_JWT_token(self):
         user_id = "1"

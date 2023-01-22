@@ -1,3 +1,4 @@
+from fastapi import status
 import pytest
 import httpx
 
@@ -15,6 +16,7 @@ class BaseAsyncTestCase:
     user_id: int = ADMIN_USER_ID
     token: str = ""
     headers: dict = {}
+    status_codes = status
 
     async def make_request(
         self,

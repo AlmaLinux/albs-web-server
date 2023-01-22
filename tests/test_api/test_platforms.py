@@ -1,5 +1,3 @@
-from fastapi import status
-
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -29,5 +27,5 @@ class TestPlatformsEndpoints(BaseAsyncTestCase):
             "/api/v1/platforms/",
             json=platform,
         )
-        message = f"platform isn't created, status_code: {response.status_code}"
-        assert response.status_code == status.HTTP_200_OK, message
+        message = f"Cannot create platform:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message

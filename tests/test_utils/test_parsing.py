@@ -1,9 +1,7 @@
-import unittest
-
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
 
-class TapParseTest(unittest.TestCase):
+class TapParseTest:
     skip_tap = {
         "log": "1..3\r\nok 1 # skip (lve-utils-debuginfo is debuginfo package) lve-utils-debuginfo shared library dependencies installed\r\nok 2 # skip (lve-utils-debuginfo is debuginfo package) lve-utils-debuginfo files are correctly installed\r\nok 3 # skip (lve-utils-debuginfo is debuginfo package) lve-utils-debuginfo shared library doesn't contain trailing ':' in RPATH\r\n\nRet code: 0",
         "tap_results": [
@@ -87,18 +85,18 @@ class TapParseTest(unittest.TestCase):
 
     def test_skip(self):
         res_skip = parse_tap_output(str.encode(self.skip_tap["log"]))
-        self.assertTrue(type(res_skip) == list)
-        self.assertEqual(res_skip, self.skip_tap["tap_results"])
-        self.assertEqual(True, tap_set_status(res_skip))
+        assert isinstance(res_skip, list)
+        assert res_skip == self.skip_tap["tap_results"]
+        assert tap_set_status(res_skip) is True
 
     def test_done(self):
-        res_skip = parse_tap_output(str.encode(self.done_tap["log"]))
-        self.assertTrue(type(res_skip) == list)
-        self.assertEqual(res_skip, self.done_tap["tap_results"])
-        self.assertEqual(True, tap_set_status(res_skip))
+        res_done = parse_tap_output(str.encode(self.done_tap["log"]))
+        assert isinstance(res_done, list)
+        assert res_done == self.done_tap["tap_results"]
+        assert tap_set_status(res_done) is True
 
     def test_fail(self):
-        res_skip = parse_tap_output(str.encode(self.fail_tap["log"]))
-        self.assertTrue(type(res_skip) == list)
-        self.assertEqual(res_skip, self.fail_tap["tap_results"])
-        self.assertEqual(False, tap_set_status(res_skip))
+        res_fail = parse_tap_output(str.encode(self.fail_tap["log"]))
+        assert isinstance(res_fail, list)
+        assert res_fail == self.fail_tap["tap_results"]
+        assert tap_set_status(res_fail) is False
