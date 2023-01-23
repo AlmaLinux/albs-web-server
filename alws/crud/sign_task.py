@@ -1,4 +1,5 @@
 import datetime
+import asyncio
 import logging
 import typing
 import urllib.parse
@@ -21,7 +22,6 @@ from alws.errors import (
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
 
@@ -305,7 +305,7 @@ async def complete_sign_task(
                 if package.name not in packages_to_convert:
                     packages_to_convert[package.name] = package
 
-            results = await gather_with_concurrency(*(
+            results = await asyncio.gather(*(
                 __process_single_package(package)
                 for package in packages_to_convert.values()
             ))
@@ -343,7 +343,7 @@ async def complete_sign_task(
                 sign_task = await __failed_post_processing(sign_task, stats)
                 return sign_task
 
-            await gather_with_concurrency(*(
+            await asyncio.gather(*(
                 pulp_client.modify_repository(repo_href, add=packages)
                 for repo_href, packages in packages_to_add.items()
             ))

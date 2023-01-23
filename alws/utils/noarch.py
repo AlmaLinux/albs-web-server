@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import logging
 import typing
@@ -8,7 +9,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.constants import BuildTaskStatus
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.pulp_client import PulpClient
 
 
@@ -132,7 +132,7 @@ async def save_noarch_packages(
     db.add_all(new_noarch_artifacts)
     await db.flush()
 
-    await gather_with_concurrency(*(
+    await asyncio.gather(*(
         pulp_client.modify_repository(
             repo_href, add=content_dict['add'],
             remove=content_dict['remove'])
