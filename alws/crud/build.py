@@ -198,7 +198,8 @@ async def get_builds(
         return query
 
     if build_id:
-        return await db.execute(await generate_query()).scalars().first()
+        query = await db.execute(await generate_query())
+        return query.scalars().first()
     elif page_number:
         return {
             "builds": (
@@ -209,7 +210,8 @@ async def get_builds(
             ).scalar(),
             "current_page": page_number,
         }
-    return await db.execute(await generate_query()).scalars().all()
+    query = await db.execute(await generate_query())
+    return query.scalars().all()
 
 
 async def get_module_preview(
