@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import urllib
@@ -11,7 +12,6 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.schemas import test_schema
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
@@ -132,7 +132,7 @@ async def complete_test_task(db: Session, task_id: int,
         else:
             logging.error('Log file %s is missing href', str(log))
             continue
-    results = await gather_with_concurrency(*conv_tasks)
+    results = await asyncio.gather(*conv_tasks)
     for name, href in results:
         new_hrefs.append(href)
         log_record = models.TestTaskArtifact(

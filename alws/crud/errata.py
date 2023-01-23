@@ -1,3 +1,4 @@
+import asyncio
 import collections
 from contextlib import asynccontextmanager
 import datetime
@@ -25,7 +26,6 @@ from alws import models
 from alws.dependencies import get_pulp_db, get_db
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.errata import (
     clean_errata_title,
     get_nevra,
@@ -1127,8 +1127,8 @@ async def process_errata_release_for_repos(
             publish_tasks.append(pulp.create_rpm_publication(repo_href))
     if not publish:
         return release_tasks
-    await gather_with_concurrency(*release_tasks)
-    await gather_with_concurrency(*publish_tasks)
+    await asyncio.gather(*release_tasks)
+    await asyncio.gather(*publish_tasks)
 
 
 def generate_query_for_release(records_ids: List[str]):
@@ -1270,9 +1270,9 @@ async def bulk_errata_records_release(records_ids: List[str]):
             release_tasks.extend(tasks)
         await session.commit()
     logging.info("Executing release tasks")
-    await gather_with_concurrency(*release_tasks)
+    await asyncio.gather(*release_tasks)
     logging.info("Executing publication tasks")
-    await gather_with_concurrency(
+    await asyncio.gather(
         *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
     )
     logging.info("Bulk errata release is finished")

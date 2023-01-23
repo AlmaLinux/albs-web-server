@@ -7,7 +7,6 @@ import aioredis
 import pydantic
 import sentry_sdk
 
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.gitea import GiteaClient
 
 
@@ -75,7 +74,7 @@ async def run(config, logger, redis_client, gitea_client, organization):
         elif cache[repo_name]['updated_at'] != repo['updated_at']:
             cache[repo_name] = repo_meta
             to_index.append(repo_name)
-    results = await gather_with_concurrency(
+    results = await asyncio.gather(
         *list(gitea_client.index_repo(repo_name) for repo_name in to_index)
     )
     for result in results:
@@ -106,7 +105,7 @@ async def main():
     gitea_client = GiteaClient(config.gitea_host, logger)
     while True:
         logger.info('Checking cache for updates')
-        await gather_with_concurrency(
+        await asyncio.gather(
             run(config, logger, redis_client, gitea_client, 'rpms'),
             run(config, logger, redis_client, gitea_client, 'modules')
         )

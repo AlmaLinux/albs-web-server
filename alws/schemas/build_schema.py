@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import re
@@ -10,7 +11,6 @@ from pydantic import BaseModel, AnyHttpUrl, validator, conlist
 from alws.config import settings
 from alws.constants import BuildTaskRefType
 from alws import models
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient
@@ -495,7 +495,7 @@ async def get_module_refs(
                 )
                 checking_tasks.append(get_module_data_from_beholder(
                     beholder_client, endpoint, arch, devel=module_is_devel))
-    beholder_results = await gather_with_concurrency(*checking_tasks)
+    beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
     for flavor in flavors:
@@ -514,7 +514,7 @@ async def get_module_refs(
             platform_packages_git=platform_packages_git,
             beholder_data=beholder_results,
         ))
-    result = await gather_with_concurrency(*component_tasks)
+    result = await asyncio.gather(*component_tasks)
     enabled_modules = module.get_all_build_deps()
     modules = [module.render()]
     if devel_module:

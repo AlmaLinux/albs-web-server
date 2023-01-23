@@ -1,3 +1,4 @@
+import asyncio
 import re
 import copy
 import logging
@@ -31,7 +32,6 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import release_schema
 from alws.constants import ErrataPackageStatus
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
@@ -165,7 +165,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
             build_rpms = build.source_rpms + build.binary_rpms
-            pulp_artifacts = await gather_with_concurrency(*(
+            pulp_artifacts = await asyncio.gather(*(
                 self.pulp_client.get_rpm_package(
                     rpm.artifact.href, include_fields=packages_fields)
                 for rpm in build_rpms
@@ -553,11 +553,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         # TODO: Add support for modules releases
         #       and checking existent packages in repos
 
-        await gather_with_concurrency(*(
+        await asyncio.gather(*(
             self.pulp_client.modify_repository(href, add=packages)
             for href, packages in repository_modification_mapping.items()
         ))
-        await gather_with_concurrency(*(
+        await asyncio.gather(*(
             self.pulp_client.create_rpm_publication(href)
             for href in repository_modification_mapping.keys()
         ))
@@ -723,7 +723,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                             pkg_arch,
                             repo_arch,
                         ))
-        await gather_with_concurrency(*tasks)
+        await asyncio.gather(*tasks)
         pkgs_in_repos = defaultdict(list)
         for pkg_info in packages:
             pkg = pkg_info['package']
@@ -1239,8 +1239,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         release.plan['packages_from_repos'] = pkgs_from_repos
         release.plan['packages_in_repos'] = pkgs_in_repos
         if self.codenotary_enabled:
-            packages_mapping = dict(
-                await gather_with_concurrency(*authenticate_tasks))
+            packages_mapping = dict(await asyncio.gather(*authenticate_tasks))
 
         for package_dict in release.plan['packages']:
             package = package_dict['package']
@@ -1359,8 +1358,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # after modify repo we need to publish repo content
                 publication_tasks.append(
                     self.pulp_client.create_rpm_publication(repo.pulp_href))
-        await gather_with_concurrency(*modify_tasks)
-        await gather_with_concurrency(*publication_tasks)
+        await asyncio.gather(*modify_tasks)
+        await asyncio.gather(*publication_tasks)
         return additional_messages
 
     async def check_released_errata_packages(

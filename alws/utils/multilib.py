@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import typing
 
@@ -10,7 +11,6 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.errors import ModuleUpdateError
-from alws.utils.asyncio_utils import gather_with_concurrency
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.modularity import IndexWrapper
@@ -227,7 +227,7 @@ class MultilibProcessor:
             r for r in self._build_task.build.repos if r.type == 'rpm'
             and r.arch == 'x86_64' and r.debug is False
         )
-        await gather_with_concurrency(
+        await asyncio.gather(
             self._pulp_client.modify_repository(
                 repo_to=debug_repo.pulp_href, add=debug_pkg_hrefs),
             self._pulp_client.modify_repository(
@@ -235,7 +235,7 @@ class MultilibProcessor:
         )
 
     async def get_packages_info_from_pulp(self, rpm_packages: list):
-        results = await gather_with_concurrency(
+        results = await asyncio.gather(
             *(get_rpm_package_info(
                 self._pulp_client, rpm.href,
                 include_fields=['epoch', 'name', 'version', 'release', 'arch']
