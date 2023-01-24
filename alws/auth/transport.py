@@ -8,7 +8,7 @@ from fastapi_users.authentication import (
     Transport,
 )
 from fastapi_users.authentication.transport import TransportLogoutNotSupportedError
-from fastapi_users.authentication.transport.bearer import BearerResponse
+from fastapi_users.authentication.transport.bearer import BearerResponse, BearerTransport
 from fastapi_users.openapi import OpenAPIResponseType
 
 from alws.config import settings
@@ -17,6 +17,7 @@ from alws.config import settings
 __all__ = [
     'get_cookie_transport',
     'get_jwt_transport',
+    'get_bearer_transport'
 ]
 
 
@@ -90,3 +91,7 @@ def get_cookie_transport(
 
 def get_jwt_transport() -> JWTransport:
     return JWTransport()
+
+
+def get_bearer_transport() -> BearerTransport:
+    return BearerTransport(tokenUrl='auth/login')
