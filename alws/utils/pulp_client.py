@@ -12,15 +12,14 @@ from typing import List
 import aiohttp
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import status
-# TODO: Return retries for GET requests
-# from aiohttp_retry import RetryClient
+from aiohttp_retry import RetryClient, ExponentialRetry
 
 from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
 
 
-PULP_SEMAPHORE = asyncio.Semaphore(10)
+PULP_SEMAPHORE = asyncio.Semaphore(5)
 
 
 class PulpClient:
@@ -31,6 +30,8 @@ class PulpClient:
         self._password = password
         self._auth = aiohttp.BasicAuth(self._username, self._password)
         self._current_transaction = None
+        self._retry_options = ExponentialRetry(exceptions={
+            asyncio.TimeoutError, ClientResponseError})
 
     async def create_log_repo(
             self, name: str, distro_path_start: str = 'build_logs') -> (str, str):
@@ -790,22 +791,33 @@ class PulpClient:
         else:
             full_url = urllib.parse.urljoin(self._host, endpoint)
         async with PULP_SEMAPHORE:
-            async with aiohttp.request(
-                    method,
-                    full_url,
-                    params=params,
-                    json=json,
-                    data=data,
-                    headers=headers,
-                    auth=self._auth
-            ) as response:
-                if raw:
-                    return {'result': await response.text()}
-                response_json = await response.json()
-                try:
-                    response.raise_for_status()
-                except ClientResponseError as exc:
-                    if exc.status == status.HTTP_400_BAD_REQUEST:
-                        exc.message += f": {str(response_json)}"
-                    raise exc
-                return response_json
+            if method.lower() == 'get':
+                async with RetryClient(
+                        retry_options=self._retry_options) as client:
+                    response = await client.get(
+                        full_url, params=params, json=json, data=data,
+                        headers=headers, auth=self._auth)
+                    if raw:
+                        return {'result': await response.text()}
+                    response_json = await response.json()
+            else:
+                async with aiohttp.request(
+                        method,
+                        full_url,
+                        params=params,
+                        json=json,
+                        data=data,
+                        headers=headers,
+                        auth=self._auth
+                ) as response:
+                    if raw:
+                        return {'result': await response.text()}
+                    response_json = await response.json()
+
+            try:
+                response.raise_for_status()
+            except ClientResponseError as exc:
+                if exc.status == status.HTTP_400_BAD_REQUEST:
+                    exc.message += f": {str(response_json)}"
+                raise exc
+            return response_json
