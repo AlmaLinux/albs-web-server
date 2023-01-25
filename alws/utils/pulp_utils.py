@@ -2,6 +2,7 @@ import typing
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 from alws.dependencies import get_pulp_db
 from alws.pulp_models import (
@@ -57,3 +58,23 @@ def get_rpm_packages_from_repository(
     query = select(RpmPackage).where(*conditions)
     with get_pulp_db() as pulp_db:
         return pulp_db.execute(query).scalars().all()
+
+
+def get_rpm_packages_by_ids(
+    pulp_pkg_ids: typing.List[uuid.UUID],
+    pkg_fields: typing.List[typing.Any],
+) -> typing.Dict[str, RpmPackage]:
+    result = {}
+    with get_pulp_db() as pulp_db:
+        pulp_pkgs = (
+            pulp_db.execute(
+                select(RpmPackage)
+                .where(RpmPackage.content_ptr_id.in_(pulp_pkg_ids))
+                .options(load_only(*pkg_fields))
+            )
+            .scalars()
+            .all()
+        )
+        for pkg in pulp_pkgs:
+            result[pkg.pulp_href] = pkg
+        return result

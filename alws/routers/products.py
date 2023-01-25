@@ -40,6 +40,7 @@ async def create_product(
     async with db.begin():
         db_product = await products.create_product(db, product)
         await db.commit()
+    await db.refresh(db_product)
     return await products.get_products(db, product_id=db_product.id)
 
 

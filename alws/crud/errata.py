@@ -38,6 +38,7 @@ from alws.utils.parsing import (
 )
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
+    get_rpm_packages_by_ids,
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
@@ -494,22 +495,10 @@ async def search_for_albs_packages(
         RpmPackage.arch,
         RpmPackage.rpm_sourcerpm,
     ]
-    with get_pulp_db() as pulp_db:
-        pulp_pkgs = (
-            pulp_db.execute(
-                select(RpmPackage)
-                .where(RpmPackage.content_ptr_id.in_(pulp_pkg_ids))
-                .options(load_only(*pkg_fields))
-            )
-            .scalars()
-            .all()
-        )
+    pulp_pkgs = get_rpm_packages_by_ids(pulp_pkg_ids, pkg_fields)
     for package in result:
-        try:
-            pulp_rpm_package = next(
-                pkg for pkg in pulp_pkgs if pkg.pulp_href == package.href
-            )
-        except Exception:
+        pulp_rpm_package = pulp_pkgs.get(package.href)
+        if not pulp_rpm_package:
             continue
         clean_pulp_package_name = "-".join(
             (
