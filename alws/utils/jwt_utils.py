@@ -11,7 +11,7 @@ def generate_JWT_token(
 ) -> str:
     payload = {
         # TODO: this is wrong
-        "user_id": user_id,
+        "sub": user_id,
         "exp": time.time() + 60000,
         "aud": ["fastapi-users:auth"],
     }
