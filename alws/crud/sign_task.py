@@ -220,7 +220,8 @@ async def complete_sign_task(
                     new_pkg_href, include_fields=['sha256'])
                 sha256 = package_info['sha256']
         return pkg.name, {'id': pkg.id, 'href': new_pkg_href, 'sha256': sha256,
-                          'original_sha256': pkg.sha256}
+                          'original_sha256': pkg.sha256,
+                          'cas_hash': pkg.cas_hash}
 
     async def __failed_post_processing(
             task: models.SignTask, statistics: dict) -> models.SignTask:
@@ -331,7 +332,7 @@ async def complete_sign_task(
                 for db_pkg in similar_rpms_mapping.get(pkg_name, []):
                     db_pkg.artifact.href = new_href
                     db_pkg.artifact.sign_key = sign_task.sign_key
-                    db_pkg.artifact.cas_hash = package.cas_hash
+                    db_pkg.artifact.cas_hash = pkg_info['cas_hash']
                     modified_items.append(db_pkg)
                     modified_items.append(db_pkg.artifact)
 
