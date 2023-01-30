@@ -164,7 +164,7 @@ class PulpClient:
         self,
         name: str,
         stream: str,
-    ) -> typing.Union[typing.List[dict], None]:
+    ) -> typing.Optional[typing.List[dict]]:
         endpoint = 'pulp/api/v3/content/rpm/modulemds/'
         params = {
             'name': name,
@@ -771,7 +771,7 @@ class PulpClient:
     async def list_updateinfo_records(
                 self,
                 id__in: List[str],
-                repository_version: typing.Union[str, None] = None
+                repository_version: typing.Optional[str] = None
             ):
         endpoint = 'pulp/api/v3/content/rpm/advisories/'
         payload = {
