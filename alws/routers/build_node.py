@@ -1,6 +1,6 @@
 import datetime
 import itertools
-
+import typing
 from fastapi import APIRouter, Depends, Response, status
 from dramatiq import pipeline
 
@@ -58,7 +58,7 @@ async def build_done(
     return {'ok': True}
 
 
-@router.get('/get_task', response_model=build_node_schema.Task)
+@router.get('/get_task', response_model=typing.Optional[build_node_schema.Task])
 async def get_task(
             request: build_node_schema.RequestTask,
             db: database.Session = Depends(get_db)
