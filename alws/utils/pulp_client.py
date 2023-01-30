@@ -160,6 +160,21 @@ class PulpClient:
             return None
         return response['results'][0]
 
+    async def get_module_by_name_and_stream(
+        self,
+        name: str,
+        stream: str,
+    ) -> typing.Optional[typing.List[dict]]:
+        endpoint = 'pulp/api/v3/content/rpm/modulemds/'
+        params = {
+            'name': name,
+            'stream': stream
+        }
+        response = await self.request('GET', endpoint, params=params)
+        if response['count'] == 0:
+            return None
+        return response['results']
+
     async def create_module_by_payload(self, payload: dict) -> str:
         ENDPOINT = 'pulp/api/v3/content/rpm/modulemds/'
         task = await self.request('POST', ENDPOINT, json=payload)
@@ -756,13 +771,14 @@ class PulpClient:
     async def list_updateinfo_records(
                 self,
                 id__in: List[str],
-                repository_version: str
+                repository_version: typing.Optional[str] = None
             ):
         endpoint = 'pulp/api/v3/content/rpm/advisories/'
         payload = {
-            'id__in': id__in,
-            'repository_version': repository_version,
+            'id__in': id__in
         }
+        if repository_version:
+            payload['repository_version'] = repository_version
         return (await self.request('GET', endpoint, params=payload))['results']
 
     async def add_errata_record(self, record: dict, repo_href: str):
