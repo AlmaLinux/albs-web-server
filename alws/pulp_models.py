@@ -193,6 +193,78 @@ class CoreContent(PulpBase):
         "RpmPackage",
         back_populates="content",
     )
+    core_contentartifact: "CoreContentArtifact" = relationship(
+        "CoreContentArtifact",
+        back_populates="content",
+    )
+
+
+class CoreContentArtifact(PulpBase):
+    __tablename__ = "core_contentartifact"
+
+    pulp_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    pulp_created = sqlalchemy.Column(sqlalchemy.DATETIME, default=datetime.now)
+    pulp_last_updated = sqlalchemy.Column(
+        sqlalchemy.DATETIME,
+        default=datetime.now,
+        nullable=True,
+    )
+    relative_path = sqlalchemy.Column(sqlalchemy.Text)
+    artifact_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey("core_artifact.pulp_id"),
+        nullable=True,
+    )
+    content_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(CoreContent.pulp_id),
+    )
+    artifact: "CoreArtifact" = relationship(
+        "CoreArtifact",
+        foreign_keys=[artifact_id],
+        back_populates="core_contentartifact",
+    )
+    content: CoreContent = relationship(
+        CoreContent,
+        foreign_keys=[content_id],
+        back_populates="core_contentartifact",
+    )
+
+
+class CoreArtifact(PulpBase):
+    __tablename__ = "core_artifact"
+
+    pulp_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    pulp_created = sqlalchemy.Column(sqlalchemy.DATETIME, default=datetime.now)
+    pulp_last_updated = sqlalchemy.Column(
+        sqlalchemy.DATETIME,
+        default=datetime.now,
+        nullable=True,
+    )
+    file = sqlalchemy.Column(sqlalchemy.VARCHAR(255))
+    size = sqlalchemy.Column(sqlalchemy.BigInteger)
+    md5 = sqlalchemy.Column(sqlalchemy.VARCHAR(32), nullable=True)
+    sha1 = sqlalchemy.Column(sqlalchemy.VARCHAR(40), nullable=True)
+    sha224 = sqlalchemy.Column(sqlalchemy.VARCHAR(56), nullable=True)
+    sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64))
+    sha384 = sqlalchemy.Column(sqlalchemy.VARCHAR(96), nullable=True)
+    sha512 = sqlalchemy.Column(sqlalchemy.VARCHAR(128), nullable=True)
+    timestamp_of_interest = sqlalchemy.Column(
+        sqlalchemy.DATETIME,
+        default=datetime.now,
+    )
+    core_contentartifact: CoreContentArtifact = relationship(
+        CoreContentArtifact,
+        back_populates="artifact",
+    )
 
 
 class CoreRepositoryContent(PulpBase):
