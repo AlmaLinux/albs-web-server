@@ -23,6 +23,6 @@ jinja2==3.1.2
 pgpy==0.6.0
 markdown==3.4.1
 fastapi-users-db-sqlalchemy==4.0.4
-httpx-oauth==0.10.2
+httpx-oauth==0.11.0
 sentry-sdk[fastapi]==1.7.2  # requires FastAPI>=0.79.0
 git+https://git.almalinux.org/almalinux/cas_wrapper.git@0.0.6#egg=cas_wrapper
