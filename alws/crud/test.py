@@ -17,10 +17,11 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
+
 async def create_test_tasks_for_build_id(db: Session, build_id: int):
     async with db.begin():
-        ## We get all build_tasks with the same build_id
-        ## and whose status is COMPLETED
+        # We get all build_tasks with the same build_id
+        # and whose status is COMPLETED
         build_task_ids = (await db.execute(
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id,
@@ -28,11 +29,20 @@ async def create_test_tasks_for_build_id(db: Session, build_id: int):
             )
         )).scalars().all()
 
+        build = (await db.execute(select(models.Build).where(
+            models.Build.id == build_id).options(
+            selectinload(models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = [i for i in build.repos
+                               if i.type == 'test_log'][0]
+
     for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id)
+        await create_test_tasks(
+            db, build_task_id, test_log_repository.id)
 
 
-async def create_test_tasks(db: Session, build_task_id: int):
+async def create_test_tasks(db: Session, build_task_id: int,
+                            repository_id: int):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -58,18 +68,6 @@ async def create_test_tasks(db: Session, build_task_id: int):
         else:
             new_revision = 1
 
-        # Create logs repository
-        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-        repo_url, repo_href = await pulp_client.create_log_repo(
-            repo_name, distro_path_start='test_logs')
-
-        repository = models.Repository(
-            name=repo_name, url=repo_url, arch=build_task.arch,
-            pulp_href=repo_href, type='test_log', debug=False
-        )
-        db.add(repository)
-        await db.flush()
-
         test_tasks = []
         for artifact in build_task.artifacts:
             if artifact.type != 'rpm':
@@ -85,7 +83,7 @@ async def create_test_tasks(db: Session, build_task_id: int):
                 env_arch=build_task.arch,
                 status=TestTaskStatus.CREATED,
                 revision=new_revision,
-                repository_id=repository.id,
+                repository_id=repository_id,
             )
             if artifact_info.get('release'):
                 task.package_release = artifact_info['release']

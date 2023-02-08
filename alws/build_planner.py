@@ -129,23 +129,46 @@ class BuildPlanner:
         )
         self._build.repos.append(repo)
 
+    async def create_log_repo(self, repo_type: str,
+                              repo_prefix: str = 'build_logs'):
+        repo_name = f'build-{self._build.id}-{repo_type}'
+        repo_url, repo_href = await self._pulp_client.create_log_repo(
+            repo_name, distro_path_start=repo_prefix)
+        repo = models.Repository(
+            name=repo_name,
+            url=repo_url,
+            arch='log',
+            pulp_href=repo_href,
+            type=repo_type,
+            debug=False
+        )
+        self._build.repos.append(repo)
+
     async def init_build_repos(self):
         tasks = []
         for platform in self._platforms:
-            for arch in ['src'] + self._request_platforms[platform.name]:
+            for arch in self._request_platforms[platform.name]:
                 tasks.append(self.create_build_repo(
                     platform,
                     arch,
                     'rpm'
                 ))
-                if arch == 'src':
-                    continue
                 tasks.append(self.create_build_repo(
                     platform,
                     arch,
                     'rpm',
                     is_debug=True
                 ))
+
+            # Add source RPM repository
+            tasks.append(self.create_build_repo(platform, 'src', 'rpm'))
+
+            # Add build log and test log repositories
+            for repo_type, repo_prefix in (
+                    ('build_log', 'build_logs'), ('test_log', 'test_logs')):
+                tasks.append(self.create_log_repo(
+                    repo_type, repo_prefix=repo_prefix))
+
         await asyncio.gather(*tasks)
 
     async def add_linked_builds(self, linked_build):
