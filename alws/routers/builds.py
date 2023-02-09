@@ -91,14 +91,14 @@ async def get_build(build_id: int, db: database.Session = Depends(get_db)):
     return db_build
 
 
-@router.patch('/{build_id}/restart-failed', response_model=build_schema.Build)
+@router.patch('/{build_id}/restart-failed', status_code=status.HTTP_200_OK)
 async def restart_failed_build_items(build_id: int,
                                      db: database.Session = Depends(get_db)):
     return await build_node.update_failed_build_items(db, build_id)
 
 
 @router.patch(
-    '/{build_id}/parallel-restart-failed', response_model=build_schema.Build
+    '/{build_id}/parallel-restart-failed', status_code=status.HTTP_200_OK
 )
 async def parallel_restart_failed_build_items(
         build_id: int, db: database.Session = Depends(get_db)

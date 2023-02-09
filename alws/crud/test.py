@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import logging
 import re
 import urllib
@@ -220,12 +221,20 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             log_href = urllib.parse.urljoin(test_task.repository.url,
                                             artifact.name)
             await download_file(log_href, log)
-            tap_results = parse_tap_output(log.getvalue())
+            log_content = log.getvalue()
+            # on local machines and our stagings
+            # we will download logs from pulp directly
+            if (
+                isinstance(log_content, bytes)
+                and log_content.startswith(b'\x1f\x8b')
+            ):
+                log_content = gzip.decompress(log_content)
+            tap_results = parse_tap_output(log_content)
             tap_status = tap_set_status(tap_results)
-            logs_format = get_logs_format(log.getvalue())
+            logs_format = get_logs_format(log_content)
             test_tap = {
                 'id': test_task.id,
-                'log': log.getvalue(),
+                'log': log_content,
                 'success': tap_status,
                 'logs_format': logs_format,
                 'tap_results': tap_results
