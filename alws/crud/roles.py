@@ -26,10 +26,8 @@ async def fix_roles_actions(db: Session, commit: bool = False):
     new_roles = []
 
     for role in roles:
-        print(role.name)
         r_actions = None
         for act_role in RolesList:
-            print(act_role.name)
             if role.name.endswith(act_role.name):
                 r_actions = set(act_role.actions)
                 break

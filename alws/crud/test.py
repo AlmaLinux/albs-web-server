@@ -33,8 +33,11 @@ async def create_test_tasks_for_build_id(db: Session, build_id: int):
             models.Build.id == build_id).options(
             selectinload(models.Build.repos)
         ))).scalars().first()
-        test_log_repository = [i for i in build.repos
-                               if i.type == 'test_log'][0]
+        test_log_repository = next(
+            (i for i in build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
 
     for build_task_id in build_task_ids:
         await create_test_tasks(
@@ -101,8 +104,17 @@ async def restart_build_tests(db: Session, build_id: int):
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id))
         build_task_ids = build_task_ids.scalars().all()
+        build = (await db.execute(select(models.Build).where(
+            models.Build.id == build_id).options(
+            selectinload(models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = next(
+            (i for i in build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
     for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id)
+        await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
