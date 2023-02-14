@@ -28,7 +28,12 @@ async def _complete_test_task(task_id: int, task_result: TestTaskResult):
                 TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
 
 
-@dramatiq.actor(max_retries=2, priority=5, time_limit=DRAMATIQ_TASK_TIMEOUT)
+@dramatiq.actor(
+    max_retries=0,
+    priority=0,
+    queue_name='tests',
+    time_limit=DRAMATIQ_TASK_TIMEOUT
+)
 def complete_test_task(task_id: int, payload: typing.Dict[str, typing.Any]):
     event_loop.run_until_complete(
         _complete_test_task(task_id, TestTaskResult(**payload)))
