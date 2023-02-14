@@ -198,6 +198,10 @@ class CoreContent(PulpBase):
         back_populates="content",
     )
 
+    @property
+    def file_href(self):
+        return f"/pulp/api/v3/content/file/files/{self.pulp_id}/"
+
 
 class CoreContentArtifact(PulpBase):
     __tablename__ = "core_contentartifact"
