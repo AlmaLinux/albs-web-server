@@ -18,9 +18,9 @@ __all__ = ['complete_test_task']
 async def _complete_test_task(task_id: int, task_result: TestTaskResult):
     async with Session() as db, db.begin():
         try:
-            logging.info('Start processesing test task %s', task_id)
+            logging.info('Start processing test task %s', task_id)
             await t_crud.complete_test_task(db, task_id, task_result)
-            logging.info('Processesing test task %s is finished', task_id)
+            logging.info('Processing test task %s is finished', task_id)
         except Exception as e:
             logging.exception(
                 'Cannot set test task "%d" result, marking as failed.'
