@@ -5,6 +5,11 @@ import typing
 import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
+from fastapi import UploadFile, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from alws import models
 
 from alws.config import settings
 from alws.errors import UploadError
@@ -14,11 +19,13 @@ from alws.utils.pulp_client import PulpClient
 
 
 class MetadataUploader:
-    def __init__(self):
+    def __init__(self, session: AsyncSession, repo_name: str):
         self.pulp = PulpClient(settings.pulp_host, settings.pulp_user,
                                settings.pulp_password)
+        self.session = session
+        self.repo_name = repo_name
 
-    async def iter_repo(self, repo_href: str) -> dict:
+    async def iter_repo(self, repo_href: str) -> typing.AsyncIterator[dict]:
         next_page = repo_href
         while True:
             if 'limit' in next_page and re.search(
@@ -42,9 +49,14 @@ class MetadataUploader:
         await self.pulp.upload_comps(data)
         await self.pulp.create_rpm_publication(repo_href)
 
-    async def upload_modules(self, repo_href: str,
-                             module_content: str) -> None:
+    async def upload_modules(
+        self,
+        repo_href: str,
+        module_content: str,
+    ) -> None:
         latest_repo_href = await self.pulp.get_repo_latest_version(repo_href)
+        if not latest_repo_href:
+            raise ValueError(f'Cannot get latest repo version by {repo_href=}')
         latest_repo_data = await self.pulp.get_latest_repo_present_content(
             latest_repo_href)
         module_content_keys = ('rpm.modulemd_defaults', 'rpm.modulemd')
@@ -59,7 +71,7 @@ class MetadataUploader:
                 continue
             async for content in self.iter_repo(repo_type_href):
                 modules_to_remove.append(content['pulp_href'])
-        artifact_href, _ = await self.pulp.upload_file(module_content)
+        artifact_href, sha256 = await self.pulp.upload_file(module_content)
         _index = IndexWrapper.from_template(module_content)
         module = next(_index.iter_modules())
         payload = {
@@ -73,7 +85,8 @@ class MetadataUploader:
             'artifacts': [],
             'dependencies': [],
         }
-        hrefs_to_add.append(await self.pulp.create_module_by_payload(payload))
+        module_href = await self.pulp.create_module_by_payload(payload)
+        hrefs_to_add.append(module_href)
 
         # we can't associate same packages in modules twice in one repo version
         # need to remove them before creating new modulemd
@@ -125,14 +138,57 @@ class MetadataUploader:
         finally:
             await self.pulp.create_rpm_publication(repo_href)
 
+        # we need to update module if we update template in build repo
+        re_result = re.search(
+            # AlmaLinux-8-s390x-0000-debug-br
+            r'.+-(?P<arch>\w+)-(?P<build_id>\d+)(-br|-debug-br)$',
+            self.repo_name,
+            flags=re.IGNORECASE,
+        )
+        if re_result:
+            re_result = re_result.groupdict()
+            subq = (
+                select(models.BuildTask.rpm_module_id)
+                .where(
+                    models.BuildTask.build_id == re_result['build_id'],
+                    models.BuildTask.arch == re_result['arch'],
+                )
+                .scalar_subquery()
+            )
+            rpm_modules = (
+                (
+                    await self.session.execute(
+                        select(models.RpmModule)
+                        .where(models.RpmModule.id == subq)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for rpm_module in rpm_modules:
+                for attr in (
+                    'name',
+                    'version',
+                    'stream',
+                    'content',
+                    'arch',
+                ):
+                    module_value = getattr(module, attr)
+                    if module_value != getattr(rpm_module, attr):
+                        setattr(rpm_module, attr, module_value)
+                rpm_module.sha256 = sha256
+                rpm_module.pulp_href = module_href
+
     async def process_uploaded_files(
         self,
-        repo_name: str,
-        module_content: bytes = None,
-        comps_content: bytes = None,
+        module_content: typing.Optional[UploadFile] = None,
+        comps_content: typing.Optional[UploadFile] = None,
     ) -> typing.List[str]:
         repo = await self.pulp.get_rpm_repository_by_params({
-            'name__contains': repo_name})
+            'name__contains': self.repo_name})
+        if not repo:
+            raise UploadError(f'{repo=} not found',
+                              status=status.HTTP_404_NOT_FOUND)
         repo_href = repo['pulp_href']
         updated_metadata = []
         try:

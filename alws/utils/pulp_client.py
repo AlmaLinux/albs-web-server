@@ -7,7 +7,11 @@ import re
 import os
 import typing
 import urllib.parse
-from typing import List
+from typing import (
+    Any,
+    Dict,
+    List,
+)
 
 import aiohttp
 from aiohttp.client_exceptions import ClientResponseError
@@ -394,7 +398,7 @@ class PulpClient:
                 repo_to: str,
                 add: List[str] = None,
                 remove: List[str] = None
-            ):
+            ) -> Dict[str, Any]:
         if self._current_transaction:
             return await self._update_transaction(repo_to, add, remove)
         return await self._modify_repository(repo_to, add, remove)
@@ -689,7 +693,7 @@ class PulpClient:
     async def get_repo_latest_version(
         self,
         repo_href: str,
-    ) -> typing.Union[str, None]:
+    ) -> typing.Optional[str]:
         repository_data = await self.request('GET', repo_href)
         return repository_data.get('latest_version_href')
 
