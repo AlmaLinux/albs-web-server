@@ -8,7 +8,6 @@ from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from alws import models
 
 from alws.config import settings
@@ -151,38 +150,42 @@ class MetadataUploader:
             self.repo_name,
             flags=re.IGNORECASE,
         )
-        if re_result:
-            re_result = re_result.groupdict()
-            subq = (
-                select(models.BuildTask.rpm_module_id)
-                .where(
-                    models.BuildTask.build_id == int(re_result["build_id"]),
-                    models.BuildTask.arch == re_result["arch"],
-                )
-                .scalar_subquery()
+        if not re_result:
+            return
+        re_result = re_result.groupdict()
+        subq = (
+            select(models.BuildTask.rpm_module_id)
+            .where(
+                models.BuildTask.build_id == int(re_result["build_id"]),
+                models.BuildTask.arch == re_result["arch"],
             )
-            rpm_modules = (
-                (
-                    await self.session.execute(
-                        select(models.RpmModule).where(models.RpmModule.id.in_(subq))
+            .scalar_subquery()
+        )
+        rpm_modules = (
+            (
+                await self.session.execute(
+                    select(models.RpmModule).where(
+                        models.RpmModule.id.in_(subq),
                     )
                 )
-                .scalars()
-                .all()
             )
-            for rpm_module in rpm_modules:
-                for attr in (
-                    "name",
-                    "version",
-                    "stream",
-                    "context",
-                    "arch",
-                ):
-                    module_value = str(getattr(module, attr))
-                    if module_value != str(getattr(rpm_module, attr)):
-                        setattr(rpm_module, attr, module_value)
-                rpm_module.sha256 = sha256
-                rpm_module.pulp_href = module_href
+            .scalars()
+            .all()
+        )
+        for rpm_module in rpm_modules:
+            for attr in (
+                "name",
+                "version",
+                "stream",
+                "context",
+                "arch",
+            ):
+                module_value = str(getattr(module, attr))
+                if module_value != str(getattr(rpm_module, attr)):
+                    setattr(rpm_module, attr, module_value)
+            rpm_module.sha256 = sha256
+            rpm_module.pulp_href = module_href
+        await self.session.commit()
 
     async def process_uploaded_files(
         self,
