@@ -121,9 +121,9 @@ class MetadataUploader:
 
         # when we deleting modulemd's, associated packages also removes
         # from repository, we need to add them in next repo version
-        removed_content = (await self.pulp.get_by_href(new_version_href))[
-            "content_summary"
-        ]["removed"]
+        removed_content = await self.pulp.get_latest_repo_removed_content(
+            new_version_href
+        )
         removed_pkgs_href = removed_content.get("rpm.package", {}).get("href")
         # in case if early removed modules doesn't contains associated packages
         if removed_pkgs_href:
@@ -156,7 +156,7 @@ class MetadataUploader:
             subq = (
                 select(models.BuildTask.rpm_module_id)
                 .where(
-                    models.BuildTask.build_id == re_result["build_id"],
+                    models.BuildTask.build_id == int(re_result["build_id"]),
                     models.BuildTask.arch == re_result["arch"],
                 )
                 .scalar_subquery()
@@ -164,7 +164,7 @@ class MetadataUploader:
             rpm_modules = (
                 (
                     await self.session.execute(
-                        select(models.RpmModule).where(models.RpmModule.id == subq)
+                        select(models.RpmModule).where(models.RpmModule.id.in_(subq))
                     )
                 )
                 .scalars()
@@ -175,11 +175,11 @@ class MetadataUploader:
                     "name",
                     "version",
                     "stream",
-                    "content",
+                    "context",
                     "arch",
                 ):
-                    module_value = getattr(module, attr)
-                    if module_value != getattr(rpm_module, attr):
+                    module_value = str(getattr(module, attr))
+                    if module_value != str(getattr(rpm_module, attr)):
                         setattr(rpm_module, attr, module_value)
                 rpm_module.sha256 = sha256
                 rpm_module.pulp_href = module_href

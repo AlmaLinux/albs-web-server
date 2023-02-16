@@ -27,6 +27,7 @@ jobs:
           echo JWT_SECRET="secret" >> ./vars.env
           echo POSTGRES_DB="test-almalinux-bs" >> ./vars.env
           echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
+          echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
       - uses: isbang/compose-action@v1.4.1
         name: Run docker-compose

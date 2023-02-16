@@ -496,6 +496,10 @@ class PulpClient:
         repo_content = await self.get_by_href(repo_version)
         return repo_content["content_summary"]["present"]
 
+    async def get_latest_repo_removed_content(self, repo_version: str) -> dict:
+        repo_content = await self.get_by_href(repo_version)
+        return repo_content["content_summary"]["removed"]
+
     async def create_rpm_distro(
         self, name: str, repository: str, base_path_start: str = "builds"
     ) -> str:
