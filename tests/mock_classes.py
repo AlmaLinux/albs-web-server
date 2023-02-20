@@ -1,14 +1,15 @@
+import typing
 from fastapi import status
 import pytest
 import httpx
 
 from alws.app import app
 from alws.config import settings
-
 from alws.dependencies import get_db
 from alws.utils import jwt_utils
-from tests.conftest import get_session
+
 from tests.constants import ADMIN_USER_ID
+from tests.fixtures.database import get_session
 
 
 @pytest.mark.anyio
@@ -22,8 +23,10 @@ class BaseAsyncTestCase:
         self,
         method: str,
         endpoint: str,
-        headers: dict = None,
-        json: dict = None,
+        headers: typing.Optional[dict] = None,
+        json: typing.Optional[dict] = None,
+        files: typing.Optional[dict] = None,
+        data: typing.Optional[dict] = None,
     ):
         if not headers:
             headers = {}
@@ -37,6 +40,8 @@ class BaseAsyncTestCase:
                 endpoint,
                 headers=headers,
                 json=json,
+                files=files,
+                data=data,
             )
 
     @classmethod
