@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import re
+from typing import Dict
 
 import sqlalchemy
 from sqlalchemy.sql import func
@@ -331,6 +332,7 @@ class Build(PermissionsMixin, TeamMixin, Base):
         nullable=False,
         default=func.current_timestamp(),
     )
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     tasks = relationship('BuildTask', back_populates='build')
     sign_tasks = relationship('SignTask', back_populates='build',
                               order_by='SignTask.id')
@@ -390,6 +392,8 @@ class BuildTask(Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
@@ -433,6 +437,10 @@ class BuildTask(Base):
     )
     test_tasks = relationship('TestTask', back_populates='build_task')
     rpm_module = relationship('RpmModule')
+    measurings: 'Measurings' = relationship(
+        'Measurings',
+        back_populates='build_task',
+    )
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
     error = sqlalchemy.Column(sqlalchemy.Text, nullable=True, default=None)
 
@@ -1265,6 +1273,25 @@ class ErrataToALBSPackage(Base):
         if self.pulp_href:
             return self.pulp_href
         return self.build_artifact.href
+
+
+class Measurings(Base):
+    __tablename__ = "measurings"
+
+    id: int = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    statistics: Dict[str, Dict[str, Dict[str, str]]] = sqlalchemy.Column(
+        JSONB,
+        nullable=True,
+    )
+    build_task_id: int = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        nullable=True,
+    )
+    build_task: BuildTask = relationship(
+        "BuildTask",
+        back_populates="measurings",
+    )
 
 
 async def create_tables():

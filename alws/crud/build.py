@@ -3,8 +3,9 @@ import typing
 
 import sqlalchemy
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -22,7 +23,7 @@ from alws.dramatiq import start_build
 
 
 async def create_build(
-            db: Session,
+            db: AsyncSession,
             build: build_schema.BuildCreate,
             user_id: int,
         ) -> models.Build:
@@ -71,7 +72,7 @@ async def create_build(
 
 
 async def get_builds(
-    db: Session,
+    db: AsyncSession,
     build_id: typing.Optional[int] = None,
     page_number: typing.Optional[int] = None,
     search_params: build_schema.BuildSearch = None,
@@ -115,6 +116,8 @@ async def get_builds(
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.test_tasks
                 ),
+                selectinload(models.Build.tasks)
+                .selectinload(models.BuildTask.measurings),
                 selectinload(models.Build.sign_tasks),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.rpm_module
@@ -148,8 +151,8 @@ async def get_builds(
                 query = project_query
             if search_params.created_by is not None:
                 query = query.filter(
-                models.Build.owner_id == search_params.created_by
-            )
+                    models.Build.owner_id == search_params.created_by,
+                )
             if search_params.ref is not None:
                 query = query.filter(
                     sqlalchemy.or_(
@@ -199,8 +202,9 @@ async def get_builds(
 
     if build_id:
         query = await db.execute(await generate_query())
-        return query.scalars().first()
-    elif page_number:
+        result = query.scalars().first()
+        return result
+    if page_number:
         return {
             "builds": (
                 await db.execute(await generate_query())
@@ -235,7 +239,7 @@ async def get_module_preview(
     )
 
 
-async def remove_build_job(db: Session, build_id: int):
+async def remove_build_job(db: AsyncSession, build_id: int):
     query_bj = select(models.Build).where(
         models.Build.id == build_id).options(
         selectinload(models.Build.tasks).selectinload(

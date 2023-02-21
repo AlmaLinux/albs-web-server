@@ -1,3 +1,4 @@
+import datetime
 from typing import Dict, Any
 
 import dramatiq
@@ -90,6 +91,14 @@ async def _build_done(request: build_node_schema.BuildDone):
         if success and request.status == 'done' and all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             await test.create_test_tasks_for_build_id(db, build_id)
+        if all_build_tasks_completed:
+            build_id = await _get_build_id(db, request.task_id)
+            await db.execute(
+                update(models.Build)
+                .where(models.Build.id == build_id)
+                .values(finished_at=datetime.datetime.utcnow())
+            )
+            await db.commit()
 
 
 async def _create_log_repo(task_id: int):

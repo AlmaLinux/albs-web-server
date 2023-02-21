@@ -161,10 +161,21 @@ class RpmModule(BaseModel):
         orm_mode = True
 
 
+class Measuring(BaseModel):
+    id: int
+    build_task_id: typing.Optional[int]
+    statistics: typing.Optional[dict]
+
+    class Config:
+        orm_mode = True
+
+
 class BuildTask(BaseModel):
 
     id: int
     ts: typing.Optional[datetime.datetime]
+    started_at: typing.Optional[datetime.datetime]
+    finished_at: typing.Optional[datetime.datetime]
     status: int
     index: int
     arch: str
@@ -178,6 +189,7 @@ class BuildTask(BaseModel):
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
     error: typing.Optional[str]
+    measurings: typing.Optional[typing.List[Measuring]] = None
 
     class Config:
         orm_mode = True
@@ -251,6 +263,7 @@ class Build(BaseModel):
 
     id: int
     created_at: datetime.datetime
+    finished_at: typing.Optional[datetime.datetime]
     tasks: typing.List[BuildTask]
     owner: BuildOwner
     sign_tasks: typing.List[BuildSignTask]
