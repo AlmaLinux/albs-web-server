@@ -431,7 +431,11 @@ class BuildTask(Base):
         primaryjoin=(BuildTaskDependency.c.build_task_id == id),
         secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id)
     )
-    test_tasks = relationship('TestTask', back_populates='build_task')
+    test_tasks = relationship(
+        'TestTask',
+        back_populates='build_task',
+        order_by='TestTask.revision'
+    )
     rpm_module = relationship('RpmModule')
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
     error = sqlalchemy.Column(sqlalchemy.Text, nullable=True, default=None)
