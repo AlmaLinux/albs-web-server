@@ -243,6 +243,7 @@ async def complete_sign_task(
     start_time = datetime.datetime.utcnow()
     similar_rpms_mapping = defaultdict(list)
     packages_to_add = defaultdict(list)
+    srpms_mapping = defaultdict(list)
 
     async with Session() as db, db.begin():
         builds = await db.execute(select(models.Build).where(
@@ -257,6 +258,9 @@ async def complete_sign_task(
             models.BinaryRpm.build_id == payload.build_id).options(
             selectinload(models.BinaryRpm.artifact)))
         binary_rpms = binary_rpms.scalars().all()
+
+        for srpm in source_rpms:
+            srpms_mapping[srpm.artifact.href].append(srpm.artifact)
 
         all_rpms = source_rpms + binary_rpms
         for rpm in all_rpms:
@@ -329,7 +333,18 @@ async def complete_sign_task(
                     break
 
                 debug = is_debuginfo_rpm(pkg_name)
+
                 for db_pkg in similar_rpms_mapping.get(pkg_name, []):
+
+                    # we should update href and add sign key
+                    # for every srpm in project
+                    db_sprms = srpms_mapping.get(db_pkg.artifact.href, [])
+                    for db_sprm in db_sprms:
+                        db_sprm.artifact.href = new_href
+                        db_sprm.artifact.sign_key = sign_task.sign_key
+                        db_sprm.artifact.cas_hash = pkg_info['cas_hash']
+                        modified_items.append(db_sprm)
+
                     db_pkg.artifact.href = new_href
                     db_pkg.artifact.sign_key = sign_task.sign_key
                     db_pkg.artifact.cas_hash = pkg_info['cas_hash']
