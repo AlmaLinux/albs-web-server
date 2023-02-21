@@ -1143,6 +1143,13 @@ class ErrataRecord(Base):
             'EA': 'enhancement',
         }[self.id[2:4]]
 
+    @property
+    def module(self):
+        r = re.compile('Module ([\d\w\-\_]+:[\d\.\w]+) is enabled')
+        match = r.findall(str(self.original_criteria))
+        module = None if not match else match[0]
+        return module
+
 
 class ErrataReference(Base):
     __tablename__ = 'errata_references'

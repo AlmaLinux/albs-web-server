@@ -377,3 +377,34 @@ class RpmPackage(PulpBase):
     @property
     def pulp_href(self):
         return f"/pulp/api/v3/content/rpm/packages/{str(self.content_ptr_id)}/"
+
+class RpmModulemd(PulpBase):
+    __tablename__ = "rpm_modulemd"
+
+    content_ptr_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(CoreContent.pulp_id),
+        primary_key=True,
+    )
+    name = sqlalchemy.Column(sqlalchemy.Text)
+    stream = sqlalchemy.Column(sqlalchemy.Text)
+    version = sqlalchemy.Column(sqlalchemy.Text)
+    context = sqlalchemy.Column(sqlalchemy.Text)
+    arch = sqlalchemy.Column(sqlalchemy.Text)
+
+    @property
+    def nsvca(self):
+        return f"{self.name}:{self.stream}:{self.version}:{self.context}:{self.arch}"
+
+class RpmModulemdPackages(PulpBase):
+    __tablename__ = "rpm_modulemd_packages"
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    modulemd_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(RpmModulemd.content_ptr_id)
+    )
+    package_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(RpmPackage.content_ptr_id)
+    )

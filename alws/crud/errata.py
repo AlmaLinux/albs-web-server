@@ -40,6 +40,7 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
     get_rpm_packages_by_ids,
     get_rpm_packages_from_repository,
+    get_rpm_module_packages_from_repository,
     get_uuid_from_pulp_href,
 )
 from alws.config import settings
@@ -387,17 +388,31 @@ async def load_platform_packages(
     platform: models.Platform,
     search_params: DefaultDict[str, List[str]],
     for_release: bool = False,
+    module: Optional[str] = None,
 ) -> Dict[str, Any]:
     cache = {}
     for repo in platform.repos:
         if not repo.production:
             continue
-        for pkg in get_rpm_packages_from_repository(
-            repo_id=get_uuid_from_pulp_href(repo.pulp_href),
-            pkg_names=search_params["name"],
-            pkg_versions=search_params["version"],
-            pkg_epochs=search_params["epoch"],
-        ):
+
+        repo_id = get_uuid_from_pulp_href(repo.pulp_href)
+        if module:
+            pkgs = get_rpm_module_packages_from_repository(
+                repo_id=repo_id,
+                module=module,
+                pkg_names=search_params["name"],
+                pkg_versions=search_params["version"],
+                pkg_epochs=search_params["epoch"],
+            )
+        else:
+            pkgs = get_rpm_packages_from_repository(
+               repo_id=repo_id,
+               pkg_names=search_params["name"],
+               pkg_versions=search_params["version"],
+               pkg_epochs=search_params["epoch"],
+            )
+
+        for pkg in pkgs:
             if for_release:
                 key = pkg.pulp_href
                 if not cache.get(key):
@@ -446,12 +461,18 @@ async def update_errata_record(
     return record
 
 
-async def search_for_albs_packages(
+async def get_matching_albs_packages(
     db: AsyncSession,
     errata_package: models.ErrataPackage,
     prod_repos_cache,
+    module,
 ) -> List[models.ErrataToALBSPackage]:
     items_to_insert = []
+    # We're going to check packages that match name-version-clean_release
+    # Note that clean_release doesn't include the .module... str, we match:
+    #   - my-pkg-2.0-2
+    #   - my-pkg-2.0-20191233git
+    #   - etc
     clean_package_name = "-".join(
         (
             errata_package.name,
@@ -459,6 +480,8 @@ async def search_for_albs_packages(
             clean_release(errata_package.release),
         )
     )
+    # We add ErrataToALBSPackage if we find a matching package already
+    # in production repositories.
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
         errata_package.arch, []
     ):
@@ -477,14 +500,28 @@ async def search_for_albs_packages(
         errata_package.albs_packages.append(mapping)
         return items_to_insert
 
+    # If we couldn't find any pkg in production repos
+    # we'll look for every package that matches name-version
+    # inside the ALBS, this is, build_task_artifacts.
     name_query = f"{errata_package.name}-{errata_package.version}"
+
     query = select(models.BuildTaskArtifact).where(
         and_(
             models.BuildTaskArtifact.type == "rpm",
             models.BuildTaskArtifact.name.startswith(name_query),
         )
     )
+    # If the errata record references a module, then we'll get
+    # only packages that belong to the right module:stream
+    if module:
+        module_name, module_stream = module.split(":")
+        query = query.join(models.BuildTask).join(models.RpmModule).filter(
+            models.RpmModule.name == module_name,
+            models.RpmModule.stream == module_stream,
+        )
+
     result = (await db.execute(query)).scalars().all()
+
     pulp_pkg_ids = [get_uuid_from_pulp_href(pkg.href) for pkg in result]
     pkg_fields = [
         RpmPackage.content_ptr_id,
@@ -537,6 +574,8 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
+
+    # Rebranding RHEL -> AlmaLinux
     for key in ("description", "title"):
         value = getattr(errata, key)
         value = re.sub(
@@ -548,6 +587,8 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         value = re.sub(r"RHEL", "AlmaLinux", value)
         setattr(errata, key, value)
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
+
+    # Errata db record
     db_errata = models.ErrataRecord(
         id=alma_errata_id,
         freezed=errata.freezed,
@@ -585,6 +626,8 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
+
+    # References
     self_ref_exists = False
     for ref in errata.references:
         db_cve = None
@@ -619,8 +662,8 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
             self_ref_exists = True
         db_errata.references.append(db_reference)
         items_to_insert.append(db_reference)
-    html_id = db_errata.id.replace(":", "-")
     if not self_ref_exists:
+        html_id = db_errata.id.replace(":", "-")
         self_ref = models.ErrataReference(
             href=(
                 f"https://errata.almalinux.org/"
@@ -632,9 +675,16 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         )
         db_errata.references.append(self_ref)
         items_to_insert.append(self_ref)
-    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
+
+    # Errata Packages
     search_params = prepare_search_params(errata)
-    prod_repos_cache = await load_platform_packages(platform, search_params)
+
+    prod_repos_cache = await load_platform_packages(
+        platform,
+        search_params,
+        False,
+        db_errata.module,
+    )
     for package in errata.packages:
         db_package = models.ErrataPackage(
             name=package.name,
@@ -647,9 +697,11 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         )
         db_errata.packages.append(db_package)
         items_to_insert.append(db_package)
+        # Create ErrataToAlbsPackages
         items_to_insert.extend(
-            await search_for_albs_packages(db, db_package, prod_repos_cache)
+            await get_matching_albs_packages(db, db_package, prod_repos_cache, db_errata.module)
         )
+
     db.add_all(items_to_insert)
     await db.commit()
     await db.refresh(db_errata)
