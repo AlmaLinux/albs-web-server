@@ -381,37 +381,23 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
                 models.ErrataPackage.arch == rpm_info['arch']
             )
 
-        errata_packages = (
-            await db.execute(select(
-                models.ErrataPackage
-            ).where(sqlalchemy.and_(*conditions)))
-        ).scalars().all()
+        query = select(models.ErrataPackage).where(
+            sqlalchemy.and_(*conditions)
+        )
 
         if module_index:
             # good idea?
             # we do not build more than one module at a time,
             # do we?
-            #
-            # Also, maybe we should just add a new "module" column
-            # that makes this task easier to ask db? i.e.:
-            #   query = query.join(models.ErrataRecord).filter(
-            #       models.ErrataRecord.module == build_task_module
-            #   )
             module = next(module_index.iter_modules())
             build_task_module = f"{module.name}:{module.stream}"
+            query = query.join(models.ErrataRecord).filter(
+                models.ErrataRecord.module == build_task_module
+            )
 
-            errata_module_cache = {}
-            for pkg in errata_packages:
-                if not errata_module_cache.get(pkg.errata_record_id):
-                    errata_record = (await db.execute(select(models.ErrataRecord).where(
-                        models.ErrataRecord.id == pkg.errata_record_id
-                    ))).scalars().first()
-                    errata_module_cache[pkg.errata_record_id] = errata_record.module
-
-            errata_packages = [
-                pkg for pkg in errata_packages
-                if errata_module_cache.get(pkg.errata_record_id) == build_task_module
-            ]
+        errata_packages = (
+            await db.execute(query)
+        ).scalars().all()
 
         # We add ErrataToALBSPackage proposals for every matching package.
         # In case of an errata that involves a module, we only add those
