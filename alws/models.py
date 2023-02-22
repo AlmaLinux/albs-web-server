@@ -1079,6 +1079,7 @@ class ErrataRecord(Base):
         nullable=False
     )
     platform = relationship('Platform')
+    module = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     release_status = sqlalchemy.Column(
         sqlalchemy.Enum(ErrataReleaseStatus),
         nullable=True,
@@ -1142,13 +1143,6 @@ class ErrataRecord(Base):
             'SA': 'security',
             'EA': 'enhancement',
         }[self.id[2:4]]
-
-    @property
-    def module(self):
-        r = re.compile('Module ([\d\w\-\_]+:[\d\.\w]+) is enabled')
-        match = r.findall(str(self.original_criteria))
-        module = None if not match else match[0]
-        return module
 
 
 class ErrataReference(Base):

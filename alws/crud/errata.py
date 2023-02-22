@@ -588,11 +588,17 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         setattr(errata, key, value)
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
 
+    # Check if errata refers to a module
+    r = re.compile('Module ([\d\w\-\_]+:[\d\.\w]+) is enabled')
+    match = r.findall(str(self.original_criteria))
+    errata_module = None if not match else match[0]
+
     # Errata db record
     db_errata = models.ErrataRecord(
         id=alma_errata_id,
         freezed=errata.freezed,
         platform_id=errata.platform_id,
+        module=errata_module,
         release_status=ErrataReleaseStatus.NOT_RELEASED,
         summary=None,
         solution=None,
