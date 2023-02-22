@@ -812,7 +812,7 @@ async def safe_build_done(db: AsyncSession, request: build_node_schema.BuildDone
             )
         )
         await db.execute(
-            insert(models.Measurings)
+            insert(models.PerformanceStats)
             .values(
                 build_task_id=request.task_id,
                 statistics=build_task_stats,

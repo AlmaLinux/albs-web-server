@@ -437,8 +437,8 @@ class BuildTask(Base):
     )
     test_tasks = relationship('TestTask', back_populates='build_task')
     rpm_module = relationship('RpmModule')
-    measurings: 'Measurings' = relationship(
-        'Measurings',
+    performance_stats: 'PerformanceStats' = relationship(
+        'PerformanceStats',
         back_populates='build_task',
     )
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
@@ -1275,8 +1275,8 @@ class ErrataToALBSPackage(Base):
         return self.build_artifact.href
 
 
-class Measurings(Base):
-    __tablename__ = "measurings"
+class PerformanceStats(Base):
+    __tablename__ = "performance_stats"
 
     id: int = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     statistics: Dict[str, Dict[str, Dict[str, str]]] = sqlalchemy.Column(
@@ -1290,7 +1290,7 @@ class Measurings(Base):
     )
     build_task: BuildTask = relationship(
         "BuildTask",
-        back_populates="measurings",
+        back_populates="performance_stats",
     )
 
 

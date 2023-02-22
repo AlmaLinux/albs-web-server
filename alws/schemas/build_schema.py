@@ -161,7 +161,7 @@ class RpmModule(BaseModel):
         orm_mode = True
 
 
-class Measuring(BaseModel):
+class PerformanceStats(BaseModel):
     id: int
     build_task_id: typing.Optional[int]
     statistics: typing.Optional[dict]
@@ -189,36 +189,10 @@ class BuildTask(BaseModel):
     is_secure_boot: typing.Optional[bool]
     test_tasks: typing.List[BuildTaskTestTask]
     error: typing.Optional[str]
-    measurings: typing.Optional[typing.List[Measuring]] = None
+    performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 
     class Config:
         orm_mode = True
-
-
-class BuildSearch(BaseModel):
-
-    created_by: typing.Optional[int]
-    project: typing.Optional[str]
-    ref: typing.Optional[str]
-    rpm_name: typing.Optional[str]
-    rpm_epoch: typing.Optional[str]
-    rpm_version: typing.Optional[str]
-    rpm_release: typing.Optional[str]
-    rpm_arch: typing.Optional[str]
-    platform_id: typing.Optional[int]
-    build_task_arch: typing.Optional[str]
-    released: typing.Optional[bool]
-    signed: typing.Optional[bool]
-
-    @property
-    def is_package_filter(self):
-        return any((
-            self.rpm_name is not None,
-            self.rpm_epoch is not None,
-            self.rpm_version is not None,
-            self.rpm_release is not None,
-            self.rpm_arch is not None,
-        ))
 
 
 class BuildOwner(BaseModel):
