@@ -590,7 +590,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
 
     # Check if errata refers to a module
     r = re.compile('Module ([\d\w\-\_]+:[\d\.\w]+) is enabled')
-    match = r.findall(str(self.original_criteria))
+    match = r.findall(str(errata.criteria))
     errata_module = None if not match else match[0]
 
     # Errata db record
