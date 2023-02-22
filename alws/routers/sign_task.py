@@ -62,7 +62,7 @@ async def complete_sign_task(
         payload: sign_schema.SignTaskComplete,
         db: database.Session = Depends(get_db)):
     task = await sign_task.get_sign_task(db, sign_task_id)
-    task.ts = datetime.datetime.now() + datetime.timedelta(hours=2)
+    task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
     await db.commit()
     dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
     return {'success': True}

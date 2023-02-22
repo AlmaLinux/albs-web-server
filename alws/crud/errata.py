@@ -146,7 +146,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
         product_name="AlmaLinux OS Errata System",
         product_version="0.0.1",
         schema_version="5.10",
-        timestamp=datetime.datetime.now(),
+        timestamp=datetime.datetime.utcnow(),
     )
     oval.generator = generator
     # TODO: add this info to platform
@@ -567,7 +567,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         version=errata.version,
         severity=errata.severity,
         rights=jinja2.Template(platform.copyright).render(
-            year=datetime.datetime.now().year
+            year=datetime.datetime.utcnow().year
         ),
         definition_id=errata.definition_id,
         definition_version=errata.definition_version,
@@ -850,7 +850,7 @@ async def release_errata_packages(
     default_summary = clean_errata_title(record.get_title(), severity=record.severity)
     pulp_record = {
         "id": record.id,
-        "updated_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_date": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         "issued_date": record.issued_date.strftime("%Y-%m-%d %H:%M:%S"),
         "description": record.get_description(),
         "fromstr": record.contact_mail,
@@ -1009,7 +1009,7 @@ def append_update_packages_in_update_records(
                         sum_type=cr.checksum_type("sha256"),
                     )
                 )
-                pulp_record.updated_date = datetime.datetime.now().strftime(
+                pulp_record.updated_date = datetime.datetime.utcnow().strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
 

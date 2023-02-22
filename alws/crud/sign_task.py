@@ -123,7 +123,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
             models.SignTask.status == SignStatus.IDLE,
             models.SignKey.keyid.in_(key_ids),
             or_(
-                models.SignTask.ts <= datetime.datetime.now(),
+                models.SignTask.ts <= datetime.datetime.utcnow(),
                 models.SignTask.ts.is_(None)
             )
         ).options(selectinload(models.SignTask.sign_key))

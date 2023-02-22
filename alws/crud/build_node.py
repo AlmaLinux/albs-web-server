@@ -35,7 +35,7 @@ async def get_available_build_task(
         ) -> models.BuildTask:
     async with db.begin():
         # TODO: here should be config value
-        ts_expired = datetime.datetime.now() - datetime.timedelta(minutes=20)
+        ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
         query = ~models.BuildTask.dependencies.any()
         db_task = await db.execute(
             select(models.BuildTask).where(query).with_for_update().filter(
@@ -68,7 +68,7 @@ async def get_available_build_task(
         db_task = db_task.scalars().first()
         if not db_task:
             return
-        db_task.ts = datetime.datetime.now()
+        db_task.ts = datetime.datetime.utcnow()
         db_task.status = BuildTaskStatus.STARTED
         await db.commit()
     return db_task
@@ -240,7 +240,7 @@ async def ping_tasks(
             task_list: typing.List[int]
         ):
     query = models.BuildTask.id.in_(task_list)
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
     async with db.begin():
         await db.execute(update(models.BuildTask).where(query).values(ts=now))
         await db.commit()
