@@ -1008,6 +1008,8 @@ class SignTask(Base):
     __tablename__ = 'sign_tasks'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),

@@ -6,6 +6,7 @@ import urllib.parse
 from collections import defaultdict
 
 from sqlalchemy import update, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -27,7 +28,7 @@ from alws.utils.pulp_client import PulpClient
 
 
 async def __get_build_repos(
-        db: Session, build_id: int, build: models.Build = None) -> dict:
+        db: AsyncSession, build_id: int, build: models.Build = None) -> dict:
     if not build:
         builds = await db.execute(select(models.Build).where(
             models.Build.id == build_id).options(
@@ -44,7 +45,7 @@ def __get_package_url(base_url: str, package_name: str) -> str:
         base_url, f'Packages/{pkg_first_letter}/{package_name}')
 
 
-async def get_sign_tasks(db: Session, build_id: int = None) \
+async def get_sign_tasks(db: AsyncSession, build_id: int = None) \
         -> typing.List[models.SignTask]:
     query = select(models.SignTask)
     if build_id:
@@ -54,7 +55,7 @@ async def get_sign_tasks(db: Session, build_id: int = None) \
     return result.scalars().all()
 
 
-async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
+async def create_sign_task(db: AsyncSession, payload: sign_schema.SignTaskCreate,
                            user_id: int) \
         -> models.SignTask:
     async with db.begin():
@@ -117,7 +118,7 @@ async def create_sign_task(db: Session, payload: sign_schema.SignTaskCreate,
     return sign_tasks.scalars().first()
 
 
-async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
+async def get_available_sign_task(db: AsyncSession, key_ids: typing.List[str]):
     sign_tasks = await db.execute(select(models.SignTask).join(
         models.SignTask.sign_key).where(
             models.SignTask.status == SignStatus.IDLE,
@@ -190,7 +191,7 @@ async def get_available_sign_task(db: Session, key_ids: typing.List[str]):
     return sign_task_payload
 
 
-async def get_sign_task(db, sign_task_id: int) -> models.SignTask:
+async def get_sign_task(db: AsyncSession, sign_task_id: int) -> models.SignTask:
     sign_tasks = await db.execute(select(models.SignTask).where(
         models.SignTask.id == sign_task_id
     ).options(selectinload(models.SignTask.sign_key)))
@@ -235,7 +236,13 @@ async def complete_sign_task(
         await db.refresh(task)
         return task
 
+    task_started_time = None
     if getattr(payload, 'stats', None) and isinstance(payload.stats, dict):
+        task_started_time = payload.stats.pop("sign_task_start_time", None)
+        if task_started_time:
+            task_started_time = datetime.datetime.fromisoformat(
+                task_started_time,
+            )
         stats = payload.stats.copy()
     else:
         stats = {}
@@ -377,6 +384,8 @@ async def complete_sign_task(
         stats['web_server_processing_time'] = int(
             (finish_time - start_time).total_seconds())
         sign_task.stats = stats
+        sign_task.started_at = task_started_time
+        sign_task.finished_at = datetime.datetime.utcnow()
 
         db.add(sign_task)
         db.add(build)
@@ -385,7 +394,7 @@ async def complete_sign_task(
         return sign_task
 
 
-async def verify_signed_build(db: Session, build_id: int,
+async def verify_signed_build(db: AsyncSession, build_id: int,
                               platform_id: int) -> bool:
     build = await db.execute(select(models.Build).where(
         models.Build.id == build_id).options(

@@ -142,7 +142,11 @@ class BuildTaskTestTask(BaseModel):
 
 class BuildSignTask(BaseModel):
 
+    id: int
+    started_at: typing.Optional[datetime.datetime]
+    finished_at: typing.Optional[datetime.datetime]
     status: int
+    stats: typing.Optional[dict]
 
     class Config:
         orm_mode = True
