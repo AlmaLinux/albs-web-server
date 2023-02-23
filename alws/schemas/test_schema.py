@@ -9,6 +9,7 @@ __all__ = ['TestTaskResult']
 class TestTaskResult(BaseModel):
     api_version: str
     result: dict
+    stats: typing.Optional[dict]
 
 
 class TestTask(BaseModel):

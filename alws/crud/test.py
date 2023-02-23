@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import gzip
 import logging
 import re
@@ -17,10 +18,11 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
+
 async def create_test_tasks_for_build_id(db: Session, build_id: int):
     async with db.begin():
-        ## We get all build_tasks with the same build_id
-        ## and whose status is COMPLETED
+        # We get all build_tasks with the same build_id
+        # and whose status is COMPLETED
         build_task_ids = (await db.execute(
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id,
@@ -140,6 +142,10 @@ async def complete_test_task(db: Session, task_id: int,
             name=name, href=href, test_task_id=task_id)
         logs.append(log_record)
 
+    if task.repository:
+        await pulp_client.modify_repository(
+            task.repository.pulp_href, add=new_hrefs)
+
     for key, item in test_result.result.items():
         if key == 'tests':
             for test_item in item.values():
@@ -154,11 +160,15 @@ async def complete_test_task(db: Session, task_id: int,
             break
     task.status = status
     task.alts_response = test_result.dict()
+    started_at = test_result.stats.pop('started_at', None)
+    if started_at:
+        started_at = datetime.datetime.fromisoformat(started_at)
+        task.started_at = started_at
+
+    task.stats = test_result.stats
+    task.finished_at = datetime.datetime.utcnow()
     db.add(task)
     db.add_all(logs)
-    if task.repository:
-        await pulp_client.modify_repository(
-            task.repository.pulp_href, add=new_hrefs)
 
 
 async def get_test_tasks_by_build_task(

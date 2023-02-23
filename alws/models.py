@@ -911,6 +911,10 @@ class TestTask(Base):
         nullable=True
     )
     repository = relationship('Repository')
+    scheduled_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    stats = sqlalchemy.Column(JSONB, nullable=True)
 
 
 class TestTaskArtifact(Base):

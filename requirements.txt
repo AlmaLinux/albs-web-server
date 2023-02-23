@@ -1,5 +1,5 @@
 fastapi[all]==0.92.0
-fastapi-users[all]==10.4.0
+fastapi-users[all]==10.3.0
 uvicorn==0.20.0
 asyncpg==0.27.0
 psycopg2-binary==2.9.5
