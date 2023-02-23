@@ -45,7 +45,7 @@ async def build_done(
     # dramatiq can have a time to complete task and build node
     # won't rebuild task again and again while it's in the queue
     # in the future this probably should be handled somehow better
-    build_task.ts = datetime.datetime.now() + datetime.timedelta(hours=3)
+    build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
     await db.commit()
     if not await build_node.log_repo_exists(db, build_task):
         pipe = pipeline([
