@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import re
+from typing import Dict
 
 import sqlalchemy
 from sqlalchemy.sql import func
@@ -331,6 +332,7 @@ class Build(PermissionsMixin, TeamMixin, Base):
         nullable=False,
         default=func.current_timestamp(),
     )
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     tasks = relationship('BuildTask', back_populates='build')
     sign_tasks = relationship('SignTask', back_populates='build',
                               order_by='SignTask.id')
@@ -390,6 +392,8 @@ class BuildTask(Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
@@ -437,6 +441,10 @@ class BuildTask(Base):
         order_by='TestTask.revision'
     )
     rpm_module = relationship('RpmModule')
+    performance_stats: 'PerformanceStats' = relationship(
+        'PerformanceStats',
+        back_populates='build_task',
+    )
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
     error = sqlalchemy.Column(sqlalchemy.Text, nullable=True, default=None)
 
@@ -1269,6 +1277,25 @@ class ErrataToALBSPackage(Base):
         if self.pulp_href:
             return self.pulp_href
         return self.build_artifact.href
+
+
+class PerformanceStats(Base):
+    __tablename__ = "performance_stats"
+
+    id: int = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    statistics: Dict[str, Dict[str, Dict[str, str]]] = sqlalchemy.Column(
+        JSONB,
+        nullable=True,
+    )
+    build_task_id: int = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        nullable=True,
+    )
+    build_task: BuildTask = relationship(
+        "BuildTask",
+        back_populates="performance_stats",
+    )
 
 
 async def create_tables():

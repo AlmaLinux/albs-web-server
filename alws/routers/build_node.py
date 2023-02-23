@@ -104,7 +104,7 @@ async def get_task(
         for flavour in task.build.platform_flavors:
             if flavour.data:
                 for key in ("macros", "secure_boot_macros"):
-                    if  "mock" not in flavour.data or key not in flavour.data["mock"]:
+                    if "mock" not in flavour.data or key not in flavour.data["mock"]:
                         continue
                     if key not in response["platform"].data["mock"]:
                         response["platform"].data["mock"][key] = {}

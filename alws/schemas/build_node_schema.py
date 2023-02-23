@@ -121,6 +121,7 @@ class BuildDone(BaseModel):
     task_id: int
     status: typing.Literal['done', 'failed', 'excluded']
     artifacts: typing.List[BuildDoneArtifact]
+    stats: typing.Dict[str, typing.Dict[str, str]]
     is_cas_authenticated: bool = False
     alma_commit_cas_hash: typing.Optional[str]
     git_commit_hash: typing.Optional[str]

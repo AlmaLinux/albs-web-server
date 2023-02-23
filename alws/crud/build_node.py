@@ -7,8 +7,9 @@ from collections import defaultdict
 
 import sqlalchemy
 from sqlalchemy import delete, insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
@@ -30,7 +31,7 @@ from alws.utils.rpm_package import get_rpm_package_info
 
 
 async def get_available_build_task(
-            db: Session,
+            db: AsyncSession,
             request: build_node_schema.RequestTask
         ) -> models.BuildTask:
     async with db.begin():
@@ -74,12 +75,12 @@ async def get_available_build_task(
     return db_task
 
 
-def add_build_task_dependencies(db: Session, task: models.BuildTask,
+def add_build_task_dependencies(db: AsyncSession, task: models.BuildTask,
                                 last_task: models.BuildTask):
     task.dependencies.append(last_task)
 
 
-async def get_failed_build_tasks_matrix(db: Session, build_id: int):
+async def get_failed_build_tasks_matrix(db: AsyncSession, build_id: int):
     build_tasks = await db.execute(
         select(models.BuildTask)
         .where(
@@ -109,7 +110,7 @@ async def get_failed_build_tasks_matrix(db: Session, build_id: int):
     return failed_matrix
 
 
-async def update_failed_build_items_in_parallel(db: Session, build_id: int):
+async def update_failed_build_items_in_parallel(db: AsyncSession, build_id: int):
     async with db.begin():
         tasks_cache = await get_failed_build_tasks_matrix(db, build_id)
         tasks_indexes = list(tasks_cache.keys())
@@ -163,7 +164,7 @@ async def update_failed_build_items_in_parallel(db: Session, build_id: int):
         await db.commit()
 
 
-async def update_failed_build_items(db: Session, build_id: int):
+async def update_failed_build_items(db: AsyncSession, build_id: int):
     async with db.begin():
         failed_tasks_matrix = await get_failed_build_tasks_matrix(db, build_id)
 
@@ -188,14 +189,14 @@ async def update_failed_build_items(db: Session, build_id: int):
         await db.commit()
 
 
-async def log_repo_exists(db: Session, task: models.BuildTask):
+async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
     repo = await db.execute(select(models.Repository).where(
         models.Repository.name == task.get_log_repo_name()
     ))
     return bool(repo.scalars().first())
 
 
-async def create_build_log_repo(db: Session, task: models.BuildTask):
+async def create_build_log_repo(db: AsyncSession, task: models.BuildTask):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -236,7 +237,7 @@ async def create_build_log_repo(db: Session, task: models.BuildTask):
 
 
 async def ping_tasks(
-            db: Session,
+            db: AsyncSession,
             task_list: typing.List[int]
         ):
     query = models.BuildTask.id.in_(task_list)
@@ -246,7 +247,7 @@ async def ping_tasks(
         await db.commit()
 
 
-async def get_build_task(db: Session, task_id: int) -> models.BuildTask:
+async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
     build_tasks = await db.execute(
         select(models.BuildTask).where(models.BuildTask.id == task_id).options(
             selectinload(models.BuildTask.platform)
@@ -268,7 +269,7 @@ def __verify_checksums(processed_entities: typing.List[typing.Tuple[
 
 
 async def get_srpm_artifact_by_build_task_id(
-        db: Session, build_task_id: int) -> models.BuildTaskArtifact:
+        db: AsyncSession, build_task_id: int) -> models.BuildTaskArtifact:
     srpm_artifact = await db.execute(
         select(models.BuildTaskArtifact).where(
             models.BuildTaskArtifact.build_task_id == build_task_id,
@@ -279,7 +280,7 @@ async def get_srpm_artifact_by_build_task_id(
     return srpm_artifact.scalars().first()
 
 
-async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
+async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int,
                          task_arch: str, task_artifacts: list,
                          repositories: list,
                          built_srpm_url: str = None, module_index=None):
@@ -469,13 +470,14 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
 
 
 async def __process_build_task_artifacts(
-    db: Session,
+    db: AsyncSession,
     pulp_client: PulpClient,
     task_id: int,
     task_artifacts: list,
     status: BuildTaskStatus,
     git_commit_hash: typing.Optional[str],
-):
+) -> typing.Tuple[models.BuildTask, typing.Dict[str, typing.Dict[str, str]]]:
+    processing_stats = {}
     build_tasks = await db.execute(
         select(models.BuildTask).where(
             models.BuildTask.id == task_id).with_for_update().options(
@@ -530,25 +532,40 @@ async def __process_build_task_artifacts(
         raise SrpmProvisionError(message)
     # Committing logs separately for UI to be able to fetch them
     logging.info('Processing logs')
+    start_time = datetime.datetime.utcnow()
     logs_entries = await __process_logs(
         pulp_client, build_task.id, log_artifacts, log_repositories)
     if logs_entries:
         db.add_all(logs_entries)
         await db.flush()
+    end_time = datetime.datetime.utcnow()
+    processing_stats["logs_processing"] = {
+        "start_ts": str(start_time),
+        "end_ts": str(end_time),
+        "delta": str(end_time - start_time),
+    }
     logging.info('Logs processing is finished')
     logging.info('Processing packages')
+    start_time = datetime.datetime.utcnow()
     rpm_entries = await __process_rpms(
         db, pulp_client, build_task.id, build_task.arch,
         rpm_artifacts, rpm_repositories,
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index
     )
+    end_time = datetime.datetime.utcnow()
+    processing_stats["packages_processing"] = {
+        "start_ts": str(start_time),
+        "end_ts": str(end_time),
+        "delta": str(end_time - start_time),
+    }
     logging.info('Packages processing is finished')
     multilib_conditions = (
         src_rpm is not None,
         build_task.arch == 'x86_64',
         status == BuildTaskStatus.COMPLETED,
         bool(settings.beholder_host),
+        bool(settings.package_beholder_enabled),
         # TODO: Beholder doesn't have authorization right now
         # bool(settings.beholder_token),
     )
@@ -556,6 +573,7 @@ async def __process_build_task_artifacts(
         processor = MultilibProcessor(
             db, build_task, pulp_client=pulp_client, module_index=module_index)
         logging.info('Processing multilib packages')
+        start_time = datetime.datetime.utcnow()
         multilib_packages = await processor.get_packages(src_rpm)
         if module_index:
             multilib_module_artifacts = await processor.get_module_artifacts()
@@ -567,9 +585,16 @@ async def __process_build_task_artifacts(
                 prepared_artifacts=multilib_module_artifacts)
         else:
             await processor.add_multilib_packages(multilib_packages)
+        end_time = datetime.datetime.utcnow()
+        processing_stats["multilib_processing"] = {
+            "start_ts": str(start_time),
+            "end_ts": str(end_time),
+            "delta": str(end_time - start_time),
+        }
         logging.info('Multilib packages processing is finished')
     if build_task.rpm_module and module_index:
         logging.info('Processing module template')
+        start_time = datetime.datetime.utcnow()
         try:
             module_pulp_href, sha256 = await pulp_client.create_module(
                 module_index.render(),
@@ -588,6 +613,12 @@ async def __process_build_task_artifacts(
             )
             build_task.rpm_module.sha256 = sha256
             build_task.rpm_module.pulp_href = module_pulp_href
+            end_time = datetime.datetime.utcnow()
+            processing_stats["module_processing"] = {
+                "start_ts": str(start_time),
+                "end_ts": str(end_time),
+                "delta": str(end_time - start_time),
+            }
         except Exception as e:
             message = f'Cannot update module information inside Pulp: {str(e)}'
             logging.exception(message)
@@ -599,11 +630,11 @@ async def __process_build_task_artifacts(
     db.add(build_task)
     await db.flush()
     await db.refresh(build_task)
-    return build_task
+    return build_task, processing_stats
 
 
 async def __update_built_srpm_url(
-    db: Session,
+    db: AsyncSession,
     build_task: models.BuildTask,
     request: build_node_schema.BuildDone,
 ):
@@ -682,7 +713,7 @@ async def __update_built_srpm_url(
 
 
 async def fast_fail_other_tasks_by_ref(
-    db: Session,
+    db: AsyncSession,
     current_task: models.BuildTask,
 ):
     build_tasks = await db.execute(
@@ -705,7 +736,7 @@ async def fast_fail_other_tasks_by_ref(
         return
     fast_fail_msg = (
         f"Fast failed: build processing failed in the initial "
-        f"architecture ({current_task.arch}). Please refer to the inital "
+        f"architecture ({current_task.arch}). Please refer to the initial "
         f"architecture build logs for more information about the failure."
     )
     uncompleted_tasks_ids = [task.id for task in uncompleted_tasks]
@@ -724,18 +755,22 @@ async def fast_fail_other_tasks_by_ref(
     )
 
 
-
-async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
+async def safe_build_done(db: AsyncSession, request: build_node_schema.BuildDone):
     success = True
     pulp = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
         settings.pulp_password
     )
+    build_task_stats = {
+        "build_node_stats": request.stats,
+        "build_done_stats": {},
+    }
+    start_time = datetime.datetime.utcnow()
     logging.info("Start processing build_task: %d", request.task_id)
     try:
         async with db.begin(), pulp.begin():
-            build_task = await build_done(db, pulp, request)
+            build_task, build_done_stats = await build_done(db, pulp, request)
             await db.commit()
     except Exception:
         logging.exception('Build done failed:')
@@ -749,6 +784,15 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
         build_task.error = traceback.format_exc()
         await fast_fail_other_tasks_by_ref(db, build_task)
     else:
+        end_time = datetime.datetime.utcnow()
+        build_task_stats["build_done_stats"] = {
+            "build_done": {
+                "start_ts": str(start_time),
+                "end_ts": str(end_time),
+                "delta": str(end_time - start_time),
+            },
+            **build_done_stats,
+        }
         async with db.begin():
             await __update_built_srpm_url(db, build_task, request)
             await db.commit()
@@ -756,17 +800,39 @@ async def safe_build_done(db: Session, request: build_node_schema.BuildDone):
         remove_dep_query = delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency == request.task_id
         )
+        build_task_start_time = request.stats.get("build_node_task", {}).get("start_ts")
+        if build_task_start_time:
+            build_task_start_time = datetime.datetime.fromisoformat(build_task_start_time)
+        await db.execute(
+            update(models.BuildTask)
+            .where(models.BuildTask.id == request.task_id)
+            .values(
+                started_at=build_task_start_time,
+                finished_at=datetime.datetime.utcnow(),
+            )
+        )
+        await db.execute(
+            insert(models.PerformanceStats)
+            .values(
+                build_task_id=request.task_id,
+                statistics=build_task_stats,
+            ),
+        )
         await db.execute(remove_dep_query)
         await db.commit()
     logging.info("Build task: %d, processing is finished", request.task_id)
     return success
 
 
-async def build_done(db: Session, pulp: PulpClient,
-                     request: build_node_schema.BuildDone):
+async def build_done(
+    db: AsyncSession,
+    pulp: PulpClient,
+    request: build_node_schema.BuildDone,
+) -> typing.Tuple[models.BuildTask, typing.Dict[str, typing.Dict[str, str]]]:
     status = BuildTaskStatus.get_status_by_text(request.status)
 
-    build_task = await __process_build_task_artifacts(
+    build_done_stats = {}
+    build_task, processing_stats = await __process_build_task_artifacts(
         db,
         pulp,
         request.task_id,
@@ -774,13 +840,21 @@ async def build_done(db: Session, pulp: PulpClient,
         status,
         request.git_commit_hash,
     )
+    build_done_stats.update(processing_stats)
 
     await db.execute(
         update(models.BuildTask).where(
             models.BuildTask.id == request.task_id).values(status=status)
     )
 
+    start_time = datetime.datetime.utcnow()
     binary_rpms = await save_noarch_packages(db, pulp, build_task)
+    end_time = datetime.datetime.utcnow()
+    processing_stats["noarch_processing"] = {
+        "start_ts": str(start_time),
+        "end_ts": str(end_time),
+        "delta": str(end_time - start_time),
+    }
 
     rpms_result = await db.execute(select(models.BuildTaskArtifact).where(
         models.BuildTaskArtifact.build_task_id == build_task.id,
@@ -845,4 +919,4 @@ async def build_done(db: Session, pulp: PulpClient,
 
     db.add_all(binary_rpms)
     await db.flush()
-    return build_task
+    return build_task, build_done_stats
