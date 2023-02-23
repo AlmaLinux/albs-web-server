@@ -134,7 +134,9 @@ class BuildTaskArtifact(BaseModel):
 
 class BuildTaskTestTask(BaseModel):
 
+    id: int
     status: int
+    revision: int
 
     class Config:
         orm_mode = True
