@@ -263,3 +263,16 @@ def get_rpm_repo_by_params(monkeypatch):
         }
 
     monkeypatch.setattr(PulpClient, "get_rpm_repository_by_params", func)
+
+
+@pytest.fixture
+def create_log_repo(monkeypatch):
+    async def func(*args, **kwargs):
+        _, repo_name = args
+        repo_prefix = kwargs["distro_path_start"]
+        return (
+            f"{settings.pulp_host}/pulp/content/{repo_prefix}/{repo_name}/",
+            get_repo_href(),
+        )
+
+    monkeypatch.setattr(PulpClient, "create_log_repo", func)

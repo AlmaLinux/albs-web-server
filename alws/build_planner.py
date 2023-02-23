@@ -204,6 +204,10 @@ class BuildPlanner:
             self, task: build_schema.BuildTaskModuleRef,
             has_devel: bool = False
     ) -> typing.Dict[str, typing.List[dict]]:
+
+        if not settings.package_beholder_enabled:
+            return {}
+
         beholder_client = BeholderClient(
             settings.beholder_host, token=settings.beholder_token)
         multilib_artifacts = {}
@@ -269,6 +273,10 @@ class BuildPlanner:
             task: build_schema.BuildTaskModuleRef,
             platform_name: str, platform_version: str, task_arch: str,
     ) -> dict:
+
+        if not settings.package_beholder_enabled:
+            return {}
+
         beholder = BeholderClient(
             settings.beholder_host, token=settings.beholder_token)
         clean_name = get_clean_distr_name(platform_name)
@@ -336,7 +344,7 @@ class BuildPlanner:
             #  accordingly
             multilib_artifacts = await self.get_multilib_artifacts(
                 task, has_devel=index.has_devel_module())
-            multilib_artifacts = multilib_artifacts[platform.name]
+            multilib_artifacts = multilib_artifacts.get(platform.name, [])
             await MultilibProcessor.update_module_index(
                 index, task.module_name, task.module_stream,
                 multilib_artifacts
