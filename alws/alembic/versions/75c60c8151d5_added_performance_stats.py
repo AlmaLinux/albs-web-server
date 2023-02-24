@@ -26,6 +26,7 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["build_task_id"],
             ["build_tasks.id"],
+            name='perf_stats_build_task_id'
         ),
         sa.PrimaryKeyConstraint("id"),
     )

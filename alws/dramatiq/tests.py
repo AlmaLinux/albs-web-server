@@ -16,7 +16,7 @@ __all__ = ['complete_test_task']
 
 
 async def _complete_test_task(task_id: int, task_result: TestTaskResult):
-    async with Session() as db, db.begin():
+    async with Session() as db:
         try:
             logging.info('Start processing test task %s', task_id)
             await t_crud.complete_test_task(db, task_id, task_result)
@@ -28,6 +28,8 @@ async def _complete_test_task(task_id: int, task_result: TestTaskResult):
             await db.rollback()
             await db.execute(update(TestTask).where(
                 TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
+        else:
+            await db.commit()
 
 
 @dramatiq.actor(
