@@ -914,7 +914,10 @@ class TestTask(Base):
     scheduled_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    stats = sqlalchemy.Column(JSONB, nullable=True)
+    performance_stats: 'PerformanceStats' = relationship(
+        'PerformanceStats',
+        back_populates='test_task',
+    )
 
 
 class TestTaskArtifact(Base):
@@ -1295,11 +1298,20 @@ class PerformanceStats(Base):
     )
     build_task_id: int = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("build_tasks.id"),
+        sqlalchemy.ForeignKey("build_tasks.id", name='perf_stats_build_task_id'),
         nullable=True,
     )
     build_task: BuildTask = relationship(
         "BuildTask",
+        back_populates="performance_stats",
+    )
+    test_task_id: int = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("test_tasks.id", name='perf_stats_test_task_id'),
+        nullable=True,
+    )
+    test_task: BuildTask = relationship(
+        "TestTask",
         back_populates="performance_stats",
     )
 

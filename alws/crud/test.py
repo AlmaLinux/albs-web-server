@@ -126,7 +126,10 @@ async def complete_test_task(db: Session, task_id: int,
     conv_tasks = []
     task = await db.execute(select(models.TestTask).where(
         models.TestTask.id == task_id,
-    ).options(selectinload(models.TestTask.repository)))
+    ).options(
+        selectinload(models.TestTask.repository),
+        selectinload(models.TestTask.performance_stats)
+    ))
     task = task.scalars().first()
     status = TestTaskStatus.COMPLETED
     for log in test_result.result.get('logs', []):
@@ -165,7 +168,7 @@ async def complete_test_task(db: Session, task_id: int,
         started_at = datetime.datetime.fromisoformat(started_at)
         task.started_at = started_at
 
-    task.stats = test_result.stats
+    task.performance_stats.statistics = test_result.stats
     task.finished_at = datetime.datetime.utcnow()
     db.add(task)
     db.add_all(logs)
