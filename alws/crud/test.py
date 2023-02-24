@@ -118,6 +118,21 @@ async def restart_build_tests(db: Session, build_id: int):
         await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
+async def restart_build_task_tests(db: Session, build_task_id: int):
+    async with db.begin():
+        build_task = (await db.execute(select(models.BuildTask).where(
+            models.BuildTask.id == build_task_id).options(
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = next(
+            (i for i in build_task.build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
+        await create_test_tasks(db, build_task_id, test_log_repository.id)
+
+
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
     href = await pulp_client.create_file(artifact['name'], artifact['href'])
     return artifact['name'], href
