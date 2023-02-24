@@ -25,7 +25,7 @@ from alws.dependencies import get_db
 from alws.dramatiq import event_loop
 
 
-__all__ = ['start_build', 'build_done', 'create_log_repo']
+__all__ = ['start_build', 'build_done']
 
 
 def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
@@ -101,12 +101,6 @@ async def _build_done(request: build_node_schema.BuildDone):
             await db.commit()
 
 
-async def _create_log_repo(task_id: int):
-    async for db in get_db():
-        task = await build_node_crud.get_build_task(db, task_id)
-        await build_node_crud.create_build_log_repo(db, task)
-
-
 async def _get_build_id(db: Session, build_task_id: int) -> int:
     async with db.begin():
         build_id = (await db.execute(select(models.BuildTask.build_id).where(
@@ -168,12 +162,3 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)
     event_loop.run_until_complete(_build_done(parsed_build))
-
-
-@dramatiq.actor(
-    max_retries=0,
-    priority=0,
-    time_limit=DRAMATIQ_TASK_TIMEOUT,
-)
-def create_log_repo(task_id: int):
-    event_loop.run_until_complete(_create_log_repo(task_id))

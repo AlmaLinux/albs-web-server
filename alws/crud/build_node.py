@@ -424,26 +424,19 @@ async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int
 
 
 async def __process_logs(pulp_client: PulpClient, task_id: int,
-                         task_artifacts: list, repositories: list):
-    if not repositories:
+                         task_artifacts: list, repository: models.Repository):
+    if not repository:
         logging.error('Log repository is absent, skipping logs processing')
         return
     logs = []
-    str_task_id = str(task_id)
-    repo = [repo for repo in repositories
-            if repo.name.endswith(str_task_id)]
-    if not repo:
-        logging.error('Log repository is absent, skipping logs processing')
-        return
-    repo = repo[0]
     tasks = [pulp_client.create_entity(artifact)
              for artifact in task_artifacts]
     try:
         results = await asyncio.gather(*tasks)
     except Exception as e:
-        logging.exception('Cannot create log files for %s', str(repo))
+        logging.exception('Cannot create log files for %s', str(repository))
         raise ArtifactConversionError(
-            f'Cannot create log files for {str(repo)}, error: {str(e)}')
+            f'Cannot create log files for {str(repository)}, error: {str(e)}')
 
     __verify_checksums(results)
 
@@ -460,7 +453,7 @@ async def __process_logs(pulp_client: PulpClient, task_id: int,
         )
         hrefs.append(href)
     try:
-        await pulp_client.modify_repository(repo.pulp_href, add=hrefs)
+        await pulp_client.modify_repository(repository.pulp_href, add=hrefs)
     except Exception as e:
         logging.exception('Cannot add log files to the repository: %s',
                           str(e))
@@ -518,8 +511,8 @@ async def __process_build_task_artifacts(
                      if item.type == 'build_log']
     rpm_repositories = [repo for repo in repositories
                         if repo.type == 'rpm']
-    log_repositories = [repo for repo in repositories
-                        if repo.type == 'build_log']
+    log_repository = [repo for repo in repositories
+                      if repo.type == 'build_log'][0]
     src_rpm = next((
         artifact.name for artifact in task_artifacts
         if artifact.arch == 'src' and artifact.type == 'rpm'
@@ -534,7 +527,7 @@ async def __process_build_task_artifacts(
     logging.info('Processing logs')
     start_time = datetime.datetime.utcnow()
     logs_entries = await __process_logs(
-        pulp_client, build_task.id, log_artifacts, log_repositories)
+        pulp_client, build_task.id, log_artifacts, log_repository)
     if logs_entries:
         db.add_all(logs_entries)
         await db.flush()

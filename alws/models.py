@@ -448,15 +448,6 @@ class BuildTask(Base):
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
     error = sqlalchemy.Column(sqlalchemy.Text, nullable=True, default=None)
 
-    def get_log_repo_name(self):
-        return '-'.join([
-            self.platform.name,
-            self.arch,
-            str(self.build_id),
-            'artifacts',
-            str(self.id)
-        ])
-
 
 class BuildTaskRef(Base):
 

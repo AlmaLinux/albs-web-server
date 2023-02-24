@@ -29,7 +29,7 @@ dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
 
 # Tasks import started from here
-from alws.dramatiq.build import start_build, build_done, create_log_repo
+from alws.dramatiq.build import start_build, build_done
 # dramatiq.user and dramatiq.products need to go before dramatiq.releases
 from alws.dramatiq.products import perform_product_modification
 from alws.dramatiq.user import perform_user_removal

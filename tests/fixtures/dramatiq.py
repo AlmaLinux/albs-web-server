@@ -20,6 +20,7 @@ async def start_build(
     modular_build_payload: dict,
     create_module,
     create_build_rpm_repo,
+    create_log_repo,
     modify_repository,
 ):
     await _start_build(modular_build.id, BuildCreate(**modular_build_payload))
