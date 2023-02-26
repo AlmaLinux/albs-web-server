@@ -1,10 +1,9 @@
 import typing
 
 from fastapi import APIRouter, Depends, UploadFile, Form
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi_sqla.asyncio_support import AsyncSession
 
 from alws.auth import get_current_user
-from alws.dependencies import get_db
 from alws.utils.uploader import MetadataUploader
 
 
@@ -20,7 +19,7 @@ async def upload_repometada(
     modules: typing.Optional[UploadFile] = None,
     comps: typing.Optional[UploadFile] = None,
     repository: str = Form(...),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(),
 ):
     uploader = MetadataUploader(session, repository)
     if modules is None and comps is None:

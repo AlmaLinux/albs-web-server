@@ -5,6 +5,7 @@ import typing
 import urllib.parse
 from collections import defaultdict
 
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy import update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -13,7 +14,6 @@ from sqlalchemy.orm import selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import SignStatus
-from alws.database import Session
 from alws.errors import (
     BuildAlreadySignedError,
     DataNotFoundError,
@@ -110,7 +110,7 @@ async def create_sign_task(db: AsyncSession, payload: sign_schema.SignTaskCreate
             sign_key_id=payload.sign_key_id
         )
         db.add(sign_task)
-        await db.commit()
+        await db.flush()
     await db.refresh(sign_task)
     sign_tasks = await db.execute(select(models.SignTask).where(
         models.SignTask.id == sign_task.id).options(
@@ -252,7 +252,7 @@ async def complete_sign_task(
     packages_to_add = defaultdict(list)
     srpms_mapping = defaultdict(list)
 
-    async with Session() as db, db.begin():
+    async with open_session() as db:
         builds = await db.execute(select(models.Build).where(
             models.Build.id == payload.build_id).options(
             selectinload(models.Build.repos)))
@@ -391,6 +391,7 @@ async def complete_sign_task(
         db.add(build)
         if modified_items:
             db.add_all(modified_items)
+        await db.flush()
         return sign_task
 
 

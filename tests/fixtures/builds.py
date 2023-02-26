@@ -103,11 +103,12 @@ def modular_build_payload() -> dict:
 @pytest.mark.anyio
 @pytest.fixture
 async def modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     modular_build_payload: dict,
+    create_base_product,
 ) -> typing.AsyncIterable[Build]:
     yield await create_build(
-        session,
+        async_session,
         BuildCreate(**modular_build_payload),
         user_id=ADMIN_USER_ID,
     )

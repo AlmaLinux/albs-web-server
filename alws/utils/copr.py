@@ -23,7 +23,7 @@ def generate_repo_config(
     clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
     config_template = (
         f"[copr:{clean_host_name}:{ownername}:{product_name}]\n"
-        f"name=Copr repo for {product_name} {repo.arch} owned by {ownername}\n"
+        f"name=Copr repo for {product_name} $basearch owned by {ownername}\n"
         f"baseurl={repo.url}\n"
         "type=rpm-md\n"
         "skip_if_unavailable=True\n"

@@ -6,11 +6,13 @@ from alws.crud import sign_task
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.dramatiq import event_loop
 from alws.schemas import sign_schema
+from alws.utils.db_utils import prepare_mappings
 
 
 __all__ = ['complete_sign_task']
 
 
+@prepare_mappings
 async def _complete_sign_task(
         task_id: int, payload: typing.Dict[str, typing.Any]):
     await sign_task.complete_sign_task(

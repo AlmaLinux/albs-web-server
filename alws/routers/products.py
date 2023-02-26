@@ -6,11 +6,10 @@ from fastapi import (
     HTTPException,
     status,
 )
+from fastapi_sqla.asyncio_support import AsyncSession
 
-from alws import database
 from alws.auth import get_current_user
 from alws.crud import products
-from alws.dependencies import get_db
 from alws.models import User
 from alws.schemas import product_schema
 
@@ -26,7 +25,7 @@ public_router = APIRouter(
 async def get_products(
     pageNumber: int = None,
     search_string: str = None,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ):
     return await products.get_products(
         db, page_number=pageNumber, search_string=search_string)
@@ -35,7 +34,7 @@ async def get_products(
 @public_router.post('/', response_model=product_schema.Product)
 async def create_product(
     product: product_schema.ProductCreate,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ):
     async with db.begin():
         db_product = await products.create_product(db, product)
@@ -47,7 +46,7 @@ async def create_product(
 @public_router.get('/{product_id}/', response_model=product_schema.Product)
 async def get_product(
     product_id: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
 ):
     db_product = await products.get_products(db, product_id=product_id)
     if db_product is None:
@@ -63,7 +62,7 @@ async def get_product(
 async def add_to_product(
     product: str,
     build_id: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
     user: User = Depends(get_current_user),
 ):
     try:
@@ -83,7 +82,7 @@ async def add_to_product(
 async def remove_from_product(
     product: str,
     build_id: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
     user: User = Depends(get_current_user),
 ):
     try:
@@ -102,7 +101,7 @@ async def remove_from_product(
                       status_code=status.HTTP_204_NO_CONTENT)
 async def remove_product(
     product_id: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(),
     user: User = Depends(get_current_user),
 ):
     return await products.remove_product(db, product_id, user.id)

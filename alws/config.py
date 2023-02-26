@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     pulp_database_url: str = 'postgresql+psycopg2://postgres:password@pulp/pulp'
 
     alts_host: str = 'http://alts-scheduler:8000'
-    alts_token: str
+    alts_token: typing.Optional[str]
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
 
     test_task_scheduler_enabled: bool = False
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     github_client: str
     github_client_secret: str
 
-    jwt_secret: str
+    jwt_secret: str = 'very-secret-secret'
     jwt_algorithm: str = 'HS256'
 
     cas_api_key: typing.Optional[str]

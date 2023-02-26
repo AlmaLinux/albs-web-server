@@ -1,14 +1,12 @@
-from contextlib import asynccontextmanager
-import typing
 import pytest
 
+from fastapi_sqla import Base
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from alws import models
 from alws.config import settings
-from alws.database import Base
 
 from tests.constants import ADMIN_USER_ID
 
@@ -19,23 +17,8 @@ engine = create_async_engine(
 )
 
 
-async def get_session():
-    async with AsyncSession(engine) as sess:
-        try:
-            yield sess
-        finally:
-            await sess.close()
-
-
 @pytest.mark.anyio
-@pytest.fixture
-async def session() -> typing.AsyncIterator[AsyncSession]:
-    async with asynccontextmanager(get_session)() as session:
-        yield session
-
-
-@pytest.mark.anyio
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -57,7 +40,7 @@ async def create_tables():
         },
     ],
 )
-async def create_user(session: AsyncSession, request):
+async def create_user(async_session: AsyncSession, request):
     data = {
         "id": request.param["id"],
         "username": request.param["username"],
@@ -66,11 +49,11 @@ async def create_user(session: AsyncSession, request):
         "is_verified": request.param["is_verified"],
     }
     user = await (
-        session.execute(
+        async_session.execute(
             select(models.User).where(models.User.id == data["id"]),
         )
     )
     if user.scalars().first():
         return
-    await session.execute(insert(models.User).values(**data))
-    await session.commit()
+    await async_session.execute(insert(models.User).values(**data))
+    await async_session.commit()

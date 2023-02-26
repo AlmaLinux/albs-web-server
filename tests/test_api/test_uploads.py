@@ -38,8 +38,6 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
         self,
         modules_yaml: bytes,
         create_base_platform,
-        create_base_product,
-        start_build,
     ):
         response = await self.make_request(
             "post",
@@ -52,12 +50,14 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
 
     async def test_db_rpm_modules(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
+        create_base_platform,
+        modular_build,
         modules_yaml: bytes,
     ):
         rpm_modules = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(RpmModule).where(
                         RpmModule.id.in_(
                             select(BuildTask.rpm_module_id)

@@ -4,10 +4,11 @@ import importlib
 import logging
 import threading
 
+import fastapi_sqla
 import sentry_sdk
 
 from fastapi import FastAPI
-from starlette.exceptions import ExceptionMiddleware
+from starlette.middleware.exceptions import ExceptionMiddleware
 
 from alws import routers
 from alws.auth import AuthRoutes
@@ -36,6 +37,7 @@ if settings.sentry_dsn:
 
 
 app = FastAPI()
+fastapi_sqla.setup(app)
 app.add_middleware(ExceptionMiddleware, handlers=handlers)
 
 

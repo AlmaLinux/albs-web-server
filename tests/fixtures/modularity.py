@@ -1,5 +1,7 @@
 import pytest
 
+from alws import models
+
 
 @pytest.fixture
 def modules_yaml():
@@ -130,3 +132,18 @@ data:
         arches: [aarch64, i686, ppc64le, s390x, x86_64]
 ...
     """
+
+
+@pytest.fixture
+async def create_rpm_module(async_session):
+    module = models.RpmModule(
+        name="go-toolset-devel",
+        stream="rhel8",
+        version="8070020230125092346",
+        context="b754926a",
+        arch="i686",
+        pulp_href="test",
+        sha256="aabbccddeeff"
+    )
+    async_session.add(module)
+    await async_session.commit()

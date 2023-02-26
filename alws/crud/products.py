@@ -1,9 +1,8 @@
 import asyncio
 import logging
-import pprint
 import typing
-from collections import defaultdict
 
+from fastapi_sqla.asyncio_support import AsyncSession
 from sqlalchemy import or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -11,14 +10,12 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus
 from alws.crud.user import get_user
 from alws.crud.teams import (
     create_team,
     create_team_roles,
     get_teams,
 )
-from alws.database import Session
 from alws.dramatiq import perform_product_modification
 from alws.errors import ProductError, PermissionDenied
 from alws.perms import actions
@@ -40,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_product(
-    db: Session,
+    db: AsyncSession,
     payload: ProductCreate,
 ) -> models.Product:
 
@@ -118,7 +115,7 @@ async def create_product(
 
 
 async def get_products(
-    db: Session,
+    db: AsyncSession,
     search_string: str = None,
     page_number: int = None,
     product_id: int = None,
@@ -176,7 +173,7 @@ async def get_products(
 
 
 async def remove_product(
-    db: Session,
+    db: AsyncSession,
     product_id: int,
     user_id: int,
 ):
@@ -208,7 +205,7 @@ async def remove_product(
 
 
 async def modify_product(
-    db: Session,
+    db: AsyncSession,
     build_id: int,
     product: str,
     user_id: int,

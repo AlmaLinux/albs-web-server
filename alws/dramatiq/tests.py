@@ -2,21 +2,23 @@ import logging
 import typing
 
 import dramatiq
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy import update
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, TestTaskStatus
 from alws.crud import test as t_crud
-from alws.database import Session
 from alws.dramatiq import event_loop
 from alws.models import TestTask
 from alws.schemas.test_schema import TestTaskResult
+from alws.utils.db_utils import prepare_mappings
 
 
 __all__ = ['complete_test_task']
 
 
+@prepare_mappings
 async def _complete_test_task(task_id: int, task_result: TestTaskResult):
-    async with Session() as db:
+    async with open_session() as db:
         try:
             logging.info('Start processing test task %s', task_id)
             await t_crud.complete_test_task(db, task_id, task_result)
@@ -28,8 +30,6 @@ async def _complete_test_task(task_id: int, task_result: TestTaskResult):
             await db.rollback()
             await db.execute(update(TestTask).where(
                 TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
-        else:
-            await db.commit()
 
 
 @dramatiq.actor(

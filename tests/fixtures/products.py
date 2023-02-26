@@ -42,10 +42,10 @@ def product_create_payload(request) -> dict:
 
 @pytest.mark.anyio
 @pytest.fixture
-async def create_base_product(session: AsyncSession, product_create_payload: dict):
+async def create_base_product(async_session: AsyncSession, product_create_payload: dict):
     product = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Product).where(
                     Product.name == product_create_payload["name"],
                 ),
@@ -56,6 +56,6 @@ async def create_base_product(session: AsyncSession, product_create_payload: dic
     )
     if not product:
         await create_product(
-            session,
+            async_session,
             ProductCreate(**product_create_payload),
         )

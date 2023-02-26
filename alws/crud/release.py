@@ -1,7 +1,8 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -19,7 +20,7 @@ __all__ = [
 
 
 async def get_releases(
-    db: Session,
+    db: AsyncSession,
     page_number: typing.Optional[int] = None,
     release_id: int = None,
     product_id: int = None,
@@ -70,7 +71,7 @@ async def get_releases(
     return (await db.execute(generate_query())).scalars().all()
 
 
-async def __get_product(db: Session, product_id: int) -> models.Product:
+async def __get_product(db: AsyncSession, product_id: int) -> models.Product:
     product = (await db.execute(select(models.Product).where(
         models.Product.id == product_id))).scalars().first()
     if not product:
@@ -79,7 +80,7 @@ async def __get_product(db: Session, product_id: int) -> models.Product:
 
 
 async def create_release(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         payload: release_schema.ReleaseCreate,
 ) -> models.Release:
@@ -89,7 +90,7 @@ async def create_release(
 
 
 async def update_release(
-        db: Session,
+        db: AsyncSession,
         release_id: int,
         user_id: int,
         payload: release_schema.ReleaseUpdate,
@@ -102,7 +103,7 @@ async def update_release(
 
 
 async def commit_release(
-        db: Session,
+        db: AsyncSession,
         release_id: int,
         user_id: int,
 ) -> typing.Tuple[models.Release, str]:

@@ -6,11 +6,10 @@ from fastapi import (
     HTTPException,
     status,
 )
+from fastapi_sqla.asyncio_support import AsyncSession
 
-from alws import database
 from alws.auth import get_current_superuser, get_current_user
 from alws.crud import user as user_crud
-from alws.dependencies import get_db
 from alws.errors import UserError, PermissionDenied
 from alws.schemas import user_schema, role_schema
 from alws.models import User
@@ -26,7 +25,7 @@ router = APIRouter(
     '/all_users',
     response_model=typing.List[user_schema.User],
 )
-async def get_all_users(db: database.Session = Depends(get_db)):
+async def get_all_users(db: AsyncSession = Depends()):
     return await user_crud.get_all_users(db)
 
 
@@ -35,7 +34,7 @@ async def get_all_users(db: database.Session = Depends(get_db)):
     response_model=user_schema.UserOpResult
     )
 async def modify_user(user_id: int, payload: user_schema.UserUpdate,
-                      db: database.Session = Depends(get_db),
+                      db: AsyncSession = Depends(),
                       _=Depends(get_current_superuser)
                       ) -> user_schema.UserOpResult:
     try:
@@ -49,7 +48,7 @@ async def modify_user(user_id: int, payload: user_schema.UserUpdate,
 
 
 @router.delete('/{user_id}/remove')
-async def remove_user(user_id: int, db: database.Session = Depends(get_db),
+async def remove_user(user_id: int, db: AsyncSession = Depends(),
                       _=Depends(get_current_superuser)
                       ) -> user_schema.UserOpResult:
     try:
@@ -69,7 +68,7 @@ async def remove_user(user_id: int, db: database.Session = Depends(get_db),
     response_model=typing.List[role_schema.Role]
 )
 async def get_user_roles(user_id: int,
-                         db: database.Session = Depends(get_db),
+                         db: AsyncSession = Depends(),
                          _=Depends(get_current_user)
                         ):
     return await user_crud.get_user_roles(db, user_id)
@@ -80,7 +79,7 @@ async def get_user_roles(user_id: int,
     response_model=user_schema.UserOpResult
     )
 async def add_roles(user_id: int, roles_ids: typing.List[int],
-                    db: database.Session = Depends(get_db),
+                    db: AsyncSession = Depends(),
                     current_user: User = Depends(get_current_user)
                     ) -> user_schema.UserOpResult:
     try:
@@ -100,7 +99,7 @@ async def add_roles(user_id: int, roles_ids: typing.List[int],
     response_model=user_schema.UserOpResult
     )
 async def remove_roles(user_id: int, roles_ids: typing.List[int],
-                       db: database.Session = Depends(get_db),
+                       db: AsyncSession = Depends(),
                        current_user: User = Depends(get_current_user)
                        ) -> user_schema.UserOpResult:
     try:
@@ -120,7 +119,7 @@ async def remove_roles(user_id: int, roles_ids: typing.List[int],
     response_model=typing.List[user_schema.UserTeam]
 )
 async def get_user_teams(user_id: int,
-                         db: database.Session = Depends(get_db),
+                         db: AsyncSession = Depends(),
                          _=Depends(get_current_user)
                         ):
     return await user_crud.get_user_teams(db, user_id)

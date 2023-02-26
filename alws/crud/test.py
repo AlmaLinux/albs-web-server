@@ -3,11 +3,12 @@ import datetime
 import gzip
 import logging
 import re
-import urllib
+import urllib.parse
 from io import BytesIO
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -19,118 +20,116 @@ from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
 
-async def create_test_tasks_for_build_id(db: Session, build_id: int):
-    async with db.begin():
-        # We get all build_tasks with the same build_id
-        # and whose status is COMPLETED
-        build_task_ids = (await db.execute(
-            select(models.BuildTask.id).where(
-                models.BuildTask.build_id == build_id,
-                models.BuildTask.status == BuildTaskStatus.COMPLETED
-            )
-        )).scalars().all()
+async def create_test_tasks_for_build_id(db: AsyncSession, build_id: int):
+    # We get all build_tasks with the same build_id
+    # and whose status is COMPLETED
+    build_task_ids = (await db.execute(
+        select(models.BuildTask.id).where(
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status == BuildTaskStatus.COMPLETED
+        )
+    )).scalars().all()
 
-        build = (await db.execute(select(models.Build).where(
-            models.Build.id == build_id).options(
-            selectinload(models.Build.repos)
-        ))).scalars().first()
-        test_log_repository = next(
-            (i for i in build.repos if i.type == 'test_log'), None)
-        if not test_log_repository:
-            raise ValueError('Cannot create test tasks: '
-                             'the log repository is not found')
+    build = (await db.execute(select(models.Build).where(
+        models.Build.id == build_id).options(
+        selectinload(models.Build.repos)
+    ))).scalars().first()
+    test_log_repository = next(
+        (i for i in build.repos if i.type == 'test_log'), None)
+    if not test_log_repository:
+        raise ValueError('Cannot create test tasks: '
+                         'the log repository is not found')
 
     for build_task_id in build_task_ids:
         await create_test_tasks(
             db, build_task_id, test_log_repository.id)
 
 
-async def create_test_tasks(db: Session, build_task_id: int,
+async def create_test_tasks(db: AsyncSession, build_task_id: int,
                             repository_id: int):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
         settings.pulp_password
     )
-    async with db.begin():
-        build_task_query = await db.execute(
-            select(models.BuildTask).where(
-                models.BuildTask.id == build_task_id,
-            ).options(selectinload(models.BuildTask.artifacts)),
+    build_task_query = await db.execute(
+        select(models.BuildTask).where(
+            models.BuildTask.id == build_task_id,
+        ).options(selectinload(models.BuildTask.artifacts)),
+    )
+    build_task = build_task_query.scalars().first()
+
+    latest_revision_query = select(
+        func.max(models.TestTask.revision),
+    ).filter(
+        models.TestTask.build_task_id == build_task_id,
+    )
+    result = await db.execute(latest_revision_query)
+    latest_revision = result.scalars().first()
+    if latest_revision:
+        new_revision = latest_revision + 1
+    else:
+        new_revision = 1
+
+    test_tasks = []
+    for artifact in build_task.artifacts:
+        if artifact.type != 'rpm':
+            continue
+        artifact_info = await pulp_client.get_rpm_package(
+            artifact.href,
+            include_fields=['name', 'version', 'release', 'arch']
         )
-        build_task = build_task_query.scalars().first()
-
-        latest_revision_query = select(
-            func.max(models.TestTask.revision),
-        ).filter(
-            models.TestTask.build_task_id == build_task_id,
+        if artifact_info['arch'] == 'src':
+            continue
+        task = models.TestTask(
+            build_task_id=build_task_id,
+            package_name=artifact_info['name'],
+            package_version=artifact_info['version'],
+            env_arch=build_task.arch,
+            status=TestTaskStatus.CREATED,
+            revision=new_revision,
+            repository_id=repository_id,
         )
-        result = await db.execute(latest_revision_query)
-        latest_revision = result.scalars().first()
-        if latest_revision:
-            new_revision = latest_revision + 1
-        else:
-            new_revision = 1
-
-        test_tasks = []
-        for artifact in build_task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            artifact_info = await pulp_client.get_rpm_package(
-                artifact.href,
-                include_fields=['name', 'version', 'release', 'arch']
-            )
-            task = models.TestTask(
-                build_task_id=build_task_id,
-                package_name=artifact_info['name'],
-                package_version=artifact_info['version'],
-                env_arch=build_task.arch,
-                status=TestTaskStatus.CREATED,
-                revision=new_revision,
-                repository_id=repository_id,
-            )
-            if artifact_info.get('release'):
-                task.package_release = artifact_info['release']
-            test_tasks.append(task)
-        db.add_all(test_tasks)
-        await db.commit()
+        if artifact_info.get('release'):
+            task.package_release = artifact_info['release']
+        test_tasks.append(task)
+    db.add_all(test_tasks)
+    await db.flush()
 
 
-async def restart_build_tests(db: Session, build_id: int):
+async def restart_build_tests(db: AsyncSession, build_id: int):
     # Note that this functionality is triggered by frontend,
     # which only restarts tests for those builds that already
     # had passed the tests
-    async with db.begin():
-        build_task_ids = await db.execute(
-            select(models.BuildTask.id).where(
-                models.BuildTask.build_id == build_id))
-        build_task_ids = build_task_ids.scalars().all()
-        build = (await db.execute(select(models.Build).where(
-            models.Build.id == build_id).options(
-            selectinload(models.Build.repos)
-        ))).scalars().first()
-        test_log_repository = next(
-            (i for i in build.repos if i.type == 'test_log'), None)
-        if not test_log_repository:
-            raise ValueError('Cannot create test tasks: '
-                             'the log repository is not found')
+    build_task_ids = await db.execute(
+        select(models.BuildTask.id).where(
+            models.BuildTask.build_id == build_id))
+    build_task_ids = build_task_ids.scalars().all()
+    build = (await db.execute(select(models.Build).where(
+        models.Build.id == build_id).options(
+        selectinload(models.Build.repos)
+    ))).scalars().first()
+    test_log_repository = next(
+        (i for i in build.repos if i.type == 'test_log'), None)
+    if not test_log_repository:
+        raise ValueError('Cannot create test tasks: '
+                         'the log repository is not found')
     for build_task_id in build_task_ids:
         await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
-async def restart_build_task_tests(db: Session, build_task_id: int):
-    async with db.begin():
-        build_task = (await db.execute(select(models.BuildTask).where(
-            models.BuildTask.id == build_task_id).options(
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos)
-        ))).scalars().first()
-        test_log_repository = next(
-            (i for i in build_task.build.repos if i.type == 'test_log'), None)
-        if not test_log_repository:
-            raise ValueError('Cannot create test tasks: '
-                             'the log repository is not found')
-        await create_test_tasks(db, build_task_id, test_log_repository.id)
+async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
+    build_task = (await db.execute(select(models.BuildTask).where(
+        models.BuildTask.id == build_task_id).options(
+        selectinload(models.BuildTask.build).selectinload(
+            models.Build.repos)
+    ))).scalars().first()
+    test_log_repository = next(
+        (i for i in build_task.build.repos if i.type == 'test_log'), None)
+    if not test_log_repository:
+        raise ValueError('Cannot create test tasks: '
+                         'the log repository is not found')
+    await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
@@ -138,7 +137,7 @@ async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
     return artifact['name'], href
 
 
-async def complete_test_task(db: Session, task_id: int,
+async def complete_test_task(db: AsyncSession, task_id: int,
                              test_result: test_schema.TestTaskResult):
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -199,10 +198,11 @@ async def complete_test_task(db: Session, task_id: int,
     db.add(task)
     db.add(stats)
     db.add_all(logs)
+    await db.flush()
 
 
 async def get_test_tasks_by_build_task(
-        db: Session, build_task_id: int, latest: bool = True,
+        db: AsyncSession, build_task_id: int, latest: bool = True,
         revision: int = None):
     query = select(models.TestTask).where(
         models.TestTask.build_task_id == build_task_id)
@@ -226,7 +226,7 @@ def get_logs_format(logs: bytes) -> str:
     return logs_format
 
 
-async def get_test_logs(build_task_id: int, db: Session) -> list:
+async def get_test_logs(build_task_id: int, db: AsyncSession) -> list:
     """
     Parses test logs and determine test format.
     Returns dict of lists for each build's test with detailed status report.
@@ -235,7 +235,7 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
     ----------
     build_task_id : int
         Id of the build, which tests info is interested
-    db: Session
+    db: AsyncSession
         db connection
 
     Returns

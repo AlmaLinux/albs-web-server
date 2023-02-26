@@ -1,7 +1,7 @@
 """
 Dramatiq new tasks how-to:
     1. ALWAYS set max_retries to some value, since by default
-       max_retries is infinity. Thats probably not what you want by default
+       max_retries is infinity. That's probably not what you want by default
     2. If you wrote a new function tasks, you should import it here,
        dramatiq knows only about tasks imported in this __init__.py
     3. Try to think about task priority a bit. Default value is 0 (very high),

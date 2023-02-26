@@ -1,20 +1,20 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
 
 from alws import models
 from alws.errors import DataNotFoundError, SignKeyAlreadyExistsError
 from alws.schemas import sign_schema
 
 
-async def get_sign_keys(db: Session) -> typing.List[models.SignKey]:
+async def get_sign_keys(db: AsyncSession) -> typing.List[models.SignKey]:
     result = await db.execute(select(models.SignKey))
     return result.scalars().all()
 
 
 async def create_sign_key(
-        db: Session, payload: sign_schema.SignKeyCreate) -> models.SignKey:
+        db: AsyncSession, payload: sign_schema.SignKeyCreate) -> models.SignKey:
     check = await db.execute(select(models.SignKey.id).where(
         models.SignKey.keyid == payload.keyid))
     if check.scalars().first():
@@ -28,7 +28,7 @@ async def create_sign_key(
 
 
 async def update_sign_key(
-        db: Session, key_id: int,
+        db: AsyncSession, key_id: int,
         payload: sign_schema.SignKeyUpdate) -> models.SignKey:
     sign_key = await db.execute(select(models.SignKey).get(key_id))
     if not sign_key:

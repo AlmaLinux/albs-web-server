@@ -2,12 +2,12 @@ import datetime
 import itertools
 import typing
 from fastapi import APIRouter, Depends, Response, status
+from fastapi_sqla.asyncio_support import AsyncSession
 
-from alws import database, dramatiq
+from alws import dramatiq
 from alws.auth import get_current_user
 from alws.config import settings
 from alws.crud import build_node
-from alws.dependencies import get_db
 from alws.schemas import build_node_schema
 from alws.constants import BuildTaskStatus, BuildTaskRefType
 
@@ -22,7 +22,7 @@ router = APIRouter(
 @router.post('/ping')
 async def ping(
             node_status: build_node_schema.Ping,
-            db: database.Session = Depends(get_db)
+            db: AsyncSession = Depends(),
         ):
     if not node_status.active_tasks:
         return {}
@@ -34,7 +34,7 @@ async def ping(
 async def build_done(
             build_done_: build_node_schema.BuildDone,
             response: Response,
-            db: database.Session = Depends(get_db),
+            db: AsyncSession = Depends(),
         ):
     build_task = await build_node.get_build_task(db, build_done_.task_id)
     if BuildTaskStatus.is_finished(build_task.status):
@@ -45,7 +45,7 @@ async def build_done(
     # won't rebuild task again and again while it's in the queue
     # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-    await db.commit()
+    await db.flush()
     dramatiq.build_done.send(build_done_.dict())
     return {'ok': True}
 
@@ -53,12 +53,12 @@ async def build_done(
 @router.get('/get_task', response_model=typing.Optional[build_node_schema.Task])
 async def get_task(
             request: build_node_schema.RequestTask,
-            db: database.Session = Depends(get_db)
+            db: AsyncSession = Depends(),
         ):
     task = await build_node.get_available_build_task(db, request)
     if not task:
         return
-    # generate full url to builted SRPM for using less memory in database
+    # generate full url to built SRPM for using less memory in database
     built_srpm_url = task.built_srpm_url
     srpm_hash = None
     if built_srpm_url is not None:

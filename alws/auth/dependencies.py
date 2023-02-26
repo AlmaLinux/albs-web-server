@@ -1,4 +1,5 @@
 from fastapi import Depends
+from fastapi_sqla.asyncio_support import AsyncSession
 from fastapi_users.authentication.strategy import (
     AccessTokenDatabase,
     DatabaseStrategy,
@@ -6,10 +7,8 @@ from fastapi_users.authentication.strategy import (
 )
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyAccessTokenDatabase
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.config import settings
-from alws.dependencies import get_async_session
 from alws.models import User, UserAccessToken, UserOauthAccount
 
 __all__ = [
@@ -20,13 +19,13 @@ __all__ = [
 ]
 
 
-async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+async def get_user_db(session: AsyncSession = Depends()):
     yield SQLAlchemyUserDatabase(
         session, User, oauth_account_table=UserOauthAccount)
 
 
 async def get_access_token_db(
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(),
 ):
     yield SQLAlchemyAccessTokenDatabase(session, UserAccessToken)
 

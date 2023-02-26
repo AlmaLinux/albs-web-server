@@ -17,13 +17,14 @@ import uuid
 
 import createrepo_c as cr
 import jinja2
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy import select, or_, and_, update
 from sqlalchemy.orm import selectinload, load_only, Session
 from sqlalchemy.sql.expression import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
-from alws.dependencies import get_pulp_db, get_db
+from alws.dependencies import get_pulp_db
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
@@ -632,7 +633,6 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         )
         db_errata.references.append(self_ref)
         items_to_insert.append(self_ref)
-    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
     search_params = prepare_search_params(errata)
     prod_repos_cache = await load_platform_packages(platform, search_params)
     for package in errata.packages:
@@ -651,7 +651,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
             await search_for_albs_packages(db, db_package, prod_repos_cache)
         )
     db.add_all(items_to_insert)
-    await db.commit()
+    await db.flush()
     await db.refresh(db_errata)
     return db_errata
 
@@ -1144,7 +1144,7 @@ async def release_errata_record(record_id: str):
         settings.pulp_user,
         settings.pulp_password,
     )
-    async with asynccontextmanager(get_db)() as session:
+    async with open_session() as session:
         await session.execute(
             update(models.ErrataRecord)
             .where(models.ErrataRecord.id == record_id)
@@ -1153,8 +1153,8 @@ async def release_errata_record(record_id: str):
                 last_release_log=None,
             )
         )
-        await session.commit()
-    async with asynccontextmanager(get_db)() as session:
+        await session.flush()
+    async with open_session() as session:
         session: AsyncSession
         db_record = await session.execute(
             generate_query_for_release([record_id]),
@@ -1188,7 +1188,7 @@ async def release_errata_record(record_id: str):
         )
         db_record.release_status = ErrataReleaseStatus.RELEASED
         db_record.last_release_log = "Succesfully released"
-        await session.commit()
+        await session.flush()
     logging.info("Record %s succesfully released", record_id)
 
 
@@ -1200,7 +1200,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
     )
     release_tasks = []
     repos_to_publish = []
-    async with asynccontextmanager(get_db)() as session:
+    async with open_session() as session:
         await session.execute(
             update(models.ErrataRecord)
             .where(models.ErrataRecord.id.in_(records_ids))
@@ -1209,9 +1209,9 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 last_release_log=None,
             )
         )
-        await session.commit()
+        await session.flush()
 
-    async with asynccontextmanager(get_db)() as session:
+    async with open_session() as session:
         session: AsyncSession
         db_records = await session.execute(
             generate_query_for_release(records_ids),
@@ -1257,7 +1257,8 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 continue
             repos_to_publish.extend(repo_mapping.keys())
             release_tasks.extend(tasks)
-        await session.commit()
+        await session.flush()
+
     logging.info("Executing release tasks")
     await asyncio.gather(*release_tasks)
     logging.info("Executing publication tasks")

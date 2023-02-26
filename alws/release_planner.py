@@ -9,8 +9,9 @@ from collections import defaultdict
 
 from cas_wrapper import CasWrapper
 from sqlalchemy import update, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
@@ -47,7 +48,7 @@ __all__ = [
 
 
 class BaseReleasePlanner(metaclass=ABCMeta):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
@@ -574,7 +575,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
 
 class AlmaLinuxReleasePlanner(BaseReleasePlanner):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         super().__init__(db)
         self.packages_presence_info = defaultdict(list)
         self.pkgs_mapping = {}

@@ -1,19 +1,21 @@
 import dramatiq
 
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy import delete
 from sqlalchemy.future import select
 
 from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import build as build_crud
-from alws.dependencies import get_db
 from alws.dramatiq import event_loop
+from alws.utils.db_utils import prepare_mappings
 
 __all__ = ['perform_user_removal'] 
 
 
+@prepare_mappings
 async def _perform_user_removal(user_id: int):
-    async for db in get_db():
+    async with open_session() as db:
         async with db.begin():
             # Remove builds
             build_ids = (await db.execute(

@@ -8,8 +8,6 @@ from alws.config import settings
 
 
 __all__ = [
-    'get_async_session',
-    'get_db',
     'get_pulp_db',
     'get_redis',
 ]
@@ -20,29 +18,8 @@ __all__ = [
 DB_SEMAPHORE = asyncio.Semaphore(90)
 
 
-# FIXME: `get_current_user` dependency causes a transaction
-#  to exist on a connection so we need a separate dependency for it for now.
-#  Remove this later when better approach is found.
-async def get_async_session() -> database.Session:
-    async with DB_SEMAPHORE:
-        async with database.Session() as session:
-            try:
-                yield session
-            finally:
-                await session.close()
-
-
-async def get_db() -> database.Session:
-    async with DB_SEMAPHORE:
-        async with database.Session() as session:
-            try:
-                yield session
-            finally:
-                await session.close()
-
-
 @contextmanager
-def get_pulp_db() -> database.Session:
+def get_pulp_db() -> database.PulpSession:
     with database.PulpSession() as session:
         try:
             yield session

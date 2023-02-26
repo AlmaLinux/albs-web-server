@@ -3,21 +3,25 @@ import dramatiq
 import logging
 import pprint
 import typing
-
 from collections import defaultdict
+
+from fastapi_sqla.asyncio_support import open_session
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, DRAMATIQ_TASK_TIMEOUT
-from alws.database import Session
 from alws.dramatiq import event_loop
+from alws.utils.db_utils import prepare_mappings
 from alws.utils.pulp_client import PulpClient
+
 
 __all__ = ['perform_product_modification']
 
+
 logger = logging.getLogger(__name__)
+
 
 async def get_existing_packages(
     pulp_client: PulpClient,
@@ -116,7 +120,6 @@ async def prepare_repo_modify_dict(
 
 
 async def set_platform_for_products_repos(
-        db: Session,
         product: models.Product,
 ) -> None:
     repo_debug_dict = {
@@ -138,7 +141,6 @@ async def set_platform_for_products_repos(
 
 
 async def set_platform_for_build_repos(
-        db: Session,
         build: models.Build,
 ) -> None:
     repo_debug_dict = {
@@ -161,6 +163,7 @@ async def set_platform_for_build_repos(
         repo.platform = repos_per_platform[repo.name]
 
 
+@prepare_mappings
 async def _perform_product_modification(
         build_id: int,
         product_id: int,
@@ -169,7 +172,7 @@ async def _perform_product_modification(
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
 
-    async with Session() as db, db.begin(): 
+    async with open_session() as db:
         db_product = (await db.execute(
             select(models.Product).where(
                 models.Product.id == product_id
@@ -200,38 +203,34 @@ async def _perform_product_modification(
         )
         db_build = db_build.scalars().first()
 
-    await set_platform_for_products_repos(db=db, product=db_product)
-    await set_platform_for_build_repos(db=db, build=db_build)
+        await set_platform_for_products_repos(product=db_product)
+        await set_platform_for_build_repos(build=db_build)
 
-    modify = await prepare_repo_modify_dict(
-        db_build, db_product, pulp_client, modification)
-    tasks = []
-    publish_tasks = []
-    for key, value in modify.items():
+        modify = await prepare_repo_modify_dict(
+            db_build, db_product, pulp_client, modification)
+        tasks = []
+        publish_tasks = []
+        for key, value in modify.items():
+            if modification == 'add':
+                tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
+            else:
+                tasks.append(pulp_client.modify_repository(
+                    remove=value, repo_to=key))
+            # We've changed products repositories to not invoke
+            # automatic publications, so now we need
+            # to manually publish them after modification
+            publish_tasks.append(pulp_client.create_rpm_publication(key))
+        await asyncio.gather(*tasks)
+        await asyncio.gather(*publish_tasks)
+
         if modification == 'add':
-            tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
+            db_product.builds.append(db_build)
         else:
-            tasks.append(pulp_client.modify_repository(
-                remove=value, repo_to=key))
-        # We've changed products repositories to not invoke
-        # automatic publications, so now we need
-        # to manually publish them after modification
-        publish_tasks.append(pulp_client.create_rpm_publication(key))
-    await asyncio.gather(*tasks)
-    await asyncio.gather(*publish_tasks)
-
-    if modification == 'add':
-        db_product.builds.append(db_build)
-    else:
-        db_product.builds.remove(db_build)
-    db.add_all([
-        db_product,
-        db_build,
-    ])
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
+            db_product.builds.remove(db_build)
+        db.add_all([
+            db_product,
+            db_build,
+        ])
 
 
 @dramatiq.actor(max_retries=0, priority=0, time_limit=DRAMATIQ_TASK_TIMEOUT)

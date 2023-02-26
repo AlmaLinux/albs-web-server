@@ -3,8 +3,8 @@ import typing
 from pathlib import Path
 
 from sqlalchemy import update, delete, insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
 
 from alws import models
 from alws.config import settings
@@ -12,7 +12,7 @@ from alws.constants import ExportStatus
 from alws.utils.pulp_client import PulpClient
 
 
-async def create_pulp_exporters_to_fs(db: Session,
+async def create_pulp_exporters_to_fs(db: AsyncSession,
                                       repo_list: typing.List[int]):
     query = select(models.Repository).where(
         models.Repository.id.in_(repo_list))
@@ -47,7 +47,7 @@ async def create_pulp_exporters_to_fs(db: Session,
     return export_task_pk
 
 
-async def execute_pulp_exporters_to_fs(db: Session,
+async def execute_pulp_exporters_to_fs(db: AsyncSession,
                                        export_id: int):
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)

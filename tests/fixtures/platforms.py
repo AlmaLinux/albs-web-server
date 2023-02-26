@@ -14,7 +14,7 @@ from tests.fixtures.pulp import get_repo_href
 
 @pytest.mark.anyio
 @pytest.fixture
-async def create_base_platform(session: AsyncSession):
+async def create_base_platform(async_session: AsyncSession):
     with open("reference_data/platforms.yaml", "rt") as file:
         loader = yaml.Loader(file)
         platform_data = loader.get_data()[0]
@@ -22,7 +22,7 @@ async def create_base_platform(session: AsyncSession):
     schema["repos"] = []
     platform = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(models.Platform).where(
                     models.Platform.name == schema["name"],
                 )
@@ -41,5 +41,5 @@ async def create_base_platform(session: AsyncSession):
             **repository_schema.RepositoryCreate(**repo).dict()
         )
         platform.repos.append(repository)
-    session.add(platform)
-    await session.commit()
+    async_session.add(platform)
+    await async_session.commit()

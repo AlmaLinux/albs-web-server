@@ -5,11 +5,9 @@ import httpx
 
 from alws.app import app
 from alws.config import settings
-from alws.dependencies import get_db
 from alws.utils import jwt_utils
 
 from tests.constants import ADMIN_USER_ID
-from tests.fixtures.database import get_session
 
 
 @pytest.mark.anyio
@@ -46,7 +44,6 @@ class BaseAsyncTestCase:
 
     @classmethod
     def setup_class(cls):
-        app.dependency_overrides[get_db] = get_session
         cls.token = jwt_utils.generate_JWT_token(
             str(cls.user_id),
             settings.jwt_secret,
