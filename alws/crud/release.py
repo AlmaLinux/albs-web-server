@@ -1,11 +1,12 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import ProductError
+from alws.errors import DataNotFoundError, ProductError
 from alws.schemas import release_schema
 from alws.release_planner import get_releaser_class
 
@@ -19,13 +20,17 @@ __all__ = [
 
 
 async def get_releases(
-    db: Session,
+    db: AsyncSession,
     page_number: typing.Optional[int] = None,
-    release_id: int = None,
-    product_id: int = None,
-    platform_id: int = None,
-    status: int = None,
-) -> typing.Union[typing.List[models.Release], models.Release]:
+    release_id: typing.Optional[int] = None,
+    product_id: typing.Optional[int] = None,
+    platform_id: typing.Optional[int] = None,
+    status: typing.Optional[int] = None,
+) -> typing.Union[
+    models.Release,
+    typing.Dict[str, typing.Any],
+    typing.List[models.Release],
+]:
 
     def generate_query(count=False):
         query = select(models.Release).options(
@@ -70,7 +75,7 @@ async def get_releases(
     return (await db.execute(generate_query())).scalars().all()
 
 
-async def __get_product(db: Session, product_id: int) -> models.Product:
+async def __get_product(db: AsyncSession, product_id: int) -> models.Product:
     product = (await db.execute(select(models.Product).where(
         models.Product.id == product_id))).scalars().first()
     if not product:
@@ -79,7 +84,7 @@ async def __get_product(db: Session, product_id: int) -> models.Product:
 
 
 async def create_release(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         payload: release_schema.ReleaseCreate,
 ) -> models.Release:
@@ -89,7 +94,7 @@ async def create_release(
 
 
 async def update_release(
-        db: Session,
+        db: AsyncSession,
         release_id: int,
         user_id: int,
         payload: release_schema.ReleaseUpdate,
@@ -102,7 +107,7 @@ async def update_release(
 
 
 async def commit_release(
-        db: Session,
+        db: AsyncSession,
         release_id: int,
         user_id: int,
 ) -> typing.Tuple[models.Release, str]:
@@ -111,3 +116,16 @@ async def commit_release(
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
     return await releaser.commit_release(release_id, user_id)
+
+
+async def revert_release(
+    db: AsyncSession,
+    release_id: int,
+    user_id: int,
+):
+    release = await get_releases(db, release_id=release_id)
+    if not release:
+        raise DataNotFoundError(f'{release_id=} not found')
+    product = await __get_product(db, release.product_id)
+    releaser = get_releaser_class(product)(db)
+    await releaser.revert_release(release_id, user_id)

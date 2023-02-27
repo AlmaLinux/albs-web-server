@@ -115,6 +115,7 @@ class ReleaseStatus(enum.IntEnum):
     IN_PROGRESS = 2
     COMPLETED = 3
     FAILED = 4
+    REVERTED = 5
 
 
 class SignStatus(enum.IntEnum):

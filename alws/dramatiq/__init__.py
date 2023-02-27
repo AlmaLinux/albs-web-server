@@ -33,7 +33,7 @@ from alws.dramatiq.build import start_build, build_done
 # dramatiq.user and dramatiq.products need to go before dramatiq.releases
 from alws.dramatiq.products import perform_product_modification
 from alws.dramatiq.user import perform_user_removal
-from alws.dramatiq.releases import execute_release_plan
+from alws.dramatiq.releases import execute_release_plan, revert_release
 from alws.dramatiq.errata import bulk_errata_release, release_errata
 from alws.dramatiq.sign_task import complete_sign_task
 from alws.dramatiq.tests import complete_test_task

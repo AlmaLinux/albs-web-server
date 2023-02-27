@@ -9,8 +9,9 @@ from collections import defaultdict
 
 from cas_wrapper import CasWrapper
 from sqlalchemy import update, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
@@ -47,7 +48,7 @@ __all__ = [
 
 
 class BaseReleasePlanner(metaclass=ABCMeta):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
@@ -60,6 +61,13 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 settings.cas_api_key,
                 settings.cas_signer_id,
             )
+
+    async def revert_release(
+        self,
+        release_id: int,
+        user_id: int,
+    ):
+        raise NotImplementedError()
 
     @property
     def db(self):
@@ -180,6 +188,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 if build_tasks and artifact_task_id not in build_tasks:
                     continue
                 artifact_name = rpm.artifact.name
+                source_name = None
                 pkg_info = copy.deepcopy(pulp_artifacts[rpm.artifact.href])
                 pkg_info['is_beta'] = self.is_beta_build(build)
                 pkg_info['build_id'] = build.id
@@ -240,7 +249,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         ]
         return pulp_packages, src_rpm_names, pulp_rpm_modules
 
-    async def __get_final_release(self, release_id: int) -> models.Release:
+    async def get_final_release(self, release_id: int) -> models.Release:
         release_res = await self.db.execute(select(models.Release).where(
             models.Release.id == release_id).options(
             selectinload(models.Release.owner),
@@ -249,7 +258,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         ))
         return release_res.scalars().first()
 
-    async def __get_release_for_update(self, release_id) -> models.Release:
+    async def get_release_for_update(self, release_id) -> typing.Optional[models.Release]:
         query = select(models.Release).where(
             models.Release.id == release_id
         ).options(
@@ -336,7 +345,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.refresh(new_release)
 
         logging.info('New release %d successfully created', new_release.id)
-        return await self.__get_final_release(new_release.id)
+        return await self.get_final_release(new_release.id)
 
     async def update_release(
         self, release_id: int,
@@ -346,7 +355,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         logging.info('Updating release %d', release_id)
         user = await user_crud.get_user(self.db, user_id=user_id)
 
-        release = await self.__get_release_for_update(release_id)
+        release = await self.get_release_for_update(release_id)
         if not release:
             raise DataNotFoundError(
                 f'Release with ID {release_id} not found')
@@ -376,7 +385,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.commit()
         await self.db.refresh(release)
         logging.info('Successfully updated release %d', release_id)
-        return await self.__get_final_release(release.id)
+        return await self.get_final_release(release.id)
 
     async def commit_release(
         self,
@@ -386,7 +395,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         logging.info('Commiting release %d', release_id)
 
         user = await user_crud.get_user(self.db, user_id=user_id)
-        release = await self.__get_release_for_update(release_id)
+        release = await self.get_release_for_update(release_id)
         if not release:
             raise DataNotFoundError(
                 f'Release with ID {release_id} not found')
@@ -426,11 +435,17 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         await self.db.commit()
         await self.db.refresh(release)
         logging.info('Successfully committed release %d', release_id)
-        release = await self.__get_final_release(release_id)
+        release = await self.get_final_release(release_id)
         return release, message
 
 
 class CommunityReleasePlanner(BaseReleasePlanner):
+    async def revert_release(
+        self,
+        release_id: int,
+        user_id: int,
+    ):
+        raise NotImplementedError()
 
     @staticmethod
     def get_repo_pretty_name(repo_name: str) -> str:
@@ -574,7 +589,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
 
 class AlmaLinuxReleasePlanner(BaseReleasePlanner):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         super().__init__(db)
         self.packages_presence_info = defaultdict(list)
         self.pkgs_mapping = {}
@@ -608,6 +623,94 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 found = True
                 break
         return found
+
+    async def revert_release_plan(
+        self,
+        release: models.Release,
+    ):
+        pkgs_to_remove = []
+        repo_ids_to_remove = []
+        for pkg_dict in release.plan.get('packages', []):
+            pkg_href = pkg_dict.get('package', {}).get('artifact_href', '')
+            repo_ids = [repo['id'] for repo in pkg_dict.get('repositories', [])]
+            if not pkg_href or not repo_ids:
+                continue
+            pkgs_to_remove.append(pkg_href)
+            repo_ids_to_remove.extend(repo_ids)
+
+        db_repos = await self.db.execute(
+            select(models.Repository).where(
+                models.Repository.id.in_(repo_ids_to_remove),
+            )
+        )
+        modify_tasks = []
+        publish_tasks = []
+        for repo in db_repos.scalars().all():
+            modify_tasks.append(
+                self.pulp_client.modify_repository(
+                    repo.pulp_href,
+                    remove=pkgs_to_remove,
+                )
+            )
+            publish_tasks.append(
+                self.pulp_client.create_rpm_publication(repo.pulp_href),
+            )
+        await asyncio.gather(*modify_tasks)
+        await asyncio.gather(*publish_tasks)
+
+        subquery = select(models.BuildTaskArtifact.id).where(
+            models.BuildTaskArtifact.href.in_(pkgs_to_remove),
+        ).scalar_subquery()
+        errata_pkgs = await self.db.execute(
+            select(models.ErrataToALBSPackage)
+            .where(or_(
+                models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
+                models.ErrataToALBSPackage.pulp_href.in_(pkgs_to_remove),
+            ))
+        )
+        for errata_pkg in errata_pkgs.scalars().all():
+            errata_pkg.status = ErrataPackageStatus.proposal
+        builds = await self.db.execute(
+            select(models.Build)
+            .where(models.Build.id.in_(release.build_ids))
+        )
+        for build in builds.scalars().all():
+            build.release_id = None
+            build.released = False
+        raise ValueError('test')
+        release.status = ReleaseStatus.REVERTED
+
+    async def revert_release(
+        self,
+        release_id: int,
+        user_id: int,
+    ):
+        message = "Successfully reverted release"
+        logging.info("Start reverting release: %d", release_id)
+        user = await user_crud.get_user(self.db, user_id=user_id)
+        release = await self.get_release_for_update(release_id)
+        if not release:
+            raise DataNotFoundError(f'{release_id=} not found')
+
+        if not can_perform(release, user, actions.ReleaseToProduct.name):
+            raise PermissionDenied('User does not have permissions '
+                                   'to update release')
+        try:
+            await self.revert_release_plan(release)
+        except Exception:
+            await self.db.rollback()
+            await self.db.refresh(release)
+            message = f"Cannot revert release:\n{traceback.format_exc()}"
+            release.status = ReleaseStatus.FAILED
+            logging.exception("Cannot revert release: %d", release_id)
+        # for updating release plan, we should use deepcopy
+        release_plan = copy.deepcopy(release.plan)
+        release_plan['last_log'] = message
+        release.plan = release_plan
+        await self.db.commit()
+        logging.info("Successfully reverted release: %s", release_id)
+
+
 
     async def check_package_presence_in_repo(
         self,
