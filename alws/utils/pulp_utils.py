@@ -12,8 +12,6 @@ from alws.pulp_models import (
     CoreContent,
     CoreRepository,
     CoreRepositoryContent,
-    RpmModulemd,
-    RpmModulemdPackages,
     RpmPackage,
 )
 
@@ -46,6 +44,9 @@ def get_modules_yaml_from_repo(repo_name: str):
     response.raise_for_status()
     return response.text
 
+# TODO: After ALBS-1012 is fixed, we can refactor this function
+# to get module packages from pulp wihtout having to grab the actual
+# modules.yaml file from the repository
 def get_rpm_module_packages_from_repository(
     repo_id: uuid.UUID,
     module: str,
@@ -62,24 +63,19 @@ def get_rpm_module_packages_from_repository(
         repo_name = repo.name
 
     if not repo_name:
-        print("### Warning: Couldn't find any repo")
         return
 
     # TODO: Getting modules.yaml files from BS production repos is not right.
     # The problem here is that we need a way to get packages from
     # the provided module:stream, and pulp actually doesn't have an artifact
     # for it. This is a side effect of our current modules workflow.
-    # When releasing/publishing modules, we don't actually get them added
-    # into pulp, and we should do it.
+    # When building/releasing/publishing modules, we don't actually get
+    # them added into pulp, and we should do it.
     # At this moment, we can only trust the modules that are in production
     # repositories.
     try:
         repo_modules_yaml = get_modules_yaml_from_repo(repo_name)
-    except Exception as exc:
-        return
-
-    if not repo_modules_yaml:
-        print("### Warning: Couldn't find any repo modules yaml")
+    except:
         return
 
     module_name, module_stream = module.split(':')
@@ -88,7 +84,7 @@ def get_rpm_module_packages_from_repository(
             module_name,
             module_stream
         )
-    except Exception:
+    except:
         return
 
     def extract_release(pkg: str):

@@ -386,9 +386,6 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         )
 
         if module_index:
-            # good idea?
-            # we do not build more than one module at a time,
-            # do we?
             module = next(module_index.iter_modules())
             build_task_module = f"{module.name}:{module.stream}"
             query = query.join(models.ErrataRecord).filter(
