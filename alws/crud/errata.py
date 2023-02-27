@@ -412,6 +412,9 @@ async def load_platform_packages(
                pkg_epochs=search_params["epoch"],
             )
 
+        if not pkgs:
+            continue
+
         for pkg in pkgs:
             if for_release:
                 key = pkg.pulp_href
