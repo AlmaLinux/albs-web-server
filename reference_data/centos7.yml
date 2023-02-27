@@ -22,7 +22,13 @@
       chroot_setup_cmd: install bash bzip2 coreutils cloudlinux-release 
         findutils gawk grep gzip info redhat-rpm-config 
         sed shadow-utils tar unzip util-linux-ng which xz yum git
-      package_manager: yum
+      dnf_common_opts:
+        - --setopt=deltarpm=False
+        - --allowerasing
+        - --nobest
+        - --setopt=install_weak_deps=False
+      dnf_install_command: install dnf dnf-plugins-core shadow-utils
+      package_manager: dnf
       releasever: '7'
       environment:
         DFLTCC: '0'
