@@ -192,9 +192,12 @@ async def complete_test_task(db: Session, task_id: int,
         started_at = datetime.datetime.fromisoformat(started_at)
         task.started_at = started_at
 
-    task.performance_stats.statistics = test_result.stats
+    stats = models.PerformanceStats(
+        test_task_id=task_id, statistics=test_result.stats)
+
     task.finished_at = datetime.datetime.utcnow()
     db.add(task)
+    db.add(stats)
     db.add_all(logs)
 
 
