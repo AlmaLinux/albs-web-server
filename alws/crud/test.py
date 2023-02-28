@@ -80,6 +80,8 @@ async def create_test_tasks(db: Session, build_task_id: int,
                 artifact.href,
                 include_fields=['name', 'version', 'release', 'arch']
             )
+            if artifact_info['arch'] == 'src':
+                continue
             task = models.TestTask(
                 build_task_id=build_task_id,
                 package_name=artifact_info['name'],
