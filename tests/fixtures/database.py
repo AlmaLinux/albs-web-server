@@ -20,7 +20,10 @@ engine = create_async_engine(
 
 
 async def get_session():
-    async with AsyncSession(engine) as sess:
+    async with AsyncSession(
+        engine,
+        expire_on_commit=False,
+    ) as sess:
         try:
             yield sess
         finally:
@@ -65,10 +68,8 @@ async def create_user(session: AsyncSession, request):
         "is_superuser": request.param["is_superuser"],
         "is_verified": request.param["is_verified"],
     }
-    user = await (
-        session.execute(
-            select(models.User).where(models.User.id == data["id"]),
-        )
+    user = await session.execute(
+        select(models.User).where(models.User.id == data["id"]),
     )
     if user.scalars().first():
         return

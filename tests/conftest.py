@@ -9,6 +9,7 @@ pytest_plugins = [
     "tests.fixtures.platforms",
     "tests.fixtures.products",
     "tests.fixtures.pulp",
+    "tests.fixtures.releases",
 ]
 
 

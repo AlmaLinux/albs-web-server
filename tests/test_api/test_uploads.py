@@ -23,7 +23,7 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
     async def test_module_upload_prod_repo(
         self,
         modules_yaml: bytes,
-        create_base_platform,
+        base_platform,
     ):
         response = await self.make_request(
             "post",
@@ -36,10 +36,12 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
 
     async def test_module_upload_build_repo(
         self,
+        session: AsyncSession,
         modules_yaml: bytes,
-        create_base_platform,
-        create_base_product,
-        start_build,
+        base_platform,
+        base_product,
+        modular_build,
+        start_modular_build,
     ):
         response = await self.make_request(
             "post",
@@ -50,11 +52,6 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
         message = f"Cannot upload module template:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
-    async def test_db_rpm_modules(
-        self,
-        session: AsyncSession,
-        modules_yaml: bytes,
-    ):
         rpm_modules = (
             (
                 await session.execute(
@@ -62,7 +59,7 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
                         RpmModule.id.in_(
                             select(BuildTask.rpm_module_id)
                             .where(
-                                BuildTask.build_id == 1,
+                                BuildTask.build_id == modular_build.id,
                                 BuildTask.arch == "i686",
                             )
                             .scalar_subquery(),

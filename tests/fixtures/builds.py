@@ -3,15 +3,16 @@ import typing
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws.crud.build import create_build
+from alws.crud.build import create_build, get_builds
 from alws.models import Build
 from alws.schemas.build_schema import BuildCreate
 
 from tests.constants import ADMIN_USER_ID
+from tests.fixtures.pulp import get_rpm_pkg_info
 
 
 @pytest.fixture
-def modular_build_payload() -> dict:
+def modular_build_payload() -> typing.Dict[str, typing.Any]:
     return {
         "platforms": [
             {
@@ -100,6 +101,32 @@ def modular_build_payload() -> dict:
     }
 
 
+@pytest.fixture
+def build_payload() -> typing.Dict[str, typing.Any]:
+    return {
+        "platforms": [
+            {
+                "name": "AlmaLinux-8",
+                "arch_list": ["i686", "x86_64"],
+                "parallel_mode_enabled": True,
+            }
+        ],
+        "tasks": [
+            {
+                "git_ref": "c8",
+                "url": "https://git.almalinux.org/rpms/chan.git",
+                "ref_type": 4,
+                "mock_options": {},
+            }
+        ],
+        "linked_builds": [],
+        "is_secure_boot": False,
+        "mock_options": {},
+        "platform_flavors": [],
+        "product_id": 1,
+    }
+
+
 @pytest.mark.anyio
 @pytest.fixture
 async def modular_build(
@@ -111,3 +138,35 @@ async def modular_build(
         BuildCreate(**modular_build_payload),
         user_id=ADMIN_USER_ID,
     )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def regular_build(
+    session: AsyncSession,
+    build_payload: dict,
+) -> typing.AsyncIterable[Build]:
+    yield await create_build(
+        session,
+        BuildCreate(**build_payload),
+        user_id=ADMIN_USER_ID,
+    )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def get_rpm_package_info(monkeypatch):
+    async def func(*args, **kwargs):
+        _, artifact = args
+        return artifact.href, get_rpm_pkg_info(artifact)
+
+    monkeypatch.setattr("alws.crud.build_node.get_rpm_package_info", func)
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def build_for_release(
+    session: AsyncSession,
+    regular_build: Build,
+) -> typing.AsyncIterable[Build]:
+    yield await get_builds(session, build_id=regular_build.id)

@@ -4,7 +4,7 @@ from tests.mock_classes import BaseAsyncTestCase
 
 
 @pytest.mark.usefixtures(
-    "create_base_platform",
+    "base_platform",
     "create_repo",
 )
 class TestProductsEndpoints(BaseAsyncTestCase):

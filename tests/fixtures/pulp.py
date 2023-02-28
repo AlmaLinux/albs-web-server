@@ -4,8 +4,10 @@ import uuid
 
 import pytest
 
-from alws.utils.pulp_client import PulpClient
 from alws.config import settings
+from alws.schemas.build_node_schema import BuildDoneArtifact
+from alws.utils.parsing import parse_rpm_nevra
+from alws.utils.pulp_client import PulpClient
 
 
 def get_repo_href() -> str:
@@ -26,6 +28,29 @@ def get_module_defaults_href() -> str:
 
 def get_artifact_href() -> str:
     return f"/pulp/api/v3/artifacts/{uuid.uuid4()}/"
+
+
+def get_file_href() -> str:
+    return f"/pulp/api/v3/content/file/files/{uuid.uuid4()}/"
+
+
+def get_rpm_pkg_href() -> str:
+    return f"/pulp/api/v3/content/rpm/packages/{uuid.uuid4()}/"
+
+
+def get_rpm_pkg_info(artifact: BuildDoneArtifact):
+    nevra = parse_rpm_nevra(artifact.name)
+    rpm_sourcerpm = f"{nevra.name}-{nevra.version}-{nevra.release}.src.rpm"
+    pkg_info = {
+        "pulp_href": artifact.href,
+        "name": nevra.name,
+        "epoch": nevra.epoch,
+        "version": nevra.version,
+        "release": nevra.release,
+        "arch": nevra.arch,
+        "rpm_sourcerpm": rpm_sourcerpm,
+    }
+    return pkg_info
 
 
 @pytest.fixture(autouse=True)
@@ -276,3 +301,15 @@ def create_log_repo(monkeypatch):
         )
 
     monkeypatch.setattr(PulpClient, "create_log_repo", func)
+
+
+@pytest.fixture
+def create_entity(monkeypatch):
+    async def func(*args, **kwargs):
+        _, artifact = args
+        href = get_file_href()
+        if artifact.type == "rpm":
+            href = get_rpm_pkg_href()
+        return href, hashlib.sha256().hexdigest(), artifact
+
+    monkeypatch.setattr(PulpClient, "create_entity", func)

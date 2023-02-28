@@ -366,7 +366,7 @@ async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch',
                       'rpm_sourcerpm']
         _, rpm_info = await get_rpm_package_info(
-            pulp_client, artifact.href, include_fields=pkg_fields
+            pulp_client, artifact, include_fields=pkg_fields
         )
         if rpm_info['arch'] != 'src':
             src_name = parse_rpm_nevra(rpm_info['rpm_sourcerpm']).name
@@ -399,7 +399,7 @@ async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int
     if module_index and rpms:
         pkg_fields = ['epoch', 'name', 'version', 'release', 'arch']
         results = await asyncio.gather(*(get_rpm_package_info(
-            pulp_client, rpm.href, include_fields=pkg_fields)
+            pulp_client, rpm, include_fields=pkg_fields)
             for rpm in rpms))
         packages_info = dict(results)
         srpm_info = None

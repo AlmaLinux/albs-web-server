@@ -1,6 +1,11 @@
 import datetime
+import typing
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from alws.crud.errata import create_errata_record
+from alws.schemas.errata_schema import BaseErrataRecord
 
 
 @pytest.fixture(
@@ -10,7 +15,7 @@ import pytest
         },
     ]
 )
-def errata_create_payload(request):
+def errata_create_payload(request) -> typing.Dict[str, typing.Any]:
     orig_id = request.param["id"].replace("ALSA", "RHSA")
     return {
         "id": request.param["id"],
@@ -59,7 +64,23 @@ def errata_create_payload(request):
                 "epoch": 0,
                 "arch": "x86_64",
                 "reboot_suggested": False,
-            }
+            },
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "epoch": 0,
+                "arch": "x86_64",
+                "reboot_suggested": False,
+            },
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "epoch": 0,
+                "arch": "i686",
+                "reboot_suggested": False,
+            },
         ],
     }
 
@@ -69,7 +90,10 @@ def mock_get_packages_from_pulp_repo(monkeypatch):
     def func(*args, **kwargs):
         return []
 
-    monkeypatch.setattr("alws.crud.errata.get_rpm_packages_from_repository", func)
+    monkeypatch.setattr(
+        "alws.crud.errata.get_rpm_packages_from_repository",
+        func,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -78,3 +102,15 @@ def mock_get_packages_from_pulp_by_ids(monkeypatch):
         return {}
 
     monkeypatch.setattr("alws.crud.errata.get_rpm_packages_by_ids", func)
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def create_errata(
+    session: AsyncSession,
+    errata_create_payload: typing.Dict[str, typing.Any],
+):
+    await create_errata_record(
+        session,
+        BaseErrataRecord(**errata_create_payload),
+    )

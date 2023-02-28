@@ -138,10 +138,29 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         pulp_repos = await self.pulp_client.get_rpm_repositories(params)
         return {repo.pop("pulp_href"): repo for repo in pulp_repos}
 
+    async def get_pulp_packages_info(
+        self,
+        build_rpms: typing.List[
+            typing.Union[models.SourceRpm, models.BinaryRpm],
+        ],
+        build_tasks: typing.Optional[typing.List[int]],
+        packages_fields: typing.List[str],
+    ):
+        return await asyncio.gather(
+            *(
+                self.pulp_client.get_rpm_package(
+                    rpm.artifact.href,
+                    include_fields=packages_fields,
+                )
+                for rpm in build_rpms
+                if build_tasks and rpm.artifact.build_task_id in build_tasks
+            )
+        )
+
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
-        build_tasks: typing.List[int] = None,
+        build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
         packages_fields = [
@@ -179,15 +198,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
             build_rpms = build.source_rpms + build.binary_rpms
-            pulp_artifacts = await asyncio.gather(
-                *(
-                    self.pulp_client.get_rpm_package(
-                        rpm.artifact.href, include_fields=packages_fields
-                    )
-                    for rpm in build_rpms
-                    if build_tasks
-                    and rpm.artifact.build_task_id in build_tasks
-                )
+            pulp_artifacts = await self.get_pulp_packages_info(
+                build_rpms,
+                build_tasks,
+                packages_fields,
             )
             pulp_artifacts = {
                 artifact_dict.pop("pulp_href"): artifact_dict

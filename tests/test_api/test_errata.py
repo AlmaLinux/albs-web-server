@@ -3,7 +3,7 @@ import pytest
 from tests.mock_classes import BaseAsyncTestCase
 
 
-@pytest.mark.usefixtures("create_base_platform")
+@pytest.mark.usefixtures("base_platform")
 class TestErrataEndpoints(BaseAsyncTestCase):
     async def test_record_create(self, errata_create_payload):
         response = await self.make_request(
