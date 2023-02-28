@@ -2,10 +2,9 @@ name: pytest
 on:
   pull_request:
     branches:
-      - master
-
+      - "**"
 jobs:
-  unit-tests:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -38,5 +37,20 @@ jobs:
           services: |
             db
             web_server
-      - name: Run tests
-        run: docker-compose run --no-deps web_server bash -c 'source env/bin/activate && pytest -v --ignore alws/'
+      - name: Run unit tests (pytest)
+        run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -c 'source
+          env/bin/activate && pytest -v --ignore alws/ --cov-report term-missing:skip-covered
+          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
+          tests/ | tee /tmp/pytest-coverage.txt'
+      - name: Pytest coverage comment
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-coverage-path: /tmp/pytest-coverage.txt
+          pytest-xml-coverage-path: /tmp/coverage.xml
+          title: Coverage report
+          badge-title: Total coverage
+          hide-badge: false
+          hide-report: false
+          hide-comment: false
+          remove-link-from-badge: false
+          junitxml-path: /tmp/pytest.xml
