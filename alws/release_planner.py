@@ -1380,6 +1380,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
+            noarch_repos = set()
             for release_repo_key in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
@@ -1396,6 +1397,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if pkg_arch == "i686" and "x86_64" in repo_arch_location:
                     repo_arch_location.append("i686")
                 if pkg_arch == "noarch":
+                    if release_repo["name"] in noarch_repos:
+                        continue
+                    noarch_repos.add(release_repo["name"])
                     repo_arch_location = pulp_repo_arch_location
                 release_repositories[release_repo_key].update(
                     repo_arch_location

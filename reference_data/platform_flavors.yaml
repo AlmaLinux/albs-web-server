@@ -7,6 +7,11 @@
       - name: '8.7'
         version_prefix: '80700'
         dist_prefix: 'el8.7.0'
+  data:
+     mock:
+       macros:
+         "%pe_signing_cert": "'f4217b7b99a69128'"
+         "%pe_signing_token": "'AlmaLinux OS Foundation'"
   repositories:
     - name: almalinux-8-beta
       arch: i686
@@ -95,6 +100,11 @@
       - name: '9.1'
         version_prefix: '90100'
         dist_prefix: 'el9.1.0'
+  data:
+     mock:
+       macros:
+         "%pe_signing_cert": "'f4217b7b99a69128'"
+         "%pe_signing_token": "'AlmaLinux OS Foundation'"
   repositories:
     - name: almalinux-9-beta
       arch: i686
