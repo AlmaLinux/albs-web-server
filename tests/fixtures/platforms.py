@@ -1,3 +1,4 @@
+from typing import AsyncIterable
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,9 @@ from tests.fixtures.pulp import get_repo_href
 
 @pytest.mark.anyio
 @pytest.fixture
-async def create_base_platform(session: AsyncSession):
+async def base_platform(
+    session: AsyncSession,
+) -> AsyncIterable[models.Platform]:
     with open("reference_data/platforms.yaml", "rt") as file:
         loader = yaml.Loader(file)
         platform_data = loader.get_data()[0]
@@ -31,15 +34,15 @@ async def create_base_platform(session: AsyncSession):
         .scalars()
         .first()
     )
-    if platform:
-        return
-    platform = models.Platform(**schema)
-    for repo in platform_data.get("repositories", []):
-        repo["url"] = repo["remote_url"]
-        repo["pulp_href"] = get_repo_href()
-        repository = models.Repository(
-            **repository_schema.RepositoryCreate(**repo).dict()
-        )
-        platform.repos.append(repository)
-    session.add(platform)
-    await session.commit()
+    if not platform:
+        platform = models.Platform(**schema)
+        for repo in platform_data.get("repositories", []):
+            repo["url"] = repo["remote_url"]
+            repo["pulp_href"] = get_repo_href()
+            repository = models.Repository(
+                **repository_schema.RepositoryCreate(**repo).dict()
+            )
+            platform.repos.append(repository)
+        session.add(platform)
+        await session.commit()
+    yield platform

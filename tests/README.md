@@ -17,7 +17,7 @@
     ```
 3. Up docker-compose services
     ```bash
-    docker-compose up -d --build --force-recreate --no-deps web_server db
+    docker-compose up -d --no-deps web_server db
     ```
 4. Run `pytest` within `web_server` container
     ```bash

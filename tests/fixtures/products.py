@@ -1,3 +1,5 @@
+from typing import AsyncIterable
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +38,17 @@ def product_create_payload(request) -> dict:
                 "modularity": {},
             },
         ],
-        "is_community": True,
+        "is_community": False,
     }
 
 
 @pytest.mark.anyio
 @pytest.fixture
-async def create_base_product(session: AsyncSession, product_create_payload: dict):
+async def base_product(
+    session: AsyncSession,
+    product_create_payload: dict,
+    create_repo,
+) -> AsyncIterable[Product]:
     product = (
         (
             await session.execute(
@@ -55,7 +61,8 @@ async def create_base_product(session: AsyncSession, product_create_payload: dic
         .first()
     )
     if not product:
-        await create_product(
+        product = await create_product(
             session,
             ProductCreate(**product_create_payload),
         )
+    yield product
