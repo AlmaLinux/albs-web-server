@@ -386,7 +386,10 @@ async def __process_rpms(db: Session, pulp_client: PulpClient, task_id: int,
         )
 
         if module_index:
-            module = next(module_index.iter_modules())
+            for mod in module_index.iter_modules():
+                if mod.name.endswith('-devel'):
+                    continue
+                module = mod
             build_task_module = f"{module.name}:{module.stream}"
             query = query.join(models.ErrataRecord).filter(
                 models.ErrataRecord.module == build_task_module
