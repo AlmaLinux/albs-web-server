@@ -347,9 +347,9 @@ async def complete_sign_task(
                     # for every srpm in project
                     db_sprms = srpms_mapping.get(db_pkg.artifact.href, [])
                     for db_sprm in db_sprms:
-                        db_sprm.artifact.href = new_href
-                        db_sprm.artifact.sign_key = sign_task.sign_key
-                        db_sprm.artifact.cas_hash = pkg_info['cas_hash']
+                        db_sprm.href = new_href
+                        db_sprm.sign_key = sign_task.sign_key
+                        db_sprm.cas_hash = pkg_info['cas_hash']
                         modified_items.append(db_sprm)
 
                     db_pkg.artifact.href = new_href
