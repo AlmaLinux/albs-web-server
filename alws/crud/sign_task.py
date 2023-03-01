@@ -162,7 +162,7 @@ async def get_available_sign_task(db: AsyncSession, key_ids: typing.List[str]):
     for src_rpm in build_src_rpms:
         packages.append(
             {
-                'id': src_rpm.id,
+                'id': src_rpm.artifact.id,
                 'name': src_rpm.artifact.name,
                 'cas_hash': src_rpm.artifact.cas_hash,
                 'arch': 'src',
@@ -177,7 +177,7 @@ async def get_available_sign_task(db: AsyncSession, key_ids: typing.List[str]):
         repo = repo_mapping.get((binary_rpm.artifact.build_task.arch, debug))
         packages.append(
             {
-                'id': binary_rpm.id,
+                'id': binary_rpm.artifact.id,
                 'name': binary_rpm.artifact.name,
                 'cas_hash': binary_rpm.artifact.cas_hash,
                 'arch': binary_rpm.artifact.build_task.arch,
