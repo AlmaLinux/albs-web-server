@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import gzip
 import logging
 import re
 import urllib
@@ -16,10 +18,11 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 
+
 async def create_test_tasks_for_build_id(db: Session, build_id: int):
     async with db.begin():
-        ## We get all build_tasks with the same build_id
-        ## and whose status is COMPLETED
+        # We get all build_tasks with the same build_id
+        # and whose status is COMPLETED
         build_task_ids = (await db.execute(
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id,
@@ -27,11 +30,23 @@ async def create_test_tasks_for_build_id(db: Session, build_id: int):
             )
         )).scalars().all()
 
+        build = (await db.execute(select(models.Build).where(
+            models.Build.id == build_id).options(
+            selectinload(models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = next(
+            (i for i in build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
+
     for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id)
+        await create_test_tasks(
+            db, build_task_id, test_log_repository.id)
 
 
-async def create_test_tasks(db: Session, build_task_id: int):
+async def create_test_tasks(db: Session, build_task_id: int,
+                            repository_id: int):
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -57,18 +72,6 @@ async def create_test_tasks(db: Session, build_task_id: int):
         else:
             new_revision = 1
 
-        # Create logs repository
-        repo_name = f'test_logs-btid-{build_task.id}-tr-{new_revision}'
-        repo_url, repo_href = await pulp_client.create_log_repo(
-            repo_name, distro_path_start='test_logs')
-
-        repository = models.Repository(
-            name=repo_name, url=repo_url, arch=build_task.arch,
-            pulp_href=repo_href, type='test_log', debug=False
-        )
-        db.add(repository)
-        await db.flush()
-
         test_tasks = []
         for artifact in build_task.artifacts:
             if artifact.type != 'rpm':
@@ -77,6 +80,8 @@ async def create_test_tasks(db: Session, build_task_id: int):
                 artifact.href,
                 include_fields=['name', 'version', 'release', 'arch']
             )
+            if artifact_info['arch'] == 'src':
+                continue
             task = models.TestTask(
                 build_task_id=build_task_id,
                 package_name=artifact_info['name'],
@@ -84,7 +89,7 @@ async def create_test_tasks(db: Session, build_task_id: int):
                 env_arch=build_task.arch,
                 status=TestTaskStatus.CREATED,
                 revision=new_revision,
-                repository_id=repository.id,
+                repository_id=repository_id,
             )
             if artifact_info.get('release'):
                 task.package_release = artifact_info['release']
@@ -102,8 +107,32 @@ async def restart_build_tests(db: Session, build_id: int):
             select(models.BuildTask.id).where(
                 models.BuildTask.build_id == build_id))
         build_task_ids = build_task_ids.scalars().all()
+        build = (await db.execute(select(models.Build).where(
+            models.Build.id == build_id).options(
+            selectinload(models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = next(
+            (i for i in build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
     for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id)
+        await create_test_tasks(db, build_task_id, test_log_repository.id)
+
+
+async def restart_build_task_tests(db: Session, build_task_id: int):
+    async with db.begin():
+        build_task = (await db.execute(select(models.BuildTask).where(
+            models.BuildTask.id == build_task_id).options(
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos)
+        ))).scalars().first()
+        test_log_repository = next(
+            (i for i in build_task.build.repos if i.type == 'test_log'), None)
+        if not test_log_repository:
+            raise ValueError('Cannot create test tasks: '
+                             'the log repository is not found')
+        await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
@@ -123,7 +152,10 @@ async def complete_test_task(db: Session, task_id: int,
     conv_tasks = []
     task = await db.execute(select(models.TestTask).where(
         models.TestTask.id == task_id,
-    ).options(selectinload(models.TestTask.repository)))
+    ).options(
+        selectinload(models.TestTask.repository),
+        selectinload(models.TestTask.performance_stats)
+    ))
     task = task.scalars().first()
     status = TestTaskStatus.COMPLETED
     for log in test_result.result.get('logs', []):
@@ -139,6 +171,10 @@ async def complete_test_task(db: Session, task_id: int,
             name=name, href=href, test_task_id=task_id)
         logs.append(log_record)
 
+    if task.repository:
+        await pulp_client.modify_repository(
+            task.repository.pulp_href, add=new_hrefs)
+
     for key, item in test_result.result.items():
         if key == 'tests':
             for test_item in item.values():
@@ -153,11 +189,18 @@ async def complete_test_task(db: Session, task_id: int,
             break
     task.status = status
     task.alts_response = test_result.dict()
+    started_at = test_result.stats.pop('started_at', None)
+    if started_at:
+        started_at = datetime.datetime.fromisoformat(started_at)
+        task.started_at = started_at
+
+    stats = models.PerformanceStats(
+        test_task_id=task_id, statistics=test_result.stats)
+
+    task.finished_at = datetime.datetime.utcnow()
     db.add(task)
+    db.add(stats)
     db.add_all(logs)
-    if task.repository:
-        await pulp_client.modify_repository(
-            task.repository.pulp_href, add=new_hrefs)
 
 
 async def get_test_tasks_by_build_task(
@@ -220,12 +263,20 @@ async def get_test_logs(build_task_id: int, db: Session) -> list:
             log_href = urllib.parse.urljoin(test_task.repository.url,
                                             artifact.name)
             await download_file(log_href, log)
-            tap_results = parse_tap_output(log.getvalue())
+            log_content = log.getvalue()
+            # on local machines and our stagings
+            # we will download logs from pulp directly
+            if (
+                isinstance(log_content, bytes)
+                and log_content.startswith(b'\x1f\x8b')
+            ):
+                log_content = gzip.decompress(log_content)
+            tap_results = parse_tap_output(log_content)
             tap_status = tap_set_status(tap_results)
-            logs_format = get_logs_format(log.getvalue())
+            logs_format = get_logs_format(log_content)
             test_tap = {
                 'id': test_task.id,
-                'log': log.getvalue(),
+                'log': log_content,
                 'success': tap_status,
                 'logs_format': logs_format,
                 'tap_results': tap_results

@@ -1,15 +1,21 @@
 import typing
 
+from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.pulp_client import PulpClient
 
 
-__all__ = ['get_rpm_package_info']
+__all__ = ["get_rpm_package_info"]
 
 
-async def get_rpm_package_info(pulp_client: PulpClient, rpm_href: str,
-                               include_fields: typing.List[str] = None,
-                               exclude_fields: typing.List[str] = None) \
-        -> (str, dict):
+async def get_rpm_package_info(
+    pulp_client: PulpClient,
+    artifact: BuildDoneArtifact,
+    include_fields: typing.Optional[typing.List[str]] = None,
+    exclude_fields: typing.Optional[typing.List[str]] = None,
+) -> typing.Tuple[str, typing.Dict[str, typing.Any]]:
     info = await pulp_client.get_rpm_package(
-        rpm_href, include_fields=include_fields, exclude_fields=exclude_fields)
-    return rpm_href, info
+        artifact.href,
+        include_fields=include_fields,
+        exclude_fields=exclude_fields,
+    )
+    return artifact.href, info

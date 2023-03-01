@@ -1,38 +1,46 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import ProductError
+from alws.errors import DataNotFoundError, ProductError
 from alws.schemas import release_schema
 from alws.release_planner import get_releaser_class
 
 
 __all__ = [
-    'get_releases',
-    'create_release',
-    'commit_release',
-    'update_release',
+    "get_releases",
+    "create_release",
+    "commit_release",
+    "update_release",
 ]
 
 
 async def get_releases(
-    db: Session,
+    db: AsyncSession,
     page_number: typing.Optional[int] = None,
-    release_id: int = None,
-    product_id: int = None,
-    platform_id: int = None,
-    status: int = None,
-) -> typing.Union[typing.List[models.Release], models.Release]:
-
+    release_id: typing.Optional[int] = None,
+    product_id: typing.Optional[int] = None,
+    platform_id: typing.Optional[int] = None,
+    status: typing.Optional[int] = None,
+) -> typing.Union[
+    models.Release,
+    typing.Dict[str, typing.Any],
+    typing.List[models.Release],
+]:
     def generate_query(count=False):
-        query = select(models.Release).options(
-            selectinload(models.Release.owner),
-            selectinload(models.Release.platform),
-            selectinload(models.Release.product),
-        ).order_by(models.Release.id.desc())
+        query = (
+            select(models.Release)
+            .options(
+                selectinload(models.Release.owner),
+                selectinload(models.Release.platform),
+                selectinload(models.Release.product),
+            )
+            .order_by(models.Release.id.desc())
+        )
         if count:
             query = select(func.count(models.Release.id))
         if release_id:
@@ -61,27 +69,32 @@ async def get_releases(
         return (await db.execute(generate_query())).scalars().first()
     if page_number:
         return {
-            'releases': (await db.execute(generate_query())).scalars().all(),
-            'total_releases': (
-                await db.execute(generate_query(count=True))
-            ).scalar(),
-            'current_page': page_number,
+            "releases": (await db.execute(generate_query())).scalars().all(),
+            "total_releases": (await db.execute(generate_query(count=True))).scalar(),
+            "current_page": page_number,
         }
     return (await db.execute(generate_query())).scalars().all()
 
 
-async def __get_product(db: Session, product_id: int) -> models.Product:
-    product = (await db.execute(select(models.Product).where(
-        models.Product.id == product_id))).scalars().first()
+async def __get_product(db: AsyncSession, product_id: int) -> models.Product:
+    product = (
+        (
+            await db.execute(
+                select(models.Product).where(models.Product.id == product_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not product:
-        raise ProductError(f'Product with ID {product_id} not found')
+        raise ProductError(f"Product with ID {product_id} not found")
     return product
 
 
 async def create_release(
-        db: Session,
-        user_id: int,
-        payload: release_schema.ReleaseCreate,
+    db: AsyncSession,
+    user_id: int,
+    payload: release_schema.ReleaseCreate,
 ) -> models.Release:
     product = await __get_product(db, payload.product_id)
     releaser = get_releaser_class(product)(db)
@@ -89,25 +102,52 @@ async def create_release(
 
 
 async def update_release(
-        db: Session,
-        release_id: int,
-        user_id: int,
-        payload: release_schema.ReleaseUpdate,
+    db: AsyncSession,
+    release_id: int,
+    user_id: int,
+    payload: release_schema.ReleaseUpdate,
 ) -> models.Release:
-    release = (await db.execute(select(models.Release).where(
-        models.Release.id == release_id))).scalars().first()
+    release = (
+        (
+            await db.execute(
+                select(models.Release).where(models.Release.id == release_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
     return await releaser.update_release(release_id, payload, user_id)
 
 
 async def commit_release(
-        db: Session,
-        release_id: int,
-        user_id: int,
+    db: AsyncSession,
+    release_id: int,
+    user_id: int,
 ) -> typing.Tuple[models.Release, str]:
-    release = (await db.execute(select(models.Release).where(
-        models.Release.id == release_id))).scalars().first()
+    release = (
+        (
+            await db.execute(
+                select(models.Release).where(models.Release.id == release_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
     return await releaser.commit_release(release_id, user_id)
+
+
+async def revert_release(
+    db: AsyncSession,
+    release_id: int,
+    user_id: int,
+):
+    release = await get_releases(db, release_id=release_id)
+    if not release:
+        raise DataNotFoundError(f"{release_id=} not found")
+    product = await __get_product(db, release.product_id)
+    releaser = get_releaser_class(product)(db)
+    await releaser.revert_release(release_id, user_id)

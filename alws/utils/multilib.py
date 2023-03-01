@@ -237,7 +237,7 @@ class MultilibProcessor:
     async def get_packages_info_from_pulp(self, rpm_packages: list):
         results = await asyncio.gather(
             *(get_rpm_package_info(
-                self._pulp_client, rpm.href,
+                self._pulp_client, rpm,
                 include_fields=['epoch', 'name', 'version', 'release', 'arch']
             ) for rpm in rpm_packages)
         )

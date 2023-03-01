@@ -3,8 +3,9 @@ import typing
 
 import sqlalchemy
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -22,7 +23,7 @@ from alws.dramatiq import start_build
 
 
 async def create_build(
-            db: Session,
+            db: AsyncSession,
             build: build_schema.BuildCreate,
             user_id: int,
         ) -> models.Build:
@@ -71,10 +72,22 @@ async def create_build(
 
 
 async def get_builds(
-    db: Session,
+    db: AsyncSession,
     build_id: typing.Optional[int] = None,
     page_number: typing.Optional[int] = None,
-    search_params: build_schema.BuildSearch = None,
+    created_by: typing.Optional[int] = None,
+    project: typing.Optional[str] = None,
+    ref: typing.Optional[str] = None,
+    rpm_name: typing.Optional[str] = None,
+    rpm_epoch: typing.Optional[str] = None,
+    rpm_version: typing.Optional[str] = None,
+    rpm_release: typing.Optional[str] = None,
+    rpm_arch: typing.Optional[str] = None,
+    platform_id: typing.Optional[int] = None,
+    build_task_arch: typing.Optional[str] = None,
+    released: typing.Optional[bool] = None,
+    signed: typing.Optional[bool] = None,
+    is_running: typing.Optional[bool] = None,
 ) -> typing.Union[models.Build, typing.List[models.Build], dict]:
 
     pulp_params = {
@@ -85,6 +98,13 @@ async def get_builds(
         settings.pulp_user,
         settings.pulp_password,
     )
+    rpm_params = {
+        "name": rpm_name,
+        "epoch": rpm_epoch,
+        "version": rpm_version,
+        "release": rpm_release,
+        "arch": rpm_arch,
+    }
 
     async def generate_query(count=False):
         query = (
@@ -115,6 +135,8 @@ async def get_builds(
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.test_tasks
                 ),
+                selectinload(models.Build.tasks)
+                .selectinload(models.BuildTask.performance_stats),
                 selectinload(models.Build.sign_tasks),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.rpm_module
@@ -127,70 +149,76 @@ async def get_builds(
 
         if build_id is not None:
             query = query.where(models.Build.id == build_id)
-        if search_params is not None:
-            if search_params.project is not None:
-                project_name = search_params.project
-                project_query = query.filter(
-                    sqlalchemy.or_(
-                        models.BuildTaskRef.url.like(f"%/{project_name}.git"),
-                        models.BuildTaskRef.url.like(
-                            f"%/{project_name}%.src.rpm"
-                        ),
-                        models.BuildTaskRef.url.like(
-                            f"%/rpms/{project_name}%.git"
-                        ),
-                    )
+        if project is not None:
+            project_name = project
+            project_query = query.filter(
+                sqlalchemy.or_(
+                    models.BuildTaskRef.url.like(f"%/{project_name}.git"),
+                    models.BuildTaskRef.url.like(
+                        f"%/{project_name}%.src.rpm"
+                    ),
+                    models.BuildTaskRef.url.like(
+                        f"%/rpms/{project_name}%.git"
+                    ),
                 )
-                if not (await db.execute(project_query)).scalars().all():
-                    project_query = query.filter(
-                        models.BuildTaskRef.url.like(f"%/{project_name}%"),
-                    )
-                query = project_query
-            if search_params.created_by is not None:
-                query = query.filter(
-                models.Build.owner_id == search_params.created_by
             )
-            if search_params.ref is not None:
-                query = query.filter(
-                    sqlalchemy.or_(
-                        models.BuildTaskRef.url.like(f"%{search_params.ref}%"),
-                        models.BuildTaskRef.git_ref.like(
-                            f"%{search_params.ref}%"
-                        ),
-                    )
+            if not (await db.execute(project_query)).scalars().all():
+                project_query = query.filter(
+                    models.BuildTaskRef.url.like(f"%/{project_name}%"),
                 )
-            if search_params.platform_id is not None:
-                query = query.filter(
-                    models.BuildTask.platform_id == search_params.platform_id
+            query = project_query
+        if created_by is not None:
+            query = query.filter(
+                models.Build.owner_id == created_by,
+            )
+        if ref is not None:
+            query = query.filter(
+                sqlalchemy.or_(
+                    models.BuildTaskRef.url.like(f"%{ref}%"),
+                    models.BuildTaskRef.git_ref.like(
+                        f"%{ref}%"
+                    ),
                 )
-            if search_params.build_task_arch is not None:
-                query = query.filter(
-                    models.BuildTask.arch == search_params.build_task_arch
+            )
+        if platform_id is not None:
+            query = query.filter(
+                models.BuildTask.platform_id == platform_id
+            )
+        if build_task_arch is not None:
+            query = query.filter(
+                models.BuildTask.arch == build_task_arch
+            )
+        if any(rpm_params.values()):
+            pulp_params.update(
+                {
+                    key: value
+                    for key, value in rpm_params.items()
+                    if value is not None
+                }
+            )
+            # TODO: we can get packages from pulp database
+            pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
+            pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
+            query = query.filter(
+                sqlalchemy.and_(
+                    models.BuildTaskArtifact.href.in_(pulp_hrefs),
+                    models.BuildTaskArtifact.type == "rpm",
                 )
-            if search_params.is_package_filter:
-                pulp_params.update(
-                    {
-                        key.replace("rpm_", ""): value
-                        for key, value in search_params.dict().items()
-                        if key.startswith("rpm_") and value is not None
-                    }
-                )
-                pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
-                pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
-                query = query.filter(
-                    sqlalchemy.and_(
-                        models.BuildTaskArtifact.href.in_(pulp_hrefs),
-                        models.BuildTaskArtifact.type == "rpm",
-                    )
-                )
-            if search_params.released is not None:
-                query = query.filter(
-                    models.Build.released == search_params.released
-                )
-            if search_params.signed is not None:
-                query = query.filter(
-                    models.Build.signed == search_params.signed
-                )
+            )
+        if released is not None:
+            query = query.filter(
+                models.Build.released == released
+            )
+        if signed is not None:
+            query = query.filter(
+                models.Build.signed == signed
+            )
+        if is_running is not None:
+            query = query.filter(
+                models.Build.finished_at.is_(None)
+                if is_running
+                else models.Build.finished_at.is_not(None)
+            )
         if page_number and not count:
             query = query.slice(10 * page_number - 10, 10 * page_number)
         if count:
@@ -200,7 +228,7 @@ async def get_builds(
     if build_id:
         query = await db.execute(await generate_query())
         return query.scalars().first()
-    elif page_number:
+    if page_number:
         return {
             "builds": (
                 await db.execute(await generate_query())
@@ -235,7 +263,7 @@ async def get_module_preview(
     )
 
 
-async def remove_build_job(db: Session, build_id: int):
+async def remove_build_job(db: AsyncSession, build_id: int):
     query_bj = select(models.Build).where(
         models.Build.id == build_id).options(
         selectinload(models.Build.tasks).selectinload(

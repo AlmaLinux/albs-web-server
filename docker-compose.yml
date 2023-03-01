@@ -73,6 +73,7 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./tests:/code/tests"
       - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
       - "../volumes/pulp/exports:/srv/exports"
@@ -155,6 +156,24 @@ services:
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases'
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
+      - rabbitmq
+
+  task_queue_tests:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      /wait_for_it.sh rabbitmq:5672 &&
+                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q tests'
     restart: on-failure
     depends_on:
       - db

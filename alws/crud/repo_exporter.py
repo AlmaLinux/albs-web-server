@@ -51,7 +51,7 @@ async def execute_pulp_exporters_to_fs(db: Session,
                                        export_id: int):
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
     query = select(
         models.RepoExporter.fs_exporter_href,
         models.RepoExporter.path,

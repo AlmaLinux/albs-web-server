@@ -2,7 +2,6 @@ import datetime
 import itertools
 import typing
 from fastapi import APIRouter, Depends, Response, status
-from dramatiq import pipeline
 
 from alws import database, dramatiq
 from alws.auth import get_current_user
@@ -45,16 +44,9 @@ async def build_done(
     # dramatiq can have a time to complete task and build node
     # won't rebuild task again and again while it's in the queue
     # in the future this probably should be handled somehow better
-    build_task.ts = datetime.datetime.now() + datetime.timedelta(hours=3)
+    build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
     await db.commit()
-    if not await build_node.log_repo_exists(db, build_task):
-        pipe = pipeline([
-            dramatiq.create_log_repo.message(build_task.id),
-            dramatiq.build_done.message_with_options(args=(build_done_.dict(), ), pipe_ignore=True)
-        ])
-        pipe.run()
-    else:
-        dramatiq.build_done.send(build_done_.dict())
+    dramatiq.build_done.send(build_done_.dict())
     return {'ok': True}
 
 
@@ -104,7 +96,7 @@ async def get_task(
         for flavour in task.build.platform_flavors:
             if flavour.data:
                 for key in ("macros", "secure_boot_macros"):
-                    if  "mock" not in flavour.data or key not in flavour.data["mock"]:
+                    if "mock" not in flavour.data or key not in flavour.data["mock"]:
                         continue
                     if key not in response["platform"].data["mock"]:
                         response["platform"].data["mock"][key] = {}

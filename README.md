@@ -58,12 +58,12 @@ In case you are building containers for the first time, there is how it should b
 
 set -e pipefail
 
-mkdir -p volumes/pulp/settings
+mkdir -p ../volumes/pulp/settings
 
 echo "CONTENT_ORIGIN='http://pulp'
 ANSIBLE_API_HOSTNAME='http://pulp'
 ANSIBLE_CONTENT_HOSTNAME='http://pulp/pulp/content'
-TOKEN_AUTH_DISABLED=True" >> volumes/pulp/settings/settings.py
+TOKEN_AUTH_DISABLED=True" >> ../volumes/pulp/settings/settings.py
 
 docker-compose up -d --build --force-recreate --remove-orphans
 sleep 25

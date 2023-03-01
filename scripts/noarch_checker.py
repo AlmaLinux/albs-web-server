@@ -33,7 +33,7 @@ class NoarchProcessor:
         only_copy: bool = False,
         only_replace: bool = False,
     ):
-        current_ts = int(datetime.datetime.now().timestamp())
+        current_ts = int(datetime.datetime.utcnow().timestamp())
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
             level=logging.INFO,

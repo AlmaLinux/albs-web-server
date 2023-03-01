@@ -1,3 +1,4 @@
+import datetime
 import logging
 import random
 import threading
@@ -50,9 +51,9 @@ class TestTaskScheduler(threading.Thread):
                                         and item.arch == task.env_arch]
                         for build in task.build_task.build.linked_builds:
                             rpm_repos = [{'name': item.name, 'baseurl': item.url}
-                                        for item in build.repos
-                                        if item.type == 'rpm'
-                                        and item.arch == task.env_arch]
+                                         for item in build.repos
+                                         if item.type == 'rpm'
+                                         and item.arch == task.env_arch]
                             repositories.extend(rpm_repos)
                         platform = task.build_task.platform
                         module_info = task.build_task.rpm_module
@@ -82,9 +83,12 @@ class TestTaskScheduler(threading.Thread):
                             updated_tasks.append(task)
                             logging.debug('Got response from ALTS: %s', response)
                         except Exception as e:
-                            logging.exception('Cannot schedule test task:')
+                            logging.exception('Cannot schedule test task: %s',
+                                              str(e))
+                        else:
+                            task.scheduled_at = datetime.datetime.utcnow()
                 except Exception as e:
-                    logging.exception('Cannot run scheduling loop:')
+                    logging.exception('Cannot run scheduling loop: %s', str(e))
                 finally:
                     if updated_tasks:
                         session.add_all(updated_tasks)
@@ -97,6 +101,6 @@ class TestTaskScheduler(threading.Thread):
             try:
                 await self._schedule_tasks_for_execution()
             except Exception as e:
-                logging.exception('Error during scheduler loop:')
+                logging.exception('Error during scheduler loop: %s', str(e))
             finally:
                 await asyncio.sleep(random.randint(5, 10))
