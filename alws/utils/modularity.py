@@ -5,6 +5,8 @@ import typing
 import hashlib
 import datetime
 import collections
+import requests
+import urllib.parse
 
 import aiohttp
 import yaml

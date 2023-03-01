@@ -1,8 +1,5 @@
 import typing
 import uuid
-import re
-import requests
-import urllib.parse
 
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
