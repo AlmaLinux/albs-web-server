@@ -15,34 +15,13 @@ from alws.pulp_models import (
     RpmPackage,
 )
 
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, get_modules_yaml_from_repo
+from alws.utils.parsing import parse_rpm_nevra
 
 
 def get_uuid_from_pulp_href(pulp_href: str) -> uuid.UUID:
     return uuid.UUID(pulp_href.split("/")[-2])
 
-def get_modules_yaml_from_repo(repo_name: str):
-    base_url = "https://build.almalinux.org/pulp/content/prod/"
-    repo_url = urllib.parse.urljoin(base_url, f"{repo_name}/repodata/")
-    response = requests.get(repo_url)
-    try:
-        response.raise_for_status()
-    except Exception as exc:
-        raise(exc)
-    template_href = next(
-        (
-            line.strip()
-            for line in response.text.splitlines()
-            if line and "modules" in line
-        ),
-        None
-    )
-    if not template_href:
-        return
-    template_href = re.search(r'href="(.+-modules.yaml)"', template_href).group(1)
-    response = requests.get(urllib.parse.urljoin(repo_url, template_href))
-    response.raise_for_status()
-    return response.text
 
 # TODO: After ALBS-1012 is fixed, we can refactor this function
 # to get module packages from pulp wihtout having to grab the actual
@@ -87,21 +66,9 @@ def get_rpm_module_packages_from_repository(
     except:
         return
 
-    def extract_release(pkg: str):
-        regex = re.compile(
-            # name-epoch:version-
-            r'^[\w\d\-]+-\d+:[\d\.\w]+-' \
-            # release (this is the capturing group)
-            r'([\d\w\.\-]+\+(?:\w)?\d{1,5}\+(?:\w)?[\d\w]+)(?:\.[\d\w]+)' \
-            r'?(?:\.[\d\w]+)?\.' \
-            # .architecture
-            r'(?:i686|x86_64|src|noarch|aarch64|ppc64le|s390x)?$'
-        )
-        return regex.match(pkg).group(1)
-
     pkg_releases = []
     for pkg in repo_module.get_rpm_artifacts():
-        pkg_release = extract_release(pkg)
+        pkg_release = parse_rpm_nevra(pkg).release
         if not pkg_release in pkg_releases:
             pkg_releases.append(pkg_release)
 

@@ -40,6 +40,30 @@ async def get_modified_refs_list(platform_url: str):
             return package_list
 
 
+def get_modules_yaml_from_repo(repo_name: str):
+    base_url = "https://build.almalinux.org/pulp/content/prod/"
+    repo_url = urllib.parse.urljoin(base_url, f"{repo_name}/repodata/")
+    response = requests.get(repo_url)
+    try:
+        response.raise_for_status()
+    except Exception as exc:
+        raise(exc)
+    template_href = next(
+        (
+            line.strip()
+            for line in response.text.splitlines()
+            if line and "modules" in line
+        ),
+        None
+    )
+    if not template_href:
+        return
+    template_href = re.search(r'href="(.+-modules.yaml)"', template_href).group(1)
+    response = requests.get(urllib.parse.urljoin(repo_url, template_href))
+    response.raise_for_status()
+    return response.text
+
+
 class RpmArtifact(BaseModel):
 
     name: str

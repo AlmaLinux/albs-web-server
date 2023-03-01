@@ -378,6 +378,7 @@ class RpmPackage(PulpBase):
     def pulp_href(self):
         return f"/pulp/api/v3/content/rpm/packages/{str(self.content_ptr_id)}/"
 
+
 class RpmModulemd(PulpBase):
     __tablename__ = "rpm_modulemd"
 
@@ -395,6 +396,7 @@ class RpmModulemd(PulpBase):
     @property
     def nsvca(self):
         return f"{self.name}:{self.stream}:{self.version}:{self.context}:{self.arch}"
+
 
 class RpmModulemdPackages(PulpBase):
     __tablename__ = "rpm_modulemd_packages"
