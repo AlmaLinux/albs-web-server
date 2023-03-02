@@ -1091,6 +1091,7 @@ class ErrataRecord(Base):
         nullable=False
     )
     platform = relationship('Platform')
+    module = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     release_status = sqlalchemy.Column(
         sqlalchemy.Enum(ErrataReleaseStatus),
         nullable=True,

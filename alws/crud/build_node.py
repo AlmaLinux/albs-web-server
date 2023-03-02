@@ -381,10 +381,29 @@ async def __process_rpms(db: AsyncSession, pulp_client: PulpClient, task_id: int
             conditions.append(
                 models.ErrataPackage.arch == rpm_info['arch']
             )
-        errata_packages = await db.execute(select(
-            models.ErrataPackage
-        ).where(sqlalchemy.and_(*conditions)))
-        for errata_package in errata_packages.scalars().all():
+
+        query = select(models.ErrataPackage).where(
+            sqlalchemy.and_(*conditions)
+        )
+
+        if module_index:
+            for mod in module_index.iter_modules():
+                if mod.name.endswith('-devel'):
+                    continue
+                module = mod
+            build_task_module = f"{module.name}:{module.stream}"
+            query = query.join(models.ErrataRecord).filter(
+                models.ErrataRecord.module == build_task_module
+            )
+
+        errata_packages = (
+            await db.execute(query)
+        ).scalars().all()
+
+        # We add ErrataToALBSPackage proposals for every matching package.
+        # In case of an errata that involves a module, we only add those
+        # packages that belong to the right module:stream
+        for errata_package in errata_packages:
             if clean_rpm_release != clean_release(errata_package.release):
                 continue
             errata_package.source_srpm = src_name
