@@ -1,11 +1,14 @@
 name: pytest
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - "**"
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
