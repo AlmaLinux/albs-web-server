@@ -9,6 +9,17 @@ from tests.mock_classes import BaseAsyncTestCase
 
 
 class TestReleasesEndpoints(BaseAsyncTestCase):
+    async def test_get_releases(
+        self,
+    ):
+        self.headers = {}
+        response = await self.make_request(
+            "get",
+            "/api/v1/releases/"
+        )
+        message = f"Cannot retrieve releases:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
+
     async def test_create_release(
         self,
         base_platform: models.Platform,
@@ -64,6 +75,22 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         release = response.json()
         last_log = release["plan"]["last_log"]
         assert release["status"] == ReleaseStatus.COMPLETED, last_log
+
+    async def test_get_release(
+        self,
+    ):
+        self.headers = {}
+        response = await self.make_request(
+            "get",
+            "/api/v1/releases/",
+        )
+        release_id = response.json()[0]["id"]
+        response = await self.make_request(
+            "get",
+            f"/api/v1/releases/{release_id}/",
+        )
+        message = f"Cannot retrieve release:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
 
     async def test_revert_release(
         self,
