@@ -44,7 +44,7 @@ async def main():
         )
         await create_product(
             db, ProductCreate(name=DEFAULT_PRODUCT, team_id=alma_team.id,
-                              owner_id=system_user.id, title=DEFAULT_PRODUCT)
+                              owner_id=system_user.id, title=DEFAULT_PRODUCT, is_community=False)
         )
         await db.execute(update(models.SignKey).where(
             models.SignKey.owner_id.is_(None)).values(owner_id=system_user.id))
