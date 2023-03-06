@@ -38,6 +38,7 @@ class PlatformCreate(BaseModel):
     priority: typing.Optional[int] = None
     test_dist_name: typing.Optional[str]
     arch_list: typing.List[str]
+    copy_priority_arches: typing.Optional[typing.List[str]] = None
     weak_arch_list: typing.Optional[typing.List[typing.Dict]] = None
     repos: typing.Optional[typing.List[RepositoryCreate]]
     data: typing.Optional[typing.Dict[str, typing.Any]]
