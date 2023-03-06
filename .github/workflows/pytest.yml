@@ -1,8 +1,7 @@
 name: pytest
 on:
   pull_request_target:
-    branches:
-      - [ master ]
+    branches: [ master ]
 jobs:
   build:
     runs-on: ubuntu-latest
