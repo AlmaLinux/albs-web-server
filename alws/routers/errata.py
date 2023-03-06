@@ -3,6 +3,8 @@ from typing import Optional, List
 from fastapi import (
     APIRouter,
     Depends,
+    HTTPException,
+    status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,10 +37,16 @@ async def get_errata_record(
     errata_id: str,
     db: database.Session = Depends(get_db),
 ):
-    return await errata_crud.get_errata_record(
+    errata_record = await errata_crud.get_errata_record(
         db,
         errata_id,
     )
+    if errata_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Unable to find errata record with {errata_id=}'
+        )
+    return errata_record
 
 
 @router.get("/get_oval_xml/", response_model=str)
