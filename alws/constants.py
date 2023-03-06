@@ -59,6 +59,7 @@ class BuildTaskStatus(enum.IntEnum):
     COMPLETED = 2
     FAILED = 3
     EXCLUDED = 4
+    CANCELLED = 5
 
     @classmethod
     def is_finished(cls, status: int):

@@ -189,6 +189,24 @@ async def update_failed_build_items(db: AsyncSession, build_id: int):
         await db.commit()
 
 
+async def mark_build_tasks_as_cancelled(
+    session: AsyncSession,
+    build_id: int,
+):
+    build_tasks = await session.execute(
+        select(models.BuildTask)
+        .where(
+            models.BuildTask.build_id == build_id,
+            models.BuildTask.status == BuildTaskStatus.IDLE,
+        )
+        .with_for_update()
+    )
+    for build_task in build_tasks.scalars().all():
+        build_task.status = BuildTaskStatus.CANCELLED
+        build_task.error = "Build task cancelled by user"
+    await session.commit()
+
+
 async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
     repo = await db.execute(select(models.Repository).where(
         models.Repository.name == task.get_log_repo_name()
