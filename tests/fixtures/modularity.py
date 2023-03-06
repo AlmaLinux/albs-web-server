@@ -130,3 +130,94 @@ data:
         arches: [aarch64, i686, ppc64le, s390x, x86_64]
 ...
     """
+
+
+@pytest.fixture
+def modules_yaml_with_filter():
+    return b"""
+---
+document: modulemd
+version: 2
+data:
+  name: 389-ds
+  stream: "1.4"
+  version: 8060020221025134811
+  context: 17499975
+  arch: x86_64
+  summary: 389 Directory Server (base)
+  description: >-
+    389 Directory Server is an LDAPv3 compliant server.  The base package includes
+    the LDAP server and command line utilities for server administration.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      llvm-toolset: [rhel8]
+      nodejs: [10]
+      platform: [el8]
+      rust-toolset: [rhel8]
+    requires:
+      platform: [el8]
+  filter:
+    rpms:
+    - cockpit-389-ds
+  components:
+    rpms:
+      389-ds-base:
+        rationale: Package in api
+        ref: ceb31709f5d2533dd667c9c958acb48edae497d3
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - 389-ds-base-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.src
+    - 389-ds-base-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-debuginfo-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-debugsource-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-devel-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-legacy-tools-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-legacy-tools-debuginfo-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-libs-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-libs-debuginfo-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-snmp-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - 389-ds-base-snmp-debuginfo-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.x86_64
+    - python3-lib389-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.noarch
+...
+---
+document: modulemd
+version: 2
+data:
+  name: 389-ds-devel
+  stream: "1.4"
+  version: 8060020221025134811
+  context: 17499975
+  arch: x86_64
+  summary: 389 Directory Server (base)
+  description: >-
+    389 Directory Server is an LDAPv3 compliant server.  The base package includes
+    the LDAP server and command line utilities for server administration.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      llvm-toolset: [rhel8]
+      nodejs: [10]
+      platform: [el8]
+      rust-toolset: [rhel8]
+    requires:
+      platform: [el8]
+  filter:
+    rpms:
+    - cockpit-389-ds
+  components:
+    rpms:
+      389-ds-base:
+        rationale: Package in api
+        ref: ceb31709f5d2533dd667c9c958acb48edae497d3
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - cockpit-389-ds-0:1.4.3.28-8.module_el8.6.0+3338+ebccfef1.noarch
+...
+    """
