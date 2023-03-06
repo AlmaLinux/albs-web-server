@@ -45,7 +45,7 @@ jobs:
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
         with:
-          token: {{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           pytest-coverage-path: /tmp/pytest-coverage.txt
           pytest-xml-coverage-path: /tmp/coverage.xml
           title: Coverage report
