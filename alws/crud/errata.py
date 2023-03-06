@@ -853,14 +853,15 @@ async def release_errata_packages(
     rpm_module = None
     reboot_suggested = False
     dict_packages = []
-    released_names = set()
+    released_pkgs = set()
     for errata_pkg in packages:
         pulp_pkg = await pulp_client.get_by_href(errata_pkg.get_pulp_href())
+        pkg_name_arch = "_".join([pulp_pkg["name"], pulp_pkg["arch"]])
         if errata_pkg.errata_package.reboot_suggested:
             reboot_suggested = True
-        if pulp_pkg["name"] in released_names:
+        if pkg_name_arch in released_pkgs:
             continue
-        released_names.add(pulp_pkg["name"])
+        released_pkgs.add(pkg_name_arch)
         dict_packages.append(
             {
                 "name": pulp_pkg["name"],
