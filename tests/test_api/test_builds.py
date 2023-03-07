@@ -38,6 +38,7 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
             task
             for task in build["tasks"]
             if task["status"] == BuildTaskStatus.CANCELLED
+            and task["error"] == "Build task cancelled by user"
         ]
         message = "Build doesn't contain cancelled tasks"
         assert cancelled_tasks, message

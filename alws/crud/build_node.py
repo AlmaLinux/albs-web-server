@@ -193,17 +193,17 @@ async def mark_build_tasks_as_cancelled(
     session: AsyncSession,
     build_id: int,
 ):
-    build_tasks = await session.execute(
-        select(models.BuildTask)
+    await session.execute(
+        update(models.BuildTask)
         .where(
             models.BuildTask.build_id == build_id,
             models.BuildTask.status == BuildTaskStatus.IDLE,
         )
-        .with_for_update()
+        .values(
+            status=BuildTaskStatus.CANCELLED,
+            error="Build task cancelled by user"
+        )
     )
-    for build_task in build_tasks.scalars().all():
-        build_task.status = BuildTaskStatus.CANCELLED
-        build_task.error = "Build task cancelled by user"
     await session.commit()
 
 
