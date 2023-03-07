@@ -298,6 +298,8 @@ async def get_module_data_from_beholder(
     devel: bool = False,
 ) -> dict:
     result = {}
+    if not settings.package_beholder_enabled:
+        return result
     try:
         beholder_response = await beholder_client.get(endpoint)
     except Exception:
@@ -465,7 +467,7 @@ async def get_module_refs(
                 continue
             # if module is devel and devel_module is None
             # we shouldn't mark module as devel, because it will broke logic
-            # for partialy updating modules
+            # for partially updating modules
             module_is_devel = _module.is_devel and devel_module is not None
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
