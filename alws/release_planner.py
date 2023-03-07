@@ -536,17 +536,20 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         arch_regex = re.compile(r"(i686|x86_64|aarch64|ppc64le|s390x)")
         debug_part = "-debug"
 
-        pretty_name = re.search(r"(\w+-\d+)-(\w+)(-debug)?", repo_name).group()
+        # TODO: make normal names
+        pretty_name = re.search(r"(\w+-\d+)-\w+(-debug)?", repo_name)
+        if pretty_name:
+            return "".join([group for group in pretty_name.groups() if group])
 
-        if not bool(arch_regex.search(pretty_name)):
-            arch_res = arch_regex.search(repo_name)
-            if bool(arch_res):
-                pretty_name += f"-{arch_res.group()}"
+        # if not bool(arch_regex.search(pretty_name)):
+        #     arch_res = arch_regex.search(repo_name)
+        #     if bool(arch_res):
+        #         pretty_name += f"-{arch_res.group()}"
 
-        if debug_part in repo_name and debug_part not in pretty_name:
-            pretty_name += debug_part
-
-        return pretty_name
+        # if debug_part in repo_name and debug_part not in pretty_name:
+        #     pretty_name += debug_part
+        #
+        # return pretty_name
 
     @staticmethod
     def get_production_repositories_mapping(
@@ -599,8 +602,8 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             arch = pkg["arch"]
             if arch == "noarch":
                 repositories = [
-                    db_repos_mapping[(a, is_debug)]
-                    for a in base_platform.arch_list
+                    db_repos_mapping[(arch, is_debug)]
+                    for arch in base_platform.arch_list
                 ]
             else:
                 repositories = [db_repos_mapping[(arch, is_debug)]]
@@ -640,8 +643,10 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
     @class_measure_work_time_async("execute_release_plan")
     async def execute_release_plan(
-        self, release: models.Release
+        self,
+        release: models.Release,
     ) -> typing.List[str]:
+        additional_messages = []
         if not release.plan.get("packages") or not release.plan.get(
             "repositories"
         ):
@@ -652,7 +657,8 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
         repository_modification_mapping = defaultdict(list)
         db_repos_mapping = self.get_production_repositories_mapping(
-            release.product, include_pulp_href=True
+            release.product,
+            include_pulp_href=True,
         )
 
         for pkg in release.plan["packages"]:
@@ -664,8 +670,62 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                     package["artifact_href"]
                 )
 
-        # TODO: Add support for modules releases
-        #       and checking existent packages in repos
+        # TODO: Add support for checking existent packages in repos
+        prod_repo_modules_cache = {}
+        added_modules = defaultdict(list)
+        for module in release.plan.get("modules", []):
+            for repository in module["repositories"]:
+                repo_name = repository["name"]
+                repo_arch = repository["arch"]
+                repo_url = repository.get("url")
+                db_repo = db_repos_mapping[(repo_arch, False)]
+                if not repo_url:
+                    repo_url = db_repo["url"]
+                repo_module_index = prod_repo_modules_cache.get(repo_url)
+                if repo_module_index is None:
+                    template = await self.pulp_client.get_repo_modules_yaml(
+                        repo_url
+                    )
+                    if not template:
+                        repo_module_index = IndexWrapper.from_template(
+                            template
+                        )
+                    else:
+                        repo_module_index = IndexWrapper()
+                    prod_repo_modules_cache[repo_url] = repo_module_index
+                module_info = module["module"]
+                release_module = ModuleWrapper.from_template(
+                    module_info["template"]
+                )
+                release_module_nvsca = release_module.nsvca
+                full_repo_name = f"{repo_name}-{repo_arch}"
+                # for old module releases that have duplicated repos
+                if release_module_nvsca in added_modules[full_repo_name]:
+                    continue
+                module_already_in_repo = any(
+                    (
+                        prod_module
+                        for prod_module in repo_module_index.iter_modules()
+                        if prod_module.nsvca == release_module_nvsca
+                    )
+                )
+                if module_already_in_repo:
+                    additional_messages.append(
+                        f"Module {release_module_nvsca} skipped,"
+                        f'module already in "{full_repo_name}" modules.yaml'
+                    )
+                    continue
+                module_pulp_href, _ = await self.pulp_client.create_module(
+                    module_info["template"],
+                    module_info["name"],
+                    module_info["stream"],
+                    module_info["context"],
+                    module_info["arch"],
+                )
+                repository_modification_mapping[db_repo["pulp_href"]].append(
+                    module_pulp_href
+                )
+                added_modules[full_repo_name].append(release_module_nvsca)
 
         await asyncio.gather(
             *(
@@ -680,7 +740,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             )
         )
 
-        return []
+        return additional_messages
 
     def get_production_pulp_repositories_names(
         self,
