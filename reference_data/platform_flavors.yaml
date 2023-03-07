@@ -4,9 +4,9 @@
       modified: a8
       non_modified: c8
     versions:
-      - name: '8.7'
-        version_prefix: '80700'
-        dist_prefix: 'el8.7.0'
+      - name: '8.8'
+        version_prefix: '80800'
+        dist_prefix: 'el8.8.0'
   data:
      mock:
        macros:
@@ -97,9 +97,9 @@
       modified: a9
       non_modified: c9
     versions:
-      - name: '9.1'
-        version_prefix: '90100'
-        dist_prefix: 'el9.1.0'
+      - name: '9.2'
+        version_prefix: '90200'
+        dist_prefix: 'el9.2.0'
   data:
      mock:
        macros:

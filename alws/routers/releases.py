@@ -19,9 +19,13 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
+public_router = APIRouter(
+    prefix="/releases",
+    tags=["releases"],
+)
 
 # TODO: add pulp db loader
-@router.get(
+@public_router.get(
     "/",
     response_model=typing.Union[
         typing.List[release_schema.Release], release_schema.ReleaseResponse
@@ -43,7 +47,7 @@ async def get_releases(
     )
 
 
-@router.get("/{release_id}/", response_model=release_schema.Release)
+@public_router.get("/{release_id}/", response_model=release_schema.Release)
 async def get_release(
     release_id: int,
     db: AsyncSession = Depends(get_db),

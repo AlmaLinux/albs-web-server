@@ -1,6 +1,6 @@
 name: pytest
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - "**"
 jobs:
@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         name: Check out repository
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Create dirs
         run: |
           mkdir -p /home/runner/work/albs-web-server/alts

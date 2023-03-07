@@ -295,6 +295,9 @@ class ModuleWrapper:
     def remove_rpm_artifact(self, artifact: str):
         self._stream.remove_rpm_artifact(artifact)
 
+    def remove_rpm_artifacts(self):
+        self._stream.clear_rpm_artifacts()
+
     def is_artifact_filtered(self, artifact: dict) -> bool:
         for filter_name in self._stream.get_rpm_filters():
             if artifact["name"] == filter_name:
