@@ -120,6 +120,14 @@ async def restart_failed_build_items(build_id: int,
     return await build_node.update_failed_build_items(db, build_id)
 
 
+@router.patch("/{build_id}/cancel", status_code=status.HTTP_200_OK)
+async def cancel_idle_build_items(
+    build_id: int,
+    session: AsyncSession = Depends(get_db),
+):
+    await build_node.mark_build_tasks_as_cancelled(session, build_id)
+
+
 @router.patch(
     '/{build_id}/parallel-restart-failed', status_code=status.HTTP_200_OK
 )
