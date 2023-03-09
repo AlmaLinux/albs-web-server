@@ -77,3 +77,37 @@ async def build_done(
             ],
         }
         await safe_build_done(session, BuildDone(**payload))
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def modular_build_done(
+    session: AsyncSession,
+    modular_build: Build,
+    start_modular_build,
+    create_entity,
+    get_rpm_package_info,
+    get_repo_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        payload = {
+            "task_id": build_task.id,
+            "status": "done",
+            "stats": {},
+            "artifacts": [
+                {
+                    "name": name,
+                    "type": "rpm",
+                    "href": get_artifact_href(),
+                    "sha256": hashlib.sha256().hexdigest(),
+                }
+                for name in (
+                    "go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.src.rpm",
+                    f"go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.{build_task.arch}.rpm",
+                )
+            ],
+        }
+        await safe_build_done(session, BuildDone(**payload))

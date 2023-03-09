@@ -49,3 +49,14 @@ async def disable_sign_verify(monkeypatch):
         "alws.release_planner.sign_task.verify_signed_build",
         func,
     )
+
+
+@pytest.fixture(autouse=True)
+def mock_get_packages_from_64_bit_repos(monkeypatch):
+    def func(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "alws.release_planner.get_rpm_packages_from_repository",
+        func,
+    )

@@ -1,11 +1,13 @@
 import asyncio
 import hashlib
+import re
 import uuid
 
 import pytest
 
 from alws.config import settings
 from alws.schemas.build_node_schema import BuildDoneArtifact
+from alws.utils.modularity import IndexWrapper
 from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 
@@ -36,6 +38,10 @@ def get_file_href() -> str:
 
 def get_rpm_pkg_href() -> str:
     return f"/pulp/api/v3/content/rpm/packages/{uuid.uuid4()}/"
+
+
+def get_modules_href() -> str:
+    return f"/pulp/api/v3/content/rpm/modulemds/{uuid.uuid4()}/"
 
 
 def get_rpm_pkg_info(artifact: BuildDoneArtifact):
@@ -301,6 +307,40 @@ def create_log_repo(monkeypatch):
         )
 
     monkeypatch.setattr(PulpClient, "create_log_repo", func)
+
+
+@pytest.fixture
+def get_repo_modules_yaml(
+    monkeypatch,
+    modular_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        modules_yaml = modular_build_payload["tasks"][0]["modules_yaml"]
+        _, repo_url = args
+        repo_arch = re.search(
+            r"-(?P<arch>\w+)-\d+-br/$",
+            repo_url,
+        )
+        if not repo_arch:
+            return modules_yaml
+        repo_arch = repo_arch.groupdict()["arch"]
+        _index = IndexWrapper.from_template(modules_yaml)
+        for _module in _index.iter_modules():
+            _module.arch = repo_arch
+        return _index.render()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_modules(
+    monkeypatch,
+    modular_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        return get_modules_href()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules", func)
 
 
 @pytest.fixture
