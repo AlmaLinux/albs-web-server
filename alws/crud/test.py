@@ -207,7 +207,9 @@ async def get_test_tasks_by_build_task(
         db: Session, build_task_id: int, latest: bool = True,
         revision: int = None):
     query = select(models.TestTask).where(
-        models.TestTask.build_task_id == build_task_id)
+        models.TestTask.build_task_id == build_task_id).options(
+        selectinload(models.TestTask.performance_stats)
+    )
     # If latest=False, but revision is not set, should return
     # latest results anyway
     if (not latest and not revision) or latest:

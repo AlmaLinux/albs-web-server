@@ -38,6 +38,7 @@ async def get_releases(
                 selectinload(models.Release.owner),
                 selectinload(models.Release.platform),
                 selectinload(models.Release.product),
+                selectinload(models.Release.performance_stats),
             )
             .order_by(models.Release.id.desc())
         )
@@ -98,7 +99,12 @@ async def create_release(
 ) -> models.Release:
     product = await __get_product(db, payload.product_id)
     releaser = get_releaser_class(product)(db)
-    return await releaser.create_new_release(user_id, payload)
+    release = await releaser.create_new_release(user_id, payload)
+    stats = models.PerformanceStats(
+        release_id=release.id, statistics=releaser.stats.copy())
+    db.add(stats)
+    await db.commit()
+    return await releaser.get_final_release(release.id)
 
 
 async def update_release(
@@ -118,7 +124,12 @@ async def update_release(
     )
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
-    return await releaser.update_release(release_id, payload, user_id)
+    release = await releaser.update_release(release_id, payload, user_id)
+    for perf_stat in release.performance_stats:
+        perf_stat.statistics.update(**releaser.stats)
+    db.add(release)
+    await db.commit()
+    return await releaser.get_final_release(release_id)
 
 
 async def commit_release(
@@ -137,7 +148,13 @@ async def commit_release(
     )
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
-    return await releaser.commit_release(release_id, user_id)
+    release, message = await releaser.commit_release(release_id, user_id)
+    for perf_stat in release.performance_stats:
+        perf_stat.statistics.update(**releaser.stats)
+    db.add(release)
+    await db.commit()
+    release = await releaser.get_final_release(release_id)
+    return release, message
 
 
 async def revert_release(

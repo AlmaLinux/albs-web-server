@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import re
 import copy
 import logging
@@ -35,6 +36,7 @@ from alws.schemas import release_schema
 from alws.constants import ErrataPackageStatus
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm, clean_debug_name
+from alws.utils.measurements import class_measure_work_time_async
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name, slice_list
 from alws.utils.pulp_client import PulpClient
@@ -61,6 +63,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 settings.cas_api_key,
                 settings.cas_signer_id,
             )
+        self.stats = {}
 
     async def revert_release(
         self,
@@ -122,6 +125,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             )
         return package_checksum, is_authenticated
 
+    @class_measure_work_time_async('get_repositories_list')
     async def get_production_pulp_repositories(
         self,
         product: models.Product = None,
@@ -138,6 +142,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         pulp_repos = await self.pulp_client.get_rpm_repositories(params)
         return {repo.pop("pulp_href"): repo for repo in pulp_repos}
 
+    @class_measure_work_time_async('get_packages_info_pulp_api')
     async def get_pulp_packages_info(
         self,
         build_rpms: typing.List[
@@ -157,6 +162,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             )
         )
 
+    @class_measure_work_time_async('get_packages_info_pulp_and_db')
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
@@ -284,6 +290,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Release.owner),
                 selectinload(models.Release.platform),
                 selectinload(models.Release.product),
+                selectinload(models.Release.performance_stats),
             )
         )
         return release_res.scalars().first()
@@ -319,6 +326,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Release.product).selectinload(
                     models.Product.repositories
                 ),
+                selectinload(models.Release.performance_stats),
             )
             .with_for_update()
         )
@@ -326,11 +334,13 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release = release_result.scalars().first()
         return release
 
+    @class_measure_work_time_async('create_new_release')
     async def create_new_release(
         self,
         user_id: int,
         payload: release_schema.ReleaseCreate,
     ) -> models.Release:
+        start = datetime.datetime.utcnow()
         user = await user_crud.get_user(self.db, user_id=user_id)
         logging.info("User %d is creating a release", user_id)
 
@@ -364,7 +374,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     .options(
                         selectinload(models.Build.team)
                         .selectinload(models.Team.roles)
-                        .selectinload(models.UserRole.actions)
+                        .selectinload(models.UserRole.actions),
+                        selectinload(models.Build.owner)
+                        .selectinload(models.User.roles)
+                        .selectinload(models.UserRole.actions),
                     )
                 )
             )
@@ -397,6 +410,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         new_release.owner = user
         new_release.team_id = product.team_id
         new_release.product_id = product.id
+        new_release.started_at = start
+        new_release.finished_at = datetime.datetime.utcnow()
         self.db.add(new_release)
         await self.db.commit()
         await self.db.refresh(new_release)
@@ -404,6 +419,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         logging.info("New release %d successfully created", new_release.id)
         return await self.get_final_release(new_release.id)
 
+    @class_measure_work_time_async('update_release')
     async def update_release(
         self,
         release_id: int,
@@ -414,6 +430,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         user = await user_crud.get_user(self.db, user_id=user_id)
 
         release = await self.get_release_for_update(release_id)
+        release.started_at = datetime.datetime.utcnow()
         if not release:
             raise DataNotFoundError(f"Release with ID {release_id} not found")
 
@@ -439,12 +456,14 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             # check packages presence in prod repos
             new_plan = await self.update_release_plan(payload.plan, release)
             release.plan = new_plan
+        release.finished_at = datetime.datetime.utcnow()
         self.db.add(release)
         await self.db.commit()
         await self.db.refresh(release)
         logging.info("Successfully updated release %d", release_id)
         return await self.get_final_release(release.id)
 
+    @class_measure_work_time_async('commit_release')
     async def commit_release(
         self,
         release_id: int,
@@ -454,6 +473,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
 
         user = await user_crud.get_user(self.db, user_id=user_id)
         release = await self.get_release_for_update(release_id)
+        release.started_at = datetime.datetime.utcnow()
         if not release:
             raise DataNotFoundError(f"Release with ID {release_id} not found")
 
@@ -493,6 +513,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release_plan = copy.deepcopy(release.plan)
         release_plan["last_log"] = message
         release.plan = release_plan
+        release.finished_at = datetime.datetime.utcnow()
         self.db.add(release)
         await self.db.commit()
         await self.db.refresh(release)
@@ -502,6 +523,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
 
 
 class CommunityReleasePlanner(BaseReleasePlanner):
+    @class_measure_work_time_async('revert_release')
     async def revert_release(
         self,
         release_id: int,
@@ -548,6 +570,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
         return result
 
+    @class_measure_work_time_async('get_release_plan')
     async def get_release_plan(
         self,
         base_platform: models.Platform,
@@ -605,6 +628,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
 
         return release_plan
 
+    @class_measure_work_time_async('update_release_plan')
     async def update_release_plan(
         self,
         plan: dict,
@@ -614,6 +638,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         # right now
         return plan
 
+    @class_measure_work_time_async('execute_release_plan')
     async def execute_release_plan(
         self, release: models.Release
     ) -> typing.List[str]:
@@ -705,6 +730,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 break
         return found
 
+    @class_measure_work_time_async('revert_release_plan_execution')
     async def revert_release_plan(
         self,
         release: models.Release,
@@ -766,6 +792,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             build.released = False
         release.status = ReleaseStatus.REVERTED
 
+    @class_measure_work_time_async('revert_release')
     async def revert_release(
         self,
         release_id: int,
@@ -843,6 +870,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             f"{repo.name}-{repo.arch}" for repo in self.base_platform.repos
         ]
 
+    @class_measure_work_time_async('prepare_data_for_tasks')
     async def prepare_data_for_executing_async_tasks(
         self,
         package: dict,
@@ -892,6 +920,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         pkg_dict[nevra.arch]["version"].add(nevra.version)
         pkg_dict[nevra.arch]["release"].add(nevra.release)
 
+    @class_measure_work_time_async('execute_release_tasks')
     async def prepare_and_execute_async_tasks(
         self,
         packages: typing.List[dict],
@@ -1161,6 +1190,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             release_repositories.add(release_repo)
         return release_repositories
 
+    @class_measure_work_time_async('get_release_plan')
     async def get_release_plan(
         self,
         build_ids: typing.List[int],
@@ -1431,6 +1461,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             "repositories": prod_repos,
         }
 
+    @class_measure_work_time_async('execute_release_plan')
     async def execute_release_plan(
         self, release: models.Release
     ) -> typing.List[str]:
@@ -1617,6 +1648,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         await asyncio.gather(*publication_tasks)
         return additional_messages
 
+    @class_measure_work_time_async('check_released_errata_packages')
     async def check_released_errata_packages(
         self,
         release: models.Release,
@@ -1644,6 +1676,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             albs_pkg.status = ErrataPackageStatus.released
         await self.db.commit()
 
+    @class_measure_work_time_async('update_release_plan')
     async def update_release_plan(
         self,
         plan: dict,
@@ -1665,6 +1698,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         updated_plan["packages_in_repos"] = pkgs_in_repos
         return updated_plan
 
+    @class_measure_work_time_async('commit_release')
     async def commit_release(
         self,
         release_id: int,

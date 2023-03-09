@@ -1,7 +1,7 @@
 """Added module column to ErrataRecord
 
 Revision ID: 237d7e07633e
-Revises: 8548c94241d9
+Revises: 673251e8ca0c
 Create Date: 2023-02-22 09:16:28.249922
 
 """
