@@ -134,7 +134,7 @@ async def get_builds(
                 selectinload(models.Build.linked_builds),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.test_tasks
-                ),
+                ).selectinload(models.TestTask.performance_stats),
                 selectinload(models.Build.tasks)
                 .selectinload(models.BuildTask.performance_stats),
                 selectinload(models.Build.sign_tasks),

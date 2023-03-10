@@ -138,6 +138,7 @@ class BuildTaskTestTask(BaseModel):
     id: int
     status: int
     revision: int
+    performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 
     class Config:
         orm_mode = True
