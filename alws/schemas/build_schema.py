@@ -11,6 +11,7 @@ from pydantic import BaseModel, AnyHttpUrl, validator, conlist
 from alws.config import settings
 from alws.constants import BuildTaskRefType
 from alws import models
+from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     download_modules_yaml, GiteaClient
@@ -162,15 +163,6 @@ class RpmModule(BaseModel):
     context: str
     arch: str
     sha256: str
-
-    class Config:
-        orm_mode = True
-
-
-class PerformanceStats(BaseModel):
-    id: int
-    build_task_id: typing.Optional[int]
-    statistics: typing.Optional[dict]
 
     class Config:
         orm_mode = True

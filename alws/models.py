@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import re
-from typing import Dict
+from typing import Dict, List
 
 import sqlalchemy
 from sqlalchemy.sql import func
@@ -104,6 +104,18 @@ class PermissionsMixin:
                 raise ValueError('Incorrect permissions representation')
             test //= 10
         return permissions
+
+
+@declarative_mixin
+class TimeMixin:
+
+    @declared_attr
+    def started_at(cls):
+        return sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+
+    @declared_attr
+    def finished_at(cls):
+        return sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
 
 
 PlatformRepo = sqlalchemy.Table(
@@ -386,14 +398,12 @@ BuildTaskDependency = sqlalchemy.Table(
 )
 
 
-class BuildTask(Base):
+class BuildTask(TimeMixin, Base):
 
     __tablename__ = 'build_tasks'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
@@ -877,7 +887,7 @@ class Product(PermissionsMixin, TeamMixin, Base):
         return f'{self.owner.username}-{self.name}'
 
 
-class TestTask(Base):
+class TestTask(TimeMixin, Base):
 
     __tablename__ = 'test_tasks'
 
@@ -903,8 +913,6 @@ class TestTask(Base):
     )
     repository = relationship('Repository')
     scheduled_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     performance_stats: 'PerformanceStats' = relationship(
         'PerformanceStats',
         back_populates='test_task',
@@ -925,7 +933,7 @@ class TestTaskArtifact(Base):
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
-class Release(PermissionsMixin, TeamMixin, Base):
+class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):
     __tablename__ = 'build_releases'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -961,6 +969,10 @@ class Release(PermissionsMixin, TeamMixin, Base):
     status = sqlalchemy.Column(
         sqlalchemy.Integer,
         default=ReleaseStatus.SCHEDULED
+    )
+    performance_stats: List['PerformanceStats'] = relationship(
+        'PerformanceStats',
+        back_populates='release',
     )
 
 
@@ -1014,12 +1026,10 @@ class SignKey(PermissionsMixin, Base):
     )
 
 
-class SignTask(Base):
+class SignTask(TimeMixin, Base):
     __tablename__ = 'sign_tasks'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    started_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
@@ -1304,6 +1314,16 @@ class PerformanceStats(Base):
     )
     test_task: BuildTask = relationship(
         "TestTask",
+        back_populates="performance_stats",
+    )
+    release_id: int = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "build_releases.id", name='perf_stats_build_release_id'),
+        nullable=True,
+    )
+    release: Release = relationship(
+        "Release",
         back_populates="performance_stats",
     )
 

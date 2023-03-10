@@ -2,6 +2,8 @@ import typing
 
 from pydantic import BaseModel
 
+from alws.schemas.perf_stats_schema import PerformanceStats
+
 
 __all__ = ['TestTaskResult']
 
@@ -20,6 +22,7 @@ class TestTask(BaseModel):
     status: int
     revision: int
     alts_response: typing.Optional[dict]
+    performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 
     class Config:
         orm_mode = True

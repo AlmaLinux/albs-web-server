@@ -7,7 +7,7 @@ import threading
 import sentry_sdk
 
 from fastapi import FastAPI
-from starlette.exceptions import ExceptionMiddleware
+from starlette.middleware.exceptions import ExceptionMiddleware
 
 from alws import routers
 from alws.auth import AuthRoutes

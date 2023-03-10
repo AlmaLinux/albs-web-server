@@ -4,6 +4,7 @@ import typing
 from pydantic import BaseModel
 
 from alws.schemas.user_schema import User
+from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.schemas.platform_schema import Platform
 
 
@@ -35,6 +36,7 @@ class Release(BaseModel):
     owner: User
     platform: Platform
     product: ReleaseProduct
+    performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
     created_at: typing.Optional[datetime.datetime]
 
     class Config:
