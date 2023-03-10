@@ -1200,6 +1200,53 @@ def generate_query_for_release(records_ids: List[str]):
     return query
 
 
+async def get_release_logs(
+    record_id: str,
+    pulp_packages: dict,
+    session: AsyncSession,
+    repo_mapping: dict,
+    db_record: list,
+) -> str:
+    release_log = [
+        f"Record {record_id} successfully released at {datetime.datetime.utcnow()}\n"
+    ]
+    pkg_fields = [
+        RpmPackage.name,
+        RpmPackage.epoch,
+        RpmPackage.version,
+        RpmPackage.release,
+        RpmPackage.arch,
+    ]
+    pulp_pkgs = get_rpm_packages_by_ids(
+        pulp_pkg_ids=[get_uuid_from_pulp_href(pkg) for pkg in pulp_packages],
+        pkg_fields=pkg_fields,
+    )
+    arches = set()
+    pkgs = []
+    for pkg in pulp_pkgs:
+        arches.add(pulp_pkgs[pkg].arch)
+        pkgs.append(pulp_pkgs[pkg].nevra)
+
+    repositories = await session.execute(
+        select(models.Repository).where(
+            models.Repository.pulp_href.in_(repo_mapping),
+        )
+    )
+    repositories: List[models.Repository] = repositories.scalars().all()
+
+    if db_record.module:
+        release_log.append(f"Module: {db_record.module}\n")
+
+    release_log.extend(
+        [
+            "Architecture(s): " + ", ".join(arches),
+            "\nPackages:\n" + "\n".join(pkgs),
+            "\nRepositories:\n" + "\n".join([repo.url for repo in repositories]),
+        ]
+    )
+    return "".join(release_log)
+
+
 async def release_errata_record(record_id: str):
     pulp = PulpClient(
         settings.pulp_host,
@@ -1249,9 +1296,16 @@ async def release_errata_record(record_id: str):
             pulp,
         )
         db_record.release_status = ErrataReleaseStatus.RELEASED
-        db_record.last_release_log = "Succesfully released"
+
+        db_record.last_release_log = await get_release_logs(
+            record_id=record_id,
+            pulp_packages=pulp_packages,
+            session=session,
+            repo_mapping=repo_mapping,
+            db_record=db_record,
+        )
         await session.commit()
-    logging.info("Record %s succesfully released", record_id)
+    logging.info("Record %s successfully released", record_id)
 
 
 async def bulk_errata_records_release(records_ids: List[str]):
@@ -1314,7 +1368,13 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 publish=False,
             )
             db_record.release_status = ErrataReleaseStatus.RELEASED
-            db_record.last_release_log = "Succesfully released"
+            db_record.last_release_log = await get_release_logs(
+                record_id=db_record.id,
+                pulp_packages=pulp_packages,
+                session=session,
+                repo_mapping=repo_mapping,
+                db_record=db_record,
+            )
             if not tasks:
                 continue
             repos_to_publish.extend(repo_mapping.keys())
