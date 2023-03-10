@@ -1,3 +1,4 @@
+import copy
 import typing
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +72,9 @@ async def get_releases(
     if page_number:
         return {
             "releases": (await db.execute(generate_query())).scalars().all(),
-            "total_releases": (await db.execute(generate_query(count=True))).scalar(),
+            "total_releases": (
+                await db.execute(generate_query(count=True))
+            ).scalar(),
             "current_page": page_number,
         }
     return (await db.execute(generate_query())).scalars().all()
@@ -101,7 +104,8 @@ async def create_release(
     releaser = get_releaser_class(product)(db)
     release = await releaser.create_new_release(user_id, payload)
     stats = models.PerformanceStats(
-        release_id=release.id, statistics=releaser.stats.copy())
+        release_id=release.id, statistics=releaser.stats.copy()
+    )
     db.add(stats)
     await db.commit()
     return await releaser.get_final_release(release.id)
@@ -126,8 +130,9 @@ async def update_release(
     releaser = get_releaser_class(product)(db)
     release = await releaser.update_release(release_id, payload, user_id)
     for perf_stat in release.performance_stats:
-        perf_stat.statistics.update(**releaser.stats)
-    db.add(release)
+        new_stats = copy.deepcopy(perf_stat.statistics)
+        new_stats.update(**releaser.stats)
+        perf_stat.statistics = new_stats
     await db.commit()
     return await releaser.get_final_release(release_id)
 
@@ -136,7 +141,7 @@ async def commit_release(
     db: AsyncSession,
     release_id: int,
     user_id: int,
-) -> typing.Tuple[models.Release, str]:
+):
     release = (
         (
             await db.execute(
@@ -148,13 +153,12 @@ async def commit_release(
     )
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
-    release, message = await releaser.commit_release(release_id, user_id)
+    release, _ = await releaser.commit_release(release_id, user_id)
     for perf_stat in release.performance_stats:
-        perf_stat.statistics.update(**releaser.stats)
-    db.add(release)
+        new_stats = copy.deepcopy(perf_stat.statistics)
+        new_stats.update(**releaser.stats)
+        perf_stat.statistics = new_stats
     await db.commit()
-    release = await releaser.get_final_release(release_id)
-    return release, message
 
 
 async def revert_release(
