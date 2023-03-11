@@ -338,42 +338,42 @@
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:x86_64"
       arch: x86_64
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-x86_64-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-x86_64-dr/"
       debug: false
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:x86_64-debug"
       arch: x86_64
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-x86_64-debug-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-x86_64-debug-dr/"
       debug: true
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:aarch64"
       arch: aarch64
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-aarch64-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-aarch64-dr/"
       debug: false
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:aarch64-debug"
       arch: aarch64
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-aarch64-debug-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-aarch64-debug-dr/"
       debug: true
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:ppc64le"
       arch: ppc64le
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-ppc64le-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-ppc64le-dr/"
       debug: false
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:ppc64le-debug"
       arch: ppc64le
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-ppc64le-debug-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-ppc64le-debug-dr/"
       debug: true
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:src"
       arch: src
       type: rpm
-      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-src-dr"
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-src-dr/"
       debug: false
       production: false
