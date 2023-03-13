@@ -1387,3 +1387,93 @@ async def bulk_errata_records_release(records_ids: List[str]):
         *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
     )
     logging.info("Bulk errata release is finished")
+
+
+async def get_updateinfo_xml_from_pulp(
+    record_id: str,
+) -> str:
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    errata_records = await pulp_client.list_updateinfo_records(
+        id__in=[record_id],
+    )
+    if not errata_records:
+        return f"{record_id} not found in pulp"
+    cr_upd = cr.UpdateInfo()
+    for errata_record in errata_records:
+        cr_ref = cr.UpdateReference()
+        cr_rec = cr.UpdateRecord()
+        cr_col = cr.UpdateCollection()
+        cr_mod = cr.UpdateCollectionModule()
+        cr_rec.id = errata_record["id"]
+        for key in (
+            "issued_date",
+            "pushcount",
+            "release",
+            "rights",
+            "severity",
+            "summary",
+            "title",
+            "description",
+            "fromstr",
+            "type",
+            "status",
+            "version",
+            "rights",
+            "updated_date",
+        ):
+            if key not in errata_record:
+                continue
+            value = errata_record[key]
+            if key in (
+                "issued_date",
+                "updated_date",
+            ):
+                value = datetime.datetime.fromisoformat(value)
+            setattr(cr_rec, key, value)
+        for ref in errata_record.get("references", []):
+            cr_ref.href = ref["href"]
+            cr_ref.type = ref["type"]
+            cr_ref.id = ref["id"]
+            cr_ref.title = ref["title"]
+            cr_rec.append_reference(cr_ref)
+        collection = errata_record["pkglist"][0]
+        cr_col.name = collection["name"]
+        cr_col.shortname = collection["shortname"]
+        if collection["module"]:
+            for key in (
+                "stream",
+                "name",
+                "version",
+                "arch",
+                "context",
+            ):
+                setattr(cr_mod, key, collection["module"][key])
+            cr_col.module = cr_mod
+        for package in collection["packages"]:
+            cr_pkg = cr.UpdateCollectionPackage()
+            for key in (
+                "name",
+                "src",
+                "version",
+                "release",
+                "arch",
+                "filename",
+                "sum",
+                "epoch",
+                "reboot_suggested",
+            ):
+                if key not in package:
+                    continue
+                setattr(cr_pkg, key, package[key])
+            if package["sum_type"] == "sha256":
+                cr_pkg.sum_type = cr.SHA256
+            else:
+                cr_pkg.sum_type = package["sum_type"]
+            cr_col.append(cr_pkg)
+        cr_rec.append_collection(cr_col)
+        cr_upd.append(cr_rec)
+    return cr_upd.xml_dump()
