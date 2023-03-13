@@ -108,8 +108,13 @@ class CriteriaNode:
             and len(self.criteria["criterion"]) == 1
             and len(self.criteria["criteria"]) == 0
         ):
-            self.parent.criteria["criterion"].append(self.criteria["criterion"].pop())
-        if len(self.criteria["criteria"]) == 0 and len(self.criteria["criterion"]) == 0:
+            self.parent.criteria["criterion"].append(
+                self.criteria["criterion"].pop()
+            )
+        if (
+            len(self.criteria["criteria"]) == 0
+            and len(self.criteria["criterion"]) == 0
+        ):
             return True
         return False
 
@@ -170,7 +175,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             ]
             for albs_pkg in albs_pkgs:
                 rhel_evra = f"{pkg.epoch}:{pkg.version}-{pkg.release}"
-                albs_evra = f"{albs_pkg.epoch}:{albs_pkg.version}-{albs_pkg.release}"
+                albs_evra = (
+                    f"{albs_pkg.epoch}:{albs_pkg.version}-{albs_pkg.release}"
+                )
                 arch = albs_pkg.arch
                 if arch == "noarch":
                     arch = pkg.arch
@@ -206,7 +213,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                                 continue
                             # TODO: Add test mapping here
                             #       test_id: rhel_evra
-                            criterion["comment"] = criterion["comment"].replace(
+                            criterion["comment"] = criterion[
+                                "comment"
+                            ].replace(
                                 evra,
                                 rhel_evra_mapping[evra][
                                     next(iter(rhel_evra_mapping[evra].keys()))
@@ -219,7 +228,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                 ):
                     criterion_list = []
                 criteria["criterion"] = criterion_list
-                links_tracking.update(criterion["ref"] for criterion in criterion_list)
+                links_tracking.update(
+                    criterion["ref"] for criterion in criterion_list
+                )
             criteria_list = new_criteria_list
         for criteria in record.original_criteria:
             criteria_node = CriteriaNode(criteria, None)
@@ -272,7 +283,8 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
                                 "cvss3": ref.cve.cvss3,
                             }
                             for ref in record.references
-                            if ref.ref_type == ErrataReferenceType.cve and ref.cve
+                            if ref.ref_type == ErrataReferenceType.cve
+                            and ref.cve
                         ],
                     },
                     "references": [
@@ -313,7 +325,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             if test.get("state_ref"):
                 test["state_ref"] = debrand_id(test["state_ref"])
             links_tracking.update([test["object_ref"], test["state_ref"]])
-            oval.append_object(get_test_cls_by_tag(test["type"]).from_dict(test))
+            oval.append_object(
+                get_test_cls_by_tag(test["type"]).from_dict(test)
+            )
         for obj in record.original_objects:
             obj["id"] = debrand_id(obj["id"])
             if obj["id"] in objects:
@@ -327,7 +341,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             if get_object_cls_by_tag(obj["type"]) == RpmverifyfileObject:
                 if obj["filepath"] == "/etc/redhat-release":
                     obj["filepath"] = "/etc/almalinux-release"
-            oval.append_object(get_object_cls_by_tag(obj["type"]).from_dict(obj))
+            oval.append_object(
+                get_object_cls_by_tag(obj["type"]).from_dict(obj)
+            )
         for state in record.original_states:
             state["id"] = debrand_id(state["id"])
             if state["id"] in objects:
@@ -337,7 +353,9 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             if state.get("evr"):
                 if state["evr"] in rhel_evra_mapping:
                     if state["arch"]:
-                        state["arch"] = "|".join(rhel_evra_mapping[state["evr"]].keys())
+                        state["arch"] = "|".join(
+                            rhel_evra_mapping[state["evr"]].keys()
+                        )
                     state["evr"] = rhel_evra_mapping[state["evr"]][
                         next(iter(rhel_evra_mapping[state["evr"]].keys()))
                     ]
@@ -360,14 +378,21 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             if var["id"] not in links_tracking:
                 continue
             objects.add(var["id"])
-            oval.append_object(get_variable_cls_by_tag(var["type"]).from_dict(var))
+            oval.append_object(
+                get_variable_cls_by_tag(var["type"]).from_dict(var)
+            )
             for obj in record.original_objects:
-                if obj["id"] != var["arithmetic"]["object_component"]["object_ref"]:
+                if (
+                    obj["id"]
+                    != var["arithmetic"]["object_component"]["object_ref"]
+                ):
                     continue
                 if obj["id"] in objects:
                     continue
                 objects.add(obj["id"])
-                oval.append_object(get_object_cls_by_tag(obj["type"]).from_dict(obj))
+                oval.append_object(
+                    get_object_cls_by_tag(obj["type"]).from_dict(obj)
+                )
     return oval.dump_to_string()
 
 
@@ -406,10 +431,10 @@ async def load_platform_packages(
             )
         else:
             pkgs = get_rpm_packages_from_repository(
-               repo_id=repo_id,
-               pkg_names=search_params["name"],
-               pkg_versions=search_params["version"],
-               pkg_epochs=search_params["epoch"],
+                repo_id=repo_id,
+                pkg_names=search_params["name"],
+                pkg_versions=search_params["version"],
+                pkg_epochs=search_params["epoch"],
             )
 
         if not pkgs:
@@ -453,7 +478,9 @@ async def update_errata_record(
         else:
             record.title = update_record.title
         if record.title:
-            record.oval_title = get_oval_title(record.title, record.id, record.severity)
+            record.oval_title = get_oval_title(
+                record.title, record.id, record.severity
+            )
     if update_record.description is not None:
         if update_record.description == record.original_description:
             record.description = None
@@ -518,9 +545,13 @@ async def get_matching_albs_packages(
     # only packages that belong to the right module:stream
     if module:
         module_name, module_stream = module.split(":")
-        query = query.join(models.BuildTask).join(models.RpmModule).filter(
-            models.RpmModule.name == module_name,
-            models.RpmModule.stream == module_stream,
+        query = (
+            query.join(models.BuildTask)
+            .join(models.RpmModule)
+            .filter(
+                models.RpmModule.name == module_name,
+                models.RpmModule.stream == module_stream,
+            )
         )
 
     result = (await db.execute(query)).scalars().all()
@@ -592,7 +623,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
 
     # Check if errata refers to a module
-    r = re.compile('Module ([\d\w\-\_]+:[\d\.\w]+) is enabled')
+    r = re.compile("Module ([\d\w\-\_]+:[\d\.\w]+) is enabled")
     match = r.findall(str(errata.criteria))
     errata_module = None if not match else match[0]
 
@@ -610,7 +641,9 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         description=None,
         original_description=errata.description,
         title=None,
-        oval_title=get_oval_title(errata.title, alma_errata_id, errata.severity),
+        oval_title=get_oval_title(
+            errata.title, alma_errata_id, errata.severity
+        ),
         original_title=get_verbose_errata_title(errata.title, errata.severity),
         contact_mail=platform.contact_mail,
         status=errata.status,
@@ -642,7 +675,9 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         db_cve = None
         if ref.cve:
             db_cve = await db.execute(
-                select(models.ErrataCVE).where(models.ErrataCVE.id == ref.cve.id)
+                select(models.ErrataCVE).where(
+                    models.ErrataCVE.id == ref.cve.id
+                )
             )
             db_cve = db_cve.scalars().first()
             if db_cve is None:
@@ -708,7 +743,9 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         items_to_insert.append(db_package)
         # Create ErrataToAlbsPackages
         items_to_insert.extend(
-            await get_matching_albs_packages(db, db_package, prod_repos_cache, db_errata.module)
+            await get_matching_albs_packages(
+                db, db_package, prod_repos_cache, db_errata.module
+            )
         )
 
     db.add_all(items_to_insert)
@@ -789,7 +826,9 @@ async def list_errata_records(
         return query
 
     return {
-        "total_records": (await db.execute(generate_query(count=True))).scalar(),
+        "total_records": (
+            await db.execute(generate_query(count=True))
+        ).scalar(),
         "records": (await db.execute(generate_query())).scalars().all(),
         "current_page": page,
     }
@@ -822,7 +861,10 @@ async def update_package_status(
                             f"There is already released package "
                             f"with same source: {albs_pkg}"
                         )
-                    if albs_pkg.build_id != record.build_id and record_approved:
+                    if (
+                        albs_pkg.build_id != record.build_id
+                        and record_approved
+                    ):
                         albs_pkg.status = ErrataPackageStatus.skipped
                     if albs_pkg.build_id == record.build_id:
                         albs_pkg.status = record.status
@@ -909,10 +951,14 @@ async def release_errata_packages(
         f"{platform.name.lower()}-for-{arch}-{repo_stage}-"
         f"rpms__{platform_version}_default"
     )
-    default_summary = clean_errata_title(record.get_title(), severity=record.severity)
+    default_summary = clean_errata_title(
+        record.get_title(), severity=record.severity
+    )
     pulp_record = {
         "id": record.id,
-        "updated_date": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_date": datetime.datetime.utcnow().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        ),
         "issued_date": record.issued_date.strftime("%Y-%m-%d %H:%M:%S"),
         "description": record.get_description(),
         "fromstr": record.contact_mail,
@@ -969,9 +1015,9 @@ async def prepare_updateinfo_mapping(
                         models.BuildTaskArtifact.href == pkg_href,
                     )
                     .options(
-                        selectinload(models.BuildTaskArtifact.build_task).selectinload(
-                            models.BuildTask.rpm_module
-                        )
+                        selectinload(
+                            models.BuildTaskArtifact.build_task
+                        ).selectinload(models.BuildTask.rpm_module)
                     )
                 )
             )
@@ -983,7 +1029,8 @@ async def prepare_updateinfo_mapping(
                 select(models.ErrataToALBSPackage)
                 .where(
                     or_(
-                        models.ErrataToALBSPackage.albs_artifact_id == db_pkg.id,
+                        models.ErrataToALBSPackage.albs_artifact_id
+                        == db_pkg.id,
                         models.ErrataToALBSPackage.pulp_href == pkg_href,
                     )
                 )
@@ -1019,7 +1066,10 @@ def append_update_packages_in_update_records(
     pulp_db: Session,
     errata_records: List[Dict[str, Any]],
     updateinfo_mapping: DefaultDict[
-        str, List[Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]]
+        str,
+        List[
+            Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]
+        ],
     ],
 ):
     with pulp_db.begin():
@@ -1241,7 +1291,8 @@ async def get_release_logs(
         [
             "Architecture(s): " + ", ".join(arches),
             "\nPackages:\n" + "\n".join(pkgs),
-            "\nRepositories:\n" + "\n".join([repo.url for repo in repositories]),
+            "\nRepositories:\n"
+            + "\n".join([repo.url for repo in repositories]),
         ]
     )
     return "".join(release_log)
@@ -1281,7 +1332,9 @@ async def release_errata_record(record_id: str):
             for_release=True,
         )
         try:
-            repo_mapping = get_albs_packages_from_record(db_record, pulp_packages)
+            repo_mapping = get_albs_packages_from_record(
+                db_record, pulp_packages
+            )
         except Exception as exc:
             db_record.release_status = ErrataReleaseStatus.FAILED
             db_record.last_release_log = str(exc)
@@ -1353,7 +1406,9 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 for_release=True,
             )
             try:
-                repo_mapping = get_albs_packages_from_record(db_record, pulp_packages)
+                repo_mapping = get_albs_packages_from_record(
+                    db_record, pulp_packages
+                )
             except Exception as exc:
                 db_record.release_status = ErrataReleaseStatus.FAILED
                 db_record.last_release_log = str(exc)
