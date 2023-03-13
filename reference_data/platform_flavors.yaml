@@ -371,6 +371,18 @@
       url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-ppc64le-debug-dr/"
       debug: true
       production: false
+    - name: "copr:build.almalinux.org:soksanichenko:Pungi:s390x"
+      arch: s390x
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-s390x-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:Pungi:s390x-debug"
+      arch: s390x
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-s390x-debug-dr/"
+      debug: true
+      production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi:src"
       arch: src
       type: rpm
