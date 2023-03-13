@@ -1446,7 +1446,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
 
 async def get_updateinfo_xml_from_pulp(
     record_id: str,
-) -> str:
+) -> Optional[str]:
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -1456,7 +1456,7 @@ async def get_updateinfo_xml_from_pulp(
         id__in=[record_id],
     )
     if not errata_records:
-        return f"{record_id} not found in pulp"
+        return
     cr_upd = cr.UpdateInfo()
     for errata_record in errata_records:
         cr_ref = cr.UpdateReference()

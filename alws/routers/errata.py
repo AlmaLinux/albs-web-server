@@ -89,7 +89,13 @@ async def list_errata_records(
 async def get_updateinfo_xml(
     record_id: str,
 ):
-    return await errata_crud.get_updateinfo_xml_from_pulp(record_id)
+    updateinfo_xml = await errata_crud.get_updateinfo_xml_from_pulp(record_id)
+    if updateinfo_xml is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unable to find errata records with {record_id=} in pulp",
+        )
+    return updateinfo_xml
 
 
 @router.post("/update/", response_model=errata_schema.ErrataRecord)
