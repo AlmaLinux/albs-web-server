@@ -190,7 +190,7 @@ async def add_missing_pkgs_to_pulp_update_collections(
                     )
 
                 repos_for_publication.add((repo_name, repo_href))
-        return repos_for_publication
+    return repos_for_publication
 
 
 async def main():
