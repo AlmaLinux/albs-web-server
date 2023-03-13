@@ -151,6 +151,7 @@ async def add_missing_pkgs_to_pulp_update_collections(
             search_params = {
                 'name': missing_pkg.name,
                 'version': missing_pkg.version,
+                'release': missing_pkg.release,
                 'arch': missing_pkg.arch
             }
             # Check if pkg belongs to collection. This is, check if the package exists
