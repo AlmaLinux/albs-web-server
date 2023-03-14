@@ -313,3 +313,11 @@ def create_entity(monkeypatch):
         return href, hashlib.sha256().hexdigest(), artifact
 
     monkeypatch.setattr(PulpClient, "create_entity", func)
+
+
+@pytest.fixture
+def list_updateinfo_records(monkeypatch, pulp_updateinfos):
+    async def func(*args, **kwargs):
+        return pulp_updateinfos
+
+    monkeypatch.setattr(PulpClient, "list_updateinfo_records", func)
