@@ -28,12 +28,14 @@ class UserManager(IntegerIDMixin, BaseUserManager):
         refresh_token: Optional[str] = None,
         request: Optional[Request] = None,
         *,
-        associate_by_email: bool = False
+        associate_by_email: bool = False,
+        is_verified_by_default: bool = False,
     ) -> models.UOAP:
         user = await super().oauth_callback(
             oauth_name, access_token, account_id, account_email,
             expires_at=expires_at, refresh_token=refresh_token,
-            request=request, associate_by_email=associate_by_email
+            request=request, associate_by_email=associate_by_email,
+            is_verified_by_default=is_verified_by_default,
         )
         token = None
         for existing_oauth_account in user.oauth_accounts:
