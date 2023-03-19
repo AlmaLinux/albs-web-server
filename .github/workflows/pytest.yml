@@ -42,7 +42,7 @@ jobs:
       - name: Run unit tests (pytest)
         run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -c 'source
           env/bin/activate && pytest -v --ignore alws/ --cov-report term-missing:skip-covered
-          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
+          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws --no-cov-on-fail
           tests/ | tee /tmp/pytest-coverage.txt'
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main

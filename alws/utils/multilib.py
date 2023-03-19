@@ -102,7 +102,7 @@ class MultilibProcessor:
             self, platform, src_rpm: str) -> typing.List[dict]:
         ref_name = get_clean_distr_name(platform.name)
         ref_ver = platform.distr_version
-        endpoint = f'api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}'
+        endpoint = f'/api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}'
         response = await self.call_beholder(self._beholder_client, endpoint)
         query = (
             "packages[?arch=='i686']"
@@ -122,7 +122,7 @@ class MultilibProcessor:
         )
 
         async def get_data(mod_name: str, mod_stream: str) -> typing.List[dict]:
-            endpoint = (f'api/v1/distros/{platform_name}/{platform_version}'
+            endpoint = (f'/api/v1/distros/{platform_name}/{platform_version}'
                         f'/module/{mod_name}/{mod_stream}/x86_64/')
             response = await MultilibProcessor.call_beholder(
                 beholder_client, endpoint)
@@ -195,8 +195,10 @@ class MultilibProcessor:
             self._db, self._build_task)
         for artifact in db_artifacts:
             href = artifact.href
-            rpm_pkg = await self._pulp_client.get_rpm_package(
-                package_href=href,
+
+            _, rpm_pkg = await get_rpm_package_info(
+                self._pulp_client,
+                artifact,
                 include_fields=['name', 'version'],
             )
             artifact_name = rpm_pkg.get('name', '')

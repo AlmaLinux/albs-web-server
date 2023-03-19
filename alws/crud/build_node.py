@@ -478,8 +478,10 @@ async def __process_rpms(
         if built_srpm_url is not None:
             db_srpm = await get_srpm_artifact_by_build_task_id(db, task_id)
             if db_srpm is not None:
-                srpm_info = await pulp_client.get_rpm_package(
-                    db_srpm.href, include_fields=pkg_fields
+                _, srpm_info = await get_rpm_package_info(
+                    pulp_client,
+                    db_srpm,
+                    include_fields=pkg_fields,
                 )
         try:
             for module in module_index.iter_modules():

@@ -10,8 +10,35 @@ from alws.dramatiq.build import _start_build
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate
-
+from alws.utils.modularity import IndexWrapper
 from tests.fixtures.pulp import get_artifact_href
+from alws.utils.parsing import parse_rpm_nevra
+
+
+def get_artifacts(
+    src_url: str,
+    all_artifacts: list,
+    beholder_artifacts: dict,
+    task_arch: str
+):
+    src = src_url.split("/")
+    src.remove("")
+    src = src[-1].replace(".git", "")
+    artifacts_name = beholder_artifacts[src]
+    artifacts = set()
+    for pkg in all_artifacts:
+        for name in artifacts_name:
+            if name in pkg:
+                artifact = f"{pkg}.rpm"
+                if task_arch == "i686":
+                    artifact = artifact.replace('x86_64', 'i686')
+                artifacts.add(artifact)
+    return artifacts
+
+
+def save_modules_yaml(payload):
+    with open('/code/modules.yaml', 'w') as f:
+        f.write(payload["tasks"][0]["modules_yaml"])
 
 
 @pytest.fixture(autouse=True)
@@ -77,3 +104,66 @@ async def build_done(
             ],
         }
         await safe_build_done(session, BuildDone(**payload))
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def build_virt_done(
+    session: AsyncSession,
+    virt_build_payload: dict,
+    virt_build: Build,
+    modules_yaml_virt,
+    beholder_responses,
+    beholder_get,
+    create_module,
+    create_log_repo,
+    modify_repository,
+    create_entity,
+    get_rpm_package_info,
+    get_repo_modules_yaml,
+    get_repo_modules
+):
+
+    beholder_artifacts = {}
+    for endpoint in beholder_responses:
+        if "project" not in endpoint:
+            continue
+        src = beholder_responses[endpoint]["sourcerpm"]
+        packages = beholder_responses[endpoint]["packages"]
+        beholder_artifacts[src["name"]] = set()
+        for pkg in packages:
+            beholder_artifacts[src["name"]].add(pkg['name'])
+
+    module_index = IndexWrapper.from_template(
+        modules_yaml_virt.decode()
+    )
+    all_artifacts = []
+    for _module in module_index.iter_modules():
+        all_artifacts += _module.get_rpm_artifacts()
+
+    save_modules_yaml(virt_build_payload)
+    await _start_build(virt_build.id, BuildCreate(**virt_build_payload))
+    build = await get_builds(session, build_id=virt_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        payload = {
+            "task_id": build_task.id,
+            "status": "done",
+            "stats": {},
+            "artifacts": [
+                {
+                    "name": name,
+                    "type": "rpm",
+                    "href": get_artifact_href(),
+                    "sha256": hashlib.sha256().hexdigest(),
+                }
+                for name in get_artifacts(
+                    src_url=build_task.ref.url,
+                    all_artifacts=all_artifacts,
+                    beholder_artifacts=beholder_artifacts,
+                    task_arch=build_task.arch,
+                )
+            ],
+        }
+        await safe_build_done(session, BuildDone(**payload))
+    yield await get_builds(session, build_id=virt_build.id)

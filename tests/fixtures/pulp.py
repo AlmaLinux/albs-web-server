@@ -196,10 +196,30 @@ def create_module_by_payload(monkeypatch):
 @pytest.fixture
 def create_module(monkeypatch):
     async def func(*args, **kwargs):
+        _, modules_yaml, name, stream, release, arch = args
+        if arch == 'x86_64':
+            with open('/code/modules.yaml', 'w') as f:
+                f.write(modules_yaml)
         return get_module_href(), hashlib.sha256().hexdigest()
 
     monkeypatch.setattr(PulpClient, "create_module", func)
 
+
+@pytest.fixture
+def get_repo_modules_yaml(monkeypatch):
+    async def func(*args, **kwargs):
+        with open('/code/modules.yaml', 'r') as file:
+            return file.read()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_modules(monkeypatch):
+    async def func(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules", func)
 
 @pytest.fixture
 def create_build_rpm_repo(monkeypatch):
