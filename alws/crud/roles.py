@@ -31,8 +31,8 @@ async def fix_roles_actions(db: Session, commit: bool = False):
             if role.name.endswith(act_role.name):
                 r_actions = set(act_role.actions)
                 break
-    if not r_actions:
-        raise ValueError(f'No actions found for the role {role.name}')
+        if not r_actions:
+            raise ValueError(f'No actions found for the role {role.name}')
 
         required_actions_mapping = {a.name: a for a in actions
                                     if a.name in r_actions}
