@@ -337,12 +337,20 @@ async def remove_build_job(db: AsyncSession, build_id: int):
                 models.TestTaskArtifact.id.in_(test_task_artifact_ids))
         )
         await db.execute(
+            delete(models.PerformanceStats).where(
+                models.PerformanceStats.test_task_id.in_(test_task_ids))
+        )
+        await db.execute(
             delete(models.TestTask).where(
                 models.TestTask.id.in_(test_task_ids))
         )
         await db.execute(
             delete(models.BuildTaskDependency).where(
                 models.BuildTaskDependency.c.build_task_dependency.in_(build_task_ids))
+        )
+        await db.execute(
+            delete(models.PerformanceStats).where(
+                models.PerformanceStats.build_task_id.in_(build_task_ids))
         )
         await db.execute(
             delete(models.BuildTask).where(
