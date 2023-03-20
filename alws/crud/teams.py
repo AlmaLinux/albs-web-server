@@ -1,11 +1,11 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws.crud.actions import ensure_all_actions_exist
-from alws.database import Session
 from alws.errors import TeamError
 from alws.models import (
     Team,
@@ -35,7 +35,7 @@ def get_team_role_name(team_name: str, role_name: str):
     return f'{team_name}_{role_name}'
 
 
-async def create_team_roles(session: Session, team_name: str):
+async def create_team_roles(session: AsyncSession, team_name: str):
     required_roles = (Contributor, Manager, Observer, ProductMaintainer, Signer)
     new_role_names = [get_team_role_name(team_name, role.name)
                       for role in required_roles]
@@ -75,7 +75,7 @@ async def create_team_roles(session: Session, team_name: str):
 
 
 async def create_team(
-    session: Session,
+    session: AsyncSession,
     payload: team_schema.TeamCreate,
     flush: bool = False,
 ) -> Team:
@@ -118,11 +118,11 @@ async def create_team(
 
 
 async def get_teams(
-    session: Session,
+    session: AsyncSession,
     page_number: int = None,
     team_id: int = None,
     name: str = None,
-) -> typing.Union[typing.List[Team], Team]:
+) -> typing.Union[typing.List[Team], typing.Dict[str, typing.Any], Team]:
 
     def generate_query(count=False):
         query = select(Team).order_by(Team.id.desc()).options(
@@ -156,7 +156,7 @@ async def get_teams(
 
 
 async def update_members(
-    session: Session,
+    session: AsyncSession,
     payload: team_schema.TeamMembersUpdate,
     team_id: int,
     modification: str,
@@ -206,7 +206,7 @@ async def update_members(
     return db_team
 
 
-async def remove_team(db: Session, team_id: int):
+async def remove_team(db: AsyncSession, team_id: int):
     db_team = await get_teams(db, team_id=team_id)
     if not db_team:
         raise TeamError(f'Team={team_id} doesn`t exist')
