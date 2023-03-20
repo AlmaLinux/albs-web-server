@@ -227,11 +227,9 @@ async def mark_build_tasks_as_cancelled(
 
 
 async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
-    repo = await db.execute(
-        select(models.Repository).where(
-            models.Repository.name == task.get_log_repo_name()
-        )
-    )
+    repo = await db.execute(select(models.Repository).where(
+        models.Repository.name == task.get_log_repo_name()
+    ))
     return bool(repo.scalars().first())
 
 
@@ -478,8 +476,10 @@ async def __process_rpms(
         if built_srpm_url is not None:
             db_srpm = await get_srpm_artifact_by_build_task_id(db, task_id)
             if db_srpm is not None:
-                srpm_info = await pulp_client.get_rpm_package(
-                    db_srpm.href, include_fields=pkg_fields
+                _, srpm_info = await get_rpm_package_info(
+                    pulp_client,
+                    db_srpm,
+                    include_fields=pkg_fields,
                 )
         try:
             for module in module_index.iter_modules():
@@ -710,7 +710,7 @@ async def __process_build_task_artifacts(
                 "delta": str(end_time - start_time),
             }
         except Exception as e:
-            message = f"Cannot update module information inside Pulp: {str(e)}"
+            message = f'Cannot update module information inside Pulp: {str(e)}'
             logging.exception(message)
             raise ModuleUpdateError(message) from e
         logging.info("Module template processing is finished")

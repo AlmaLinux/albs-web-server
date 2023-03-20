@@ -24,6 +24,7 @@ public_router = APIRouter(
     tags=["releases"],
 )
 
+
 # TODO: add pulp db loader
 @public_router.get(
     "/",

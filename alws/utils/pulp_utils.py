@@ -107,9 +107,10 @@ def get_rpm_module_packages_from_repository(
 
 def get_rpm_packages_from_repository(
     repo_id: uuid.UUID,
-    pkg_names: typing.List[str] = None,
-    pkg_versions: typing.List[str] = None,
-    pkg_epochs: typing.List[str] = None,
+    pkg_names: typing.Optional[typing.List[str]] = None,
+    pkg_versions: typing.Optional[typing.List[str]] = None,
+    pkg_epochs: typing.Optional[typing.List[str]] = None,
+    pkg_arches: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
     first_subq = (
         select(CoreRepository.pulp_id)
@@ -142,6 +143,8 @@ def get_rpm_packages_from_repository(
         conditions.append(RpmPackage.version.in_(pkg_versions))
     if pkg_epochs:
         conditions.append(RpmPackage.epoch.in_(pkg_epochs))
+    if pkg_arches:
+        conditions.append(RpmPackage.arch.in_(pkg_arches))
 
     query = select(RpmPackage).where(*conditions)
     with get_pulp_db() as pulp_db:
