@@ -103,8 +103,8 @@
   data:
      mock:
        macros:
-         "%pe_signing_cert": "'f4217b7b99a69128'"
-         "%pe_signing_token": "'AlmaLinux OS Foundation'"
+         "%pe_signing_cert": 'f4217b7b99a69128'
+         "%pe_signing_token": 'AlmaLinux OS Foundation'
   repositories:
     - name: almalinux-9-beta
       arch: i686
