@@ -2,13 +2,11 @@ import logging
 import typing
 
 import dramatiq
-from sqlalchemy import update
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, TestTaskStatus
 from alws.crud import test as t_crud
 from alws.database import Session
 from alws.dramatiq import event_loop
-from alws.models import TestTask
 from alws.schemas.test_schema import TestTaskResult
 
 
@@ -26,9 +24,9 @@ async def _complete_test_task(task_id: int, task_result: TestTaskResult):
                 'Cannot set test task "%d" result, marking as failed.'
                 'Error: %s', task_id, str(e))
             await db.rollback()
-            await db.execute(update(TestTask).where(
-                TestTask.id == task_id).values(status=TestTaskStatus.FAILED))
-        else:
+            await t_crud.update_test_task(
+                db, task_id, task_result, status=TestTaskStatus.FAILED)
+        finally:
             await db.commit()
 
 

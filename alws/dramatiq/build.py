@@ -5,8 +5,8 @@ import dramatiq
 import logging
 
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -110,7 +110,7 @@ async def _build_done(request: build_node_schema.BuildDone):
         all_build_tasks_completed = await _all_build_tasks_completed(
             db, request.task_id)
 
-        if success and request.status == 'done' and all_build_tasks_completed:
+        if success and all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             try:
                 await test.create_test_tasks_for_build_id(db, build_id)
@@ -130,7 +130,7 @@ async def _build_done(request: build_node_schema.BuildDone):
             await db.commit()
 
 
-async def _get_build_id(db: Session, build_task_id: int) -> int:
+async def _get_build_id(db: AsyncSession, build_task_id: int) -> int:
     async with db.begin():
         build_id = (await db.execute(select(models.BuildTask.build_id).where(
             models.BuildTask.id == build_task_id
@@ -139,7 +139,7 @@ async def _get_build_id(db: Session, build_task_id: int) -> int:
 
 
 async def _check_build_and_completed_tasks(
-            db: Session,
+            db: AsyncSession,
             build_id: int
         ) -> bool:
     async with db.begin():
@@ -163,7 +163,8 @@ async def _check_build_and_completed_tasks(
         return completed_tasks == build_tasks
 
 
-async def _all_build_tasks_completed(db: Session, build_task_id: int) -> bool:
+async def _all_build_tasks_completed(
+        db: AsyncSession, build_task_id: int) -> bool:
     build_id = await _get_build_id(db, build_task_id)
     all_completed = await _check_build_and_completed_tasks(db, build_id)
     return all_completed
