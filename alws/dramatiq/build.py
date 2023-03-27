@@ -2,6 +2,8 @@ import datetime
 from typing import Dict, Any
 
 import dramatiq
+import logging
+
 from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
@@ -24,9 +26,9 @@ from alws.database import SyncSession
 from alws.dependencies import get_db
 from alws.dramatiq import event_loop
 
-
 __all__ = ['start_build', 'build_done']
 
+logger = logging.getLogger(__name__)
 
 def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
@@ -81,16 +83,43 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 async def _build_done(request: build_node_schema.BuildDone):
     async for db in get_db():
-        success = await build_node_crud.safe_build_done(db, request)
+        success = False
+        try:
+            success = await build_node_crud.safe_build_done(db, request)
+        except Exception as e:
+            logger.exception(
+                'Unable to complete safe_build_done for build task "%d", '
+                'marking it as failed.\nError: %s',
+                request.task_id, str(e)
+            )
+            build_task = (await db.execute(
+                select(models.BuildTask).where(
+                    models.BuildTask.id == request.task_id
+                )
+            )).scalars().first()
+            build_task.ts = datetime.datetime.utcnow()
+            build_task.error = str(e)
+            build_task.status = BuildTaskStatus.FAILED
+            await build_node_crud.fast_fail_other_tasks_by_ref(db, build_task)
+            await db.commit()
+
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
         # The last completed task will trigger the creation of the test tasks
         # of the same build.
-        all_build_tasks_completed = await _all_build_tasks_completed(db, request.task_id)
+        all_build_tasks_completed = await _all_build_tasks_completed(
+            db, request.task_id)
 
         if success and request.status == 'done' and all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
-            await test.create_test_tasks_for_build_id(db, build_id)
+            try:
+                await test.create_test_tasks_for_build_id(db, build_id)
+            except Exception as e:
+                logger.exception(
+                    'Unable to create test tasks for build "%d". Error: %s',
+                    build_id, str(e)
+                )
+
         if all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             await db.execute(

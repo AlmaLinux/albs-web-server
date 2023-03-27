@@ -883,6 +883,7 @@ async def safe_build_done(
             )
         )
         build_task = build_task.scalars().first()
+        build_task.ts = datetime.datetime.utcnow()
         build_task.status = BuildTaskStatus.FAILED
         build_task.error = traceback.format_exc()
         await fast_fail_other_tasks_by_ref(db, build_task)
