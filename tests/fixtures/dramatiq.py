@@ -10,8 +10,7 @@ from alws.dramatiq.build import _start_build
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate
-
-from tests.fixtures.pulp import get_artifact_href
+from tests.test_utils.pulp_utils import get_artifact_href
 
 
 @pytest.fixture(autouse=True)

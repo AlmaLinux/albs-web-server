@@ -6,9 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.crud.build import create_build, get_builds
 from alws.models import Build
 from alws.schemas.build_schema import BuildCreate
-
 from tests.constants import ADMIN_USER_ID
-from tests.fixtures.pulp import get_rpm_pkg_info
+from tests.test_utils.pulp_utils import get_rpm_pkg_info
 
 
 @pytest.fixture

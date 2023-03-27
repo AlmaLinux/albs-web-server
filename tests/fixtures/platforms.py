@@ -1,16 +1,13 @@
 from typing import AsyncIterable
+
 import pytest
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import yaml
 
 from alws import models
-from alws.schemas import (
-    repository_schema,
-    platform_schema,
-)
-
-from tests.fixtures.pulp import get_repo_href
+from alws.schemas import platform_schema, repository_schema
+from tests.test_utils.pulp_utils import get_repo_href
 
 
 @pytest.mark.anyio
