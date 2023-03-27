@@ -1,7 +1,7 @@
 import pytest
 
 from alws.release_planner import AlmaLinuxReleasePlanner, BaseReleasePlanner
-from tests.fixtures.pulp import get_rpm_pkg_info
+from tests.test_utils.pulp_utils import get_rpm_pkg_info
 
 
 @pytest.mark.anyio
