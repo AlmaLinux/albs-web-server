@@ -83,9 +83,8 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 async def _build_done(request: build_node_schema.BuildDone):
     async for db in get_db():
-        success = False
         try:
-            success = await build_node_crud.safe_build_done(db, request)
+            await build_node_crud.safe_build_done(db, request)
         except Exception as e:
             logger.exception(
                 'Unable to complete safe_build_done for build task "%d", '
@@ -110,7 +109,7 @@ async def _build_done(request: build_node_schema.BuildDone):
         all_build_tasks_completed = await _all_build_tasks_completed(
             db, request.task_id)
 
-        if success and all_build_tasks_completed:
+        if all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             try:
                 await test.create_test_tasks_for_build_id(db, build_id)
@@ -119,8 +118,6 @@ async def _build_done(request: build_node_schema.BuildDone):
                     'Unable to create test tasks for build "%d". Error: %s',
                     build_id, str(e)
                 )
-
-        if all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             await db.execute(
                 update(models.Build)
