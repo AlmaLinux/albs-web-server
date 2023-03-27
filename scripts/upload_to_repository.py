@@ -5,6 +5,7 @@ import os.path
 import pprint
 import sys
 import tempfile
+import urllib.parse
 
 from alws.utils.parsing import parse_rpm_nevra
 
@@ -40,7 +41,8 @@ async def async_main(args, work_dir, logger):
     logger.debug('Repository: %s', str(repository))
     rpm_package_hrefs = []
 
-    for link in args.package_links:
+    for raw_link in args.package_links:
+        link = urllib.parse.unquote(raw_link)
         file_name = os.path.basename(link.strip())
         nevra = parse_rpm_nevra(file_name)
         file_path = os.path.join(work_dir, file_name)
