@@ -388,6 +388,23 @@ services:
       - 6379:6379
     restart: on-failure
 
+  sign_file:
+    image: sign-file:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-sign-file
+    command: >
+      bash -c "/app/env/bin/python /app/db_manage.py dev_init
+      && /app/env/bin/python /app/start.py"
+    restart: on-failure
+    volumes:
+      - "~/.gnupg:/home/alt/.gnupg"
+      - "../albs-sign-file/sign:/app/sign"
+    ports:
+      - "8083:8000"
+
   nginx:
     image: nginx
     ports:
@@ -397,6 +414,7 @@ services:
     depends_on:
       - web_server
       - frontend
+      - sign_file
 
   immudb:
     image: codenotary/immudb:1.5
