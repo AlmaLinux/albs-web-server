@@ -2,7 +2,7 @@ import typing
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import joinedload, load_only
 
 from alws.dependencies import get_pulp_db
 from alws.pulp_models import (
@@ -11,7 +11,6 @@ from alws.pulp_models import (
     CoreRepositoryContent,
     RpmPackage,
 )
-
 from alws.utils.modularity import IndexWrapper, get_modules_yaml_from_repo
 from alws.utils.parsing import parse_rpm_nevra
 
@@ -30,9 +29,8 @@ def get_rpm_module_packages_from_repository(
     pkg_versions: typing.List[str] = None,
     pkg_epochs: typing.List[str] = None,
 ) -> typing.List[RpmPackage]:
-    repo_query = (
-        select(CoreRepository)
-        .where(CoreRepository.pulp_id == repo_id)
+    repo_query = select(CoreRepository).where(
+        CoreRepository.pulp_id == repo_id
     )
     with get_pulp_db() as pulp_db:
         repo = pulp_db.execute(repo_query).scalars().first()
@@ -54,11 +52,10 @@ def get_rpm_module_packages_from_repository(
     except:
         return
 
-    module_name, module_stream = module.split(':')
+    module_name, module_stream = module.split(":")
     try:
         repo_module = IndexWrapper.from_template(repo_modules_yaml).get_module(
-            module_name,
-            module_stream
+            module_name, module_stream
         )
     except:
         return
@@ -95,14 +92,56 @@ def get_rpm_module_packages_from_repository(
         .scalar_subquery()
     )
 
-    conditions.extend([
-        RpmPackage.content_ptr_id.in_(last_subq),
-        RpmPackage.release.in_(pkg_releases),
-    ])
+    conditions.extend(
+        [
+            RpmPackage.content_ptr_id.in_(last_subq),
+            RpmPackage.release.in_(pkg_releases),
+        ]
+    )
 
     query = select(RpmPackage).where(*conditions)
     with get_pulp_db() as pulp_db:
         return pulp_db.execute(query).scalars().all()
+
+
+def get_rpm_packages_from_repositories(
+    repo_ids: typing.List[uuid.UUID],
+    pkg_names: typing.Optional[typing.List[str]] = None,
+    pkg_versions: typing.Optional[typing.List[str]] = None,
+    pkg_epochs: typing.Optional[typing.List[str]] = None,
+    pkg_arches: typing.Optional[typing.List[str]] = None,
+    pkg_releases: typing.Optional[typing.List[str]] = None,
+) -> typing.List[RpmPackage]:
+    conditions = [
+        CoreRepository.pulp_id.in_(repo_ids),
+        CoreRepositoryContent.version_removed_id.is_(None),
+    ]
+    if pkg_names:
+        conditions.append(RpmPackage.name.in_(pkg_names))
+    if pkg_versions:
+        conditions.append(RpmPackage.version.in_(pkg_versions))
+    if pkg_epochs:
+        conditions.append(RpmPackage.epoch.in_(pkg_epochs))
+    if pkg_arches:
+        conditions.append(RpmPackage.arch.in_(pkg_arches))
+    if pkg_releases:
+        conditions.append(RpmPackage.release.in_(pkg_releases))
+    query = (
+        select(RpmPackage)
+        .join(CoreContent)
+        .join(CoreRepositoryContent)
+        .join(CoreRepository)
+        .where(*conditions)
+        .options(
+            joinedload(RpmPackage.content).joinedload(
+                CoreContent.core_repositorycontent.and_(
+                    CoreRepositoryContent.repository_id.in_(repo_ids)
+                )
+            )
+        )
+    )
+    with get_pulp_db() as pulp_db:
+        return pulp_db.execute(query).scalars().unique().all()
 
 
 def get_rpm_packages_from_repository(

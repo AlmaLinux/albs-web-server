@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     test_task_scheduler_enabled: bool = False
 
     package_beholder_enabled: bool = True
-    beholder_host: typing.Optional[str] = 'http://beholder-web:5000'
+    beholder_host: str = 'http://beholder-web:5000'
     beholder_token: typing.Optional[str]
 
     redis_url: str = 'redis://redis:6379'
