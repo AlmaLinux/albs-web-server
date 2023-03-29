@@ -18,24 +18,14 @@ async def get_pulp_packages_info(monkeypatch):
     monkeypatch.setattr(BaseReleasePlanner, "get_pulp_packages_info", func)
 
 
-@pytest.mark.anyio
 @pytest.fixture
-async def disable_packages_check_in_prod_repos(monkeypatch):
-    async def preparation_result(*args, **kwargs):
-        return
-
-    async def async_tasks_result(*args, **kwargs):
-        return {}, {}
+def disable_packages_check_in_prod_repos(monkeypatch):
+    def func(*args, **kwargs):
+        return []
 
     monkeypatch.setattr(
-        AlmaLinuxReleasePlanner,
-        "prepare_data_for_executing_async_tasks",
-        preparation_result,
-    )
-    monkeypatch.setattr(
-        AlmaLinuxReleasePlanner,
-        "prepare_and_execute_async_tasks",
-        async_tasks_result,
+        "alws.release_planner.get_rpm_packages_from_repositories",
+        func,
     )
 
 

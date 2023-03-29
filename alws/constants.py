@@ -2,9 +2,7 @@ import enum
 import re
 import typing
 from collections import namedtuple
-
 from dataclasses import dataclass
-
 
 __all__ = [
     "DEFAULT_PRODUCT",

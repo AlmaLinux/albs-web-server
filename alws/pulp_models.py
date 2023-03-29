@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List
 
 import sqlalchemy
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from alws.database import PulpBase
@@ -197,6 +197,10 @@ class CoreContent(PulpBase):
         "CoreContentArtifact",
         back_populates="content",
     )
+    core_repositorycontent: "CoreRepositoryContent" = relationship(
+        "CoreRepositoryContent",
+        back_populates="content",
+    )
 
     @property
     def file_href(self):
@@ -305,6 +309,7 @@ class CoreRepositoryContent(PulpBase):
     content: List[CoreContent] = relationship(
         CoreContent,
         foreign_keys=[content_id],
+        back_populates="core_repositorycontent",
     )
     repository: List[CoreRepository] = relationship(
         CoreRepository,
@@ -375,12 +380,20 @@ class RpmPackage(PulpBase):
     def nevra(self) -> str:
         return f"{self.epoch}:{self.name}-{self.version}-{self.release}.{self.arch}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"RpmPackage <{self.content_ptr_id}>: {self.nevra}"
 
     @property
-    def pulp_href(self):
+    def pulp_href(self) -> str:
         return f"/pulp/api/v3/content/rpm/packages/{str(self.content_ptr_id)}/"
+
+    @property
+    def repo_ids(self) -> List[uuid.UUID]:
+        return [
+            repo_content.repository_id
+            for repo_content in self.content.core_repositorycontent
+            if repo_content.version_removed_id is None
+        ]
 
 
 class RpmModulemd(PulpBase):
@@ -407,10 +420,8 @@ class RpmModulemdPackages(PulpBase):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     modulemd_id = sqlalchemy.Column(
-        UUID(as_uuid=True),
-        sqlalchemy.ForeignKey(RpmModulemd.content_ptr_id)
+        UUID(as_uuid=True), sqlalchemy.ForeignKey(RpmModulemd.content_ptr_id)
     )
     package_id = sqlalchemy.Column(
-        UUID(as_uuid=True),
-        sqlalchemy.ForeignKey(RpmPackage.content_ptr_id)
+        UUID(as_uuid=True), sqlalchemy.ForeignKey(RpmPackage.content_ptr_id)
     )
