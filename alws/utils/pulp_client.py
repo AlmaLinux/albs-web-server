@@ -90,14 +90,26 @@ class PulpClient:
     async def get_by_href(self, href: str) -> typing.Dict[str, Any]:
         return await self.request("GET", href)
 
-    async def get_rpm_repository_by_params(
+    async def get_rpm_repositories_by_params(
         self, params: dict
-    ) -> typing.Union[dict, None]:
+    ) -> typing.Optional[typing.List[typing.Dict[str, typing.Any]]]:
         endpoint = "pulp/api/v3/repositories/rpm/rpm/"
         response = await self.request("GET", endpoint, params=params)
         if response["count"] == 0:
+            return []
+        if response["count"] > 100:
+            new_params = params.copy()
+            new_params["limit"] = response["count"] + 1
+            response = await self.request("GET", endpoint, params=params)
+        return response["results"]
+
+    async def get_rpm_repository_by_params(
+        self, params: dict
+    ) -> typing.Union[dict, None]:
+        repositories = await self.get_rpm_repositories_by_params(params)
+        if not repositories:
             return None
-        return response["results"][0]
+        return repositories[0]
 
     async def get_log_repository(self, name: str) -> typing.Union[dict, None]:
         endpoint = "pulp/api/v3/repositories/file/file/"
@@ -147,29 +159,12 @@ class PulpClient:
         exclude_fields: typing.List[str] = None,
         **search_params,
     ) -> typing.List[dict]:
-        endpoint = "pulp/api/v3/distributions/rpm/rpm/"
-        all_distros = []
-        result = await self.__get_content_info(
-            endpoint,
+        return await self.__get_entities(
+            "pulp/api/v3/distributions/rpm/rpm/",
             include_fields=include_fields,
             exclude_fields=exclude_fields,
-            **search_params,
+            **search_params
         )
-        if result["count"] == 0:
-            return []
-        all_distros.extend(result["results"])
-        while result.get("next"):
-            new_url = result.get("next")
-            parsed_url = urllib.parse.urlsplit(new_url)
-            new_url = parsed_url.path + "?" + parsed_url.query
-            result = await self.__get_content_info(
-                new_url,
-                include_fields=include_fields,
-                exclude_fields=exclude_fields,
-                **search_params,
-            )
-            all_distros.extend(result["results"])
-        return all_distros
 
     async def get_rpm_remote(self, name: str) -> typing.Union[dict, None]:
         endpoint = "pulp/api/v3/remotes/rpm/rpm/"
@@ -189,6 +184,13 @@ class PulpClient:
         response = await self.request("GET", endpoint, params=params)
         if response["count"] == 0:
             return None
+        return response["results"]
+
+    async def get_modules(self, **search_params):
+        endpoint = "pulp/api/v3/content/rpm/modulemds/"
+        response = await self.request("GET", endpoint, params=search_params)
+        if response["count"] == 0:
+            return []
         return response["results"]
 
     async def create_module_by_payload(self, payload: dict) -> str:
@@ -542,17 +544,15 @@ class PulpClient:
             package_href, include_fields=include_fields, exclude_fields=exclude_fields
         )
 
-    async def get_rpm_packages(
+    async def __get_entities(
         self,
+        endpoint,
         include_fields: typing.List[str] = None,
         exclude_fields: typing.List[str] = None,
-        custom_endpoint: str = None,
-        **search_params,
+        **search_params
     ):
-        endpoint = "pulp/api/v3/content/rpm/packages/"
-        if custom_endpoint:
-            endpoint = custom_endpoint
-        all_rpms = []
+        all_entities = []
+
         result = await self.__get_content_info(
             endpoint,
             include_fields=include_fields,
@@ -561,7 +561,7 @@ class PulpClient:
         )
         if result["count"] == 0:
             return []
-        all_rpms.extend(result["results"])
+        all_entities.extend(result["results"])
         while result.get("next"):
             new_url = result.get("next")
             parsed_url = urllib.parse.urlsplit(new_url)
@@ -572,8 +572,25 @@ class PulpClient:
                 exclude_fields=exclude_fields,
                 **search_params,
             )
-            all_rpms.extend(result["results"])
-        return all_rpms
+            all_entities.extend(result["results"])
+        return all_entities
+
+    async def get_rpm_packages(
+        self,
+        include_fields: typing.List[str] = None,
+        exclude_fields: typing.List[str] = None,
+        custom_endpoint: str = None,
+        **search_params,
+    ):
+        endpoint = "pulp/api/v3/content/rpm/packages/"
+        if custom_endpoint:
+            endpoint = custom_endpoint
+        return await self.__get_entities(
+            endpoint,
+            include_fields=include_fields,
+            exclude_fields=exclude_fields,
+            **search_params
+        )
 
     async def get_rpm_repository_packages(
         self,
