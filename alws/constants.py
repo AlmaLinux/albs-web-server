@@ -166,6 +166,11 @@ build_ref_int_mapping: typing.Dict[int, str] = {
 debuginfo_regex = re.compile(r"debug(info|source)")
 
 RepoType = namedtuple("RepoType", ("name", "arch", "debug"))
+BeholderKey = namedtuple(
+    "BeholderKey",
+    ("name", "version", "arch", "is_beta", "is_devel"),
+)
 PackageNevra = namedtuple(
-    "PackageNevra", ("name", "epoch", "version", "release", "arch")
+    "PackageNevra",
+    ("name", "epoch", "version", "release", "arch"),
 )

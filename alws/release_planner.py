@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import (
+    BeholderKey,
     ErrataPackageStatus,
     PackageNevra,
     ReleaseStatus,
@@ -1105,28 +1106,37 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
     @staticmethod
     def update_beholder_cache(
-        beholder_cache: dict,
+        beholder_cache: typing.Dict[BeholderKey, typing.Any],
         packages: typing.List[dict],
         strong_arches: dict,
         is_beta: bool,
         is_devel: bool,
+        priority: int,
     ):
-        def generate_key(pkg_arch: str = None) -> typing.Tuple:
-            arch = pkg_arch if pkg_arch else pkg["arch"]
-            return (pkg["name"], pkg["version"], arch, is_beta, is_devel)
+        def generate_key(pkg_arch: str) -> BeholderKey:
+            return BeholderKey(
+                pkg["name"],
+                pkg["version"],
+                pkg_arch,
+                is_beta,
+                is_devel,
+            )
 
         for pkg in packages:
-            key = generate_key()
+            key = generate_key(pkg["arch"])
+            pkg["priority"] = priority
             beholder_cache[key] = pkg
             for weak_arch in strong_arches[pkg["arch"]]:
-                second_key = generate_key(pkg_arch=weak_arch)
+                second_key = generate_key(weak_arch)
                 # if we've already found repos for i686 arch
                 # we don't need to override them,
                 # because there can be multilib info
-                beholder_repos = beholder_cache.get(second_key, {}).get(
-                    "repositories", []
-                )
-                if beholder_repos and weak_arch == "i686":
+                cache_item = beholder_cache.get(second_key, {})
+                if (
+                    cache_item.get("repositories", [])
+                    and weak_arch == "i686"
+                    and priority >= cache_item["priority"]
+                ):
                     continue
                 replaced_pkg = copy.deepcopy(pkg)
                 for repo in replaced_pkg["repositories"]:
@@ -1142,40 +1152,43 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_beta: bool,
         is_devel: bool,
         is_debug: bool,
-        beholder_cache: dict,
+        beholder_cache: typing.Dict[BeholderKey, typing.Any],
     ) -> typing.Set[RepoType]:
+        def generate_key(beta: bool) -> BeholderKey:
+            return BeholderKey(
+                pkg_name,
+                pkg_version,
+                pkg_arch,
+                beta,
+                is_devel,
+            )
+
         release_repositories = set()
-        beholder_key = (pkg_name, pkg_version, pkg_arch, is_beta, is_devel)
+        beholder_key = generate_key(is_beta)
         logging.debug(
-            "At find_release_repos - beholder_key: %s", str(beholder_key)
+            "At find_release_repos - beholder_key: %s",
+            str(beholder_key),
         )
         predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info from stable/beta,
         # we can try to find info by opposite stable/beta flag
         if not predicted_package:
-            beholder_key = (
-                pkg_name,
-                pkg_version,
-                pkg_arch,
-                not is_beta,
-                is_devel,
-            )
+            beholder_key = generate_key(not is_beta)
             logging.debug(
-                "Not predicted_package, beholder_key: %s", str(beholder_key)
+                "Not predicted_package, beholder_key: %s",
+                str(beholder_key),
             )
             predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info by current version,
         # then we should try find info by other versions
         if not predicted_package:
             beholder_keys = [
-                (name, version, arch, beta, devel)
-                for name, version, arch, beta, devel in beholder_cache
-                if all(
-                    (
-                        pkg_name == name,
-                        pkg_arch == arch,
-                        is_devel == devel,
-                    )
+                key
+                for key in beholder_cache
+                if (
+                    pkg_name == key.name
+                    and pkg_arch == key.arch
+                    and is_devel == key.is_devel
                 )
             ]
             logging.debug(
@@ -1183,10 +1196,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 str(beholder_keys),
             )
             predicted_package = next(
-                (
-                    beholder_cache[beholder_key]
-                    for beholder_key in beholder_keys
-                ),
+                (beholder_cache[key] for key in beholder_keys),
                 {},
             )
         for repo in predicted_package.get("repositories", []):
@@ -1213,8 +1223,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self,
         build_ids: typing.List[int],
         base_platform: models.Platform,
-        build_tasks: typing.List[int] = None,
-        product: models.Product = None,
+        build_tasks: typing.Optional[typing.List[int]] = None,
+        product: typing.Optional[models.Product] = None,
     ) -> dict:
         packages = []
         rpm_modules = []
@@ -1279,10 +1289,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     module_arch_list.append(strong_arch)
             module_responses = await self._beholder_client.retrieve_responses(
                 base_platform,
-                module_name,
-                module_stream,
-                module_arch_list,
-                is_module=True,
+                module_name=module_name,
+                module_stream=module_stream,
+                module_arch_list=module_arch_list,
             )
             module_info = {"module": module, "repositories": []}
             if not module_responses:
@@ -1311,6 +1320,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         strong_arches,
                         is_beta,
                         is_devel,
+                        module_response["priority"],
                     )
                 module_repo = module_response["repository"]
                 repo_name = self.repo_name_regex.search(
@@ -1357,6 +1367,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     strong_arches,
                     is_beta,
                     is_devel,
+                    beholder_response["priority"],
                 )
         if not beholder_cache:
             return await self.get_pulp_based_response(
