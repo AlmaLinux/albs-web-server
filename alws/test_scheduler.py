@@ -22,6 +22,49 @@ class TestTaskScheduler(threading.Thread):
         self._graceful_event = graceful_event
         self._alts_client = AltsClient(settings.alts_host, settings.alts_token)
 
+
+    @staticmethod
+    def __get_repos_for_test_task(task: models.TestTask):
+        repos = []
+        # Build task repos
+        build_repositories = [
+            {'name': item.name, 'baseurl': item.url}
+            for item in task.build_task.build.repos
+            if item.type == 'rpm'
+            and item.arch == task.env_arch
+        ]
+        repos.extend(build_repositories)
+
+        # Linked build repos
+        linked_build_repos = [
+            {'name': item.name, 'baseurl': item.url}
+            for build in task.build_task.build.linked_builds
+            for item in build.repos
+            if item.type == 'rpm'
+            and item.arch == task.env_arch
+        ]
+        repos.extend(linked_build_repos)
+
+        # Flavor repos
+        platform = task.build_task.platform
+        flavor_repos = [
+            {
+                'name': item.name,
+                'baseurl': item.url.replace(
+                    '$releasever',
+                    platform.distr_version
+                )
+            }
+            for flavor in task.build_task.build.platform_flavors
+            for item in flavor.repos
+            if item.type == 'rpm'
+            and item.arch == task.env_arch
+        ]
+        repos.extend(flavor_repos)
+
+        return repos
+
+
     async def _schedule_tasks_for_execution(self):
         updated_tasks = []
         with SyncSession() as session:
@@ -38,28 +81,25 @@ class TestTaskScheduler(threading.Thread):
                                 models.BuildTask.build).selectinload(
                                 models.Build.linked_builds),
                             selectinload(models.TestTask.build_task).selectinload(
+                                models.BuildTask.build).selectinload(
+                                models.Build.platform_flavors).selectinload(
+                                    models.PlatformFlavour.repos
+                                ),
+                            selectinload(models.TestTask.build_task).selectinload(
                                 models.BuildTask.platform),
                             selectinload(models.TestTask.build_task).selectinload(
                                 models.BuildTask.rpm_module),
                         ).limit(10)
                     )
                     for task in tasks_query.scalars():
-                        task.status = TestTaskStatus.STARTED
-                        repositories = [{'name': item.name, 'baseurl': item.url}
-                                        for item in task.build_task.build.repos
-                                        if item.type == 'rpm'
-                                        and item.arch == task.env_arch]
-                        for build in task.build_task.build.linked_builds:
-                            rpm_repos = [{'name': item.name, 'baseurl': item.url}
-                                         for item in build.repos
-                                         if item.type == 'rpm'
-                                         and item.arch == task.env_arch]
-                            repositories.extend(rpm_repos)
                         platform = task.build_task.platform
                         module_info = task.build_task.rpm_module
                         module_name = module_info.name if module_info else None
                         module_stream = module_info.stream if module_info else None
                         module_version = module_info.version if module_info else None
+                        repositories = self.__get_repos_for_test_task(task)
+                        task.status = TestTaskStatus.STARTED
+
                         try:
                             logging.debug(
                                 'Scheduling testing for %s-%s-%s',
@@ -93,6 +133,7 @@ class TestTaskScheduler(threading.Thread):
                     if updated_tasks:
                         session.add_all(updated_tasks)
                         session.commit()
+
 
     async def run(self) -> None:
         self._term_event.wait(10)
