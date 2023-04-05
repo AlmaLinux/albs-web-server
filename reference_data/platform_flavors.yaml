@@ -9,7 +9,7 @@
         dist_prefix: 'el8.8.0'
   data:
      mock:
-       macros:
+       secure_boot_macros:
          "%pe_signing_cert": "'f4217b7b99a69128'"
          "%pe_signing_token": "'AlmaLinux OS Foundation'"
   repositories:
@@ -102,7 +102,7 @@
         dist_prefix: 'el9.2.0'
   data:
      mock:
-       macros:
+       secure_boot_macros:
          "%pe_signing_cert": 'f4217b7b99a69128'
          "%pe_signing_token": 'AlmaLinux OS Foundation'
   repositories:
