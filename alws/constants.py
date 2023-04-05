@@ -9,6 +9,7 @@ __all__ = [
     "DEFAULT_TEAM",
     "DRAMATIQ_TASK_TIMEOUT",
     "DEFAULT_FILE_CHUNK_SIZE",
+    "LOWEST_PRIORITY",
     "REQUEST_TIMEOUT",
     "SYSTEM_USER_NAME",
     "UPLOAD_FILE_CHUNK_SIZE",
@@ -36,6 +37,8 @@ UPLOAD_FILE_CHUNK_SIZE = 52428800  # 50 MB
 SYSTEM_USER_NAME = "base_user"
 DEFAULT_PRODUCT = "AlmaLinux"
 DEFAULT_TEAM = "almalinux"
+# Release constants
+LOWEST_PRIORITY = 10
 
 
 class Permissions(enum.IntFlag):
@@ -49,6 +52,23 @@ class PermissionTriad:
     owner: Permissions
     group: Permissions
     other: Permissions
+
+
+class ReleasePackageTrustness(enum.IntEnum):
+    UNKNOWN = 0
+    MAXIMUM = 1
+    MEDIUM = 2
+    LOWEST = 10
+
+    @classmethod
+    def decrease(cls, trustness: int) -> int:
+        if trustness == cls.LOWEST:
+            return trustness
+        if trustness == cls.MAXIMUM:
+            trustness = cls.MEDIUM
+        elif trustness == cls.MEDIUM:
+            trustness = cls.LOWEST
+        return trustness
 
 
 class BuildTaskStatus(enum.IntEnum):
