@@ -1,5 +1,6 @@
 import datetime
 import logging
+import typing
 import random
 import threading
 import asyncio
@@ -24,7 +25,7 @@ class TestTaskScheduler(threading.Thread):
 
 
     @staticmethod
-    def __get_repos_for_test_task(task: models.TestTask):
+    def __get_repos_for_test_task(task: models.TestTask) -> typing.List[dict]:
         repos = []
         # Build task repos
         build_repositories = [
@@ -33,7 +34,6 @@ class TestTaskScheduler(threading.Thread):
             if item.type == 'rpm'
             and item.arch == task.env_arch
         ]
-        repos.extend(build_repositories)
 
         # Linked build repos
         linked_build_repos = [
@@ -43,7 +43,6 @@ class TestTaskScheduler(threading.Thread):
             if item.type == 'rpm'
             and item.arch == task.env_arch
         ]
-        repos.extend(linked_build_repos)
 
         # Flavor repos
         platform = task.build_task.platform
@@ -60,7 +59,13 @@ class TestTaskScheduler(threading.Thread):
             if item.type == 'rpm'
             and item.arch == task.env_arch
         ]
-        repos.extend(flavor_repos)
+
+        for repo_arr in (
+            build_repositories,
+            linked_build_repos,
+            flavor_repos
+        ):
+            repos.extend(repo_arr)
 
         return repos
 
