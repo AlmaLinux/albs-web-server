@@ -354,6 +354,8 @@ async def _get_module_ref(
     ref_prefix = platform_prefix_list['non_modified']
     if component_name in modified_list:
         ref_prefix = platform_prefix_list['modified']
+    # gitea doesn't support + in repo names
+    component_name = re.sub(r"\+", "-", component_name)
     git_ref = f'{ref_prefix}-stream-{module.stream}'
     exist = True
     commit_id = ''
