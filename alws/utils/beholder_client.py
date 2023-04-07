@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import REQUEST_TIMEOUT
+from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -92,8 +92,7 @@ class BeholderClient:
                 and db_platform.distr_version == response_distr_ver
             )
             # we have priority only in ref platforms
-            # 10 is lowest priority
-            response["priority"] = response.get("priority") or 10
+            response["priority"] = response.get("priority") or LOWEST_PRIORITY
             responses.append(response)
         return sorted(responses, key=lambda x: x["priority"], reverse=True)
 

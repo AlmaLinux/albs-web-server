@@ -17,9 +17,11 @@ from sqlalchemy.orm import selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import (
+    LOWEST_PRIORITY,
     BeholderKey,
     ErrataPackageStatus,
     PackageNevra,
+    ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
 )
@@ -1014,7 +1016,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self,
         arch: str,
         is_debug: bool,
-        task_arch: typing.Optional[str] = None,
+        task_arch: str = "",
         is_module: bool = False,
     ):
         repo_name = "-".join(
@@ -1034,7 +1036,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         arch: str,
         is_debug: bool,
         repos_mapping: dict,
-        task_arch: typing.Optional[str] = None,
+        task_arch: str = "",
         is_module: bool = False,
     ) -> typing.Optional[dict]:
         devel_repo_key = self.get_devel_repo_key(
@@ -1153,7 +1155,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_devel: bool,
         is_debug: bool,
         beholder_cache: typing.Dict[BeholderKey, typing.Any],
-    ) -> typing.Set[RepoType]:
+    ) -> typing.Set[typing.Tuple[RepoType, int]]:
         def generate_key(beta: bool) -> BeholderKey:
             return BeholderKey(
                 pkg_name,
@@ -1199,8 +1201,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 (beholder_cache[key] for key in beholder_keys),
                 {},
             )
+            # we should decrease trustness
+            # if we find package with different version
+            priority = predicted_package.get("priority", LOWEST_PRIORITY)
+            predicted_package["priority"] = ReleasePackageTrustness.decrease(
+                priority,
+            )
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
+            trustness = predicted_package["priority"]
             repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
                 "name"
             ]
@@ -1215,7 +1224,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
             )
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
-            release_repositories.add(release_repo)
+            release_repositories.add((release_repo, trustness))
         return release_repositories
 
     @class_measure_work_time_async("get_release_plan")
@@ -1303,7 +1312,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
                 if devel_repo is None:
                     logging.debug(
-                        "Skipping module=%s, repositories is missing",
+                        "Skipping module=%s, devel repo is missing",
                         module_nvsca,
                     )
                     continue
@@ -1322,6 +1331,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_devel,
                         module_response["priority"],
                     )
+                trustness = module_response["priority"]
                 module_repo = module_response["repository"]
                 repo_name = self.repo_name_regex.search(
                     module_repo["name"]
@@ -1336,17 +1346,25 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 repo_key = RepoType(release_repo_name, module["arch"], False)
                 prod_repo = repos_mapping.get(repo_key)
                 if prod_repo is None:
-                    logging.debug(
-                        "Skipping module=%s, cannot find prod repo by key: %s",
-                        module_nvsca,
-                        repo_key,
+                    prod_repo = self.get_devel_repo(
+                        arch=module["arch"],
+                        is_debug=False,
+                        repos_mapping=repos_mapping,
+                        is_module=True,
                     )
-                    continue
+                    trustness = ReleasePackageTrustness.UNKNOWN
+                    if prod_repo is None:
+                        logging.debug(
+                            "Skipping module=%s, devel repo is missing",
+                            module_nvsca,
+                        )
+                        continue
                 module_repo_dict = {
                     "name": repo_key.name,
                     "arch": repo_key.arch,
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
+                    "trustness": trustness,
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
@@ -1428,26 +1446,39 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
                 if devel_repo is None:
                     logging.debug(
-                        "Skipping package=%s, repositories is missing",
+                        "Skipping package=%s, devel repo is missing",
                         full_name,
                     )
                     continue
+                devel_repo["trustness"] = ReleasePackageTrustness.UNKNOWN
                 pkg_info["repositories"].append(devel_repo)
                 packages.append(pkg_info)
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key in release_repository_keys:
+            for release_repo_key, trustness in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
-                    logging.debug(
-                        "Skipping package=%s, "
-                        "cannot find prod repo by key: %s",
-                        full_name,
-                        release_repo_key,
+                    release_repo_key = self.get_devel_repo_key(
+                        arch=pkg_arch,
+                        is_debug=is_debug,
+                        task_arch=package["task_arch"],
                     )
-                    continue
+                    release_repo = self.get_devel_repo(
+                        arch=pkg_arch,
+                        is_debug=is_debug,
+                        repos_mapping=repos_mapping,
+                        task_arch=package["task_arch"],
+                    )
+                    trustness = ReleasePackageTrustness.UNKNOWN
+                    if not release_repo:
+                        logging.debug(
+                            "Skipping package=%s, devel repo is missing",
+                            full_name,
+                        )
+                        continue
+                release_repo["trustness"] = trustness
                 repo_arch_location = [release_repo["arch"]]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == "i686" and "x86_64" in repo_arch_location:
@@ -1489,7 +1520,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
     @class_measure_work_time_async("execute_release_plan")
     async def execute_release_plan(
-        self, release: models.Release
+        self,
+        release: models.Release,
     ) -> typing.List[str]:
         additional_messages = []
         authenticate_tasks = []
