@@ -16,6 +16,9 @@ from alws.utils.alts_client import AltsClient
 
 
 class TestTaskScheduler(threading.Thread):
+    # Filter this class out of pytest
+    __test__ = False
+
     def __init__(self, term_event: threading.Event,
                  graceful_event: threading.Event):
         super().__init__()
@@ -25,7 +28,7 @@ class TestTaskScheduler(threading.Thread):
 
 
     @staticmethod
-    def __get_repos_for_test_task(task: models.TestTask) -> typing.List[dict]:
+    def get_repos_for_test_task(task: models.TestTask) -> typing.List[dict]:
         repos = []
         # Build task repos
         build_repositories = [
@@ -102,7 +105,7 @@ class TestTaskScheduler(threading.Thread):
                         module_name = module_info.name if module_info else None
                         module_stream = module_info.stream if module_info else None
                         module_version = module_info.version if module_info else None
-                        repositories = self.__get_repos_for_test_task(task)
+                        repositories = self.get_repos_for_test_task(task)
                         task.status = TestTaskStatus.STARTED
 
                         try:
