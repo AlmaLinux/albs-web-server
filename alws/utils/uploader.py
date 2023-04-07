@@ -8,8 +8,8 @@ from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from alws import models
 
+from alws import models
 from alws.config import settings
 from alws.errors import UploadError
 from alws.utils.ids import get_random_unique_version
@@ -64,7 +64,8 @@ class MetadataUploader:
         )
         module_content_keys = ("rpm.modulemd_defaults", "rpm.modulemd")
         repo_data_hrefs = [
-            latest_repo_data.get(key, {}).get("href") for key in module_content_keys
+            latest_repo_data.get(key, {}).get("href")
+            for key in module_content_keys
         ]
         modules_to_remove = []
         hrefs_to_add = []
@@ -137,7 +138,10 @@ class MetadataUploader:
             )
             await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
         except Exception as exc:
-            await self.pulp.delete_by_href(new_version_href, wait_for_result=True)
+            await self.pulp.delete_by_href(
+                new_version_href,
+                wait_for_result=True,
+            )
             logging.exception("Cannot restore packages in repo:")
             raise exc
         finally:
@@ -193,13 +197,14 @@ class MetadataUploader:
         comps_content: typing.Optional[UploadFile] = None,
     ) -> typing.List[str]:
         repo = await self.pulp.get_rpm_repository_by_params(
-            {"name__contains": self.repo_name}
+            {"name": self.repo_name},
         )
         if not repo:
             raise UploadError(
                 f"{repo=} not found",
                 status=status.HTTP_404_NOT_FOUND,
             )
+        logging.debug("Start processing upload for repo: %s", repo["name"])
         repo_href = repo["pulp_href"]
         updated_metadata = []
         try:
