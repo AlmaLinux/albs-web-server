@@ -1,8 +1,8 @@
 import asyncio
 import datetime
 import logging
-import typing
 import traceback
+import typing
 from collections import defaultdict
 
 import sqlalchemy
@@ -15,8 +15,8 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, ErrataPackageStatus
 from alws.errors import (
-    ArtifactConversionError,
     ArtifactChecksumError,
+    ArtifactConversionError,
     ModuleUpdateError,
     RepositoryAddError,
     SrpmProvisionError,
@@ -25,7 +25,7 @@ from alws.schemas import build_node_schema
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
-from alws.utils.parsing import parse_rpm_nevra, clean_release
+from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.rpm_package import get_rpm_package_info
 
@@ -226,9 +226,11 @@ async def mark_build_tasks_as_cancelled(
 
 
 async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
-    repo = await db.execute(select(models.Repository).where(
-        models.Repository.name == task.get_log_repo_name()
-    ))
+    repo = await db.execute(
+        select(models.Repository).where(
+            models.Repository.name == task.get_log_repo_name()
+        )
+    )
     return bool(repo.scalars().first())
 
 
@@ -709,7 +711,7 @@ async def __process_build_task_artifacts(
                 "delta": str(end_time - start_time),
             }
         except Exception as e:
-            message = f'Cannot update module information inside Pulp: {str(e)}'
+            message = f"Cannot update module information inside Pulp: {str(e)}"
             logging.exception(message)
             raise ModuleUpdateError(message) from e
         logging.info("Module template processing is finished")
