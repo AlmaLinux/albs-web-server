@@ -33,16 +33,15 @@ from alws.utils.rpm_package import get_rpm_package_info
 async def get_available_build_task(
     db: AsyncSession,
     request: build_node_schema.RequestTask,
-) -> models.BuildTask:
+) -> typing.Optional[models.BuildTask]:
     async with db.begin():
         # TODO: here should be config value
         ts_expired = datetime.datetime.utcnow() - datetime.timedelta(
             minutes=20
         )
-        query = ~models.BuildTask.dependencies.any()
         db_task = await db.execute(
             select(models.BuildTask)
-            .where(query)
+            .where(~models.BuildTask.dependencies.any())
             .with_for_update()
             .filter(
                 sqlalchemy.and_(
@@ -50,7 +49,7 @@ async def get_available_build_task(
                     models.BuildTask.arch.in_(request.supported_arches),
                     sqlalchemy.or_(
                         models.BuildTask.ts < ts_expired,
-                        models.BuildTask.ts.__eq__(None),
+                        models.BuildTask.ts.is_(None),
                     ),
                 )
             )

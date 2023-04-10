@@ -403,13 +403,14 @@ class BuildTask(TimeMixin, Base):
     __tablename__ = 'build_tasks'
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True, index=True,)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
         # saw https://stackoverflow.com/questions/
         # 5033547/sqlalchemy-cascade-delete
-        nullable=False
+        nullable=False,
+        index=True,
     )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
@@ -419,16 +420,17 @@ class BuildTask(TimeMixin, Base):
     ref_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_task_refs.id'),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     rpm_module_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('rpm_module.id'),
         nullable=True
     )
-    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False, index=True,)
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False, index=True,)
     is_secure_boot = sqlalchemy.Column(
         sqlalchemy.Boolean, default=False, nullable=True)
     mock_options = sqlalchemy.Column(JSONB)
@@ -497,7 +499,8 @@ class BuildTaskArtifact(Base):
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_tasks.id'),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -532,7 +535,8 @@ class SourceRpm(Base):
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('builds.id'),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     build = relationship('Build', back_populates='source_rpms')
     artifact_id = sqlalchemy.Column(
@@ -899,12 +903,13 @@ class TestTask(TimeMixin, Base):
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey('build_tasks.id'),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     build_task = relationship('BuildTask', back_populates='test_tasks')
-    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False, index=True,)
     alts_response = sqlalchemy.Column(JSONB, nullable=True)
-    revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False, index=True,)
     artifacts = relationship('TestTaskArtifact', back_populates='test_task')
     repository_id = sqlalchemy.Column(
         sqlalchemy.Integer,
@@ -1184,7 +1189,8 @@ class ErrataReference(Base):
             name='errata_reference_errata_record_id_fk',
             ondelete='CASCADE',
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     cve = relationship('ErrataCVE', cascade="all, delete")
     cve_id = sqlalchemy.Column(
@@ -1219,7 +1225,8 @@ class ErrataPackage(Base):
             name='errata_package_errata_record_id_fk',
             ondelete='CASCADE'
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1254,7 +1261,8 @@ class ErrataToALBSPackage(Base):
             name='errata_to_albs_package_errata_package_id_fk',
             ondelete='CASCADE',
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     errata_package = relationship('ErrataPackage',
                                   back_populates='albs_packages')
@@ -1302,6 +1310,7 @@ class PerformanceStats(Base):
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("build_tasks.id", name='perf_stats_build_task_id'),
         nullable=True,
+        index=True,
     )
     build_task: BuildTask = relationship(
         "BuildTask",
@@ -1311,6 +1320,7 @@ class PerformanceStats(Base):
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("test_tasks.id", name='perf_stats_test_task_id'),
         nullable=True,
+        index=True,
     )
     test_task: BuildTask = relationship(
         "TestTask",
@@ -1321,11 +1331,63 @@ class PerformanceStats(Base):
         sqlalchemy.ForeignKey(
             "build_releases.id", name='perf_stats_build_release_id'),
         nullable=True,
+        index=True,
     )
     release: Release = relationship(
         "Release",
         back_populates="performance_stats",
     )
+
+
+idx_build_tasks_status_arch_ts = sqlalchemy.Index(
+    "idx_build_tasks_status_arch_ts",
+    BuildTask.status,
+    BuildTask.arch,
+    BuildTask.ts,
+)
+idx_build_tasks_build_id_index = sqlalchemy.Index(
+    "idx_build_tasks_build_id_index",
+    BuildTask.build_id,
+    BuildTask.index,
+)
+idx_build_tasks_build_id_index_status = sqlalchemy.Index(
+    "idx_build_tasks_build_id_index_status",
+    BuildTask.build_id,
+    BuildTask.index,
+    BuildTask.status,
+)
+idx_build_tasks_build_id_status = sqlalchemy.Index(
+    "idx_build_tasks_build_id_status",
+    BuildTask.build_id,
+    BuildTask.status,
+)
+idx_test_tasks_build_task_id_revision = sqlalchemy.Index(
+    "idx_test_tasks_build_task_id_revision",
+    TestTask.build_task_id,
+    TestTask.revision,
+)
+idx_build_artifacts_build_task_id_type = sqlalchemy.Index(
+    "idx_build_artifacts_build_task_id_type",
+    BuildTaskArtifact.build_task_id,
+    BuildTaskArtifact.type,
+)
+idx_build_artifacts_build_task_id_name_type = sqlalchemy.Index(
+    "idx_build_artifacts_build_task_id_name_type",
+    BuildTaskArtifact.build_task_id,
+    BuildTaskArtifact.name,
+    BuildTaskArtifact.type,
+)
+idx_errata_packages_name_version = sqlalchemy.Index(
+    "idx_errata_packages_name_version",
+    ErrataPackage.name,
+    ErrataPackage.version,
+)
+idx_errata_packages_name_version_arch = sqlalchemy.Index(
+    "idx_errata_packages_name_version_arch",
+    ErrataPackage.name,
+    ErrataPackage.version,
+    ErrataPackage.arch,
+)
 
 
 async def create_tables():

@@ -1,9 +1,10 @@
 import datetime
 import itertools
 import typing
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, Response, status
 
-from alws import database, dramatiq
+from alws import dramatiq
 from alws.auth import get_current_user
 from alws.config import settings
 from alws.crud import build_node
@@ -22,7 +23,7 @@ router = APIRouter(
 @router.post('/ping')
 async def ping(
             node_status: build_node_schema.Ping,
-            db: database.Session = Depends(get_db)
+            db: AsyncSession = Depends(get_db),
         ):
     if not node_status.active_tasks:
         return {}
@@ -34,7 +35,7 @@ async def ping(
 async def build_done(
             build_done_: build_node_schema.BuildDone,
             response: Response,
-            db: database.Session = Depends(get_db),
+            db: AsyncSession = Depends(get_db),
         ):
     build_task = await build_node.get_build_task(db, build_done_.task_id)
     if BuildTaskStatus.is_finished(build_task.status):
@@ -50,10 +51,10 @@ async def build_done(
     return {'ok': True}
 
 
-@router.get('/get_task', response_model=typing.Optional[build_node_schema.Task])
+@router.get('/get_task', response_model=typing.Optional[build_node_schema.Task],)
 async def get_task(
             request: build_node_schema.RequestTask,
-            db: database.Session = Depends(get_db)
+            db: AsyncSession = Depends(get_db),
         ):
     task = await build_node.get_available_build_task(db, request)
     if not task:
