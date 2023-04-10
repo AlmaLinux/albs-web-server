@@ -234,7 +234,7 @@ async def _perform_product_modification(
         await db.rollback()
 
 
-@dramatiq.actor(max_retries=0, priority=0, time_limit=DRAMATIQ_TASK_TIMEOUT)
+@dramatiq.actor(max_retries=0, priority=0, queue_name='product_modify', time_limit=DRAMATIQ_TASK_TIMEOUT)
 def perform_product_modification(
         build_id: int,
         product_id: int,

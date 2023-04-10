@@ -355,7 +355,7 @@ async def _get_module_ref(
     if component_name in modified_list:
         ref_prefix = platform_prefix_list['modified']
     # gitea doesn't support + in repo names
-    component_name = re.sub(r"\+", "-", component_name)
+    gitea_component_name = re.sub(r"\+", "-", component_name)
     git_ref = f'{ref_prefix}-stream-{module.stream}'
     exist = True
     commit_id = ''
@@ -365,14 +365,14 @@ async def _get_module_ref(
     clean_tag_name = ''
     try:
         response = await gitea_client.get_branch(
-            f'rpms/{component_name}', git_ref
+            f'rpms/{gitea_component_name}', git_ref
         )
         commit_id = response['commit']['id']
     except aiohttp.client_exceptions.ClientResponseError as e:
         if e.status == 404:
             exist = False
     if commit_id:
-        tags = await gitea_client.list_tags(f'rpms/{component_name}')
+        tags = await gitea_client.list_tags(f'rpms/{gitea_component_name}')
         raw_tag_name = next((
             tag['name'] for tag in tags
             if tag['id'] == commit_id
@@ -401,7 +401,7 @@ async def _get_module_ref(
             added_packages.append(
                 RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
     return ModuleRef(
-        url=f'{platform_packages_git}{component_name}.git',
+        url=f'{platform_packages_git}{gitea_component_name}.git',
         git_ref=git_ref,
         exist=exist,
         added_artifacts=added_packages,
