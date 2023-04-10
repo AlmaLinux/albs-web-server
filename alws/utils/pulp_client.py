@@ -613,14 +613,23 @@ class PulpClient:
         Policy variants: 'on_demand', 'immediate', 'streamed'
         """
         ENDPOINT = "pulp/api/v3/remotes/rpm/rpm/"
-        payload = {"name": remote_name, "url": remote_url, "policy": remote_policy}
+        payload = {
+            "name": remote_name,
+            "url": remote_url,
+            "policy": remote_policy,
+            "download_concurrency": 5,
+        }
         result = await self.request("POST", ENDPOINT, json=payload)
         return result["pulp_href"]
 
     async def update_rpm_remote(
         self, remote_href, remote_url: str, remote_policy: str = "on_demand"
     ) -> str:
-        payload = {"url": remote_url, "policy": remote_policy}
+        payload = {
+            "url": remote_url,
+            "policy": remote_policy,
+            "download_concurrency": 5,
+        }
 
         await self.request("PATCH", remote_href, data=payload)
         return remote_href

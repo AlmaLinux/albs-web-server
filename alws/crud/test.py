@@ -152,7 +152,7 @@ async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
 async def update_test_task(db: AsyncSession, task_id: int,
                            test_result: test_schema.TestTaskResult,
                            status: TestTaskStatus = TestTaskStatus.COMPLETED):
-    started_at = test_result.stats.pop('started_at', None)
+    started_at = test_result.stats.get('started_at', None)
     if started_at:
         started_at = datetime.datetime.fromisoformat(started_at)
     await db.execute(update(models.TestTask).where(
