@@ -463,6 +463,8 @@ class IndexWrapper:
     def from_template(template: str):
         index = Modulemd.ModuleIndex.new()
         ret, error = index.update_from_string(template, strict=True)
+        if ret:
+            return IndexWrapper(index)
         # This may be a PackagerV3 thing, so try to read it differently
         packager_v3 = Modulemd.read_packager_string(template)
         if not packager_v3:
