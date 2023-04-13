@@ -137,6 +137,10 @@ class ModuleWrapper:
     def __init__(self, stream):
         self._stream = stream
 
+    @property
+    def raw_stream(self):
+        return self._stream
+
     @classmethod
     def from_template(cls, template: str, name=None, stream=None):
         if all([name, stream]):
@@ -149,6 +153,17 @@ class ModuleWrapper:
             md_stream = Modulemd.read_packager_string(template)
         if not md_stream:
             raise ValueError("can not parse modules.yaml template")
+        if isinstance(md_stream, Modulemd.PackagerV3):
+            index = md_stream.convert_to_index()
+            if len(index.get_module_names()) > 1:
+                raise ValueError("Module template contains more than 1 module")
+            for module_name in index.get_module_names():
+                module = index.get_module(module_name)
+                streams = module.get_all_streams()
+                if len(streams) > 1:
+                    raise ValueError("Module contains more than 1 stream")
+                return ModuleWrapper(streams[0])
+
         return ModuleWrapper(md_stream)
 
     @staticmethod
@@ -448,11 +463,16 @@ class IndexWrapper:
     def from_template(template: str):
         index = Modulemd.ModuleIndex.new()
         ret, error = index.update_from_string(template, strict=True)
-        if not ret:
+        if ret:
+            return IndexWrapper(index)
+        # This may be a PackagerV3 thing, so try to read it differently
+        packager_v3 = Modulemd.read_packager_string(template)
+        if not packager_v3:
             raise ValueError(
                 f"Can not parse modules.yaml template, "
                 f"error: {error[0].get_gerror()}"
             )
+        index = packager_v3.convert_to_index()
         return IndexWrapper(index)
 
     def get_module(self, name: str, stream: str) -> ModuleWrapper:
@@ -465,7 +485,7 @@ class IndexWrapper:
         raise ModuleNotFoundError(f"Index doesn't contain {name}:{stream}")
 
     def add_module(self, module: ModuleWrapper):
-        self._index.add_module_stream(module._stream)
+        self._index.add_module_stream(module.raw_stream)
 
     def has_devel_module(self):
         for module_name in self._index.get_module_names():
