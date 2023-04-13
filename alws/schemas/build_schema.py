@@ -418,7 +418,8 @@ async def get_module_refs(
     platform: models.Platform,
     flavors: typing.List[models.PlatformFlavour],
     platform_arches: typing.List[str] = None,
-) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
+) -> typing.Tuple[typing.List[ModuleRef], typing.List[str],
+                  typing.Dict[str, typing.Any]]:
     gitea_client = GiteaClient(
         settings.gitea_host,
         logging.getLogger(__name__)
@@ -504,7 +505,7 @@ async def get_module_refs(
             platform_packages_git=platform_packages_git,
             beholder_data=beholder_results,
         ))
-    result = await asyncio.gather(*component_tasks)
+    result = list(await asyncio.gather(*component_tasks))
     enabled_modules = module.get_all_build_deps()
     modules = [module.render()]
     if devel_module:
