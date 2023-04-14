@@ -61,7 +61,7 @@
         DFLTCC: '0'
       use_bootstrap_container: false
       nspawn_args:
-        - '--rlimit=RLIMIT_NOFILE=10240'
+        - '--rlimit=RLIMIT_NOFILE=20480'
       secure_boot_macros:
         "%__pesign_cert": "%pe_signing_cert"
         "%__pesign_client_cert": "%pe_signing_cert"
@@ -1454,7 +1454,7 @@
       releasever: '9'
       use_bootstrap_container: false
       nspawn_args:
-        - '--rlimit=RLIMIT_NOFILE=10240'
+        - '--rlimit=RLIMIT_NOFILE=20480'
       secure_boot_macros:
         "%pe_signing_cert": "Cloud Linux Software, Inc"
         "%pe_signing_token": "profil standardowy"
