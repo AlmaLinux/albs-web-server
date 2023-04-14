@@ -757,6 +757,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         db_repos_mapping = self.get_production_repositories_mapping(
             release.product,
             include_pulp_href=True,
+            platform_name=release.platform.name.lower(),
         )
 
         for pkg in release.plan.get("packages", []):
