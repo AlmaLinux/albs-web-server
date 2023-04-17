@@ -9,7 +9,7 @@ aiohttp==3.8.4
 aiofiles==23.1.0
 aioredis==2.0.1
 alembic==1.10.3
-pytest==7.3.0
+pytest==7.3.1
 pytest-cov==4.0.0
 jmespath==1.0.1
 PyYAML==6.0
