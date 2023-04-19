@@ -524,9 +524,9 @@ class PulpClient:
     ):
         params = {}
         if include_fields:
-            params["fields"] = include_fields
+            params["fields"] = ','.join(include_fields)
         if exclude_fields:
-            params["exclude_fields"] = exclude_fields
+            params["exclude_fields"] = ','.join(exclude_fields)
         if search_params:
             params.update(**search_params)
 
