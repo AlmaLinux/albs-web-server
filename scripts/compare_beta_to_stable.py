@@ -107,6 +107,8 @@ class PackagesComparator:
             arch: typing.Optional[str] = None
     ) -> typing.Tuple[str, typing.List[typing.Dict[str, str]]]:
 
+        logging.info("Getting packages from repository %s",
+                     repository.name)
         search_params = {}
         if arch:
             if arch == "src":
@@ -118,6 +120,8 @@ class PackagesComparator:
             include_fields=["sha256", "location_href"],
             **search_params,
         )
+        logging.info("Got all packages from repository %s",
+                     repository.name)
         return repository.name, packages
 
     async def get_packages_list(
@@ -180,7 +184,7 @@ class PackagesComparator:
                           "with stable: %s", pprint.pformat(usual_diff))
         if debuginfo_diff:
             logging.error("Beta debuginfo packages have intersections "
-                          "with stable: %s", pprint.pformat(usual_diff))
+                          "with stable: %s", pprint.pformat(debuginfo_diff))
 
 
 async def main():
@@ -200,4 +204,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
