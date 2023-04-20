@@ -51,7 +51,8 @@ class Settings(BaseSettings):
     rabbitmq_default_vhost: str = 'test_system'
 
     sign_server_url: Optional[str] = 'http://web_server:8000/api/v1/'
-    sign_server_token: Optional[str] = None
+    sign_server_token: Optional[str]
+    sign_file_token: Optional[str]
 
     documentation_path: str = 'alws/documentation/'
 
