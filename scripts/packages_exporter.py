@@ -263,20 +263,17 @@ class Exporter:
         )
         self.logger.debug("OSV data are generated")
 
-    async def make_request(
-        self,
-        method: str,
-        endpoint: str,
-        params: dict = None,
-        data: dict = None,
-    ):
+    async def make_request(self, method: str, endpoint: str,
+                           params: dict = None, data: dict = None,
+                           user_headers: dict = None):
+        headers = {**self.headers}
+        if user_headers:
+            headers.update(user_headers)
         full_url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
-        async with aiohttp.ClientSession(
-            headers=self.headers, raise_for_status=True
-        ) as session:
-            async with session.request(
-                method, full_url, json=data, params=params
-            ) as response:
+        async with aiohttp.ClientSession(headers=headers,
+                                         raise_for_status=True) as session:
+            async with session.request(method, full_url,
+                                       json=data, params=params) as response:
                 json_data = await response.read()
                 json_data = json.loads(json_data)
                 return json_data
@@ -346,8 +343,16 @@ class Exporter:
         return list(dict(results).values())
 
     async def sign_repomd_xml(self, data):
-        endpoint = "sign-tasks/sync_sign_task/"
-        return await self.make_request("POST", endpoint, data=data)
+        endpoint = 'sign-file/sign'
+        headers = {
+            'Authorization': f'Bearer {settings.sign_file_token}',
+        }
+        return await self.make_request(
+            'POST',
+            endpoint,
+            data=data,
+            user_headers=headers
+        )
 
     async def get_sign_keys(self):
         endpoint = "sign-keys/"
@@ -467,8 +472,8 @@ class Exporter:
         with open(os.path.join(repodata_path, "repomd.xml"), "rt") as f:
             file_content = f.read()
         sign_data = {
-            "content": file_content,
-            "pgp_keyid": key_id,
+            "file": file_content,
+            "keyid": key_id,
         }
         result = await self.sign_repomd_xml(sign_data)
         result_data = result.get("asc_content")
