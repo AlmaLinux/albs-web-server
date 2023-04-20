@@ -107,8 +107,8 @@ class PackagesComparator:
             arch: typing.Optional[str] = None
     ) -> typing.Tuple[str, typing.List[typing.Dict[str, str]]]:
 
-        logging.info("Getting packages from repository %s",
-                     repository.name)
+        logging.info("Getting packages from repository %s %s",
+                     repository.name, repository.arch)
         search_params = {}
         if arch:
             if arch == "src":
@@ -120,8 +120,8 @@ class PackagesComparator:
             include_fields=["sha256", "location_href"],
             **search_params,
         )
-        logging.info("Got all packages from repository %s",
-                     repository.name)
+        logging.info("Got all packages from repository %s %s",
+                     repository.name, repository.arch)
         return repository.name, packages
 
     async def get_packages_list(
