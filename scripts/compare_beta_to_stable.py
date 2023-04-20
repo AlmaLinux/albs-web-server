@@ -90,7 +90,8 @@ async def get_repositories(
         raise ValueError(f"Cannot find {entity_class_name.lower()} "
                          f"with name {entity_name}")
     if arch:
-        return [r for r in getattr(entity, field_name, [])]
+        return [r for r in getattr(entity, field_name, [])
+                if r.arch == arch]
     return list(getattr(entity, field_name, []))
 
 
@@ -150,10 +151,12 @@ class PackagesComparator:
         for repo_name, packages in packages:
             package_names = [p["location_href"].split("/")[-1]
                              for p in packages]
-            if is_debuginfo(repo_name):
-                debuginfo_packages.extend(package_names)
-            else:
-                usual_packages.extend(package_names)
+            packages_list = (
+                debuginfo_packages
+                if is_debuginfo(repo_name)
+                else usual_packages
+            )
+            packages_list.extend(package_names)
 
         return set(usual_packages), set(debuginfo_packages)
 
