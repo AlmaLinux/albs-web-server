@@ -1,4 +1,4 @@
-fastapi[all]==0.95.0
+fastapi[all]==0.95.1
 fastapi-users[all]==10.4.1
 uvicorn==0.21.1
 asyncpg==0.27.0
