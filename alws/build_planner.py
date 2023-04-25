@@ -146,6 +146,13 @@ class BuildPlanner:
 
     async def init_build_repos(self):
         tasks = []
+
+        # Add build log and test log repositories
+        for repo_type, repo_prefix in (
+                ('build_log', 'build_logs'), ('test_log', 'test_logs')):
+            tasks.append(self.create_log_repo(
+                repo_type, repo_prefix=repo_prefix))
+
         for platform in self._platforms:
             for arch in self._request_platforms[platform.name]:
                 tasks.append(self.create_build_repo(
@@ -162,12 +169,6 @@ class BuildPlanner:
 
             # Add source RPM repository
             tasks.append(self.create_build_repo(platform, 'src', 'rpm'))
-
-            # Add build log and test log repositories
-            for repo_type, repo_prefix in (
-                    ('build_log', 'build_logs'), ('test_log', 'test_logs')):
-                tasks.append(self.create_log_repo(
-                    repo_type, repo_prefix=repo_prefix))
 
         await asyncio.gather(*tasks)
 
