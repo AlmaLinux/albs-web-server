@@ -106,7 +106,7 @@ class PackagesComparator:
             self,
             repository: Repository,
             arch: typing.Optional[str] = None
-    ) -> typing.Tuple[str, typing.List[typing.Dict[str, str]]]:
+    ) -> typing.Tuple[str, str, typing.List[typing.Dict[str, str]]]:
 
         logging.info("Getting packages from repository %s %s",
                      repository.name, repository.arch)
@@ -123,7 +123,7 @@ class PackagesComparator:
         )
         logging.info("Got all packages from repository %s %s",
                      repository.name, repository.arch)
-        return repository.name, packages
+        return repository.name, repository.arch, packages
 
     async def get_packages_list(
             self,
@@ -148,15 +148,15 @@ class PackagesComparator:
 
         logging.debug("All packages: %s", pprint.pformat(packages))
 
-        for repo_name, packages in packages:
-            package_names = [p["location_href"].split("/")[-1]
-                             for p in packages]
+        for repo_name, repo_arch, packages in packages:
+            packages = [(repo_arch, os.path.basename(p["location_href"]))
+                        for p in packages]
             packages_list = (
                 debuginfo_packages
                 if is_debuginfo(repo_name)
                 else usual_packages
             )
-            packages_list.extend(package_names)
+            packages_list.extend(packages)
 
         return set(usual_packages), set(debuginfo_packages)
 
