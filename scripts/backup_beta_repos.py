@@ -15,7 +15,7 @@ ReposType = typing.List[typing.Dict[str, typing.Any]]
 
 async def find_pulp_repos(
         name_starts: str,
-        pulp_client: PulpClient = None
+        pulp_client: typing.Optional[PulpClient] = None
 ) -> ReposType:
     if not pulp_client:
         host, user, password = get_pulp_params()
@@ -30,7 +30,7 @@ async def find_pulp_repos(
 async def create_pulp_backup_repos(
         repos: ReposType,
         dry_run: bool = False,
-        pulp_client: PulpClient = None
+        pulp_client: typing.Optional[PulpClient] = None
 ) -> typing.Dict[str, typing.Dict[str, typing.Any]]:
     logger = logging.getLogger(PROG_NAME)
     if not pulp_client:
@@ -86,17 +86,19 @@ async def _main(dry_run: bool = False):
             hrefs.append(entity["pulp_href"])
         backup_repo = backup_repos[repo["name"]]
         logger.info("Backup repository: %s", str(backup_repo))
-        repo_href = backup_repo["pulp_href"]
+        backup_repo_href = backup_repo["pulp_href"]
         logger.info("Packages and modules for %s are gathered", repo["name"])
         logger.debug("Hrefs to backup: %s", pprint.pformat(hrefs))
-        await pulp_client.create_rpm_publication(repo["pulp_href"])
-        if not dry_run and hrefs:
+        if dry_run:
+            continue
+
+        if hrefs:
             add_tasks.append(
-                pulp_client.modify_repository(repo_href, add=hrefs)
+                pulp_client.modify_repository(backup_repo_href, add=hrefs)
             )
             if not backup_repo.get("autopublish", False):
                 publications_tasks.append(
-                    pulp_client.create_rpm_publication(repo_href)
+                    pulp_client.create_rpm_publication(backup_repo_href)
                 )
             remove_tasks.append(
                 pulp_client.modify_repository(

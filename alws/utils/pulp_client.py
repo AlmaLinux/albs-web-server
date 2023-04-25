@@ -92,7 +92,7 @@ class PulpClient:
 
     async def get_rpm_repositories_by_params(
         self, params: dict
-    ) -> typing.Optional[typing.List[typing.Dict[str, typing.Any]]]:
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         endpoint = "pulp/api/v3/repositories/rpm/rpm/"
         response = await self.request("GET", endpoint, params=params)
         if response["count"] == 0:
@@ -105,13 +105,15 @@ class PulpClient:
 
     async def get_rpm_repository_by_params(
         self, params: dict
-    ) -> typing.Union[dict, None]:
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         repositories = await self.get_rpm_repositories_by_params(params)
         if not repositories:
             return None
         return repositories[0]
 
-    async def get_log_repository(self, name: str) -> typing.Union[dict, None]:
+    async def get_log_repository(
+            self, name: str
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         endpoint = "pulp/api/v3/repositories/file/file/"
         params = {"name": name}
         response = await self.request("GET", endpoint, params=params)
@@ -155,10 +157,10 @@ class PulpClient:
 
     async def get_rpm_distros(
         self,
-        include_fields: typing.List[str] = None,
-        exclude_fields: typing.List[str] = None,
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
         **search_params,
-    ) -> typing.List[dict]:
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         return await self.__get_entities(
             "pulp/api/v3/distributions/rpm/rpm/",
             include_fields=include_fields,
@@ -166,7 +168,7 @@ class PulpClient:
             **search_params
         )
 
-    async def get_rpm_remote(self, name: str) -> typing.Union[dict, None]:
+    async def get_rpm_remote(self, name: str) -> typing.Optional[dict]:
         endpoint = "pulp/api/v3/remotes/rpm/rpm/"
         params = {"name__contains": name}
         response = await self.request("GET", endpoint, params=params)
@@ -186,7 +188,9 @@ class PulpClient:
             return None
         return response["results"]
 
-    async def get_modules(self, **search_params):
+    async def get_modules(
+            self, **search_params
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         endpoint = "pulp/api/v3/content/rpm/modulemds/"
         response = await self.request("GET", endpoint, params=search_params)
         if response["count"] == 0:
@@ -547,10 +551,10 @@ class PulpClient:
     async def __get_entities(
         self,
         endpoint,
-        include_fields: typing.List[str] = None,
-        exclude_fields: typing.List[str] = None,
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
         **search_params
-    ):
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         all_entities = []
 
         result = await self.__get_content_info(
@@ -577,11 +581,11 @@ class PulpClient:
 
     async def get_rpm_packages(
         self,
-        include_fields: typing.List[str] = None,
-        exclude_fields: typing.List[str] = None,
-        custom_endpoint: str = None,
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
+        custom_endpoint: typing.Optional[str] = None,
         **search_params,
-    ):
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         endpoint = "pulp/api/v3/content/rpm/packages/"
         if custom_endpoint:
             endpoint = custom_endpoint
@@ -595,10 +599,10 @@ class PulpClient:
     async def get_rpm_repository_packages(
         self,
         repository_href: str,
-        include_fields: typing.List[str] = None,
-        exclude_fields: typing.List[str] = None,
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
         **search_params,
-    ):
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         latest_version = await self.get_repo_latest_version(repository_href)
         params = {"repository_version": latest_version, "limit": 10000}
         params.update(**search_params)
@@ -609,9 +613,9 @@ class PulpClient:
     async def get_artifact(
         self,
         package_href,
-        include_fields: typing.List[str] = None,
-        exclude_fields: typing.List[str] = None,
-    ):
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
+    ) -> typing.Optional[typing.Dict[str, Any]]:
         return await self.__get_content_info(
             package_href, include_fields=include_fields, exclude_fields=exclude_fields
         )
