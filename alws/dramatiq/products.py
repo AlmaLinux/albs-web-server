@@ -64,7 +64,8 @@ async def get_packages(
     if modification == "add":
         dedup_mapping = {}
         for pkg in filtered_build_packages:
-            if pkg["location_href"] in dedup_mapping:
+            if pkg["location_href"] in dedup_mapping or \
+                pkg["pulp_href"] in pkgs_blacklist:
                 continue
             dedup_mapping[pkg["location_href"]] = pkg["pulp_href"]
         logger.debug("Deduplication mapping for packages"
@@ -72,7 +73,6 @@ async def get_packages(
         final_packages = [
             href for href in dedup_mapping.values()
             if href not in search_by_href
-            and pkg["pulp_href"] not in pkgs_blacklist
         ]
     else:
         final_packages = [
