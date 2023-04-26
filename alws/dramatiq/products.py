@@ -1,6 +1,5 @@
 import asyncio
 import dramatiq
-import logging
 import pprint
 import typing
 
@@ -13,11 +12,12 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus, DRAMATIQ_TASK_TIMEOUT
 from alws.database import Session
 from alws.dramatiq import event_loop
+from alws.utils.log_utils import setup_logger
 from alws.utils.pulp_client import PulpClient
 
 __all__ = ['perform_product_modification']
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 async def get_existing_packages(
     pulp_client: PulpClient,
