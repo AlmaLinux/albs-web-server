@@ -244,7 +244,7 @@ async def _perform_product_modification(
         pkgs_blacklist = (await db.execute(
             select(models.BuildTaskArtifact.href).where(
                 models.BuildTaskArtifact.type == "rpm",
-                models.BuildTaskArtifact.name.like("%src.rpm")
+                models.BuildTaskArtifact.name.like("%src.rpm"),
                 models.BuildTaskArtifact.build_task_id.in_(failed_build_tasks),
             )
         )).scalars().all()
