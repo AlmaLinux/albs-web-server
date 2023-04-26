@@ -11,12 +11,14 @@ from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.errors import ModuleUpdateError
+from alws.pulp_models import RpmPackage
+from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.modularity import IndexWrapper
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
-from alws.utils.rpm_package import get_rpm_package_info
+from alws.utils.pulp_utils import get_uuid_from_pulp_href, get_rpm_packages_by_ids
 
 
 __all__ = [
@@ -193,14 +195,15 @@ class MultilibProcessor:
         debug_pkg_hrefs = []
         db_artifacts = await get_build_task_artifacts(
             self._db, self._build_task)
+        pulp_packages = get_rpm_packages_by_ids(
+            [get_uuid_from_pulp_href(artifact.href) for artifact in db_artifacts],
+            [RpmPackage.content_ptr_id, RpmPackage.name, RpmPackage.version],
+        )
         for artifact in db_artifacts:
             href = artifact.href
-            rpm_pkg = await self._pulp_client.get_rpm_package(
-                package_href=href,
-                include_fields=['name', 'version'],
-            )
-            artifact_name = rpm_pkg.get('name', '')
-            for pkg_name, pkg_version in multilib_packages.items():
+            rpm_pkg = pulp_packages[artifact.href]
+            artifact_name = rpm_pkg.name
+            for pkg_name, _ in multilib_packages.items():
                 add_conditions = (
                     artifact_name == pkg_name,
                     href not in pkg_hrefs or href not in debug_pkg_hrefs,
@@ -213,10 +216,8 @@ class MultilibProcessor:
                         href=href,
                         cas_hash=artifact.cas_hash,
                     ))
-                    if is_debuginfo_rpm(artifact_name):
-                        debug_pkg_hrefs.append(href)
-                    else:
-                        pkg_hrefs.append(href)
+                    targer_arr = debug_pkg_hrefs if is_debuginfo_rpm(artifact_name) else pkg_hrefs
+                    targer_arr.append(href)
         self._db.add_all(artifacts)
         await self._db.flush()
         debug_repo = next(
@@ -234,19 +235,20 @@ class MultilibProcessor:
                 repo_to=arch_repo.pulp_href, add=pkg_hrefs)
         )
 
-    async def get_packages_info_from_pulp(self, rpm_packages: list):
-        results = await asyncio.gather(
-            *(get_rpm_package_info(
-                self._pulp_client, rpm,
-                include_fields=['epoch', 'name', 'version', 'release', 'arch']
-            ) for rpm in rpm_packages)
+    async def get_packages_info_from_pulp(
+        self,
+        rpm_packages: typing.List[BuildDoneArtifact],
+    ) -> typing.List[RpmPackage]:
+        results = get_rpm_packages_by_ids(
+            [get_uuid_from_pulp_href(rpm.href) for rpm in rpm_packages],
+            [RpmPackage.content_ptr_id, RpmPackage.name, RpmPackage.epoch,
+             RpmPackage.version, RpmPackage.release, RpmPackage.arch],
         )
-
-        return [v for k, v in dict(results).items()]
+        return list(results.values())
 
     @staticmethod
     async def update_module_index(module_index: IndexWrapper, module_name: str,
-                                  module_stream: str, packages: list):
+                                  module_stream: str, packages: typing.List[RpmPackage]):
         if not packages:
             return
 
@@ -258,10 +260,12 @@ class MultilibProcessor:
                 f'{module_name}-devel', module_stream)
 
         for pkg_info in packages:
-            module.add_rpm_artifact(pkg_info, multilib=True)
+            module.add_rpm_artifact(pkg_info._asdict(), multilib=True)
 
     async def add_multilib_module_artifacts(
-            self, prepared_artifacts: list = None):
+            self,
+            prepared_artifacts: typing.Optional[typing.List[dict]] = None,
+    ):
         if not self._module_index:
             return
 

@@ -22,9 +22,11 @@ from alws.errors import (
 )
 from alws.perms import actions
 from alws.perms.authorization import can_perform
+from alws.pulp_models import RpmPackage
 from alws.schemas import sign_schema
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import get_rpm_packages_by_checksums
 
 
 async def __get_build_repos(
@@ -204,15 +206,14 @@ async def complete_sign_task(
         ) -> models.SignTask:
 
     async def __process_single_package(
-            pkg: sign_schema.SignedRpmInfo) -> typing.Tuple[str, dict]:
-        rpm_pkg = await pulp_client.get_rpm_packages(
-            include_fields=['pulp_href', 'sha256'],
-            sha256=pkg.sha256
-        )
+        pkg: sign_schema.SignedRpmInfo,
+        pulp_db_packages: typing.Dict[str, RpmPackage],
+    ) -> typing.Tuple[str, dict]:
         sha256 = None
+        rpm_pkg = pulp_db_packages.get(pkg.sha256)
         if rpm_pkg:
-            new_pkg_href = rpm_pkg[0]['pulp_href']
-            sha256 = rpm_pkg[0]['sha256']
+            new_pkg_href = rpm_pkg.pulp_href
+            sha256 = pkg.sha256
         else:
             new_pkg_href = await pulp_client.create_rpm_package(
                 pkg.name, pkg.href)
@@ -316,9 +317,11 @@ async def complete_sign_task(
                 package_arches_mapping[package.name].add(package.arch)
                 if package.name not in packages_to_convert:
                     packages_to_convert[package.name] = package
-
+            pulp_db_packages = get_rpm_packages_by_checksums(
+                [pkg.sha256 for pkg in packages_to_convert.values()],
+            )
             results = await asyncio.gather(*(
-                __process_single_package(package)
+                __process_single_package(package, pulp_db_packages)
                 for package in packages_to_convert.values()
             ))
             converted_packages = dict(results)

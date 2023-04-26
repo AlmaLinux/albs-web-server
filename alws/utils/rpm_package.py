@@ -1,21 +1,39 @@
 import typing
 
-from alws.schemas.build_node_schema import BuildDoneArtifact
-from alws.utils.pulp_client import PulpClient
+from alws.models import BuildTaskArtifact
+from alws.pulp_models import RpmPackage
+from alws.utils.pulp_utils import (
+    get_rpm_packages_by_ids,
+    get_uuid_from_pulp_href,
+)
+
+__all__ = ["get_rpm_packages_info"]
 
 
-__all__ = ["get_rpm_package_info"]
-
-
-async def get_rpm_package_info(
-    pulp_client: PulpClient,
-    artifact: BuildDoneArtifact,
-    include_fields: typing.Optional[typing.List[str]] = None,
-    exclude_fields: typing.Optional[typing.List[str]] = None,
-) -> typing.Tuple[str, typing.Dict[str, typing.Any]]:
-    info = await pulp_client.get_rpm_package(
-        artifact.href,
-        include_fields=include_fields,
-        exclude_fields=exclude_fields,
+def get_rpm_packages_info(
+    artifacts: typing.List[BuildTaskArtifact],
+) -> typing.Dict[str, typing.Dict[str, typing.Any]]:
+    pkg_fields = [
+        RpmPackage.content_ptr_id,
+        RpmPackage.name,
+        RpmPackage.epoch,
+        RpmPackage.version,
+        RpmPackage.release,
+        RpmPackage.arch,
+        RpmPackage.rpm_sourcerpm,
+    ]
+    pulp_packages = get_rpm_packages_by_ids(
+        [get_uuid_from_pulp_href(artifact.href) for artifact in artifacts],
+        pkg_fields,
     )
-    return artifact.href, info
+    return {
+        pkg.pulp_href: {
+            "name": pkg.name,
+            "epoch": pkg.epoch,
+            "version": pkg.version,
+            "release": pkg.release,
+            "arch": pkg.arch,
+            "rpm_sourcerpm": pkg.rpm_sourcerpm,
+        }
+        for _, pkg in pulp_packages.items()
+    }
