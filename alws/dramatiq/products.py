@@ -35,7 +35,8 @@ async def get_packages(
     pulp_client: PulpClient,
     build_repo: models.Repository,
     dist_repo: models.Repository,
-    modification: str
+    modification: str,
+    pkgs_blacklist: typing.List[str]
 ) -> typing.Tuple[str, typing.List[str]]:
 
     def filter_by_arch(pkgs: typing.List[dict], repo_arch: str):
@@ -68,8 +69,11 @@ async def get_packages(
             dedup_mapping[pkg['location_href']] = pkg['pulp_href']
         logger.debug('Deduplication mapping for packages'
                      'with the same name:\n%s', pprint.pformat(dedup_mapping))
-        final_packages = [href for href in dedup_mapping.values()
-                          if href not in search_by_href]
+        final_packages = [
+            href for href in dedup_mapping.values()
+            if href not in search_by_href
+            and pkg['pulp_href'] not in pkgs_blacklist
+        ]
     else:
         final_packages = [pkg['pulp_href'] for pkg in filtered_build_packages
                           if pkg['pulp_href'] in search_by_href]
@@ -82,7 +86,8 @@ async def prepare_repo_modify_dict(
     db_build: models.Build,
     db_product: models.Product,
     pulp_client: PulpClient,
-    modification: str
+    modification: str,
+    pkgs_blacklist: typing.List[str]
 ) -> typing.Dict[str, typing.List[str]]:
 
     product_repo_mapping = {(repo.arch, repo.debug, repo.platform.name): repo
@@ -96,7 +101,9 @@ async def prepare_repo_modify_dict(
         )
         if dist_repo is None:
             continue
-        tasks.append(get_packages(pulp_client, repo, dist_repo, modification))
+        tasks.append(get_packages(
+            pulp_client, repo, dist_repo, modification, pkgs_blacklist
+        ))
 
     results = await asyncio.gather(*tasks)
     modify.update(**dict(results))
@@ -200,11 +207,55 @@ async def _perform_product_modification(
         )
         db_build = db_build.scalars().first()
 
+        # We should skip src.rpms coming from failed tasks
+        tasks_by_ref = defaultdict(list)
+        {
+            tasks_by_ref[task_ref].append(
+                (
+                    task_id, task_status
+                )
+            )
+            for (
+                task_ref,
+                task_id,
+                task_status
+            )
+            in [
+                (
+                    task.ref_id,
+                    task.id,
+                    (task.status == BuildTaskStatus.COMPLETED)
+                )
+                for task in db_build.tasks
+            ]
+        }
+
+        # We don't need all the build tasks ids as
+        # all them share the same ref_id
+        failed_build_tasks = [
+            tasks[0][0]
+            for tasks in tasks_by_ref.values()
+            if not any([task[1] for task in tasks])
+        ]
+
+        pkgs_blacklist = (await db.execute(
+            select(models.BuildTaskArtifact.href).where(
+                models.BuildTaskArtifact.type == "rpm",
+                models.BuildTaskArtifact.name.like("%src.rpm")
+                models.BuildTaskArtifact.build_task_id.in_(failed_build_tasks),
+            )
+        )).scalars().all()
+
     await set_platform_for_products_repos(db=db, product=db_product)
     await set_platform_for_build_repos(db=db, build=db_build)
 
     modify = await prepare_repo_modify_dict(
-        db_build, db_product, pulp_client, modification)
+        db_build,
+        db_product,
+        pulp_client,
+        modification,
+        pkgs_blacklist
+    )
     tasks = []
     publish_tasks = []
     for key, value in modify.items():
