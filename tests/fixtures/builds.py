@@ -152,14 +152,14 @@ async def regular_build(
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
-async def get_rpm_package_info(monkeypatch):
-    async def func(*args, **kwargs):
-        _, artifact = args
-        return artifact.href, get_rpm_pkg_info(artifact)
+def get_rpm_packages_info(monkeypatch):
+    def func(artifacts):
+        return {
+            artifact.href: get_rpm_pkg_info(artifact) for artifact in artifacts
+        }
 
-    monkeypatch.setattr("alws.crud.build_node.get_rpm_package_info", func)
+    monkeypatch.setattr("alws.crud.build_node.get_rpm_packages_info", func)
 
 
 @pytest.mark.anyio
