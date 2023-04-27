@@ -4,7 +4,7 @@ uvicorn==0.21.1
 asyncpg==0.27.0
 psycopg2-binary==2.9.6
 pydantic==1.10.7
-SQLAlchemy==1.4.46
+SQLAlchemy==2.0.11
 aiohttp==3.8.4
 aiofiles==23.1.0
 aioredis==2.0.1
