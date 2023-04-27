@@ -122,4 +122,6 @@ async def user_product(
             session,
             ProductCreate(**user_product_create_payload),
         )
+        session.add(product)
+        await session.commit()
     yield product

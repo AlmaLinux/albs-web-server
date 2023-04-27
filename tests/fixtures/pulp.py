@@ -322,3 +322,25 @@ def list_updateinfo_records(monkeypatch, pulp_updateinfos):
         return pulp_updateinfos
 
     monkeypatch.setattr(PulpClient, "list_updateinfo_records", func)
+
+
+@pytest.fixture
+def get_rpm_distros(monkeypatch):
+    async def func(*args, **kwargs):
+        return [
+            {
+                "pulp_href": get_module_href()
+            }
+        ]
+
+    monkeypatch.setattr(PulpClient, "get_rpm_distros", func)
+
+
+@pytest.fixture
+def delete_by_href(monkeypatch):
+    async def func(*args, **kwargs):
+        return {
+            "pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"
+        }
+
+    monkeypatch.setattr(PulpClient, "delete_by_href", func)

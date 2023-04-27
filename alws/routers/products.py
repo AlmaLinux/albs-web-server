@@ -98,11 +98,21 @@ async def remove_from_product(
             status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@public_router.delete('/{product_id}/remove/',
-                      status_code=status.HTTP_204_NO_CONTENT)
+@public_router.delete(
+    "/{product_id}/remove/",
+    response_model=product_schema.ProductOpResult
+)
 async def remove_product(
     product_id: int,
     db: database.Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await products.remove_product(db, product_id, user.id)
+    try:
+        await products.remove_product(db, product_id, user.id)
+        return product_schema.ProductOpResult(
+            success=True,
+            message=f"Product with {product_id=} successfully removed")
+    except Exception as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST)
