@@ -346,12 +346,13 @@ async def __process_rpms(
     src_packages_tasks = []
     debug_packages_tasks = []
     for artifact in task_artifacts:
-        target_arr = arch_packages_tasks
-        if artifact.arch == "src" and built_srpm_url is None:
-            target_arr = src_packages_tasks
+        if artifact.arch == "src":
+            if built_srpm_url is None:
+                src_packages_tasks.append(pulp_client.create_entity(artifact))
         elif artifact.is_debuginfo:
-            target_arr = debug_packages_tasks
-        target_arr.append(pulp_client.create_entity(artifact))
+            debug_packages_tasks.append(pulp_client.create_entity(artifact))
+        else:
+            arch_packages_tasks.append(pulp_client.create_entity(artifact))
 
     processed_packages = []
     for tasks, repo in (
