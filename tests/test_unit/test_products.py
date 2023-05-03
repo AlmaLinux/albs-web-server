@@ -21,6 +21,8 @@ from sqlalchemy.orm import selectinload
 from tests.constants import ADMIN_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
+from typing import List
+
 from unittest.mock import Mock
 
 
