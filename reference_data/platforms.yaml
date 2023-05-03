@@ -393,6 +393,61 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: src
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/Source/gcp/
+      export_path: vault/8/cloud/Source/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/cloud/aarch64/gcp/
+      export_path: almalinux/8/cloud/aarch64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/cloud/x86_64/gcp/
+      export_path: almalinux/8/cloud/x86_64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/aarch64/gcp/
+      export_path: vault/8/cloud/debug/aarch64/gcp/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/x86_64/gcp/
+      export_path: vault/8/cloud/debug/x86_64/gcp/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - name: almalinux-8-baseos
       arch: src
       type: rpm
@@ -2751,6 +2806,61 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
       export_path: vault/9/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: src
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/Source/gcp/
+      export_path: vault/9/cloud/Source/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/cloud/aarch64/gcp/
+      export_path: almalinux/9/cloud/aarch64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/cloud/x86_64/gcp/
+      export_path: almalinux/9/cloud/x86_64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/aarch64/gcp/
+      export_path: vault/9/cloud/debug/aarch64/gcp/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/x86_64/gcp/
+      export_path: vault/9/cloud/debug/x86_64/gcp/
       production: true
       debug: true
       remote_sync_policy: on_demand
