@@ -10,6 +10,7 @@ from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 from tests.test_utils.pulp_utils import (
     get_artifact_href,
+    get_distros_href,
     get_file_href,
     get_latest_repo_version,
     get_module_defaults_href,
@@ -329,7 +330,7 @@ def get_rpm_distros(monkeypatch):
     async def func(*args, **kwargs):
         return [
             {
-                "pulp_href": get_module_href()
+                "pulp_href": get_distros_href()
             }
         ]
 
