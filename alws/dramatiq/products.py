@@ -170,6 +170,60 @@ async def set_platform_for_build_repos(
         repo.platform = repos_per_platform[repo.name]
 
 
+def group_tasks_by_ref_id(
+    build_tasks: typing.List[models.BuildTask]
+) -> dict:
+    tasks_by_ref = defaultdict(list)
+    {
+        tasks_by_ref[task_ref].append(
+            (
+                task_id, task_status
+            )
+        )
+        for (
+            task_ref,
+            task_id,
+            task_status
+        )
+        in [
+            (
+                task.ref_id,
+                task.id,
+                (task.status == BuildTaskStatus.COMPLETED)
+            )
+            for task in build_tasks
+        ]
+    }
+    return tasks_by_ref
+
+
+async def get_packages_to_blacklist(
+    db: Session,
+    build_tasks: typing.List[models.BuildTask]
+) -> typing.List:
+
+    # We should skip src.rpms coming from failed tasks
+    tasks_by_ref = group_tasks_by_ref_id(build_tasks)
+
+    # We don't need all the build tasks ids as
+    # all them share the same ref_id
+    failed_build_tasks = [
+        tasks[0][0]
+        for tasks in tasks_by_ref.values()
+        if not any([task[1] for task in tasks])
+    ]
+
+    pkgs_blacklist = (await db.execute(
+        select(models.BuildTaskArtifact.href).where(
+            models.BuildTaskArtifact.type == "rpm",
+            models.BuildTaskArtifact.name.like("%src.rpm"),
+            models.BuildTaskArtifact.build_task_id.in_(failed_build_tasks),
+        )
+    )).scalars().all()
+
+    return pkgs_blacklist
+
+
 async def _perform_product_modification(
     build_id: int,
     product_id: int,
@@ -210,44 +264,10 @@ async def _perform_product_modification(
         )
         db_build = db_build.scalars().first()
 
-        # We should skip src.rpms coming from failed tasks
-        tasks_by_ref = defaultdict(list)
-        {
-            tasks_by_ref[task_ref].append(
-                (
-                    task_id, task_status
-                )
-            )
-            for (
-                task_ref,
-                task_id,
-                task_status
-            )
-            in [
-                (
-                    task.ref_id,
-                    task.id,
-                    (task.status == BuildTaskStatus.COMPLETED)
-                )
-                for task in db_build.tasks
-            ]
-        }
+        pkgs_blacklist = []
+        if modification == "add":
+            pkgs_blacklist = await get_packages_to_blacklist(db, db_build.tasks)
 
-        # We don't need all the build tasks ids as
-        # all them share the same ref_id
-        failed_build_tasks = [
-            tasks[0][0]
-            for tasks in tasks_by_ref.values()
-            if not any([task[1] for task in tasks])
-        ]
-
-        pkgs_blacklist = (await db.execute(
-            select(models.BuildTaskArtifact.href).where(
-                models.BuildTaskArtifact.type == "rpm",
-                models.BuildTaskArtifact.name.like("%src.rpm"),
-                models.BuildTaskArtifact.build_task_id.in_(failed_build_tasks),
-            )
-        )).scalars().all()
 
     await set_platform_for_products_repos(db=db, product=db_product)
     await set_platform_for_build_repos(db=db, build=db_build)
