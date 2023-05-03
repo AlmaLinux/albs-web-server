@@ -21,7 +21,7 @@ from sqlalchemy.orm import selectinload
 from tests.constants import ADMIN_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
-from typing import List
+from typing import List, Tuple
 
 from unittest.mock import Mock
 
@@ -325,7 +325,7 @@ class TestProductsUnit(BaseAsyncTestCase):
         session: AsyncSession,
         create_build_and_artifacts,
         request
-    ) -> List[List[BuildTask], dict]:
+    ) -> Tuple[List[BuildTask], List[str]]:
         db_build = (await session.execute(
             select(Build).where(Build.id == create_build_and_artifacts.id).options(
                 selectinload(Build.tasks)
