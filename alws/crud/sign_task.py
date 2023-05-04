@@ -160,7 +160,7 @@ async def create_sign_task(
 async def get_available_sign_task(
     db: AsyncSession,
     key_ids: typing.List[str],
-):
+) -> typing.Dict[str, typing.Any]:
     sign_tasks = await db.execute(
         select(models.SignTask)
         .join(models.SignTask.sign_key)
