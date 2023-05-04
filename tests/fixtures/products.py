@@ -51,7 +51,7 @@ def user_product_create_payload(request) -> dict:
     return {
         "name": "testy-testy",
         "owner_id": request.param,
-        "title": "AlmaLinux",
+        "title": "Testy's Product",
         "description": "",
         "platforms": [
             {
@@ -78,7 +78,7 @@ def user_product_create_payload(request) -> dict:
 async def base_product(
     session: AsyncSession,
     product_create_payload: dict,
-    create_repo,
+    create_repo
 ) -> AsyncIterable[Product]:
     product = (
         (
@@ -122,4 +122,6 @@ async def user_product(
             session,
             ProductCreate(**user_product_create_payload),
         )
+        session.add(product)
+        await session.commit()
     yield product
