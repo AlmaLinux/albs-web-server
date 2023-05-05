@@ -10,6 +10,7 @@ from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 from tests.test_utils.pulp_utils import (
     get_artifact_href,
+    get_distros_href,
     get_file_href,
     get_latest_repo_version,
     get_module_defaults_href,
@@ -322,3 +323,25 @@ def list_updateinfo_records(monkeypatch, pulp_updateinfos):
         return pulp_updateinfos
 
     monkeypatch.setattr(PulpClient, "list_updateinfo_records", func)
+
+
+@pytest.fixture
+def get_rpm_distros(monkeypatch):
+    async def func(*args, **kwargs):
+        return [
+            {
+                "pulp_href": get_distros_href()
+            }
+        ]
+
+    monkeypatch.setattr(PulpClient, "get_rpm_distros", func)
+
+
+@pytest.fixture
+def delete_by_href(monkeypatch):
+    async def func(*args, **kwargs):
+        return {
+            "pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"
+        }
+
+    monkeypatch.setattr(PulpClient, "delete_by_href", func)

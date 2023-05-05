@@ -36,6 +36,10 @@ def get_modules_href() -> str:
     return f"/pulp/api/v3/content/rpm/modulemds/{uuid.uuid4()}/"
 
 
+def get_distros_href() -> str:
+    return f"/pulp/api/v3/distributions/rpm/rpm/{uuid.uuid4()}/"
+
+
 def get_rpm_pkg_info(artifact: BuildDoneArtifact):
     nevra = parse_rpm_nevra(artifact.name)
     rpm_sourcerpm = f"{nevra.name}-{nevra.version}-{nevra.release}.src.rpm"
