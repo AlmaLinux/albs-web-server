@@ -125,7 +125,7 @@ def debrand_comment(comment: str, distro_version: str) -> str:
 def debrand_description_and_title(string: str) -> str:
     regex_patterns = (
         (r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?", "AlmaLinux"),
-        (r"^RH", "AlmaLinux"),
+        (r"^RH", "AL"),
         (r"RHEL", "AlmaLinux"),
         (r"\[rhel", "[almalinux"),
     )
