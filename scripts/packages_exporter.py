@@ -35,6 +35,7 @@ from alws.config import settings
 from alws.constants import SignStatusEnum
 from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import PulpClient
+from alws.utils.osv import export_errata_to_osv
 from alws.utils.errata import (
     merge_errata_records, find_metadata, iter_updateinfo,
     extract_errata_metadata, extract_errata_metadata_modern,
@@ -70,6 +71,15 @@ def parse_args():
                         required=False, help='Repodata cache directory')
     parser.add_argument('-v', '--verbose', action='store_true',
                         default=False, required=False, help='Verbose output')
+    parser.add_argument('-method', '--export-method', type=str,
+                        default="hardlink", required=False,
+                        help='Method of exporting (choices: write, hardlink, symlink)')
+    parser.add_argument('-u', '--pulp-user', type=str,
+                        default="pulp", required=False,
+                        help='Pulp user, used for change the user ownership')
+    parser.add_argument('-g', '--pulp-group', type=str,
+                        default="pulp-exports", required=False,
+                        help='Pulp group, used for change the group ownership')
     return parser.parse_args()
 
 
@@ -109,9 +119,13 @@ class Exporter:
         self,
         pulp_client: PulpClient,
         repodata_cache_dir: str,
-        verbose: bool = False
+        verbose: bool = False,
+        export_method: str = "hardlink",
+        pulp_user: str = "pulp",
+        pulp_group: str = "pulp-exports",
     ):
 
+        os.makedirs(LOG_DIR, exist_ok=True)
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
             level=logging.DEBUG if verbose else logging.INFO,
@@ -119,7 +133,6 @@ class Exporter:
             handlers=[logging.FileHandler(filename=LOG_FILE, mode='a'),
                       logging.StreamHandler(stream=sys.stdout)]
         )
-        os.makedirs(LOG_DIR, exist_ok=True)
 
         self._temp_dir = tempfile.gettempdir()
         self.logger = logging.getLogger(LOGGER_NAME)
@@ -128,8 +141,9 @@ class Exporter:
         self.headers = {
             'Authorization': f'Bearer {settings.sign_server_token}',
         }
-        self.pulp_system_user = 'pulp'
-        self.common_group = 'pulp-exports'
+        self.pulp_system_user = pulp_user
+        self.common_group = pulp_group
+        self.export_method = export_method
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
             os.path.expanduser('~/export.err'))
@@ -152,6 +166,30 @@ class Exporter:
     def get_current_username():
         return pwd.getpwuid(os.getuid())[0]
 
+    def process_osv_data(
+        self,
+        errata_cache: typing.List[typing.Dict[str, typing.Any]],
+        platform: str,
+    ):
+        osv_distr_mapping = {
+            "AlmaLinux-8": "AlmaLinux:8",
+            "AlmaLinux-9": "AlmaLinux:9",
+        }
+        self.logger.debug('Generating OSV data')
+        osv_target_dir = os.path.join(
+            settings.pulp_export_path,
+            "osv",
+            platform.lower().replace("-", ""),
+        )
+        if not os.path.exists(osv_target_dir):
+            os.makedirs(osv_target_dir, exist_ok=True)
+        export_errata_to_osv(
+            errata_records=errata_cache,
+            target_dir=osv_target_dir,
+            ecosystem=osv_distr_mapping[platform],
+        )
+        self.logger.debug('OSV data are generated')
+
     async def make_request(self, method: str, endpoint: str,
                            params: dict = None, data: dict = None):
         full_url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
@@ -165,7 +203,7 @@ class Exporter:
 
     async def create_filesystem_exporters(
             self, repository_ids: typing.List[int],
-            get_publications: bool = False
+            get_publications: bool = False,
     ):
 
         async def get_exporter_data(
@@ -175,7 +213,7 @@ class Exporter:
             exporter_name = f'{repository.name}-{repository.arch}-debug' \
                 if repository.debug else f'{repository.name}-{repository.arch}'
             fs_exporter_href = await self.pulp_client.create_filesystem_exporter(
-                exporter_name, export_path)
+                exporter_name, export_path, export_method=self.export_method)
 
             repo_latest_version = await self.pulp_client.get_repo_latest_version(
                 repository.pulp_href
@@ -325,11 +363,10 @@ class Exporter:
                     sig = signature.signer.lower()
                     if sig in key_ids_lower:
                         return SignStatusEnum.SUCCESS, sig
-                    else:
-                        for key_id in key_ids_lower:
-                            sub_keys = self.known_subkeys.get(key_id, [])
-                            if sig in sub_keys:
-                                return SignStatusEnum.SUCCESS, sig
+                    for key_id in key_ids_lower:
+                        sub_keys = self.known_subkeys.get(key_id, [])
+                        if sig in sub_keys:
+                            return SignStatusEnum.SUCCESS, sig
 
                 return SignStatusEnum.WRONG_SIGNATURE, sig
 
@@ -556,6 +593,7 @@ def extract_errata(repo_path: str):
     errata_records = []
     modern_errata_records = []
     if not os.path.exists(repo_path):
+        logging.debug("%s is missing, skipping", repo_path)
         return errata_records, modern_errata_records
 
     path = Path(repo_path)
@@ -563,6 +601,7 @@ def extract_errata(repo_path: str):
     repodata = parent_dir / 'repodata'
     errata_file = find_metadata(str(repodata), 'updateinfo')
     if not errata_file:
+        logging.debug("updateinfo.xml is missing, skipping")
         return errata_records, modern_errata_records
 
     for record in iter_updateinfo(errata_file):
@@ -598,7 +637,14 @@ def main():
         settings.pulp_user,
         settings.pulp_password,
     )
-    exporter = Exporter(pulp_client, args.cache_dir, verbose=args.verbose)
+    exporter = Exporter(
+        pulp_client,
+        args.cache_dir,
+        verbose=args.verbose,
+        export_method=args.export_method,
+        pulp_user=args.pulp_user,
+        pulp_group=args.pulp_group,
+    )
     exporter.logger.debug('Fixing permissions before export')
     sync_fix_permissions(
         exporter.pulp_system_user, exporter.common_group)
@@ -630,8 +676,8 @@ def main():
     except Exception:
         pass
 
-    errata_cache = []
-    modern_errata_cache = {'data': []}
+    platform_errata_cache = {}
+    platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
 
     for repo_path in exported_paths:
         exporter.logger.info('%s post-processing started', repo_path)
@@ -656,11 +702,22 @@ def main():
             if errata_records or modern_errata_records:
                 exporter.logger.info(
                     'Extracted errata records from %s', repo_path)
-
-                errata_cache = merge_errata_records(
-                    errata_cache, errata_records)
-                modern_errata_cache = merge_errata_records_modern(
-                    modern_errata_cache, {'data': modern_errata_records}
+                platform = "AlmaLinux-8"
+                if platform_regex.search(repo_path):
+                    platform = "AlmaLinux-9"
+                if platform not in platform_errata_cache:
+                    platform_errata_cache[platform] = {
+                        "cache": [],
+                        "modern_cache": {
+                            "data": [],
+                        },
+                    }
+                platform_cache = platform_errata_cache[platform]
+                platform_cache["cache"] = merge_errata_records(
+                    platform_cache["cache"], errata_records)
+                platform_cache["modern_cache"] = merge_errata_records_modern(
+                    platform_cache["modern_cache"],
+                    {'data': modern_errata_records},
                 )
         exporter.logger.debug('Errata extraction completed')
 
@@ -685,6 +742,8 @@ def main():
                 html_path = os.path.join(platform_path, 'html')
                 if not os.path.exists(html_path):
                     os.mkdir(html_path)
+                errata_cache = platform_errata_cache[platform]["cache"]
+                exporter.process_osv_data(errata_cache, platform)
                 exporter.logger.debug('Generating HTML errata pages')
                 for record in errata_cache:
                     generate_errata_page(record, html_path)
@@ -700,7 +759,7 @@ def main():
                 with open(os.path.join(platform_path, 'errata.json'), 'w') as fd:
                     json.dump(errata_cache, fd)
                 with open(os.path.join(platform_path, 'errata.full.json'), 'w') as fd:
-                    json.dump(modern_errata_cache, fd)
+                    json.dump(platform_errata_cache[platform]["modern_cache"], fd)
                 exporter.logger.debug('JSON dump is done')
                 exporter.logger.debug('Generating OVAL data')
                 oval = sync(exporter.get_oval_xml(platform))
