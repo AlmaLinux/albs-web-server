@@ -6,7 +6,9 @@ from sqlalchemy.orm import joinedload, load_only
 
 from alws.dependencies import get_pulp_db
 from alws.pulp_models import (
+    CoreArtifact,
     CoreContent,
+    CoreContentArtifact,
     CoreRepository,
     CoreRepositoryContent,
     RpmPackage,
@@ -20,14 +22,14 @@ def get_uuid_from_pulp_href(pulp_href: str) -> uuid.UUID:
 
 
 # TODO: After ALBS-1012 is fixed, we can refactor this function
-# to get module packages from pulp wihtout having to grab the actual
+# to get module packages from pulp without having to grab the actual
 # modules.yaml file from the repository
 def get_rpm_module_packages_from_repository(
     repo_id: uuid.UUID,
     module: str,
-    pkg_names: typing.List[str] = None,
-    pkg_versions: typing.List[str] = None,
-    pkg_epochs: typing.List[str] = None,
+    pkg_names: typing.Optional[typing.List[str]] = None,
+    pkg_versions: typing.Optional[typing.List[str]] = None,
+    pkg_epochs: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
     repo_query = select(CoreRepository).where(
         CoreRepository.pulp_id == repo_id
@@ -37,7 +39,7 @@ def get_rpm_module_packages_from_repository(
         repo_name = repo.name
 
     if not repo_name:
-        return
+        return []
 
     # TODO: Getting modules.yaml files from BS production repos is not right.
     # The problem here is that we need a way to get packages from
@@ -49,21 +51,21 @@ def get_rpm_module_packages_from_repository(
     # repositories.
     try:
         repo_modules_yaml = get_modules_yaml_from_repo(repo_name)
-    except:
-        return
+    except Exception:
+        return []
 
     module_name, module_stream = module.split(":")
     try:
         repo_module = IndexWrapper.from_template(repo_modules_yaml).get_module(
             module_name, module_stream
         )
-    except:
-        return
+    except Exception:
+        return []
 
     pkg_releases = []
     for pkg in repo_module.get_rpm_artifacts():
         pkg_release = parse_rpm_nevra(pkg).release
-        if not pkg_release in pkg_releases:
+        if pkg_release not in pkg_releases:
             pkg_releases.append(pkg_release)
 
     conditions = []
@@ -199,12 +201,47 @@ def get_rpm_packages_by_ids(
         pulp_pkgs = (
             pulp_db.execute(
                 select(RpmPackage)
-                .where(RpmPackage.content_ptr_id.in_(pulp_pkg_ids))
-                .options(load_only(*pkg_fields))
+                .where(
+                    RpmPackage.content_ptr_id.in_(pulp_pkg_ids),
+                )
+                .options(
+                    joinedload(RpmPackage.content)
+                    .joinedload(CoreContent.core_contentartifact)
+                    .joinedload(CoreContentArtifact.artifact),
+                    load_only(*pkg_fields),
+                )
             )
+            .unique()
             .scalars()
             .all()
         )
         for pkg in pulp_pkgs:
             result[pkg.pulp_href] = pkg
+        return result
+
+
+def get_rpm_packages_by_checksums(
+    pkg_checksums: typing.List[str],
+) -> typing.Dict[str, RpmPackage]:
+    result = {}
+    with get_pulp_db() as pulp_db:
+        pulp_pkgs = (
+            pulp_db.execute(
+                select(RpmPackage)
+                .join(CoreContent)
+                .join(CoreContentArtifact)
+                .join(CoreArtifact)
+                .where(CoreArtifact.sha256.in_(pkg_checksums))
+                .options(
+                    joinedload(RpmPackage.content)
+                    .joinedload(CoreContent.core_contentartifact)
+                    .joinedload(CoreContentArtifact.artifact),
+                ),
+            )
+            .unique()
+            .scalars()
+            .all()
+        )
+        for package in pulp_pkgs:
+            result[package.sha256] = package
         return result

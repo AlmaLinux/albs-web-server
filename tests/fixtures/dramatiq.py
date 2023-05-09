@@ -53,7 +53,7 @@ async def build_done(
     regular_build: Build,
     start_build,
     create_entity,
-    get_rpm_package_info,
+    get_rpm_packages_info,
 ):
     build = await get_builds(db=session, build_id=regular_build.id)
     await session.close()
@@ -85,7 +85,7 @@ async def modular_build_done(
     modular_build: Build,
     start_modular_build,
     create_entity,
-    get_rpm_package_info,
+    get_rpm_packages_info,
     get_repo_modules_yaml,
     get_repo_modules,
 ):

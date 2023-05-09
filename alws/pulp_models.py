@@ -395,6 +395,10 @@ class RpmPackage(PulpBase):
             if repo_content.version_removed_id is None
         ]
 
+    @property
+    def sha256(self) -> str:
+        return self.content.core_contentartifact[0].artifact.sha256
+
 
 class RpmModulemd(PulpBase):
     __tablename__ = "rpm_modulemd"
@@ -420,8 +424,10 @@ class RpmModulemdPackages(PulpBase):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     modulemd_id = sqlalchemy.Column(
-        UUID(as_uuid=True), sqlalchemy.ForeignKey(RpmModulemd.content_ptr_id)
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(RpmModulemd.content_ptr_id),
     )
     package_id = sqlalchemy.Column(
-        UUID(as_uuid=True), sqlalchemy.ForeignKey(RpmPackage.content_ptr_id)
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(RpmPackage.content_ptr_id),
     )
