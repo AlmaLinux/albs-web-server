@@ -27,7 +27,7 @@ from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
-from alws.utils.rpm_package import get_rpm_package_info
+from alws.utils.rpm_package import get_rpm_packages_info
 
 
 async def get_available_build_task(
@@ -397,26 +397,19 @@ async def __process_rpms(
         model.build_artifact = artifact
         errata_package.albs_packages.append(model)
 
-    for href, _, artifact in processed_packages:
-        artifact = models.BuildTaskArtifact(
+    rpms = [
+        models.BuildTaskArtifact(
             build_task_id=task_id,
             name=artifact.name,
             type=artifact.type,
             href=href,
             cas_hash=artifact.cas_hash,
         )
-        # TODO: for modules info will be taken twice, we should reconsider this
-        pkg_fields = [
-            "epoch",
-            "name",
-            "version",
-            "release",
-            "arch",
-            "rpm_sourcerpm",
-        ]
-        _, rpm_info = await get_rpm_package_info(
-            pulp_client, artifact, include_fields=pkg_fields
-        )
+        for href, _, artifact in processed_packages
+    ]
+    rpms_info = get_rpm_packages_info(rpms)
+    for build_task_artifact in rpms:
+        rpm_info = rpms_info[build_task_artifact.href]
         if rpm_info["arch"] != "src":
             src_name = parse_rpm_nevra(rpm_info["rpm_sourcerpm"]).name
         else:
@@ -434,6 +427,7 @@ async def __process_rpms(
         )
 
         if module_index:
+            module = None
             for mod in module_index.iter_modules():
                 if mod.name.endswith("-devel"):
                     continue
@@ -455,37 +449,23 @@ async def __process_rpms(
             await db.run_sync(
                 append_errata_package,
                 errata_package,
-                artifact,
+                build_task_artifact,
                 rpm_info,
             )
-        rpms.append(artifact)
 
     if module_index and rpms:
-        pkg_fields = ["epoch", "name", "version", "release", "arch"]
-        results = await asyncio.gather(
-            *(
-                get_rpm_package_info(
-                    pulp_client, rpm, include_fields=pkg_fields
-                )
-                for rpm in rpms
-            )
-        )
-        packages_info = dict(results)
         srpm_info = None
         # we need to put source RPM in module as well, but it can be skipped
         # because it's built before
         if built_srpm_url is not None:
             db_srpm = await get_srpm_artifact_by_build_task_id(db, task_id)
             if db_srpm is not None:
-                _, srpm_info = await get_rpm_package_info(
-                    pulp_client,
-                    db_srpm,
-                    include_fields=pkg_fields,
-                )
+                srpms_info = get_rpm_packages_info([db_srpm])
+                srpm_info = srpms_info[db_srpm.href]
         try:
             for module in module_index.iter_modules():
                 for rpm in rpms:
-                    rpm_package = packages_info[rpm.href]
+                    rpm_package = rpms_info[rpm.href]
                     module.add_rpm_artifact(rpm_package)
                 if srpm_info:
                     module.add_rpm_artifact(srpm_info)

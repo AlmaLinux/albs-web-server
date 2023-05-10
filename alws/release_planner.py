@@ -38,6 +38,7 @@ from alws.errors import (
 )
 from alws.perms import actions
 from alws.perms.authorization import can_perform
+from alws.pulp_models import RpmPackage
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import clean_debug_name, is_debuginfo_rpm
@@ -46,6 +47,7 @@ from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
+    get_rpm_packages_by_ids,
     get_rpm_packages_from_repositories,
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
@@ -197,21 +199,39 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     async def get_pulp_packages_info(
         self,
         build_rpms: typing.List[
-            typing.Union[models.SourceRpm, models.BinaryRpm],
+            typing.Union[models.SourceRpm, models.BinaryRpm]
         ],
-        build_tasks: typing.Optional[typing.List[int]],
-        packages_fields: typing.List[str],
-    ):
-        return await asyncio.gather(
-            *(
-                self.pulp_client.get_rpm_package(
-                    rpm.artifact.href,
-                    include_fields=packages_fields,
-                )
+        build_tasks: typing.Optional[typing.List[int]] = None,
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
+        packages_fields = [
+            RpmPackage.content_ptr_id,
+            RpmPackage.content,
+            RpmPackage.name,
+            RpmPackage.epoch,
+            RpmPackage.version,
+            RpmPackage.release,
+            RpmPackage.arch,
+        ]
+        pulp_packages = get_rpm_packages_by_ids(
+            [
+                get_uuid_from_pulp_href(rpm.artifact.href)
                 for rpm in build_rpms
                 if build_tasks and rpm.artifact.build_task_id in build_tasks
-            )
+            ],
+            packages_fields,
         )
+        return [
+            {
+                "name": package.name,
+                "epoch": package.epoch,
+                "version": package.version,
+                "release": package.release,
+                "arch": package.arch,
+                "pulp_href": package.pulp_href,
+                "sha256": package.sha256,
+            }
+            for _, package in pulp_packages.items()
+        ]
 
     @class_measure_work_time_async("get_packages_info_pulp_and_db")
     async def get_pulp_packages(
@@ -220,15 +240,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
-        packages_fields = [
-            "name",
-            "epoch",
-            "version",
-            "release",
-            "arch",
-            "pulp_href",
-            "sha256",
-        ]
         pulp_packages = []
 
         builds_q = (
@@ -258,7 +269,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             pulp_artifacts = await self.get_pulp_packages_info(
                 build_rpms,
                 build_tasks,
-                packages_fields,
             )
             pulp_artifacts = {
                 artifact_dict.pop("pulp_href"): artifact_dict

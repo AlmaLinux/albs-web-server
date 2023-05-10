@@ -1,65 +1,53 @@
 import asyncio
 import collections
-from contextlib import asynccontextmanager
 import datetime
 import logging
 import re
-from typing import (
-    Any,
-    Awaitable,
-    DefaultDict,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-)
 import uuid
+from contextlib import asynccontextmanager
+from typing import Any, Awaitable, DefaultDict, Dict, List, Optional, Tuple
 
 import createrepo_c as cr
 import jinja2
-from sqlalchemy import select, or_, and_, update
-from sqlalchemy.orm import selectinload, load_only, Session
-from sqlalchemy.sql.expression import func
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, load_only, selectinload
+from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.dependencies import get_pulp_db, get_db
+from alws.config import settings
+from alws.constants import (
+    ErrataPackageStatus,
+    ErrataReferenceType,
+    ErrataReleaseStatus,
+)
+from alws.dependencies import get_db, get_pulp_db
+from alws.pulp_models import (
+    RpmPackage,
+    UpdateCollection,
+    UpdatePackage,
+    UpdateRecord,
+)
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
 from alws.utils.errata import (
     clean_errata_title,
+    debrand_affected_cpe_list,
+    debrand_comment,
+    debrand_description_and_title,
+    debrand_id,
+    debrand_reference,
     get_nevra,
     get_oval_title,
     get_verbose_errata_title,
 )
-from alws.utils.parsing import (
-    clean_release,
-    parse_rpm_nevra,
-)
+from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
+    get_rpm_module_packages_from_repository,
     get_rpm_packages_by_ids,
     get_rpm_packages_from_repository,
-    get_rpm_module_packages_from_repository,
     get_uuid_from_pulp_href,
-)
-from alws.config import settings
-from alws.constants import (
-    ErrataReferenceType,
-    ErrataPackageStatus,
-    ErrataReleaseStatus,
-)
-from alws.pulp_models import (
-    UpdateRecord,
-    UpdatePackage,
-    UpdateCollection,
-    RpmPackage,
-)
-from alws.utils.errata import (
-    debrand_id,
-    debrand_affected_cpe_list,
-    debrand_reference,
-    debrand_comment,
 )
 
 try:
@@ -67,18 +55,18 @@ try:
     #        for web-server until we release it.
     from almalinux.liboval.composer import (
         Composer,
-        get_test_cls_by_tag,
         get_object_cls_by_tag,
         get_state_cls_by_tag,
+        get_test_cls_by_tag,
         get_variable_cls_by_tag,
     )
-    from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
-    from almalinux.liboval.rpminfo_test import RpminfoTest
-    from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
-    from almalinux.liboval.rpminfo_state import RpminfoState
-    from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
-    from almalinux.liboval.generator import Generator
     from almalinux.liboval.definition import Definition
+    from almalinux.liboval.generator import Generator
+    from almalinux.liboval.rpminfo_state import RpminfoState
+    from almalinux.liboval.rpminfo_test import RpminfoTest
+    from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
+    from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
+    from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
 except ImportError:
     pass
 
@@ -611,15 +599,11 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
 
     # Rebranding RHEL -> AlmaLinux
     for key in ("description", "title"):
-        value = getattr(errata, key)
-        value = re.sub(
-            r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?",
-            "AlmaLinux",
-            value,
+        setattr(
+            errata,
+            key,
+            debrand_description_and_title(getattr(errata, key)),
         )
-        value = re.sub(r"^RH", "AL", value)
-        value = re.sub(r"RHEL", "AlmaLinux", value)
-        setattr(errata, key, value)
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
 
     # Check if errata refers to a module
