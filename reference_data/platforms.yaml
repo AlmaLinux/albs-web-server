@@ -1478,6 +1478,9 @@
       - name: '9.1'
         version_prefix: '90100'
         dist_prefix: 'el9.1.0'
+      - name: '9.2'
+        version_prefix: '90200'
+        dist_prefix: 'el9.2.0'
   type: rpm
   arch_list:
     - i686
@@ -1513,8 +1516,8 @@
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
       secure_boot_macros:
-        "%pe_signing_cert": "Cloud Linux Software, Inc"
-        "%pe_signing_token": "profil standardowy"
+        "%pe_signing_cert": 'f4217b7b99a69128'
+        "%pe_signing_token": 'AlmaLinux OS Foundation'
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
