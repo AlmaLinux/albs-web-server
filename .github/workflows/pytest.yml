@@ -17,6 +17,7 @@ jobs:
           mkdir -p /home/runner/work/albs-web-server/alts
           mkdir -p /home/runner/work/albs-web-server/albs-frontend
           mkdir -p /home/runner/work/albs-web-server/albs-node
+          mkdir -p /home/runner/work/albs-web-server/albs-sign-file
           mkdir -p /home/runner/work/albs-web-server/albs-sign-node
       - name: Add env file
         run: |
