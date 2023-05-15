@@ -292,6 +292,26 @@ def merge_errata_records(a, b):
                 continue
             processed_packages.add(pkg["sum"])
             result_record["pkglist"]["packages"].append(pkg)
+        processed_references = []
+        for ref in result_record["references"]:
+            processed_references.append(ref)
+        for ref in record["references"]:
+            if ref in processed_references:
+                continue
+            result_record["references"].append(ref)
+        # we need this for avoiding unneeded changes in OSV data
+        if record["updated_date"] > result_record["updated_date"]:
+            result_record["updated_date"] = record["updated_date"]
+        if record["issued_date"] < result_record["issued_date"]:
+            result_record["issued_date"] = record["issued_date"]
+        result_record["references"] = sorted(
+            result_record["references"],
+            key=lambda x: x["type"],
+        )
+        result_record["pkglist"]["packages"] = sorted(
+            result_record["pkglist"]["packages"],
+            key=lambda x: x["sum"],
+        )
     return result
 
 
@@ -313,6 +333,13 @@ def merge_errata_records_modern(a, b):
                 continue
             processed_packages.add(pkg["checksum"])
             result_record["packages"].append(pkg)
+        processed_references = []
+        for ref in result_record["references"]:
+            processed_references.append(ref)
+        for ref in record["references"]:
+            if ref in processed_references:
+                continue
+            result_record["references"].append(ref)
         processed_modules = set()
         for module in result_record["modules"]:
             processed_modules.add(_get_module_nsvca(module))
