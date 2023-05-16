@@ -1,8 +1,8 @@
 - name: AlmaLinux-8-beta
   modularity:
     git_tag_prefix:
-      modified: a8-beta
-      non_modified: c8-beta
+      modified: a8
+      non_modified: c8
     versions:
       - name: '8.8'
         version_prefix: '80800'
