@@ -55,6 +55,21 @@ class PermissionTriad:
 
 
 class ReleasePackageTrustness(enum.IntEnum):
+    """
+    Enum representing the trustworthiness of a release package. The trustworthiness is shown in different colors
+    on the web UI. The values correspond to:
+
+    UNKNOWN (0): The trustworthiness of the package is unknown, represented in grey on the UI.
+    MAXIMUM (1): The package has maximum trustworthiness, represented in green on the UI.
+    MEDIUM (2): The package has medium trustworthiness, represented in yellow on the UI.
+    LOWEST (10): The package has the lowest trustworthiness, represented in red on the UI.
+
+    Methods
+    -------
+    decrease(trustness: int) -> int:
+        Decreases the level of trustness by one step from its current value, unless it's already at the lowest.
+    """
+
     UNKNOWN = 0
     MAXIMUM = 1
     MEDIUM = 2
@@ -62,6 +77,23 @@ class ReleasePackageTrustness(enum.IntEnum):
 
     @classmethod
     def decrease(cls, trustness: int) -> int:
+        """
+        Decrease the trustness level.
+
+        If the current trustness level is MAXIMUM, it will be decreased to MEDIUM.
+        If the current trustness level is MEDIUM, it will be decreased to LOWEST.
+        If the current trustness level is LOWEST or UNKNOWN, it will remain unchanged.
+
+        Parameters
+        ----------
+        trustness : int
+            Current trustness level.
+
+        Returns
+        -------
+        int
+            New trustness level after decrease.
+        """
         if trustness == cls.LOWEST:
             return trustness
         if trustness == cls.MAXIMUM:

@@ -1383,7 +1383,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         beholder_responses = await self._beholder_client.retrieve_responses(
             base_platform,
-            data={"source_rpms": src_rpm_names, "match": "closest"},
+            data={"source_rpms": src_rpm_names, "match": ["closest", "name_only"]},
         )
         for beholder_response in beholder_responses:
             distr = beholder_response["distribution"]

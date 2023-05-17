@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT
+from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT, ReleasePackageTrustness
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -66,6 +66,33 @@ class BeholderClient:
                     "trying next reference platform"
                 )
 
+    async def __get_response_priority(self, response: dict, platforms: list) -> int:
+        response_distr_name = response["distribution"]["name"]
+        response_distr_ver = response["distribution"]["version"]
+
+        # Check if the platform is in the list of platforms
+        platform_priority = next(
+            (
+                db_platform.priority
+                for db_platform in platforms
+                if db_platform.name.startswith(response_distr_name)
+                   and db_platform.distr_version == response_distr_ver
+            ),
+            None
+        )
+        # We have priority only in ref platforms
+        # If the platform was not found, derive priority from the match level
+        if platform_priority is None:
+            match = response.get("match")
+            if match in {"exact", "closest"}:
+                platform_priority = ReleasePackageTrustness.MAXIMUM.value
+            elif match in {"name_version", "name_only"}:
+                platform_priority = ReleasePackageTrustness.MEDIUM.value
+            else:
+                platform_priority = LOWEST_PRIORITY
+
+        return platform_priority
+
     async def retrieve_responses(
         self,
         platform: Platform,
@@ -83,16 +110,7 @@ class BeholderClient:
         )
         responses = []
         async for response in self.iter_endpoints(endpoints, data):
-            response_distr_name = response["distribution"]["name"]
-            response_distr_ver = response["distribution"]["version"]
-            response["priority"] = next(
-                db_platform.priority
-                for db_platform in platforms_list
-                if db_platform.name.startswith(response_distr_name)
-                and db_platform.distr_version == response_distr_ver
-            )
-            # we have priority only in ref platforms
-            response["priority"] = response.get("priority") or LOWEST_PRIORITY
+            response["priority"] = await self.__get_response_priority(response, platforms_list)
             responses.append(response)
         return sorted(responses, key=lambda x: x["priority"], reverse=True)
 
