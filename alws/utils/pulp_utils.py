@@ -31,6 +31,7 @@ def get_rpm_module_packages_from_repository(
     pkg_versions: typing.Optional[typing.List[str]] = None,
     pkg_epochs: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
+    result = []
     repo_query = select(CoreRepository).where(
         CoreRepository.pulp_id == repo_id
     )
@@ -52,21 +53,30 @@ def get_rpm_module_packages_from_repository(
     try:
         repo_modules_yaml = get_modules_yaml_from_repo(repo_name)
     except Exception:
-        return []
+        return result
 
     module_name, module_stream = module.split(":")
-    try:
-        repo_module = IndexWrapper.from_template(repo_modules_yaml).get_module(
-            module_name, module_stream
-        )
-    except Exception:
-        return []
+    devel_module_name = (
+        f"{module_name}-devel" if not module_name.endswith("-devel") else ""
+    )
+    repo_modules = []
+    for name in (module_name, devel_module_name):
+        try:
+            repo_module = IndexWrapper.from_template(
+                repo_modules_yaml,
+            ).get_module(name, module_stream)
+        except Exception:
+            continue
+        repo_modules.append(repo_module)
+    if not repo_modules:
+        return result
 
     pkg_releases = []
-    for pkg in repo_module.get_rpm_artifacts():
-        pkg_release = parse_rpm_nevra(pkg).release
-        if pkg_release not in pkg_releases:
-            pkg_releases.append(pkg_release)
+    for repo_module in repo_modules:
+        for pkg in repo_module.get_rpm_artifacts():
+            pkg_release = parse_rpm_nevra(pkg).release
+            if pkg_release not in pkg_releases:
+                pkg_releases.append(pkg_release)
 
     conditions = []
 
@@ -103,7 +113,8 @@ def get_rpm_module_packages_from_repository(
 
     query = select(RpmPackage).where(*conditions)
     with get_pulp_db() as pulp_db:
-        return pulp_db.execute(query).scalars().all()
+        result = pulp_db.execute(query).scalars().all()
+    return result
 
 
 def get_rpm_packages_from_repositories(
