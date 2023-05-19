@@ -1,7 +1,8 @@
-from typing import Optional, List
+from typing import Optional, List, Annotated
 
 from fastapi import (
     APIRouter,
+    Query,
     Depends,
     HTTPException,
     status,
@@ -65,6 +66,7 @@ async def get_oval_xml(
 async def list_errata_records(
     pageNumber: Optional[int] = None,
     id: Optional[str] = None,
+    ids: Annotated[Optional[List[str]], Query()] = None,
     title: Optional[str] = None,
     platformId: Optional[int] = None,
     cveId: Optional[str] = None,
@@ -75,6 +77,7 @@ async def list_errata_records(
         db,
         page=pageNumber,
         errata_id=id,
+        errata_ids=ids,
         title=title,
         platform=platformId,
         cve_id=cveId,
