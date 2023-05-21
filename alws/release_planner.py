@@ -205,7 +205,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     ) -> typing.List[typing.Dict[str, typing.Any]]:
         packages_fields = [
             RpmPackage.content_ptr_id,
-            RpmPackage.content,
             RpmPackage.name,
             RpmPackage.epoch,
             RpmPackage.version,
