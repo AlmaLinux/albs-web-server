@@ -762,6 +762,7 @@ async def list_errata_records(
     page: Optional[int] = None,
     compact: Optional[bool] = False,
     errata_id: Optional[str] = None,
+    errata_ids: Optional[List[str]] = None,
     title: Optional[str] = None,
     platform: Optional[int] = None,
     cve_id: Optional[str] = None,
@@ -792,6 +793,8 @@ async def list_errata_records(
             query = query.order_by(models.ErrataRecord.id.desc())
         if errata_id:
             query = query.filter(models.ErrataRecord.id.like(f"%{errata_id}%"))
+        if errata_ids:
+            query = query.filter(models.ErrataRecord.id.in_(errata_ids))
         if title:
             query = query.filter(
                 or_(
