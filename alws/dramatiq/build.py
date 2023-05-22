@@ -149,10 +149,9 @@ async def _check_build_and_completed_tasks(
         completed_tasks = (await db.execute(
             select(func.count()).select_from(models.BuildTask).where(
                 models.BuildTask.build_id == build_id,
-                models.BuildTask.status.in_([
-                    BuildTaskStatus.COMPLETED,
-                    BuildTaskStatus.FAILED,
-                    BuildTaskStatus.EXCLUDED,
+                models.BuildTask.status.notin_([
+                    BuildTaskStatus.IDLE,
+                    BuildTaskStatus.STARTED,
                 ])
             )
         )).scalar()
