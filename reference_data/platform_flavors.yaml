@@ -391,7 +391,6 @@
       production: false
 
 - name: java-portable
-  data:
   repositories:
     - name: java-portable
       arch: i686
