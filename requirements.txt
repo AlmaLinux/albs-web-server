@@ -3,7 +3,7 @@ fastapi-users[all]==10.4.1
 uvicorn==0.21.1
 asyncpg==0.27.0
 psycopg2-binary==2.9.6
-pydantic==1.10.7
+pydantic==1.10.8
 SQLAlchemy==1.4.46
 aiohttp==3.8.4
 aiofiles==23.1.0
