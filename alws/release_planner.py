@@ -637,7 +637,13 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pretty_name = CommunityReleasePlanner.get_repo_pretty_name(
                 repo.name,
             )
-            if not re.search(rf"{platform_name}(-debug)?$", pretty_name):
+            if not re.search(
+                rf"{platform_name}(-debug)?$",
+                pretty_name,
+                # We get lowered platform_name and some old repos
+                # contain camel case platform in repo names
+                re.IGNORECASE
+            ):
                 continue
             main_info = {
                 "id": repo.id,
