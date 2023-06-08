@@ -644,7 +644,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE
+                re.IGNORECASE,
             ):
                 continue
             main_info = {
