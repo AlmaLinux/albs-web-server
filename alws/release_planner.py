@@ -71,8 +71,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         self.codenotary_enabled = settings.codenotary_enabled
         if self.codenotary_enabled:
             self._cas_wrapper = CasWrapper(
-                settings.cas_api_key,
-                settings.cas_signer_id,
+                vcn_lc_api_key=settings.vcn_lc_api_key,
+                vcn_lc_host=settings.vcn_lc_host,
+                vcn_lc_port=settings.vcn_lc_port,
+                binary_path=settings.vcn_binary_path,
             )
         self.stats = {}
 
@@ -875,8 +877,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self.codenotary_enabled = settings.codenotary_enabled
         if self.codenotary_enabled:
             self._cas_wrapper = CasWrapper(
-                settings.cas_api_key,
-                settings.cas_signer_id,
+                vcn_lc_api_key=settings.vcn_lc_api_key,
+                vcn_lc_host=settings.vcn_lc_host,
+                vcn_lc_port=settings.vcn_lc_port,
+                binary_path=settings.vcn_binary_path,
             )
 
     @staticmethod

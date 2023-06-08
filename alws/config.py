@@ -34,8 +34,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
-    cas_api_key: typing.Optional[str]
-    cas_signer_id: typing.Optional[str]
+    vcn_lc_host: typing.Optional[str]
+    vcn_lc_port: typing.Optional[int] = 443
+    vcn_lc_api_key: typing.Optional[str]
+    vcn_binary_path: typing.Optional[str] = "/code/"
 
     rabbitmq_default_user: str = 'test-system'
     rabbitmq_default_pass: str = 'test-system'
@@ -58,7 +60,7 @@ class Settings(BaseSettings):
 
     @property
     def codenotary_enabled(self) -> bool:
-        return bool(self.cas_api_key) and bool(self.cas_signer_id)
+        return bool(self.vcn_lc_api_key) and bool(self.vcn_lc_host)
 
     @property
     def github_callback_url(self) -> str:
