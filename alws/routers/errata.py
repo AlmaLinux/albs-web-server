@@ -1,18 +1,13 @@
-from typing import Optional, List
+from typing import Annotated, List, Optional
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    status,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import database
 from alws.auth import get_current_user
-from alws.crud import errata as errata_crud
 from alws.constants import ErrataReleaseStatus
+from alws.crud import errata as errata_crud
 from alws.dependencies import get_db
 from alws.dramatiq import bulk_errata_release, release_errata
 from alws.schemas import errata_schema
@@ -65,6 +60,7 @@ async def get_oval_xml(
 async def list_errata_records(
     pageNumber: Optional[int] = None,
     id: Optional[str] = None,
+    ids: Annotated[Optional[List[str]], Query()] = None,
     title: Optional[str] = None,
     platformId: Optional[int] = None,
     cveId: Optional[str] = None,
@@ -75,6 +71,7 @@ async def list_errata_records(
         db,
         page=pageNumber,
         errata_id=id,
+        errata_ids=ids,
         title=title,
         platform=platformId,
         cve_id=cveId,

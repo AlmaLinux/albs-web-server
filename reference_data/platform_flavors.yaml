@@ -389,3 +389,41 @@
       url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi-almalinux-$releasever-src-dr/"
       debug: false
       production: false
+
+- name: java-portable
+  repositories:
+    - name: java-portable
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-i686-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-portable
+      arch: x86_64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-portable
+      arch: aarch64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-aarch64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-portable
+      arch: ppc64le
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-ppc64le-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-portable
+      arch: s390x
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-s390x-dr/
+      production: false
+      debug: false
+      priority: 10

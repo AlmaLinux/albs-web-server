@@ -122,6 +122,8 @@ class BuildTaskStatus(enum.IntEnum):
             status = cls.FAILED
         elif text == "excluded":
             status = cls.EXCLUDED
+        elif text == "cancelled":
+            status = cls.CANCELLED
         return status
 
 
