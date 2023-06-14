@@ -66,7 +66,8 @@ class BeholderClient:
                     "trying next reference platform"
                 )
 
-    async def __get_response_priority(self, response: dict, platforms: list) -> int:
+    @staticmethod
+    async def _get_response_priority(response: dict, platforms: list) -> int:
         response_distr_name = response["distribution"]["name"]
         response_distr_ver = response["distribution"]["version"]
 
@@ -84,12 +85,11 @@ class BeholderClient:
         # If the platform was not found, derive priority from the match level
         if platform_priority is None:
             match = response.get("match")
+            platform_priority = LOWEST_PRIORITY
             if match in {"exact", "closest"}:
                 platform_priority = ReleasePackageTrustness.MAXIMUM.value
             elif match in {"name_version", "name_only"}:
                 platform_priority = ReleasePackageTrustness.MEDIUM.value
-            else:
-                platform_priority = LOWEST_PRIORITY
 
         return platform_priority
 
@@ -110,7 +110,7 @@ class BeholderClient:
         )
         responses = []
         async for response in self.iter_endpoints(endpoints, data):
-            response["priority"] = await self.__get_response_priority(response, platforms_list)
+            response["priority"] = await self._get_response_priority(response, platforms_list)
             responses.append(response)
         return sorted(responses, key=lambda x: x["priority"], reverse=True)
 
