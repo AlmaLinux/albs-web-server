@@ -67,6 +67,71 @@ async def get_sign_tasks(
     return result.scalars().all()
 
 
+async def create_gen_key_task(
+        db: AsyncSession,
+        payload: sign_schema.GenKeyTaskCreate,
+        user_id: int,
+) -> models.GenKeyTask:
+    async with db.begin():
+        user = (
+            (
+                await db.execute(
+                    select(models.User)
+                    .where(models.User.id == user_id)
+                    .options(
+                        selectinload(models.User.roles).selectinload(
+                            models.UserRole.actions
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        product = (
+            (
+                await db.execute(
+                    select(models.Product)
+                    .where(models.Product.name == payload.product_name)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        platform = (
+            (
+                await db.execute(
+                    select(models.Platform)
+                    .where(models.Platform.id == payload.platform_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not can_perform(product, user, actions.GenKey.name):
+            raise PermissionDenied(
+                "User does not have permissions "
+                "to generate " "for that product"
+            )
+        gen_key_task = models.GenKeyTask(
+            status=SignStatus.IDLE,
+            product_id=product.id,
+            platform_id=platform.id,
+        )
+        db.add(gen_key_task)
+    await db.refresh(gen_key_task)
+    gen_key_tasks = await db.execute(
+        select(models.GenKeyTask)
+        .where(models.GenKeyTask.id == gen_key_task.id)
+        .options(
+            selectinload(models.GenKeyTask.product)
+            .selectinload(models.User),
+            selectinload(models.Platform),
+        )
+    )
+    return gen_key_tasks.scalars().first()
+
+
 async def create_sign_task(
     db: AsyncSession,
     payload: sign_schema.SignTaskCreate,
@@ -155,6 +220,37 @@ async def create_sign_task(
         .options(selectinload(models.SignTask.sign_key))
     )
     return sign_tasks.scalars().first()
+
+
+async def get_available_gen_key_task(
+        db: AsyncSession,
+) -> typing.Dict[str, typing.Any]:
+    gen_key_tasks = await db.execute(
+        select(models.GenKeyTask)
+        .where(models.GenKeyTask.status == SignStatus.IDLE)
+        .options(
+            selectinload(models.GenKeyTask.product)
+            .selectinload(models.User),
+            selectinload(models.GenKeyTask.platform)
+        )
+    )
+    gen_key_task = gen_key_tasks.scalars().first()
+    if gen_key_task:
+        return {}
+    await db.execute(
+        update(models.GenKeyTask)
+        .where(models.GenKeyTask.id == gen_key_task.id)
+        .values(status=SignStatus.IN_PROGRESS)
+    )
+    gen_key_task_payload = {
+        'id': gen_key_task.id,
+        'user_name': gen_key_task.product.owner.username,
+        'product_name': gen_key_task.name,
+        'user_email': gen_key_task.product.owner.email,
+        'platform_id': gen_key_task.platform.id,
+    }
+    await db.commit()
+    return gen_key_task_payload
 
 
 async def get_available_sign_task(
@@ -257,6 +353,58 @@ async def get_sign_task(
         .options(selectinload(models.SignTask.sign_key))
     )
     return sign_tasks.scalars().first()
+
+
+async def get_gen_key_task(
+    db: AsyncSession,
+    gen_key_task_id: int,
+) -> models.GenKeyTask:
+    gen_key_tasks = await db.execute(
+        select(models.GenKeyTask)
+        .where(models.GenKeyTask.id == gen_key_task_id)
+        .options(
+            selectinload(models.GenKeyTask.product)
+            .selectinload(models.User)
+        )
+    )
+    return gen_key_tasks.scalars().first()
+
+
+async def complete_gen_key_task(
+    gen_key_task_id: int,
+    payload: sign_schema.GenKeyTaskComplete,
+) -> models.GenKeyTask:
+    async with Session() as db, db.begin():
+        if payload.success:
+            task_status = SignStatus.COMPLETED
+            error_message = None,
+        else:
+            task_status = SignStatus.FAILED
+            error_message = payload.error_message
+        db.execute(
+            update(models.GenKeyTask)
+            .where(models.GenKeyTask.id == gen_key_task_id)
+            .values(
+                status=task_status,
+                error_message=error_message,
+            )
+        )
+        gen_key_task = await get_gen_key_task(
+            db=db,
+            gen_key_task_id=gen_key_task_id,
+        )
+        if gen_key_task.status == SignStatus.COMPLETED:
+            sign_key = models.SignKey(
+                name=payload.key_name,
+                description=f'Community key "{payload.key_name}"',
+                is_community=True,
+                keyid=payload.key_id,
+                fingerprint=payload.fingerprint,
+                public_url=payload.sign_key_href,
+                platform_id=payload.platform_id,
+            )
+            db.add(sign_key)
+        return gen_key_task
 
 
 async def complete_sign_task(

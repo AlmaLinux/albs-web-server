@@ -46,9 +46,25 @@ class SignTask(BaseModel):
         orm_mode = True
 
 
+class GenKeyTask(BaseModel):
+    id: int
+    user_name: typing.Optional[str]
+    product_name: typing.Optional[str]
+    user_email: typing.Optional[str]
+    platform_id: typing.Optional[int]
+
+
 class SignTaskCreate(BaseModel):
     build_id: int
     sign_key_id: int
+
+
+class GenKeyTaskCreate(BaseModel):
+    id: int
+    user_name: typing.Optional[str]
+    product_name: typing.Optional[str]
+    user_email: typing.Optional[str]
+    platform_id: typing.Optional[int]
 
 
 class SignTaskGet(BaseModel):
@@ -82,6 +98,25 @@ class AvailableSignTask(BaseModel):
     packages: typing.Optional[typing.List[SignRpmInfo]]
 
 
+class AvailableGenKeyTask(BaseModel):
+    id: typing.Optional[int]
+    user_name: typing.Optional[str]
+    product_name: typing.Optional[str]
+    user_email: typing.Optional[str]
+    platform_id: typing.Optional[int]
+
+
+class GenKeyTaskComplete(BaseModel):
+    success: bool
+    error_message: typing.Optional[str]
+    sign_key_href: typing.Optional[str]
+    key_name: typing.Optional[str]
+    key_id: typing.Optional[str]
+    fingerprint: typing.Optional[str]
+    file_name: typing.Optional[str]
+    platform_id: typing.Optional[int]
+
+
 class SignTaskComplete(BaseModel):
     build_id: int
     success: bool
@@ -92,6 +127,10 @@ class SignTaskComplete(BaseModel):
 
 
 class SignTaskCompleteResponse(BaseModel):
+    success: bool
+
+
+class GenKeyTaskCompleteResponse(BaseModel):
     success: bool
 
 

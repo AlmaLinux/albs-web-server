@@ -1044,6 +1044,10 @@ class SignKey(PermissionsMixin, Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text)
+    # FIXME: change nullable to False after population
+    is_community = sqlalchemy.Column(
+        sqlalchemy.Boolean, nullable=True, default=False,
+    )
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True)
     fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True)
@@ -1065,6 +1069,26 @@ class SignKey(PermissionsMixin, Base):
         back_populates="sign_key",
     )
     roles = relationship("UserRole", secondary=SignKeyRoleMapping)
+
+
+class GenKeyTask(Base):
+    __tablename__ = "gen_key_tasks"
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    status = sqlalchemy.Column(sqlalchemy.Integer, default=SignStatus.IDLE)
+    error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    product = relationship("Product")
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("products.id"),
+        nullable=False,
+    )
+    platform = relationship("Platform")
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platforms.id"),
+        nullable=False,
+    )
 
 
 class SignTask(TimeMixin, Base):

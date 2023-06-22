@@ -43,6 +43,40 @@ async def create_sign_task(payload: sign_schema.SignTaskCreate,
     return await sign_task.create_sign_task(db, payload, user.id)
 
 
+@router.post('/community/', response_model=sign_schema.GenKeyTask)
+async def create_gen_key_task(
+        payload: sign_schema.GenKeyTaskCreate,
+        db: database.Session = Depends(get_db),
+        user=Depends(get_current_user)
+):
+    gen_key_task = await sign_task.create_gen_key_task(db, payload, user.id)
+    return {
+        'id': gen_key_task.id,
+        'user_name': gen_key_task.owner.name,
+        'user_email': gen_key_task.owner.email,
+        'product_name': gen_key_task.platform.name,
+        'platform_id': gen_key_task.platform.id,
+    }
+
+
+@router.post(
+    '/community/get_gen_sign_key_task/',
+    response_model=typing.Union[dict, sign_schema.AvailableGenKeyTask],
+)
+async def get_avaiable_gen_key_task(db: database.Session = Depends(get_db)):
+    return await sign_task.get_available_gen_key_task(db)
+
+
+@router.post('/community/{gen_key_task_id}/complete/',
+             response_model=sign_schema.GenKeyTaskCompleteResponse)
+async def complete_gen_key_task(
+        gen_key_task_id: int,
+        payload: sign_schema.GenKeyTaskComplete,
+):
+    dramatiq.sign_task.complete_gen_key_task(gen_key_task_id, payload.dict())
+    return {'success': True}
+
+
 @router.post('/get_sign_task/',
              response_model=typing.Union[dict, sign_schema.AvailableSignTask])
 async def get_available_sign_task(
