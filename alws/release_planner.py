@@ -71,10 +71,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         self.codenotary_enabled = settings.codenotary_enabled
         if self.codenotary_enabled:
             self._cas_wrapper = CasWrapper(
-                vcn_lc_api_key=settings.vcn_lc_api_key,
-                vcn_lc_host=settings.vcn_lc_host,
-                vcn_lc_port=settings.vcn_lc_port,
-                binary_path=settings.vcn_binary_path,
+                settings.cas_api_key,
+                settings.cas_signer_id,
             )
         self.stats = {}
 
@@ -644,7 +642,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE,
+                re.IGNORECASE
             ):
                 continue
             main_info = {
@@ -877,10 +875,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self.codenotary_enabled = settings.codenotary_enabled
         if self.codenotary_enabled:
             self._cas_wrapper = CasWrapper(
-                vcn_lc_api_key=settings.vcn_lc_api_key,
-                vcn_lc_host=settings.vcn_lc_host,
-                vcn_lc_port=settings.vcn_lc_port,
-                binary_path=settings.vcn_binary_path,
+                settings.cas_api_key,
+                settings.cas_signer_id,
             )
 
     @staticmethod
