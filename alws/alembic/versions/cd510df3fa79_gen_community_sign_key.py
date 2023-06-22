@@ -10,6 +10,7 @@ from alembic import op
 
 from alws.constants import SignStatus
 
+
 # revision identifiers, used by Alembic.
 revision = 'cd510df3fa79'
 down_revision = 'cd510df3fa78'
