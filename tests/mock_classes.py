@@ -1,15 +1,14 @@
 import typing
 from urllib.parse import urljoin
 
-from fastapi import status
-import pytest
 import httpx
+import pytest
+from fastapi import status
 
 from alws.app import app
 from alws.config import settings
 from alws.dependencies import get_db
 from alws.utils import jwt_utils
-
 from tests.constants import ADMIN_USER_ID
 from tests.fixtures.database import get_session
 

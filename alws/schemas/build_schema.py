@@ -11,6 +11,7 @@ from pydantic import BaseModel, AnyHttpUrl, validator, conlist
 from alws.config import settings
 from alws.constants import BuildTaskRefType
 from alws import models
+from alws.errors import EmptyBuildError
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
@@ -84,6 +85,14 @@ class BuildTaskModuleRef(BaseModel):
     modules_yaml: str
     enabled_modules: dict
     refs: typing.List[BuildTaskRef]
+
+    @validator('refs', pre=True)
+    def refs_validator(cls, refs):
+        if not refs or all((not ref['enabled'] for ref in refs)):
+            raise EmptyBuildError(
+                'refs are empty or doesn`t contain any enabled ref'
+            )
+        return refs
 
 
 class BuildCreatePlatforms(BaseModel):
