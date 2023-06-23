@@ -119,7 +119,8 @@ async def create_product(
             arch='sign_key',
             pulp_href=repo_href,
             debug=False,
-            production=True
+            production=True,
+            type='sign_key',
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)
