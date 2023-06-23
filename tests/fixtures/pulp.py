@@ -274,8 +274,7 @@ def create_log_repo(monkeypatch):
 @pytest.fixture
 def create_file_repository(monkeypatch):
     async def func(*args, **kwargs):
-        _, repo_name = args
-        repo_prefix = kwargs["distro_path_start"]
+        _, repo_name, repo_prefix  = args
         return (
             f"{settings.pulp_host}/pulp/content/{repo_prefix}/{repo_name}/",
             get_repo_href(),
