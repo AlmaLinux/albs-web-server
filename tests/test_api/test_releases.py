@@ -50,7 +50,6 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         modular_build_done,
         modular_build_for_release: models.Build,
         get_pulp_packages_info,
-        create_file_repository,
     ):
         payload = {
             "builds": [
@@ -113,7 +112,6 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         create_rpm_publication,
         get_repo_modules_yaml,
         create_module,
-        create_file_repository,
     ):
         response = await self.make_request(
             "get",
@@ -226,7 +224,6 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         user_product: models.Product,
         modify_repository,
         create_rpm_publication,
-        create_file_repository,
     ):
         response = await self.make_request(
             "get",
