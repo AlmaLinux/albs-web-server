@@ -108,23 +108,21 @@ async def create_product(
             production=True,
         )
         product.repositories.append(repo)
-        items_to_insert.append(repo)    # Create sign key repository
-    task_results = await asyncio.gather(*(
-        create_product_sign_key_repo(
-            pulp_client, owner.username, product.name
-        ),
-    ))
-    repo_name, repo_url, repo_href = task_results[0]
-    repo = models.Repository(
-        name=repo_name,
-        url=repo_url,
-        arch='sign_key',
-        pulp_href=repo_href,
-        debug=False,
-        production=True
-    )
-    product.repositories.append(repo)
-    items_to_insert.append(repo)
+        items_to_insert.append(repo)
+    # Create sign key repository if a product is community
+    if payload.is_community:
+        repo_name, repo_url, repo_href = await create_product_sign_key_repo(
+            pulp_client, owner.username, product.name)
+        repo = models.Repository(
+            name=repo_name,
+            url=repo_url,
+            arch='sign_key',
+            pulp_href=repo_href,
+            debug=False,
+            production=True
+        )
+        product.repositories.append(repo)
+        items_to_insert.append(repo)
     items_to_insert.append(product)
 
     owner.roles.extend(team_roles)

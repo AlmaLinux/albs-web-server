@@ -15,7 +15,11 @@ from tests.mock_classes import BaseAsyncTestCase
     "create_repo"
 )
 class TestProductsEndpoints(BaseAsyncTestCase):
-    async def test_product_create(self, product_create_payload):
+    async def test_product_create(
+            self,
+            product_create_payload,
+            create_file_repository,
+    ):
         response = await self.make_request(
             "post",
             "/api/v1/products/",
