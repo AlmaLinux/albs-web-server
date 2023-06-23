@@ -32,7 +32,8 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         self,
         user_product: Product,
         get_rpm_distros,
-        delete_by_href
+        delete_by_href,
+        create_file_repository,
     ):
         endpoint = f"/api/v1/products/{user_product.id}/remove/"
         response = await self.make_request(
