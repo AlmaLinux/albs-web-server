@@ -7,6 +7,7 @@ from alws.utils.pulp_client import PulpClient
 
 __all__ = [
     'create_product_repo',
+    'create_product_sign_key_repo',
     'generate_repo_config',
     'get_clean_copr_chroot',
     'get_copr_chroot_repo_key',
@@ -89,3 +90,12 @@ async def create_product_repo(
         base_path_start='copr',
     )
     return repo_name, repo_url, arch, repo_href, is_debug
+
+
+async def create_product_sign_key_repo(
+        pulp_client: PulpClient, owner_name: str, product_name: str
+) -> typing.Tuple[str, str, str]:
+    sign_key_repo_name = f'{owner_name}-{product_name}-sign-key-repo'
+    repo_url, repo_href = await pulp_client.create_sign_key_repo(
+        sign_key_repo_name)
+    return sign_key_repo_name, repo_url, repo_href

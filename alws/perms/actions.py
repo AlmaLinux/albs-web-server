@@ -53,6 +53,10 @@ SignBuild = Action(
     name='sign_build',
     description='Ability to sign a build'
 )
+GenKey = Action(
+    name='gen_key',
+    description='Ability to generate a community sign key'
+)
 ReleaseBuild = Action(
     name='release_build',
     description='Ability to release a build'
@@ -148,6 +152,7 @@ ActionsList = [
     ReadBuild,
     CreateBuild,
     SignBuild,
+    GenKey,
     ReleaseBuild,
     DeleteBuild,
 
@@ -179,6 +184,7 @@ ActionsMaskMapping = {
     ReadBuild.name: Permissions.READ,
     CreateBuild.name: Permissions.WRITE,
     SignBuild.name: Permissions.WRITE,
+    GenKey.name: Permissions.WRITE,
     ReleaseBuild.name: Permissions.WRITE,
     DeleteBuild.name: Permissions.DELETE,
 

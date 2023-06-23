@@ -7,17 +7,25 @@ from fastapi import (
     status,
 )
 
-from alws import database
+from alws import database, dramatiq
 from alws.auth import get_current_user
-from alws.crud import products
+from alws.crud import products, sign_task, platform as platforms
 from alws.dependencies import get_db
 from alws.models import User
-from alws.schemas import product_schema
-
+from alws.schemas import (
+    product_schema,
+    sign_schema,
+)
 
 public_router = APIRouter(
     prefix="/products",
     tags=["products"],
+)
+
+router = APIRouter(
+    prefix='/products',
+    tags=['products'],
+    dependencies=[Depends(get_current_user)]
 )
 
 
@@ -125,3 +133,41 @@ async def remove_product(
         raise HTTPException(
             detail=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@router.post(
+    '/{product_id}/{platform_name}/gen-sign-key/',
+    response_model=sign_schema.GenKeyTask,
+)
+async def create_gen_key_task(
+        product_id: int,
+        platform_name: str,
+        db: database.Session = Depends(get_db),
+        user: User = Depends(get_current_user),
+):
+    product = await products.get_products(db=db, product_id=product_id)
+    if not product.is_community:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Product "{product.name}" is not community and '
+                   'you cannot generate sign key for one'
+        )
+    platform = await platforms.get_platform(db=db, name=platform_name)
+    if platform not in product.platforms:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Product "{product.name}" '
+                   f'does not have platform "{platform_name}"'
+        )
+    gen_key_task = await sign_task.create_gen_key_task(
+        db=db,
+        product=product,
+        platform=platform,
+        user=user,
+    )
+    return {
+        'id': gen_key_task.id,
+        'user_name': user.username,
+        'user_email': user.email,
+        'product_name': product.name,
+    }
