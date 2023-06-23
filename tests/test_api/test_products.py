@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.mock_classes import BaseAsyncTestCase
 
+
 @pytest.mark.usefixtures(
     "base_platform",
     "create_repo"
@@ -23,7 +24,6 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         message = f"Cannot create product:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
-
     async def test_product_remove(
         self,
         user_product: Product,
@@ -37,7 +37,6 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot remove product:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
-
 
     async def test_add_to_product(
         self,
@@ -71,7 +70,6 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         )).scalars().first()
 
         assert db_product.builds[0].id == build_id, message
-
 
     async def test_remove_from_product(
         self,

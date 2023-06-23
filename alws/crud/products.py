@@ -109,9 +109,12 @@ async def create_product(
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)    # Create sign key repository
-
-    repo_name, repo_url, repo_href = await create_product_sign_key_repo(
-        pulp_client, owner.username, product.name)
+    task_results = await asyncio.gather(*(
+        await create_product_sign_key_repo(
+            pulp_client, owner.username, product.name
+        )
+    ))
+    repo_name, repo_url, repo_href = task_results[0]
     repo = models.Repository(
         name=repo_name,
         url=repo_url,
