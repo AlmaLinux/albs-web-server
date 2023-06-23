@@ -38,6 +38,8 @@ def upgrade():
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('status', sa.Boolean(), default=GenKeyStatus.IDLE),
         sa.Column('error_message', sa.TEXT(), nullable=True),
+        sa.Column("platform_id", sa.Integer(), nullable=False),
+        sa.Column("product_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
             ["product_id"],
             ["products.id"],
