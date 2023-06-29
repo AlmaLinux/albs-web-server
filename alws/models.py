@@ -1094,12 +1094,6 @@ class GenKeyTask(Base):
         sqlalchemy.ForeignKey("products.id"),
         nullable=False,
     )
-    platform = relationship("Platform")
-    platform_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("platforms.id"),
-        nullable=False,
-    )
 
 
 class SignTask(TimeMixin, Base):

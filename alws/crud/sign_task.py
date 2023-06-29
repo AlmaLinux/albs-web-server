@@ -86,9 +86,6 @@ async def get_gen_key_task(
             .selectinload(models.Product.repositories),
             selectinload(models.GenKeyTask.product)
             .selectinload(models.Product.owner),
-            selectinload(models.GenKeyTask.product)
-            .selectinload(models.Product.team)
-            .selectinload(models.Team.roles),
         )
     )
     return gen_key_tasks.scalars().first()
@@ -97,7 +94,6 @@ async def get_gen_key_task(
 async def create_gen_key_task(
         db: AsyncSession,
         product: models.Product,
-        platform: models.Platform,
         user: models.User,
 ) -> models.GenKeyTask:
     if not can_perform(product, user, actions.GenKey.name):
@@ -110,8 +106,6 @@ async def create_gen_key_task(
             status=GenKeyStatus.IDLE,
             product=product,
             product_id=product.id,
-            platform=platform,
-            platform_id=platform.id,
         )
         db.add(gen_key_task)
     await db.refresh(gen_key_task)
@@ -204,7 +198,6 @@ async def get_available_gen_key_task(
             .options(
                 selectinload(models.GenKeyTask.product)
                 .selectinload(models.User),
-                selectinload(models.GenKeyTask.platform)
             )
         )
         gen_key_task = gen_key_tasks.scalars().first()
@@ -393,8 +386,6 @@ async def complete_gen_key_task(
             keyid=payload.key_id,
             fingerprint=payload.fingerprint,
             public_url=sign_key_url,
-            platform_id=gen_key_task.platform_id,
-            platform=gen_key_task.platform,
             product_id=gen_key_task.product_id,
             product=gen_key_task.product,
             roles=roles,

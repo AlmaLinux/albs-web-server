@@ -136,12 +136,11 @@ async def remove_product(
 
 
 @router.post(
-    '/{product_id}/{platform_name}/gen-sign-key/',
+    '/{product_id}/gen-sign-key/',
     response_model=sign_schema.GenKeyTask,
 )
 async def create_gen_key_task(
         product_id: int,
-        platform_name: str,
         db: database.Session = Depends(get_db),
         user: User = Depends(get_current_user),
 ):
@@ -152,17 +151,9 @@ async def create_gen_key_task(
             detail=f'Product "{product.name}" is not community and '
                    'you cannot generate sign key for one'
         )
-    platform = await platforms.get_platform(db=db, name=platform_name)
-    if platform not in product.platforms:
-        raise HTTPException(
-            status_code=400,
-            detail=f'Product "{product.name}" '
-                   f'does not have platform "{platform_name}"'
-        )
     gen_key_task = await sign_task.create_gen_key_task(
         db=db,
         product=product,
-        platform=platform,
         user=user,
     )
     return {
