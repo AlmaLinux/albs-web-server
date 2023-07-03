@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import Any, Dict, List
 
 import sqlalchemy
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -398,6 +398,15 @@ class RpmPackage(PulpBase):
     @property
     def sha256(self) -> str:
         return self.content.core_contentartifact[0].artifact.sha256
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "epoch": self.epoch,
+            "version": self.version,
+            "release": self.release,
+            "arch": self.arch,
+        }
 
 
 class RpmModulemd(PulpBase):
