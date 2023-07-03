@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT, ReleasePackageTrustness
+from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT, ReleasePackageTrustness, BeholderMatchMethods
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -86,9 +86,9 @@ class BeholderClient:
         if platform_priority is None:
             match = response.get("match")
             platform_priority = LOWEST_PRIORITY
-            if match in {"exact", "closest"}:
+            if match in BeholderMatchMethods.green():
                 platform_priority = ReleasePackageTrustness.MAXIMUM.value
-            elif match in {"name_version", "name_only"}:
+            elif match in BeholderMatchMethods.yellow():
                 platform_priority = ReleasePackageTrustness.MEDIUM.value
 
         return platform_priority

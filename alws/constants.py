@@ -206,6 +206,31 @@ class SignStatusEnum(enum.IntEnum):
     WRONG_SIGNATURE = 4
 
 
+class BeholderMatchMethods(enum.Enum):
+    EXACT = "exact"
+    CLOSEST = "closest"
+    NAME_VERSION = "name_version"
+    NAME_ONLY = "name_only"
+
+    @classmethod
+    def all(cls):
+        return [member.value for member in cls]
+
+    @classmethod
+    def green(cls):
+        # as Andrew mentioned exact = green in the Web user interface
+        return [cls.EXACT.value]
+
+    @classmethod
+    def yellow(cls):
+        # as Andrew mentioned closest\name_version\name_only = yellow in the Web user interface
+        return [
+            cls.CLOSEST.value,
+            cls.NAME_VERSION.value,
+            cls.NAME_ONLY.value
+        ]
+
+
 build_ref_str_mapping: typing.Dict[str, int] = {
     "git_branch": BuildTaskRefType.GIT_BRANCH,
     "git_tag": BuildTaskRefType.GIT_TAG,
