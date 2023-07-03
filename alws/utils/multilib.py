@@ -5,7 +5,7 @@ import typing
 import jmespath
 import sqlalchemy
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
 from alws.config import settings
@@ -29,7 +29,7 @@ __all__ = [
 
 
 async def get_build_task_artifacts(
-    db: Session,
+    db: AsyncSession,
     build_task: models.BuildTask,
 ):
     subquery = (
@@ -58,7 +58,7 @@ async def get_build_task_artifacts(
 class MultilibProcessor:
     def __init__(
         self,
-        db,
+        db: AsyncSession,
         build_task: models.BuildTask,
         pulp_client: PulpClient = None,
         module_index=None,
@@ -300,7 +300,7 @@ class MultilibProcessor:
     async def get_packages_info_from_pulp(
         self,
         rpm_packages: typing.List[BuildDoneArtifact],
-    ) -> typing.List[RpmPackage]:
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
         results = get_rpm_packages_by_ids(
             [get_uuid_from_pulp_href(rpm.href) for rpm in rpm_packages],
             [
@@ -312,14 +312,14 @@ class MultilibProcessor:
                 RpmPackage.arch,
             ],
         )
-        return list(results.values())
+        return [pkg.as_dict() for pkg in results.values()]
 
     @staticmethod
     async def update_module_index(
         module_index: IndexWrapper,
         module_name: str,
         module_stream: str,
-        packages: typing.List[RpmPackage],
+        packages: typing.List[typing.Dict[str, typing.Any]],
     ):
         if not packages:
             return
@@ -333,7 +333,7 @@ class MultilibProcessor:
             )
 
         for pkg_info in packages:
-            module.add_rpm_artifact(pkg_info._asdict(), multilib=True)
+            module.add_rpm_artifact(pkg_info, multilib=True)
 
     async def add_multilib_module_artifacts(
         self,
@@ -364,7 +364,10 @@ class MultilibProcessor:
             module_name = self._build_task.rpm_module.name
             module_stream = self._build_task.rpm_module.stream
             await self.update_module_index(
-                self._module_index, module_name, module_stream, packages
+                self._module_index,
+                module_name,
+                module_stream,
+                packages,
             )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
