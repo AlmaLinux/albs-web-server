@@ -59,3 +59,10 @@ class BaseAsyncTestCase:
                 "Authorization": f"Bearer {cls.token}",
             }
         )
+
+    def get_assertion_message(
+        self,
+        response_text: str,
+        message: str = "",
+    ) -> str:
+        return f"{message}\n{response_text}"

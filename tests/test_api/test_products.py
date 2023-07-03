@@ -19,18 +19,10 @@ class TestProductsEndpoints(BaseAsyncTestCase):
             "/api/v1/products/",
             json=product_create_payload,
         )
-        message = f"Cannot create product:\n{response.text}"
-        assert response.status_code == self.status_codes.HTTP_200_OK, message
-
-    async def test_user_product_remove(
-        self,
-        user_product: Product,
-        get_rpm_distros,
-        delete_by_href,
-    ):
-        endpoint = f"/api/v1/products/{user_product.id}/remove/"
-        response = await self.make_request("delete", endpoint)
-        message = f"Cannot remove product:\n{response.text}"
+        message = self.get_assertion_message(
+            response.text,
+            "Cannot create product:",
+        )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
     async def test_add_to_product(
@@ -45,7 +37,10 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         endpoint = f"/api/v1/products/add/{build_id}/{product_name}/"
         response = await self.make_request("post", endpoint)
 
-        message = f"Cannot add build to product:\n{response.text}"
+        message = self.get_assertion_message(
+            response.text,
+            "Cannot add build to product:",
+        )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
         # dramatic.Actor.send is monkeypatched to return None.
@@ -79,7 +74,10 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         endpoint = f"/api/v1/products/remove/{build_id}/{product_name}/"
         response = await self.make_request("post", endpoint)
 
-        message = f"Cannot remove build from product:\n{response.text}"
+        message = self.get_assertion_message(
+            response.text,
+            "Cannot remove build from product:",
+        )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
         await _perform_product_modification(build_id, product_id, "remove")
         db_product = (
@@ -96,3 +94,35 @@ class TestProductsEndpoints(BaseAsyncTestCase):
 
         # At this point, db_product shouldn't have any build
         assert not db_product.builds, message
+
+    async def test_user_product_remove_when_build_is_running(
+        self,
+        session: AsyncSession,
+        user_product: Product,
+        regular_build_with_user_product: Build,
+    ):
+        endpoint = f"/api/v1/products/{user_product.id}/remove/"
+        response = await self.make_request("delete", endpoint)
+        assert (
+            response.status_code == self.status_codes.HTTP_400_BAD_REQUEST
+        ), response.text
+        # we need to delete active build for further product deletion
+        for task in regular_build_with_user_product.tasks:
+            await session.delete(task)
+        await session.delete(regular_build_with_user_product)
+        await session.commit()
+
+    async def test_user_product_remove(
+        self,
+        session: AsyncSession,
+        user_product: Product,
+        get_rpm_distros,
+        delete_by_href,
+    ):
+        endpoint = f"/api/v1/products/{user_product.id}/remove/"
+        response = await self.make_request("delete", endpoint)
+        message = self.get_assertion_message(
+            response.text,
+            "Cannot remove product:",
+        )
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
