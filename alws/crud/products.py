@@ -1,10 +1,9 @@
 import asyncio
 import logging
-import pprint
 import typing
-from collections import defaultdict
 
 from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
@@ -18,9 +17,8 @@ from alws.crud.teams import (
     create_team_roles,
     get_teams,
 )
-from alws.database import Session
 from alws.dramatiq import perform_product_modification
-from alws.errors import ProductError, PermissionDenied
+from alws.errors import DataNotFoundError, ProductError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
@@ -40,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_product(
-    db: Session,
+    db: AsyncSession,
     payload: ProductCreate,
 ) -> models.Product:
 
@@ -61,8 +59,8 @@ async def create_product(
     existing_team = await get_teams(db, name=team_name)
     if existing_team:
         raise ProductError(
-            f"Product's team name intersects with the existing team, "
-            f"which may lead to permissions issues")
+            "Product's team name intersects with the existing team, "
+            "which may lead to permissions issues")
 
     team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
     team_roles = await create_team_roles(db, team_name)
@@ -118,7 +116,7 @@ async def create_product(
 
 
 async def get_products(
-    db: Session,
+    db: AsyncSession,
     search_string: str = None,
     page_number: int = None,
     product_id: int = None,
@@ -126,6 +124,8 @@ async def get_products(
 ) -> typing.Union[
     typing.List[models.Product],
     models.Product,
+    typing.Dict[str, typing.Any],
+    None,
 ]:
 
     def generate_query(count=False):
@@ -176,7 +176,7 @@ async def get_products(
 
 
 async def remove_product(
-    db: Session,
+    db: AsyncSession,
     product_id: int,
     user_id: int,
 ):
@@ -188,7 +188,7 @@ async def remove_product(
             f"User has no permissions to delete the product {db_product.name}"
         )
     if not db_product:
-        raise Exception(f"Product={product_id} doesn't exist")
+        raise DataNotFoundError(f"Product={product_id} doesn't exist")
     active_builds_by_team_id = (
         await db.execute(
             select(models.Build.id)
@@ -226,7 +226,7 @@ async def remove_product(
 
 
 async def modify_product(
-    db: Session,
+    db: AsyncSession,
     build_id: int,
     product: str,
     user_id: int,
@@ -237,7 +237,7 @@ async def modify_product(
         db_product = await get_products(db, product_name=product)
         db_user = await get_user(db, user_id=user_id)
         if not db_user:
-            raise
+            raise DataNotFoundError(f"User={user_id} doesn't exist")
         if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
             raise PermissionDenied(
                 f'User has no permissions '
@@ -246,7 +246,7 @@ async def modify_product(
 
         db_build = await db.execute(
             select(models.Build).where(
-                models.Build.id.__eq__(build_id),
+                models.Build.id == build_id,
             ).options(
                 selectinload(models.Build.repos),
                 selectinload(models.Build.tasks).selectinload(
