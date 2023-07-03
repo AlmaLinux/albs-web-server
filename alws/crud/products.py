@@ -189,6 +189,24 @@ async def remove_product(
         )
     if not db_product:
         raise Exception(f"Product={product_id} doesn't exist")
+    active_builds_by_team_id = (
+        await db.execute(
+            select(models.Build.id)
+            .join(models.BuildTask)
+            .where(
+                models.Build.team_id == db_product.team_id,
+                models.BuildTask.status.in_([
+                    BuildTaskStatus.IDLE,
+                    BuildTaskStatus.STARTED,
+                ]),
+            )
+        )
+    ).scalars().all()
+    if active_builds_by_team_id:
+        raise ProductError(
+            f'Cannot remove product, please wait until the following '
+            f'builds would be finished: {str(active_builds_by_team_id)}'
+        )
     pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
                              settings.pulp_password)
     delete_tasks = []

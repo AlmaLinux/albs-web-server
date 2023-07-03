@@ -10,7 +10,7 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
         raise ValueError(f'Cannot detect if user can perform action: '
                          f'{action} is missing in mapping')
 
-    if user.is_superuser:
+    if user.is_superuser or obj.owner.id == user.id:
         return True
 
     action_mask = ActionsMaskMapping[action]
@@ -31,13 +31,9 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
     logging.debug('Intersection between object and user roles: %s',
                   str(groups_intersection))
     object_permissions = obj.permissions_triad
-    if obj.owner.id == user.id:
-        is_performable = bool(object_permissions.owner & action_mask)
-    else:
-        if groups_intersection:
-            is_performable = bool(object_permissions.group & action_mask)
-        else:
-            is_performable = bool(object_permissions.other & action_mask)
+    is_performable = bool(object_permissions.other & action_mask)
+    if groups_intersection:
+        is_performable = bool(object_permissions.group & action_mask)
 
     if not is_performable:
         return False
