@@ -12,7 +12,7 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
             f'{action} is missing in mapping'
         )
 
-    if user.is_superuser or obj.owner.id == user.id:
+    if user.is_superuser:
         return True
 
     action_mask = ActionsMaskMapping[action]
@@ -35,9 +35,13 @@ def can_perform(obj: typing.Any, user: User, action: str) -> bool:
         str(groups_intersection),
     )
     object_permissions = obj.permissions_triad
-    is_performable = bool(object_permissions.other & action_mask)
-    if groups_intersection:
-        is_performable = bool(object_permissions.group & action_mask)
+    if obj.owner.id == user.id:
+        is_performable = bool(object_permissions.owner & action_mask)
+    else:
+        if groups_intersection:
+            is_performable = bool(object_permissions.group & action_mask)
+        else:
+            is_performable = bool(object_permissions.other & action_mask)
 
     if not is_performable:
         return False

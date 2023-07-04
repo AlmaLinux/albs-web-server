@@ -241,7 +241,7 @@ async def remove_product(
     if active_builds_by_team_id:
         raise ProductError(
             f'Cannot remove product, please wait until the following '
-            f'builds would be finished: {str(active_builds_by_team_id)}'
+            f'builds are finished: {str(active_builds_by_team_id)}'
         )
     pulp_client = PulpClient(
         settings.pulp_host,
