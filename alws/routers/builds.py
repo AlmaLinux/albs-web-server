@@ -89,10 +89,13 @@ async def get_module_preview(
     flavors = []
     if module_request.flavors:
         flavors = await flavors_crud.list_flavours(
-            db, ids=module_request.flavors
+            db,
+            ids=module_request.flavors,
         )
     return await build_crud.get_module_preview(
-        platform, flavors, module_request
+        platform,
+        flavors,
+        module_request,
     )
 
 
