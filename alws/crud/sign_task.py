@@ -201,11 +201,12 @@ async def get_available_gen_key_task(
             )
         )
         gen_key_task = gen_key_tasks.scalars().first()
-        await db.execute(
-            update(models.GenKeyTask)
-            .where(models.GenKeyTask.id == gen_key_task.id)
-            .values(status=GenKeyStatus.IN_PROGRESS)
-        )
+        if gen_key_task:
+            await db.execute(
+                update(models.GenKeyTask)
+                .where(models.GenKeyTask.id == gen_key_task.id)
+                .values(status=GenKeyStatus.IN_PROGRESS)
+            )
     return gen_key_task
 
 
