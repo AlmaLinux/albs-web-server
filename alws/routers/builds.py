@@ -17,7 +17,7 @@ from alws.crud import (
     platform_flavors as flavors_crud
 )
 from alws.dependencies import get_db
-from alws.errors import BuildError, DataNotFoundError, PermissionDenied
+from alws.errors import BuildError, DataNotFoundError
 from alws.schemas import build_schema
 
 
@@ -39,13 +39,7 @@ async def create_build(
             user: models.User = Depends(get_current_user),
             db: AsyncSession = Depends(get_db)
         ):
-    try:
-        return await build_crud.create_build(db, build, user.id)
-    except PermissionDenied:
-        return HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='User has no permissions to create build'
-        )
+    return await build_crud.create_build(db, build, user.id)
 
 
 @public_router.get('/', response_model=typing.Union[
