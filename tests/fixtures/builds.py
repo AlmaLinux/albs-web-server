@@ -1,10 +1,13 @@
+import copy
 import typing
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.crud.build import create_build, get_builds
-from alws.models import Build
+from alws.dramatiq.build import _start_build
+from alws.models import Build, Product
 from alws.schemas.build_schema import BuildCreate
 from tests.constants import ADMIN_USER_ID
 from tests.test_utils.pulp_utils import get_rpm_pkg_info
@@ -249,6 +252,35 @@ async def regular_build(
         BuildCreate(**build_payload),
         user_id=ADMIN_USER_ID,
     )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def regular_build_with_user_product(
+    session: AsyncSession,
+    build_payload: dict,
+    create_build_rpm_repo,
+    create_log_repo,
+    modify_repository,
+) -> typing.AsyncIterable[Build]:
+    payload = copy.deepcopy(build_payload)
+    user_product_id = (
+        (
+            await session.execute(
+                select(Product.id).where(Product.is_community.is_(True))
+            )
+        )
+        .scalars()
+        .first()
+    )
+    payload['product_id'] = user_product_id
+    build = await create_build(
+        session,
+        BuildCreate(**payload),
+        user_id=ADMIN_USER_ID,
+    )
+    await _start_build(build.id, BuildCreate(**payload))
+    yield await get_builds(session, build_id=build.id)
 
 
 @pytest.fixture
