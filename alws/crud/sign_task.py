@@ -197,7 +197,7 @@ async def get_available_gen_key_task(
             .where(models.GenKeyTask.status == GenKeyStatus.IDLE)
             .options(
                 selectinload(models.GenKeyTask.product)
-                .selectinload(models.User),
+                .selectinload(models.Product.owner),
             )
         )
         gen_key_task = gen_key_tasks.scalars().first()
