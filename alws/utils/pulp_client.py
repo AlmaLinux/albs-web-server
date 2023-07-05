@@ -72,15 +72,8 @@ class PulpClient:
             "autopublish": auto_publish,
             "retain_repo_versions": 5,
         }
-        # get already existing repo
-        response = await self.request("GET", endpoint, params={
-            "name": name,
-        })
-        if response["results"]:
-            repo_href = response["results"][0]["pulp_href"]
-        else:
-            response = await self.request("POST", endpoint, json=payload)
-            repo_href = response["pulp_href"]
+        response = await self.request("POST", endpoint, json=payload)
+        repo_href = response["pulp_href"]
         if create_publication:
             await self.create_rpm_publication(repo_href)
         distribution = await self.create_rpm_distro(
