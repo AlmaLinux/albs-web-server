@@ -75,7 +75,6 @@ class PulpClient:
         # get already existing repo
         response = await self.request("GET", endpoint, params={
             "name": name,
-            "retain_repo_versions": 5,
         })
         if response["results"]:
             repo_href = response["results"][0]["pulp_href"]
