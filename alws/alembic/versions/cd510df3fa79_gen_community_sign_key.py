@@ -36,7 +36,7 @@ def upgrade():
     op.create_table(
         'gen_key_tasks',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('status', sa.Boolean(), default=GenKeyStatus.IDLE),
+        sa.Column('status', sa.Integer(), default=GenKeyStatus.IDLE),
         sa.Column('error_message', sa.TEXT(), nullable=True),
         sa.Column("platform_id", sa.Integer(), nullable=False),
         sa.Column("product_id", sa.Integer(), nullable=False),
