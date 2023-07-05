@@ -78,7 +78,7 @@ class PulpClient:
             "retain_repo_versions": 5,
         })
         if response["results"]:
-            repo_href = response["results"]["pulp_href"]
+            repo_href = response["results"][0]["pulp_href"]
         else:
             response = await self.request("POST", endpoint, json=payload)
             repo_href = response["pulp_href"]
