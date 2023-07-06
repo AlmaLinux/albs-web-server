@@ -1410,7 +1410,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             is_beta = distr["version"].endswith("-beta")
             is_devel = False
             for pkg_list in beholder_response.get("packages", {}):
-                for matched, packages in pkg_list["packages"]:
+                for matched, packages in pkg_list["packages"].items():
                     response_priority = await self._beholder_matched_to_priority(matched)
                     self.update_beholder_cache(
                         beholder_cache,
