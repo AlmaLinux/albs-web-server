@@ -23,7 +23,7 @@ from alws.constants import (
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
-    RepoType, BeholderMatchMethods,
+    RepoType, BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -1130,6 +1130,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_beta: bool,
         is_devel: bool,
         priority: int,
+        matched: str,
     ):
         def generate_key(pkg_arch: str) -> BeholderKey:
             return BeholderKey(
@@ -1143,6 +1144,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         for pkg in packages:
             key = generate_key(pkg["arch"])
             pkg["priority"] = priority
+            pkg["matched"] = matched
             beholder_cache[key] = pkg
             for weak_arch in strong_arches[pkg["arch"]]:
                 second_key = generate_key(weak_arch)
@@ -1243,6 +1245,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             release_repositories.add((release_repo, trustness))
         return release_repositories
 
+    @staticmethod
+    async def _beholder_matched_to_priority(matched: str) -> int:
+        priority = LOWEST_PRIORITY
+        if matched in BeholderMatchMethod.green():
+            priority = ReleasePackageTrustness.MAXIMUM.value
+        elif matched in BeholderMatchMethod.yellow():
+            priority = ReleasePackageTrustness.MEDIUM.value
+        return priority
+
     @class_measure_work_time_async("get_release_plan")
     async def get_release_plan(
         self,
@@ -1312,8 +1323,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for strong_arch, weak_arches in strong_arches.items():
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
+
+            platforms_list = base_platform.reference_platforms + [base_platform]
             module_responses = await self._beholder_client.retrieve_responses(
-                base_platform,
+                platforms_list,
                 module_name=module_name,
                 module_stream=module_stream,
                 module_arch_list=module_arch_list,
@@ -1386,23 +1399,28 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
+        platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
-            base_platform,
-            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethods.all()},
+            platforms_list,
+            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
         )
+
         for beholder_response in beholder_responses:
             distr = beholder_response["distribution"]
             is_beta = distr["version"].endswith("-beta")
             is_devel = False
             for pkg_list in beholder_response.get("packages", {}):
-                self.update_beholder_cache(
-                    beholder_cache,
-                    pkg_list["packages"],
-                    strong_arches,
-                    is_beta,
-                    is_devel,
-                    beholder_response["priority"],
-                )
+                for matched, packages in pkg_list["packages"]:
+                    response_priority = await self._beholder_matched_to_priority(matched)
+                    self.update_beholder_cache(
+                        beholder_cache,
+                        packages,
+                        strong_arches,
+                        is_beta,
+                        is_devel,
+                        response_priority,
+                        matched
+                    )
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,

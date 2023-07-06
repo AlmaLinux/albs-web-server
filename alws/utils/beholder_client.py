@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT, ReleasePackageTrustness, BeholderMatchMethods
+from alws.constants import REQUEST_TIMEOUT
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -66,53 +66,24 @@ class BeholderClient:
                     "trying next reference platform"
                 )
 
-    @staticmethod
-    async def _get_response_priority(response: dict, platforms: list) -> int:
-        response_distr_name = response["distribution"]["name"]
-        response_distr_ver = response["distribution"]["version"]
-
-        # Check if the platform is in the list of platforms
-        platform_priority = next(
-            (
-                db_platform.priority
-                for db_platform in platforms
-                if db_platform.name.startswith(response_distr_name)
-                   and db_platform.distr_version == response_distr_ver
-            ),
-            None
-        )
-        # We have priority only in ref platforms
-        # If the platform was not found, derive priority from the match level
-        if platform_priority is None:
-            match = response.get("match")
-            platform_priority = LOWEST_PRIORITY
-            if match in BeholderMatchMethods.green():
-                platform_priority = ReleasePackageTrustness.MAXIMUM.value
-            elif match in BeholderMatchMethods.yellow():
-                platform_priority = ReleasePackageTrustness.MEDIUM.value
-
-        return platform_priority
-
     async def retrieve_responses(
         self,
-        platform: Platform,
+        platforms: typing.List[Platform],
         module_name: str = "",
         module_stream: str = "",
         module_arch_list: typing.Optional[typing.List[str]] = None,
         data: typing.Optional[typing.Union[dict, list]] = None,
     ) -> typing.List[dict]:
-        platforms_list = platform.reference_platforms + [platform]
         endpoints = self.create_endpoints(
-            platforms_list,
+            platforms,
             module_name,
             module_stream,
             module_arch_list,
         )
         responses = []
         async for response in self.iter_endpoints(endpoints, data):
-            response["priority"] = await self._get_response_priority(response, platforms_list)
             responses.append(response)
-        return sorted(responses, key=lambda x: x["priority"], reverse=True)
+        return responses
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)

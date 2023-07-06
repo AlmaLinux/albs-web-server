@@ -27,6 +27,7 @@ __all__ = [
     "SignStatus",
     "TestTaskStatus",
     "debuginfo_regex",
+    "BeholderMatchMethod",
 ]
 
 
@@ -206,7 +207,7 @@ class SignStatusEnum(enum.IntEnum):
     WRONG_SIGNATURE = 4
 
 
-class BeholderMatchMethods(enum.Enum):
+class BeholderMatchMethod(enum.Enum):
     EXACT = "exact"
     CLOSEST = "closest"
     NAME_VERSION = "name_version"
