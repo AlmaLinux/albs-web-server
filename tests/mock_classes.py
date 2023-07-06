@@ -47,13 +47,20 @@ class BaseAsyncTestCase:
             return await client.send(request)
 
     @classmethod
-    def setup_class(cls):
-        app.dependency_overrides[get_db] = get_session
-        cls.token = jwt_utils.generate_JWT_token(
-            str(cls.user_id),
+    def generate_jwt_token(
+        cls,
+        user_id: str,
+    ) -> str:
+        return jwt_utils.generate_JWT_token(
+            user_id,
             settings.jwt_secret,
             "HS256",
         )
+
+    @classmethod
+    def setup_class(cls):
+        app.dependency_overrides[get_db] = get_session
+        cls.token = cls.generate_jwt_token(str(cls.user_id))
         cls.headers.update(
             {
                 "Authorization": f"Bearer {cls.token}",
