@@ -1219,12 +1219,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 (beholder_cache[key] for key in beholder_keys),
                 {},
             )
-            # we should decrease trustness
-            # if we find package with different version
-            priority = predicted_package.get("priority", LOWEST_PRIORITY)
-            predicted_package["priority"] = ReleasePackageTrustness.decrease(
-                priority,
-            )
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
             trustness = predicted_package["priority"]
