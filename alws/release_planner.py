@@ -1222,6 +1222,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
             trustness = predicted_package["priority"]
+            matched = predicted_package["matched"]
             repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
                 "name"
             ]
@@ -1236,7 +1237,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
             )
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
-            release_repositories.add((release_repo, trustness))
+            release_repositories.add((release_repo, trustness, matched))
         return release_repositories
 
     @staticmethod
@@ -1491,7 +1492,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness in release_repository_keys:
+            for release_repo_key, trustness, matched in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1514,6 +1515,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         )
                         continue
                 release_repo["trustness"] = trustness
+                release_repo["matched"] = matched
                 repo_arch_location = [release_repo["arch"]]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == "i686" and "x86_64" in repo_arch_location:
