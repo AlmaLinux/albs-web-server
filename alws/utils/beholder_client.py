@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import REQUEST_TIMEOUT
+from alws.constants import REQUEST_TIMEOUT, LOWEST_PRIORITY
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -82,8 +82,18 @@ class BeholderClient:
         )
         responses = []
         async for response in self.iter_endpoints(endpoints, data):
+            response_distr_name = response["distribution"]["name"]
+            response_distr_ver = response["distribution"]["version"]
+            response["priority"] = next(
+                db_platform.priority
+                for db_platform in platforms
+                if db_platform.name.startswith(response_distr_name)
+                and db_platform.distr_version == response_distr_ver
+            )
+            # we have priority only in ref platforms
+            response["priority"] = response.get("priority") or LOWEST_PRIORITY
             responses.append(response)
-        return responses
+        return sorted(responses, key=lambda x: x["priority"], reverse=True)
 
     def _get_url(self, endpoint: str) -> str:
         return urllib.parse.urljoin(self._host, endpoint)
