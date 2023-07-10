@@ -1342,6 +1342,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(devel_repo)
             rpm_modules.append(module_info)
+            matched = BeholderMatchMethod.EXACT.value
             for module_response in module_responses:
                 distr = module_response["distribution"]
                 is_beta = distr["version"].endswith("-beta")
@@ -1354,7 +1355,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
-                        BeholderMatchMethod.EXACT.value
+                        matched
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
@@ -1390,6 +1391,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
+                    "matched": matched
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
