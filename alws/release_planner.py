@@ -1354,6 +1354,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
+                        BeholderMatchMethod.EXACT.value
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
