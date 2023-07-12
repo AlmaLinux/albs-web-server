@@ -27,7 +27,10 @@ async def ensure_system_user_exists(session: database.Session) -> models.User:
         return user
 
     user = models.User(
-        username=SYSTEM_USER_NAME, email=f'{SYSTEM_USER_NAME}@almalinux.org')
+        username=SYSTEM_USER_NAME, 
+        email=f'{SYSTEM_USER_NAME}@almalinux.org',
+        is_verified=True,
+    )
     session.add(user)
     await session.flush()
     return user
