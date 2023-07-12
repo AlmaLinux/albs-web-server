@@ -12,7 +12,6 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.crud.products import get_products
 from alws.crud.user import get_user
 from alws.constants import (
     SignStatus,
