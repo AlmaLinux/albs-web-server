@@ -80,11 +80,13 @@ async def get_gen_key_task(
         select(models.GenKeyTask)
         .where(models.GenKeyTask.id == gen_key_task_id)
         .options(
-            selectinload(models.GenKeyTask.platform),
             selectinload(models.GenKeyTask.product)
             .selectinload(models.Product.repositories),
             selectinload(models.GenKeyTask.product)
             .selectinload(models.Product.owner),
+            selectinload(models.GenKeyTask.product)
+            .selectinload(models.Product.team)
+            .selectinload(models.Team.roles),
         )
     )
     return gen_key_tasks.scalars().first()
@@ -106,6 +108,7 @@ async def create_gen_key_task(
         product_id=product.id,
     )
     db.add(gen_key_task)
+    await db.commit()
     await db.refresh(gen_key_task)
     return await get_gen_key_task(db=db, gen_key_task_id=gen_key_task.id)
 
@@ -346,12 +349,12 @@ async def complete_gen_key_task(
             ),
             None
         )
+        pulp_client = PulpClient(
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password,
+        )
         if not sign_key_repo:
-            pulp_client = PulpClient(
-                settings.pulp_host,
-                settings.pulp_user,
-                settings.pulp_password,
-            )
             repo_name, repo_url, repo_href = await create_product_sign_key_repo(
                 pulp_client=pulp_client,
                 owner_name=gen_key_task.product.owner.username,
