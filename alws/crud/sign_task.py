@@ -100,13 +100,12 @@ async def create_gen_key_task(
             'User does not have permissions '
             'to generate sign key for that product'
         )
-    async with db.begin():
-        gen_key_task = models.GenKeyTask(
-            status=GenKeyStatus.IDLE,
-            product=product,
-            product_id=product.id,
-        )
-        db.add(gen_key_task)
+    gen_key_task = models.GenKeyTask(
+        status=GenKeyStatus.IDLE,
+        product=product,
+        product_id=product.id,
+    )
+    db.add(gen_key_task)
     await db.refresh(gen_key_task)
     return await get_gen_key_task(db=db, gen_key_task_id=gen_key_task.id)
 
