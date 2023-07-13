@@ -317,82 +317,87 @@ async def complete_gen_key_task(
     gen_key_task_id: int,
     payload: sign_schema.GenKeyTaskComplete,
 ) -> typing.Optional[models.GenKeyTask]:
-    async with Session() as db, db.begin():
-        gen_key_task = await get_gen_key_task(
-            db=db,
-            gen_key_task_id=gen_key_task_id,
+    db = Session()
+    gen_key_task = await get_gen_key_task(
+        db=db,
+        gen_key_task_id=gen_key_task_id,
+    )
+    if not gen_key_task:
+        raise GenKeyError(
+            f'Gen key task with id "{gen_key_task_id}" is absent'
         )
-        if not gen_key_task:
-            raise GenKeyError(
-                f'Gen key task with id "{gen_key_task_id}" is absent'
-            )
-        if payload.success:
-            task_status = GenKeyStatus.COMPLETED
-            error_message = None,
-        else:
-            task_status = GenKeyStatus.FAILED
-            error_message = payload.error_message
-        db.execute(
-            update(models.GenKeyTask)
-            .where(models.GenKeyTask.id == gen_key_task_id)
-            .values(
-                status=task_status,
-                error_message=error_message,
-            )
+    if payload.success:
+        task_status = GenKeyStatus.COMPLETED
+        error_message = None,
+    else:
+        task_status = GenKeyStatus.FAILED
+        error_message = payload.error_message
+    db.execute(
+        update(models.GenKeyTask)
+        .where(models.GenKeyTask.id == gen_key_task_id)
+        .values(
+            status=task_status,
+            error_message=error_message,
         )
-        if not payload.success:
-            return
-        sign_key_repo = next(
-            (
-                r for r in gen_key_task.product.repositories
-                if r.type == 'sign_key'
-            ),
-            None
+    )
+    if not payload.success:
+        return
+    sign_key_repo = next(
+        (
+            r for r in gen_key_task.product.repositories
+            if r.type == 'sign_key'
+        ),
+        None
+    )
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    if not sign_key_repo:
+        repo_name, repo_url, repo_href = await create_product_sign_key_repo(
+            pulp_client=pulp_client,
+            owner_name=gen_key_task.product.owner.username,
+            product_name=gen_key_task.product.name,
         )
-        pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password,
+        sign_key_repo = models.Repository(
+            name=repo_name,
+            url=repo_url,
+            arch='sign_key',
+            pulp_href=repo_href,
+            debug=False,
+            production=True
         )
-        if not sign_key_repo:
-            repo_name, repo_url, repo_href = await create_product_sign_key_repo(
-                pulp_client=pulp_client,
-                owner_name=gen_key_task.product.owner.username,
-                product_name=gen_key_task.product.name,
-            )
-            sign_key_repo = models.Repository(
-                name=repo_name,
-                url=repo_url,
-                arch='sign_key',
-                pulp_href=repo_href,
-                debug=False,
-                production=True
-            )
-            db.add(sign_key_repo)
+        db.add(sign_key_repo)
+    result = await pulp_client.get_files(
+        relative_path=payload.file_name,
+    )
+    if not result:
         await pulp_client.create_file(
             file_name=payload.file_name,
             artifact_href=payload.sign_key_href,
             repo=sign_key_repo.pulp_href,
         )
-        sign_key_url = urllib.parse.urljoin(
-            sign_key_repo.url,
-            payload.file_name,
-        )
-        roles = [
-            r for r in gen_key_task.product.team.roles if 'signer' in r.name
-        ]
-        sign_key = models.SignKey(
-            name=payload.key_name,
-            description=f'Community key "{payload.key_name}"',
-            is_community=True,
-            keyid=payload.key_id,
-            fingerprint=payload.fingerprint,
-            public_url=sign_key_url,
-            product_id=gen_key_task.product_id,
-            product=gen_key_task.product,
-            roles=roles,
-        )
-        db.add(sign_key)
+    sign_key_url = urllib.parse.urljoin(
+        sign_key_repo.url,
+        payload.file_name,
+    )
+    roles = [
+        r for r in gen_key_task.product.team.roles if 'signer' in r.name
+    ]
+    sign_key = models.SignKey(
+        name=payload.key_name,
+        description=f'Community key "{payload.key_name}"',
+        is_community=True,
+        keyid=payload.key_id,
+        fingerprint=payload.fingerprint,
+        public_url=sign_key_url,
+        product_id=gen_key_task.product_id,
+        product=gen_key_task.product,
+        roles=roles,
+    )
+    db.add(sign_key)
+    await db.commit()
     await db.refresh(sign_key)
     return sign_key
 
