@@ -145,10 +145,12 @@ async def get_avaiable_gen_key_task(db: database.Session = Depends(get_db)):
 async def complete_gen_key_task(
         gen_key_task_id: int,
         payload: sign_schema.GenKeyTaskComplete,
+        db: database.Session = Depends(get_db),
 ):
     sign_key = await sign_task.complete_gen_key_task(
         gen_key_task_id=gen_key_task_id,
         payload=payload,
+        db=db,
     )
     return sign_key
 
