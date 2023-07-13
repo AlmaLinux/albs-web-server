@@ -328,7 +328,7 @@ async def complete_gen_key_task(
         )
     if payload.success:
         task_status = GenKeyStatus.COMPLETED
-        error_message = None,
+        error_message = None
     else:
         task_status = GenKeyStatus.FAILED
         error_message = payload.error_message
