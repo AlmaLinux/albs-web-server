@@ -332,7 +332,7 @@ async def complete_gen_key_task(
     else:
         task_status = GenKeyStatus.FAILED
         error_message = payload.error_message
-    db.execute(
+    await db.execute(
         update(models.GenKeyTask)
         .where(models.GenKeyTask.id == gen_key_task_id)
         .values(
