@@ -397,6 +397,7 @@ async def complete_gen_key_task(
             roles=roles,
         )
         db.add(sign_key)
+    await db.commit()
     await db.refresh(sign_key)
     return sign_key
 
