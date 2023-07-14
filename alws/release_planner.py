@@ -23,7 +23,8 @@ from alws.constants import (
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
-    RepoType, BeholderMatchMethod,
+    RepoType,
+    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -1241,7 +1242,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         return release_repositories
 
     @staticmethod
-    async def _beholder_matched_to_priority(matched: str) -> int:
+    def _beholder_matched_to_priority(matched: str) -> int:
         priority = LOWEST_PRIORITY
         if matched in BeholderMatchMethod.green():
             priority = ReleasePackageTrustness.MAXIMUM.value
@@ -1416,7 +1417,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 ]
 
                 for matched in ordered_keys:
-                    response_priority = await self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(matched)
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
