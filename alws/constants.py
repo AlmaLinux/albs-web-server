@@ -67,47 +67,11 @@ class ReleasePackageTrustness(enum.IntEnum):
     represented in green on the UI.
     MEDIUM (2): The package has medium trustworthiness,
     represented in yellow on the UI.
-    LOWEST (10): The package has the lowest trustworthiness,
+    LOWEST (3): The package has the lowest trustworthiness,
     represented in red on the UI.
-
-    Methods
-    -------
-    decrease(trustness: int) -> int:
-        Decreases the level of trustness by one step from its current value,
-        unless it's already at the lowest.
     """
 
     UNKNOWN, MAXIMUM, MEDIUM, LOWEST = range(4)
-
-    @classmethod
-    def decrease(cls, trustness: int) -> int:
-        """
-        Decrease the trustness level.
-
-        If the current trustness level is MAXIMUM,
-        it will be decreased to MEDIUM.
-        If the current trustness level is MEDIUM,
-        it will be decreased to LOWEST.
-        If the current trustness level is LOWEST or UNKNOWN,
-        it will remain unchanged.
-
-        Parameters
-        ----------
-        trustness : int
-            Current trustness level.
-
-        Returns
-        -------
-        int
-            New trustness level after decrease.
-        """
-        if trustness == cls.LOWEST:
-            return trustness
-        if trustness == cls.MAXIMUM:
-            trustness = cls.MEDIUM
-        elif trustness == cls.MEDIUM:
-            trustness = cls.LOWEST
-        return trustness
 
 
 class BuildTaskStatus(enum.IntEnum):
