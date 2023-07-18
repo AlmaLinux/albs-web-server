@@ -907,7 +907,11 @@ class Product(PermissionsMixin, TeamMixin, Base):
         secondary=ProductBuilds,
         back_populates="products",
     )
-    sign_keys = relationship("SignKey", back_populates="product")
+    sign_keys = relationship(
+        "SignKey",
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def full_name(self) -> str:

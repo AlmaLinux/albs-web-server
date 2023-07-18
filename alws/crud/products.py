@@ -222,7 +222,6 @@ async def remove_product(
             pulp_client.delete_by_href(product_distro["pulp_href"]),
         )
     await asyncio.gather(*delete_tasks)
-    await db.delete(db_product.sign_keys)
     await db.delete(db_product)
     await db.commit()
 
