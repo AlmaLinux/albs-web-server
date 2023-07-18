@@ -8,8 +8,8 @@ RUN mkdir -p /code && \
     yum clean all
 RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o wait_for_it.sh && chmod +x wait_for_it.sh
 COPY requirements.txt /tmp/requirements.txt
-RUN cd /code && virtualenv -p python3.9 --system-site-packages env && source env/bin/activate \
-    && pip3 install -r /tmp/requirements.txt --no-cache-dir
+RUN cd /code && virtualenv -p python3.9 --system-site-packages env && source env/bin/activate && pip3 install -U pip
+RUN cd /code && source env/bin/activate && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY alws /code/alws
 COPY tests /code/tests
 WORKDIR /code
