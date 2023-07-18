@@ -164,6 +164,7 @@ async def get_products(
                 models.Team.members),
             selectinload(models.Product.team).selectinload(
                 models.Team.products),
+            selectinload(models.Product.sign_keys),
         )
         if count:
             query = select(func.count(models.Product.id))
@@ -221,6 +222,7 @@ async def remove_product(
             pulp_client.delete_by_href(product_distro["pulp_href"]),
         )
     await asyncio.gather(*delete_tasks)
+    await db.delete(db_product.sign_keys)
     await db.delete(db_product)
     await db.commit()
 

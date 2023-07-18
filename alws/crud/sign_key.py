@@ -1,16 +1,26 @@
 import typing
 
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.errors import DataNotFoundError, SignKeyAlreadyExistsError
+from alws.models import User
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
 
 
-async def get_sign_keys(db: Session) -> typing.List[models.SignKey]:
+async def get_sign_keys(
+        db: Session,
+        user: User,
+) -> typing.List[models.SignKey]:
     result = await db.execute(select(models.SignKey))
-    return result.scalars().all()
+    suitable_keys = [
+        sign_key for sign_key in result.scalars.all()
+        if can_perform(sign_key, user, actions.UseSignKey.name)
+    ]
+    return suitable_keys
 
 
 async def create_sign_key(

@@ -17,8 +17,11 @@ router = APIRouter(
 
 
 @router.get('/', response_model=typing.List[sign_schema.SignKey])
-async def get_sign_keys(db: database.Session = Depends(get_db)):
-    return await sign_key.get_sign_keys(db)
+async def get_sign_keys(
+        db: database.Session = Depends(get_db),
+        user=Depends(get_current_user),
+):
+    return await sign_key.get_sign_keys(db, user)
 
 
 @router.post('/new/', response_model=sign_schema.SignKey)
