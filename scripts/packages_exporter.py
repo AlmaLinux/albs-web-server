@@ -128,6 +128,13 @@ def parse_args():
         required=False,
         help="Pulp group, used for change the group ownership",
     )
+    parser.add_argument(
+        "-osv-dir",
+        type=str,
+        default=settings.pulp_export_path,
+        required=False,
+        help="The path to the directory where the OSV data will be generated",
+    )
     return parser.parse_args()
 
 
@@ -179,6 +186,7 @@ class Exporter:
         export_method: str = "hardlink",
         pulp_user: str = "pulp",
         pulp_group: str = "pulp-exports",
+        osv_dir: str = settings.pulp_export_path,
     ):
         os.makedirs(LOG_DIR, exist_ok=True)
         logging.basicConfig(
@@ -201,6 +209,7 @@ class Exporter:
         self.pulp_system_user = pulp_user
         self.common_group = pulp_group
         self.export_method = export_method
+        self.osv_dir = osv_dir
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
             os.path.expanduser("~/export.err")
@@ -237,7 +246,7 @@ class Exporter:
         }
         self.logger.debug("Generating OSV data")
         osv_target_dir = os.path.join(
-            settings.pulp_export_path,
+            self.osv_dir,
             "osv",
             platform.lower().replace("-", ""),
         )
@@ -780,6 +789,7 @@ def main():
         export_method=args.export_method,
         pulp_user=args.pulp_user,
         pulp_group=args.pulp_group,
+        osv_dir=args.osv_dir,
     )
     exporter.logger.debug("Fixing permissions before export")
     sync_fix_permissions(exporter.pulp_system_user, exporter.common_group)
@@ -938,6 +948,8 @@ def main():
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
                 exporter.logger.debug("OVAL is generated")
+        except Exception:
+            exporter.logger.exception("Error happened:\n")
         finally:
             if errata_export_base_path:
                 sync_fix_permissions(

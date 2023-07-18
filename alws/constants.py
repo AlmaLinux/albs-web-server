@@ -29,6 +29,7 @@ __all__ = [
     "GenKeyStatus",
     "TestTaskStatus",
     "debuginfo_regex",
+    "BeholderMatchMethod",
 ]
 
 
@@ -57,20 +58,22 @@ class PermissionTriad:
 
 
 class ReleasePackageTrustness(enum.IntEnum):
-    UNKNOWN = 0
-    MAXIMUM = 1
-    MEDIUM = 2
-    LOWEST = 10
+    """
+    Enum representing the trustworthiness of a release package.
+    The trustworthiness is shown in different colors
+    on the web UI. The values correspond to:
 
-    @classmethod
-    def decrease(cls, trustness: int) -> int:
-        if trustness == cls.LOWEST:
-            return trustness
-        if trustness == cls.MAXIMUM:
-            trustness = cls.MEDIUM
-        elif trustness == cls.MEDIUM:
-            trustness = cls.LOWEST
-        return trustness
+    UNKNOWN (0): The trustworthiness of the package is unknown,
+    represented in grey on the UI.
+    MAXIMUM (1): The package has maximum trustworthiness,
+    represented in green on the UI.
+    MEDIUM (2): The package has medium trustworthiness,
+    represented in yellow on the UI.
+    LOWEST (3): The package has the lowest trustworthiness,
+    represented in red on the UI.
+    """
+
+    UNKNOWN, MAXIMUM, MEDIUM, LOWEST = range(4)
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -181,6 +184,31 @@ class SignStatusEnum(enum.IntEnum):
     READ_ERROR = 2
     NO_SIGNATURE = 3
     WRONG_SIGNATURE = 4
+
+
+class BeholderMatchMethod(enum.Enum):
+    EXACT = "exact"
+    CLOSEST = "closest"
+    NAME_VERSION = "name_version"
+    NAME_ONLY = "name_only"
+
+    @classmethod
+    def all(cls):
+        return [member.value for member in cls]
+
+    @classmethod
+    def green(cls):
+        # as Andrew mentioned exact = green in the Web user interface
+        return [cls.EXACT.value]
+
+    @classmethod
+    def yellow(cls):
+        # as Andrew mentioned closest\name_version\name_only = yellow in the Web user interface
+        return [
+            cls.CLOSEST.value,
+            cls.NAME_VERSION.value,
+            cls.NAME_ONLY.value
+        ]
 
 
 build_ref_str_mapping: typing.Dict[str, int] = {

@@ -6,7 +6,7 @@ import urllib.parse
 
 import aiohttp
 
-from alws.constants import LOWEST_PRIORITY, REQUEST_TIMEOUT
+from alws.constants import REQUEST_TIMEOUT, LOWEST_PRIORITY
 from alws.models import Platform
 from alws.utils.parsing import get_clean_distr_name
 
@@ -68,15 +68,14 @@ class BeholderClient:
 
     async def retrieve_responses(
         self,
-        platform: Platform,
+        platforms: typing.List[Platform],
         module_name: str = "",
         module_stream: str = "",
         module_arch_list: typing.Optional[typing.List[str]] = None,
         data: typing.Optional[typing.Union[dict, list]] = None,
     ) -> typing.List[dict]:
-        platforms_list = platform.reference_platforms + [platform]
         endpoints = self.create_endpoints(
-            platforms_list,
+            platforms,
             module_name,
             module_stream,
             module_arch_list,
@@ -87,7 +86,7 @@ class BeholderClient:
             response_distr_ver = response["distribution"]["version"]
             response["priority"] = next(
                 db_platform.priority
-                for db_platform in platforms_list
+                for db_platform in platforms
                 if db_platform.name.startswith(response_distr_name)
                 and db_platform.distr_version == response_distr_ver
             )

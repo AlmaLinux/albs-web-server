@@ -24,6 +24,7 @@ from alws.constants import (
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
+    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -1130,6 +1131,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_beta: bool,
         is_devel: bool,
         priority: int,
+        matched: str,
     ):
         def generate_key(pkg_arch: str) -> BeholderKey:
             return BeholderKey(
@@ -1143,6 +1145,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         for pkg in packages:
             key = generate_key(pkg["arch"])
             pkg["priority"] = priority
+            pkg["matched"] = matched
             beholder_cache[key] = pkg
             for weak_arch in strong_arches[pkg["arch"]]:
                 second_key = generate_key(weak_arch)
@@ -1217,15 +1220,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 (beholder_cache[key] for key in beholder_keys),
                 {},
             )
-            # we should decrease trustness
-            # if we find package with different version
-            priority = predicted_package.get("priority", LOWEST_PRIORITY)
-            predicted_package["priority"] = ReleasePackageTrustness.decrease(
-                priority,
-            )
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
             trustness = predicted_package["priority"]
+            matched = predicted_package["matched"]
             repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
                 "name"
             ]
@@ -1240,8 +1238,17 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
             )
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
-            release_repositories.add((release_repo, trustness))
+            release_repositories.add((release_repo, trustness, matched))
         return release_repositories
+
+    @staticmethod
+    def _beholder_matched_to_priority(matched: str) -> int:
+        priority = LOWEST_PRIORITY
+        if matched in BeholderMatchMethod.green():
+            priority = ReleasePackageTrustness.MAXIMUM.value
+        elif matched in BeholderMatchMethod.yellow():
+            priority = ReleasePackageTrustness.MEDIUM.value
+        return priority
 
     @class_measure_work_time_async("get_release_plan")
     async def get_release_plan(
@@ -1312,8 +1319,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for strong_arch, weak_arches in strong_arches.items():
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
+
+            platforms_list = base_platform.reference_platforms + [base_platform]
             module_responses = await self._beholder_client.retrieve_responses(
-                base_platform,
+                platforms_list,
                 module_name=module_name,
                 module_stream=module_stream,
                 module_arch_list=module_arch_list,
@@ -1334,6 +1343,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(devel_repo)
             rpm_modules.append(module_info)
+            matched = BeholderMatchMethod.EXACT.value
             for module_response in module_responses:
                 distr = module_response["distribution"]
                 is_beta = distr["version"].endswith("-beta")
@@ -1346,6 +1356,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
+                        matched
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
@@ -1381,28 +1392,41 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
+                    "matched": matched
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
+        platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
-            base_platform,
-            data={"source_rpms": src_rpm_names, "match": "closest"},
+            platforms_list,
+            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
         )
+
         for beholder_response in beholder_responses:
             distr = beholder_response["distribution"]
             is_beta = distr["version"].endswith("-beta")
             is_devel = False
             for pkg_list in beholder_response.get("packages", {}):
-                self.update_beholder_cache(
-                    beholder_cache,
-                    pkg_list["packages"],
-                    strong_arches,
-                    is_beta,
-                    is_devel,
-                    beholder_response["priority"],
-                )
+                # we should apply matches in reversed order to overwrite less accurate results by more accurate
+                # name_only -> name_version -> closest -> exact
+                ordered_keys = [
+                    method for method in BeholderMatchMethod.all()[::-1]
+                    if method in pkg_list["packages"].keys()
+                ]
+
+                for matched in ordered_keys:
+                    response_priority = self._beholder_matched_to_priority(matched)
+                    self.update_beholder_cache(
+                        beholder_cache,
+                        pkg_list["packages"][matched],
+                        strong_arches,
+                        is_beta,
+                        is_devel,
+                        response_priority,
+                        matched
+                    )
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -1472,7 +1496,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness in release_repository_keys:
+            for release_repo_key, trustness, matched in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1495,6 +1519,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         )
                         continue
                 release_repo["trustness"] = trustness
+                release_repo["matched"] = matched
                 repo_arch_location = [release_repo["arch"]]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == "i686" and "x86_64" in repo_arch_location:
