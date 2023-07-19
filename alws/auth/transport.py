@@ -1,7 +1,7 @@
 from urllib.parse import urljoin, urlparse
 from typing import Any
 
-from fastapi import Request, status
+from fastapi import Request, Response, status
 from fastapi.security import HTTPBearer
 from fastapi_users.authentication import (
     CookieTransport,
@@ -35,10 +35,10 @@ class JWTransport(Transport):
     def __init__(self):
         self.scheme = JWTBearer()
 
-    def get_login_response(self, token: str) -> Any:
+    def get_login_response(self, token: str, response: Response) -> Any:
         return BearerResponse(access_token=token, token_type='bearer')
 
-    async def get_logout_response(self) -> Any:
+    async def get_logout_response(self, response: Response) -> Any:
         raise TransportLogoutNotSupportedError()
 
     @staticmethod
@@ -67,9 +67,9 @@ class JWTransport(Transport):
 
 
 class RedirectCookieTransport(CookieTransport):
-    async def get_login_response(self, token: str) -> Any:
+    async def get_login_response(self, token: str, response: Response) -> Any:
         redirect_url = urljoin(settings.frontend_baseurl, 'auth/login/github')
-        response = await super().get_login_response(token)
+        await super().get_login_response(token, response)
         response.status_code = status.HTTP_302_FOUND
         response.headers['Location'] = redirect_url
 
