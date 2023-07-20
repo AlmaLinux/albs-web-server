@@ -1,5 +1,5 @@
-fastapi==0.95.1
-fastapi-users==10.4.1
+fastapi[all]==0.95.1
+fastapi-users[all]==10.4.1
 fastapi-users-db-sqlalchemy==4.0.5
 uvicorn==0.21.1
 asyncpg==0.27.0
