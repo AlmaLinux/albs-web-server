@@ -7,7 +7,7 @@ RUN mkdir -p /code && \
 RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o wait_for_it.sh && chmod +x wait_for_it.sh
 COPY ./alws/scripts/albs-gitea-listener/requirements.txt /tmp/requirements.txt
 RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
-    && pip3 install -r /tmp/requirements.txt --no-cache-dir
+    && pip3 install --upgrade pip && pip3 install -r /tmp/requirements.txt --no-cache-dir
 COPY ./alws/scripts/albs-gitea-listener/* /code/
 COPY ./alws/scripts/git_cacher/git_cacher.py /code/
 COPY ./alws /code/alws
