@@ -63,14 +63,11 @@ services:
       - rabbitmq
 
   web_server:
-    image: al-web-server:latest
+    image: quay.io/almalinuxorg/albs:latest
     env_file:
       - vars.env
     ports:
       - "8088:8000"
-    build:
-      dockerfile: Dockerfile
-      context: .
     volumes:
       - "./alws:/code/alws"
       - "./tests:/code/tests"
