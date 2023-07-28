@@ -9,4 +9,4 @@ COPY ./alws/scripts/albs-gitea-listener/requirements.txt /code/requirements.txt
 RUN cd /code && virtualenv -p python3.8 env && source env/bin/activate \
     && pip3 install --upgrade pip && pip3 install -r /code/requirements.txt --no-cache-dir
 WORKDIR /code
-CMD ["/bin/bash", "-c", "source env/bin/activate && pip3 install --upgrade pip && pip3 install -r /code/requirements.txt --no-cache-dir && python gitea_listener.py"]
+CMD ["/bin/bash", "-c", "source env/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt --no-cache-dir && python3 gitea_listener.py"]

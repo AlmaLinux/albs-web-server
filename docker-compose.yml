@@ -81,7 +81,7 @@ services:
                  /wait_for_it.sh db:5432 &&
                  PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
                  pip3 install --upgrade pip &&
-                 pip3 install -r /code/requirements.txt
+                 pip3 install -r requirements.txt
                  uvicorn --host 0.0.0.0 alws.app:app'
     restart: on-failure
     depends_on:
@@ -89,7 +89,7 @@ services:
       - pulp
 
   task_queue:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -104,7 +104,7 @@ services:
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
                       pip3 install --upgrade pip && 
-                      pip3 install -r /code/requirements.txt --no-cache-dir &&
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --threads 1 -Q default'
     restart: on-failure
     depends_on:
@@ -113,7 +113,7 @@ services:
       - rabbitmq
 
   task_queue_builds:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -121,8 +121,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --threads 1 -Q builds'
     restart: on-failure
     depends_on:
@@ -131,7 +134,7 @@ services:
       - rabbitmq
 
   task_queue_errata:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -139,8 +142,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q errata'
     restart: on-failure
     depends_on:
@@ -149,7 +155,7 @@ services:
       - rabbitmq
 
   task_queue_releases:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -157,8 +163,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases'
     restart: on-failure
     depends_on:
@@ -167,7 +176,7 @@ services:
       - rabbitmq
 
   task_queue_sign:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -175,12 +184,15 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
     restart: on-failure
 
   task_queue_product_modify:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -188,12 +200,15 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
     restart: on-failure
 
   task_queue_tests:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -201,8 +216,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q tests'
     restart: on-failure
     depends_on:
@@ -223,7 +241,7 @@ services:
       - web_server
 
   build_node:
-    image: albs-node:latest
+    image: quay.io/almalinuxorg/albs-node:latest
     privileged: true
     env_file:
       - vars.env
