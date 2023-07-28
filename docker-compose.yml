@@ -211,13 +211,9 @@ services:
       - rabbitmq
 
   frontend:
-    image: albs-frontend:latest
+    image: quay.io/almalinuxorg/albs-frontend:latest
     env_file:
       - vars.env
-    build:
-      dockerfile: Dockerfile
-      # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-frontend here instead
-      context: ../albs-frontend
     command: bash -c "npm install && npm run dev"
     volumes:
       - "../albs-frontend:/code"
@@ -244,18 +240,18 @@ services:
       - web_server
 
   sign_node:
-    image: sign-node:latest
+    image: quay.io/almalinuxorg/albs-sign-node:latest
     env_file:
       - vars.env
-    build:
-      context: ../albs-sign-node
-      dockerfile: Dockerfile
     volumes:
       # TODO: Hack for developement, put placeholder here instead
       - "../albs-sign-node/node-config:/home/alt/.config"
       - "~/.gnupg:/home/alt/.gnupg"
+      - "../albs-sign-node/almalinux_sign_node.py:/sign-node/almalinux_sign_node.py"
+      - "../albs-sign-node:/sign-node/sign_node"
+      - "../albs-sign-node/requirements.txt:/sign-node/requirements.txt"
     restart: on-failure
-    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_sign_node.py -v'"
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt --no-cache-dir && python3 almalinux_sign_node.py -v'"
 
   gitea_listener:
     image: quay.io/almalinuxorg/gitea-listener:latest
