@@ -70,6 +70,7 @@ services:
       - "8088:8000"
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt:/code/requirements.txt"
       - "./tests:/code/tests"
       - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
@@ -79,6 +80,8 @@ services:
         bash -c 'source env/bin/activate &&
                  /wait_for_it.sh db:5432 &&
                  PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
+                 pip3 install --upgrade pip &&
+                 pip3 install -r /code/requirements.txt
                  uvicorn --host 0.0.0.0 alws.app:app'
     restart: on-failure
     depends_on:
@@ -94,10 +97,14 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./tests:/code/tests"
       - "./scripts:/code/scripts"
       - "./reference_data:/code/reference_data"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r /code/requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --threads 1 -Q default'
     restart: on-failure
     depends_on:
@@ -251,26 +258,29 @@ services:
     command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_sign_node.py -v'"
 
   gitea_listener:
-    image: albs-gitea-listener:latest
+    image: quay.io/almalinuxorg/gitea-listener:latest
     env_file:
       - vars.env
-    build:
-      context: .
-      dockerfile: Dockerfile.gitea-listener
     restart: on-failure
     depends_on:
       - mosquitto
+    volumes:
+      - "./alws/scripts/albs-gitea-listener:/code"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
+      - "./alws:/code/alws"
+      - "./alws/scripts/albs-gitea-listener/requirements.txt:/code/requirements.txt"
 
   git_cacher:
-    image: albs-git-cacher:latest
+    image: quay.io/almalinuxorg/git-cacher:latest
     env_file:
       - vars.env
-    build:
-      context: .
-      dockerfile: Dockerfile.git-cacher
     restart: on-failure
     depends_on:
       - redis
+    volumes:
+      - "./alws:/code/alws"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
+      - "./requirements.txt:/code/requirements.txt"
 
   pulp:
     # image: pulp/pulp
