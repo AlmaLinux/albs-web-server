@@ -315,3 +315,13 @@ services:
     depends_on:
       - web_server
       - frontend
+
+  immudb:
+    image: codenotary/immudb:latest
+    ports:
+      - 3322:3322
+      - 9497:9497
+    volumes:
+      - "../volumes/immudb/data:/var/lib/immudb"
+      - "../volumes/immudb/config:/etc/immudb"
+      - "../volumes/immudb/logs:/var/log/immudb"

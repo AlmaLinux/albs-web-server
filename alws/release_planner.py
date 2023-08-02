@@ -8,7 +8,7 @@ import typing
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
-from cas_wrapper import CasWrapper
+from immudb_wrapper import ImmudbWrapper
 from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -71,9 +71,12 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         )
         self.codenotary_enabled = settings.codenotary_enabled
         if self.codenotary_enabled:
-            self._cas_wrapper = CasWrapper(
-                settings.cas_api_key,
-                settings.cas_signer_id,
+            self._immudb_wrapper = ImmudbWrapper(
+                username=settings.immudb_username,
+                password=settings.immudb_password,
+                database=settings.immudb_database,
+                immudb_address=settings.immudb_address,
+                public_key_file=settings.immudb_public_key_file,
             )
         self.stats = {}
 
@@ -191,9 +194,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     async def authenticate_package(self, package_checksum: str):
         is_authenticated = False
         if self.codenotary_enabled:
-            is_authenticated = self._cas_wrapper.authenticate_artifact(
-                package_checksum, use_hash=True
+            response = self._immudb_wrapper.authenticate(
+                package_checksum,
             )
+            is_authenticated = response.get('verified', False)
         return package_checksum, is_authenticated
 
     @class_measure_work_time_async("get_packages_info_pulp_api")
@@ -873,12 +877,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             r"\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)"
         )
         self._beholder_client = BeholderClient(settings.beholder_host)
-        self.codenotary_enabled = settings.codenotary_enabled
-        if self.codenotary_enabled:
-            self._cas_wrapper = CasWrapper(
-                settings.cas_api_key,
-                settings.cas_signer_id,
-            )
 
     @staticmethod
     def is_beta_build(build: models.Build):
