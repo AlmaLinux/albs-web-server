@@ -317,7 +317,7 @@ services:
       - frontend
 
   immudb:
-    image: codenotary/immudb:latest
+    image: codenotary/immudb:1.5
     ports:
       - 3322:3322
       - 9497:9497
