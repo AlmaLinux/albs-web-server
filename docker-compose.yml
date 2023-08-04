@@ -162,6 +162,32 @@ services:
       - pulp
       - rabbitmq
 
+  task_queue_sign:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
+    restart: on-failure
+
+  task_queue_product_modify:
+    image: albs-task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: bash -c 'source env/bin/activate &&
+                      dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
+    restart: on-failure
+
   task_queue_tests:
     image: albs-task-queue:latest
     env_file:
@@ -250,7 +276,9 @@ services:
       - redis
 
   pulp:
-    image: pulp/pulp
+    # image: pulp/pulp
+    # after downgrading pulp you probably should to remove pulp volumes
+    image: pulp/pulp:upgrade
     ports:
       - 8081:80
     volumes:

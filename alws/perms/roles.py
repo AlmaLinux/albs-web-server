@@ -82,6 +82,7 @@ ProductMaintainer = Role(
         actions.CreateProduct.name,
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
+        actions.ReleaseBuild.name,
         actions.ReleaseToProduct.name,
         actions.ReadSignKeyInfo.name,
     ]

@@ -2,6 +2,7 @@ import asyncio
 from contextlib import contextmanager
 
 import aioredis
+from sqlalchemy.orm import Session
 
 from alws import database
 from alws.config import settings
@@ -42,7 +43,7 @@ async def get_db() -> database.Session:
 
 
 @contextmanager
-def get_pulp_db() -> database.Session:
+def get_pulp_db() -> Session:
     with database.PulpSession() as session:
         try:
             yield session

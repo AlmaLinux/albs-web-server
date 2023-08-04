@@ -6,32 +6,26 @@ import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
-from pydantic import BaseModel, AnyHttpUrl, validator, conlist
+from pydantic import AnyHttpUrl, BaseModel, conlist, validator
 
+from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskRefType
-from alws import models
+from alws.errors import EmptyBuildError
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.gitea import (
-    download_modules_yaml, GiteaClient
-)
+from alws.utils.gitea import GiteaClient, download_modules_yaml
 from alws.utils.modularity import (
     ModuleWrapper,
-    get_modified_refs_list,
     RpmArtifact,
+    get_modified_refs_list,
 )
-from alws.utils.parsing import (
-    clean_release,
-    get_clean_distr_name,
-)
-
+from alws.utils.parsing import clean_release, get_clean_distr_name
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 
 class BuildTaskRef(BaseModel):
-
     url: AnyHttpUrl
     git_ref: typing.Optional[str]
     ref_type: typing.Optional[int]
@@ -67,7 +61,7 @@ class BuildTaskRef(BaseModel):
         model_copy = self.copy(deep=True)
         model_copy.url = self.url.replace(
             self.git_repo_name,
-            self.git_repo_name + '-devel'
+            self.git_repo_name + '-devel',
         )
         return model_copy
 
@@ -76,7 +70,6 @@ class BuildTaskRef(BaseModel):
 
 
 class BuildTaskModuleRef(BaseModel):
-
     module_name: str
     module_stream: str
     module_platform_version: str
@@ -85,22 +78,30 @@ class BuildTaskModuleRef(BaseModel):
     enabled_modules: dict
     refs: typing.List[BuildTaskRef]
 
+    @validator('refs', pre=True)
+    def refs_validator(cls, refs):
+        if not refs or all((not ref['enabled'] for ref in refs)):
+            raise EmptyBuildError(
+                'refs are empty or doesn`t contain any enabled ref'
+            )
+        return refs
+
 
 class BuildCreatePlatforms(BaseModel):
-
     name: str
-    arch_list: typing.List[typing.Literal[
-        'x86_64',
-        'i686',
-        'aarch64',
-        'ppc64le',
-        's390x',
-    ]]
+    arch_list: typing.List[
+        typing.Literal[
+            'x86_64',
+            'i686',
+            'aarch64',
+            'ppc64le',
+            's390x',
+        ]
+    ]
     parallel_mode_enabled: bool
 
 
 class BuildCreate(BaseModel):
-
     platforms: conlist(BuildCreatePlatforms, min_items=1)
     tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
     linked_builds: typing.List[int] = []
@@ -111,7 +112,6 @@ class BuildCreate(BaseModel):
 
 
 class BuildPlatform(BaseModel):
-
     id: int
     type: str
     name: str
@@ -122,7 +122,6 @@ class BuildPlatform(BaseModel):
 
 
 class BuildTaskArtifact(BaseModel):
-
     id: int
     name: str
     type: str
@@ -134,7 +133,6 @@ class BuildTaskArtifact(BaseModel):
 
 
 class BuildTaskTestTask(BaseModel):
-
     id: int
     status: int
     revision: int
@@ -145,7 +143,6 @@ class BuildTaskTestTask(BaseModel):
 
 
 class BuildSignTask(BaseModel):
-
     id: int
     started_at: typing.Optional[datetime.datetime]
     finished_at: typing.Optional[datetime.datetime]
@@ -170,7 +167,6 @@ class RpmModule(BaseModel):
 
 
 class BuildTask(BaseModel):
-
     id: int
     ts: typing.Optional[datetime.datetime]
     started_at: typing.Optional[datetime.datetime]
@@ -195,7 +191,6 @@ class BuildTask(BaseModel):
 
 
 class BuildOwner(BaseModel):
-
     id: int
     username: str
     email: str
@@ -205,7 +200,6 @@ class BuildOwner(BaseModel):
 
 
 class BuildCreateResponse(BaseModel):
-
     id: int
     created_at: datetime.datetime
     mock_options: typing.Optional[typing.Dict[str, typing.Any]]
@@ -215,7 +209,6 @@ class BuildCreateResponse(BaseModel):
 
 
 class PlatformFlavour(BaseModel):
-
     id: int
     name: str
 
@@ -224,7 +217,6 @@ class PlatformFlavour(BaseModel):
 
 
 class Product(BaseModel):
-
     id: int
     name: str
 
@@ -233,7 +225,6 @@ class Product(BaseModel):
 
 
 class Build(BaseModel):
-
     id: int
     created_at: datetime.datetime
     finished_at: typing.Optional[datetime.datetime]
@@ -256,14 +247,12 @@ class Build(BaseModel):
 
 
 class BuildsResponse(BaseModel):
-
     builds: typing.List[Build]
     total_builds: typing.Optional[int]
     current_page: typing.Optional[int]
 
 
 class ModulePreviewRequest(BaseModel):
-
     ref: BuildTaskRef
     platform_name: str
     platform_arches: typing.List[str] = []
@@ -271,7 +260,6 @@ class ModulePreviewRequest(BaseModel):
 
 
 class ModuleRef(BaseModel):
-
     url: str
     git_ref: str
     exist: bool
@@ -282,7 +270,6 @@ class ModuleRef(BaseModel):
 
 
 class ModulePreview(BaseModel):
-
     refs: typing.List[ModuleRef]
     modules_yaml: str
     module_name: str
@@ -298,6 +285,8 @@ async def get_module_data_from_beholder(
     devel: bool = False,
 ) -> dict:
     result = {}
+    if not settings.package_beholder_enabled:
+        return result
     try:
         beholder_response = await beholder_client.get(endpoint)
     except Exception:
@@ -328,8 +317,9 @@ def compare_module_data(
         if beholder_artifact is None:
             continue
         srpm = beholder_artifact['sourcerpm']
-        beholder_tag_name = (f"{srpm['name']}-{srpm['version']}-"
-                             f"{srpm['release']}")
+        beholder_tag_name = (
+            f"{srpm['name']}-{srpm['version']}-" f"{srpm['release']}"
+        )
         beholder_tag_name = clean_release(beholder_tag_name)
         if beholder_tag_name != tag_name:
             continue
@@ -352,6 +342,8 @@ async def _get_module_ref(
     ref_prefix = platform_prefix_list['non_modified']
     if component_name in modified_list:
         ref_prefix = platform_prefix_list['modified']
+    # gitea doesn't support + in repo names
+    gitea_component_name = re.sub(r"\+", "-", component_name)
     git_ref = f'{ref_prefix}-stream-{module.stream}'
     exist = True
     commit_id = ''
@@ -361,32 +353,36 @@ async def _get_module_ref(
     clean_tag_name = ''
     try:
         response = await gitea_client.get_branch(
-            f'rpms/{component_name}', git_ref
+            f'rpms/{gitea_component_name}', git_ref
         )
         commit_id = response['commit']['id']
     except aiohttp.client_exceptions.ClientResponseError as e:
         if e.status == 404:
             exist = False
     if commit_id:
-        tags = await gitea_client.list_tags(f'rpms/{component_name}')
-        raw_tag_name = next((
-            tag['name'] for tag in tags
-            if tag['id'] == commit_id
-        ), None)
+        tags = await gitea_client.list_tags(f'rpms/{gitea_component_name}')
+        raw_tag_name = next(
+            (tag['name'] for tag in tags if tag['id'] == commit_id),
+            None,
+        )
         if raw_tag_name is not None:
             # we need only last part from tag to comparison
             # imports/c8-stream-rhel8/golang-1.16.7-1.module+el8.5.0+12+1aae3f
             tag_name = raw_tag_name.split('/')[-1]
             clean_tag_name = clean_release(tag_name)
             pkgs_to_add = compare_module_data(
-                component_name, beholder_data, clean_tag_name)
+                component_name,
+                beholder_data,
+                clean_tag_name,
+            )
             enabled = not pkgs_to_add
     for pkg_dict in pkgs_to_add:
         if pkg_dict['devel']:
             continue
         module.add_rpm_artifact(pkg_dict)
         added_packages.append(
-            RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
+            RpmArtifact.from_pulp_model(pkg_dict).as_artifact()
+        )
     module.set_component_ref(component_name, commit_id)
     if devel_module:
         devel_module.set_component_ref(component_name, commit_id)
@@ -395,9 +391,10 @@ async def _get_module_ref(
                 continue
             devel_module.add_rpm_artifact(pkg_dict, devel=True)
             added_packages.append(
-                RpmArtifact.from_pulp_model(pkg_dict).as_artifact())
+                RpmArtifact.from_pulp_model(pkg_dict).as_artifact()
+            )
     return ModuleRef(
-        url=f'{platform_packages_git}{component_name}.git',
+        url=f'{platform_packages_git}{gitea_component_name}.git',
         git_ref=git_ref,
         exist=exist,
         added_artifacts=added_packages,
@@ -405,7 +402,7 @@ async def _get_module_ref(
         mock_options={
             'definitions': dict(module.iter_mock_definitions()),
         },
-        ref_type=BuildTaskRefType.GIT_BRANCH
+        ref_type=BuildTaskRefType.GIT_BRANCH,
     )
 
 
@@ -414,10 +411,14 @@ async def get_module_refs(
     platform: models.Platform,
     flavors: typing.List[models.PlatformFlavour],
     platform_arches: typing.List[str] = None,
-) -> typing.Tuple[typing.List[ModuleRef], typing.List[str]]:
+) -> typing.Tuple[
+    typing.List[ModuleRef],
+    typing.List[str],
+    typing.Dict[str, typing.Any],
+]:
     gitea_client = GiteaClient(
         settings.gitea_host,
-        logging.getLogger(__name__)
+        logging.getLogger(__name__),
     )
 
     beholder_client = BeholderClient(
@@ -430,21 +431,19 @@ async def get_module_refs(
         platform.modularity['modified_packages_url']
     )
     template = await download_modules_yaml(
-        task.url,
-        task.git_ref,
-        BuildTaskRefType.to_text(task.ref_type)
+        task.url, task.git_ref, BuildTaskRefType.to_text(task.ref_type)
     )
     devel_module = None
     module = ModuleWrapper.from_template(
         template,
         name=task.git_repo_name,
-        stream=task.module_stream_from_ref()
+        stream=task.module_stream_from_ref(),
     )
     if not module.is_devel:
         devel_module = ModuleWrapper.from_template(
             template,
             name=f'{task.git_repo_name}-devel',
-            stream=task.module_stream_from_ref()
+            stream=task.module_stream_from_ref(),
         )
 
     has_beta_flafor = False
@@ -465,22 +464,34 @@ async def get_module_refs(
                 continue
             # if module is devel and devel_module is None
             # we shouldn't mark module as devel, because it will broke logic
-            # for partialy updating modules
+            # for partially updating modules
             module_is_devel = _module.is_devel and devel_module is not None
             endpoint = (
                 f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
                 f'/module/{_module.name}/{_module.stream}/{request_arch}/'
             )
-            checking_tasks.append(get_module_data_from_beholder(
-                beholder_client, endpoint, arch, devel=module_is_devel))
+            checking_tasks.append(
+                get_module_data_from_beholder(
+                    beholder_client,
+                    endpoint,
+                    arch,
+                    devel=module_is_devel,
+                )
+            )
 
             if has_beta_flafor:
                 endpoint = (
                     f'/api/v1/distros/{clean_dist_name}-beta/{distr_ver}'
                     f'/module/{_module.name}/{_module.stream}/{request_arch}/'
                 )
-                checking_tasks.append(get_module_data_from_beholder(
-                    beholder_client, endpoint, arch, devel=module_is_devel))
+                checking_tasks.append(
+                    get_module_data_from_beholder(
+                        beholder_client,
+                        endpoint,
+                        arch,
+                        devel=module_is_devel,
+                    )
+                )
     beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
@@ -490,17 +501,19 @@ async def get_module_refs(
     platform_packages_git = platform.modularity['packages_git']
     component_tasks = []
     for component_name, _ in module.iter_components():
-        component_tasks.append(_get_module_ref(
-            component_name=component_name,
-            modified_list=modified_list,
-            platform_prefix_list=platform_prefix_list,
-            module=module,
-            gitea_client=gitea_client,
-            devel_module=devel_module,
-            platform_packages_git=platform_packages_git,
-            beholder_data=beholder_results,
-        ))
-    result = await asyncio.gather(*component_tasks)
+        component_tasks.append(
+            _get_module_ref(
+                component_name=component_name,
+                modified_list=modified_list,
+                platform_prefix_list=platform_prefix_list,
+                module=module,
+                gitea_client=gitea_client,
+                devel_module=devel_module,
+                platform_packages_git=platform_packages_git,
+                beholder_data=beholder_results,
+            )
+        )
+    result = list(await asyncio.gather(*component_tasks))
     enabled_modules = module.get_all_build_deps()
     modules = [module.render()]
     if devel_module:

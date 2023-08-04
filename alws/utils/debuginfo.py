@@ -3,6 +3,7 @@ import re
 
 __all__ = [
     'clean_debug_name',
+    'is_debuginfo',
     'is_debuginfo_rpm',
 ]
 
@@ -10,6 +11,9 @@ __all__ = [
 def is_debuginfo_rpm(name: str) -> bool:
     regex = re.compile(r'-debug(info|source)(-|$)')
     return bool(regex.search(name))
+
+
+is_debuginfo = is_debuginfo_rpm
 
 
 def clean_debug_name(name: str) -> str:

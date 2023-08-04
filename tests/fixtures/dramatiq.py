@@ -11,7 +11,7 @@ from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate
 from alws.utils.modularity import IndexWrapper
-from tests.fixtures.pulp import get_artifact_href
+from tests.test_utils.pulp_utils import get_artifact_href
 from alws.utils.parsing import parse_rpm_nevra
 
 
@@ -81,7 +81,7 @@ async def build_done(
     regular_build: Build,
     start_build,
     create_entity,
-    get_rpm_package_info,
+    get_rpm_packages_info,
 ):
     build = await get_builds(db=session, build_id=regular_build.id)
     await session.close()
@@ -119,7 +119,7 @@ async def build_virt_done(
     create_log_repo,
     modify_repository,
     create_entity,
-    get_rpm_package_info,
+    get_rpm_packages_info,
     get_repo_modules_yaml,
     get_repo_modules
 ):
@@ -163,7 +163,41 @@ async def build_virt_done(
                     beholder_artifacts=beholder_artifacts,
                     task_arch=build_task.arch,
                 )
+            ]
+        }
+        await safe_build_done(session, BuildDone(**payload))
+    #yield await get_builds(session, build_id=virt_build.id)
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def modular_build_done(
+    session: AsyncSession,
+    modular_build: Build,
+    start_modular_build,
+    create_entity,
+    get_rpm_packages_info,
+    get_repo_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        payload = {
+            "task_id": build_task.id,
+            "status": "done",
+            "stats": {},
+            "artifacts": [
+                {
+                    "name": name,
+                    "type": "rpm",
+                    "href": get_artifact_href(),
+                    "sha256": hashlib.sha256().hexdigest(),
+                }
+                for name in (
+                    "go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.src.rpm",
+                    f"go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.{build_task.arch}.rpm",
+                )
             ],
         }
         await safe_build_done(session, BuildDone(**payload))
-    yield await get_builds(session, build_id=virt_build.id)

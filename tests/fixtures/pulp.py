@@ -1,56 +1,24 @@
 import asyncio
 import hashlib
+import re
 import uuid
 
 import pytest
 
 from alws.config import settings
-from alws.schemas.build_node_schema import BuildDoneArtifact
-from alws.utils.parsing import parse_rpm_nevra
+from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
-
-
-def get_repo_href() -> str:
-    return f"/pulp/api/v3/repositories/rpm/rpm/{uuid.uuid4()}/"
-
-
-def get_latest_repo_version(repo_href: str) -> str:
-    return f"{repo_href}versions/1/"
-
-
-def get_module_href() -> str:
-    return f"/pulp/api/v3/content/rpm/modulemds/{uuid.uuid4()}/"
-
-
-def get_module_defaults_href() -> str:
-    return f"/pulp/api/v3/content/rpm/modulemd_defaults/{uuid.uuid4()}/"
-
-
-def get_artifact_href() -> str:
-    return f"/pulp/api/v3/artifacts/{uuid.uuid4()}/"
-
-
-def get_file_href() -> str:
-    return f"/pulp/api/v3/content/file/files/{uuid.uuid4()}/"
-
-
-def get_rpm_pkg_href() -> str:
-    return f"/pulp/api/v3/content/rpm/packages/{uuid.uuid4()}/"
-
-
-def get_rpm_pkg_info(artifact: BuildDoneArtifact):
-    nevra = parse_rpm_nevra(artifact.name)
-    rpm_sourcerpm = f"{nevra.name}-{nevra.version}-{nevra.release}.src.rpm"
-    pkg_info = {
-        "pulp_href": artifact.href,
-        "name": nevra.name,
-        "epoch": nevra.epoch,
-        "version": nevra.version,
-        "release": nevra.release,
-        "arch": nevra.arch,
-        "rpm_sourcerpm": rpm_sourcerpm,
-    }
-    return pkg_info
+from tests.test_utils.pulp_utils import (
+    get_artifact_href,
+    get_distros_href,
+    get_file_href,
+    get_latest_repo_version,
+    get_module_defaults_href,
+    get_module_href,
+    get_modules_href,
+    get_repo_href,
+    get_rpm_pkg_href,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -206,15 +174,6 @@ def create_module(monkeypatch):
 
 
 @pytest.fixture
-def get_repo_modules_yaml(monkeypatch):
-    async def func(*args, **kwargs):
-        with open('/code/modules.yaml', 'r') as file:
-            return file.read()
-
-    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
-
-
-@pytest.fixture
 def get_repo_modules(monkeypatch):
     async def func(*args, **kwargs):
         return None
@@ -324,6 +283,49 @@ def create_log_repo(monkeypatch):
 
 
 @pytest.fixture
+def get_repo_modules_yaml(
+    monkeypatch,
+    modular_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        modules_yaml = modular_build_payload["tasks"][0]["modules_yaml"]
+        _, repo_url = args
+        repo_arch = re.search(
+            r"-(?P<arch>\w+)-\d+-br/$",
+            repo_url,
+        )
+        if not repo_arch:
+            return modules_yaml
+        repo_arch = repo_arch.groupdict()["arch"]
+        _index = IndexWrapper.from_template(modules_yaml)
+        for _module in _index.iter_modules():
+            _module.arch = repo_arch
+        return _index.render()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_modules_yaml(monkeypatch):
+    async def func(*args, **kwargs):
+        with open('/code/modules.yaml', 'r') as file:
+            return file.read()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_modules(
+    monkeypatch,
+    modular_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        return get_modules_href()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules", func)
+
+
+@pytest.fixture
 def create_entity(monkeypatch):
     async def func(*args, **kwargs):
         _, artifact = args
@@ -333,3 +335,33 @@ def create_entity(monkeypatch):
         return href, hashlib.sha256().hexdigest(), artifact
 
     monkeypatch.setattr(PulpClient, "create_entity", func)
+
+
+@pytest.fixture
+def list_updateinfo_records(monkeypatch, pulp_updateinfos):
+    async def func(*args, **kwargs):
+        return pulp_updateinfos
+
+    monkeypatch.setattr(PulpClient, "list_updateinfo_records", func)
+
+
+@pytest.fixture
+def get_rpm_distros(monkeypatch):
+    async def func(*args, **kwargs):
+        return [
+            {
+                "pulp_href": get_distros_href()
+            }
+        ]
+
+    monkeypatch.setattr(PulpClient, "get_rpm_distros", func)
+
+
+@pytest.fixture
+def delete_by_href(monkeypatch):
+    async def func(*args, **kwargs):
+        return {
+            "pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"
+        }
+
+    monkeypatch.setattr(PulpClient, "delete_by_href", func)

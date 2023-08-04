@@ -1,17 +1,17 @@
+import collections
+import datetime
+import hashlib
+import json
 import logging
 import re
-import json
 import typing
-import hashlib
-import datetime
-import collections
-import requests
 import urllib.parse
 
 import aiohttp
+import gi
+import requests
 import yaml
 from pydantic import BaseModel
-import gi
 
 gi.require_version("Modulemd", "2.0")
 from gi.repository import Modulemd
@@ -49,25 +49,27 @@ def get_modules_yaml_from_repo(repo_name: str):
     try:
         response.raise_for_status()
     except Exception as exc:
-        raise(exc)
+        raise (exc)
     template_href = next(
         (
             line.strip()
             for line in response.text.splitlines()
             if line and "modules" in line
         ),
-        None
+        None,
     )
     if not template_href:
         return
-    template_href = re.search(r'href="(.+-modules.yaml)"', template_href).group(1)
+    template_href = re.search(
+        r'href="(.+-modules.yaml)"',
+        template_href,
+    ).group(1)
     response = requests.get(urllib.parse.urljoin(repo_url, template_href))
     response.raise_for_status()
     return response.text
 
 
 class RpmArtifact(BaseModel):
-
     name: str
     version: str
     release: str
@@ -135,22 +137,40 @@ class ModuleWrapper:
     def __init__(self, stream):
         self._stream = stream
 
+    @property
+    def raw_stream(self):
+        return self._stream
+
     @classmethod
     def from_template(cls, template: str, name=None, stream=None):
         if all([name, stream]):
-            md_stream = Modulemd.ModuleStreamV2.read_string(
-                template, True, name, stream
+            md_stream = Modulemd.read_packager_string(
+                template,
+                name,
+                stream,
             )
         else:
-            md_stream = Modulemd.ModuleStreamV2.read_string(template, True)
+            md_stream = Modulemd.read_packager_string(template)
         if not md_stream:
             raise ValueError("can not parse modules.yaml template")
+        if isinstance(md_stream, Modulemd.PackagerV3):
+            index = md_stream.convert_to_index()
+            if len(index.get_module_names()) > 1:
+                raise ValueError("Module template contains more than 1 module")
+            for module_name in index.get_module_names():
+                module = index.get_module(module_name)
+                streams = module.get_all_streams()
+                if len(streams) > 1:
+                    raise ValueError("Module contains more than 1 stream")
+                return ModuleWrapper(streams[0])
+
         return ModuleWrapper(md_stream)
 
     @staticmethod
     def generate_new_version(platform_prefix: str) -> int:
         return int(
-            platform_prefix + datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            platform_prefix
+            + datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
         )
 
     def generate_new_context(self) -> str:
@@ -164,7 +184,9 @@ class ModuleWrapper:
             return module, ""
         module_dep = module.split(":")
         if len(module_dep) != 2:
-            logging.error("Incorrect build-time dependency definition: %s", module)
+            logging.error(
+                "Incorrect build-time dependency definition: %s", module
+            )
             return
         module_name, module_stream = module_dep
         return module_name, module_stream
@@ -193,7 +215,9 @@ class ModuleWrapper:
                     if stream:
                         new_deps.add_buildtime_stream(name, stream)
                     else:
-                        new_deps.set_empty_buildtime_dependencies_for_module(name)
+                        new_deps.set_empty_buildtime_dependencies_for_module(
+                            name
+                        )
 
         for module in old_buildtime:
             if module == "platform":
@@ -202,12 +226,14 @@ class ModuleWrapper:
 
         # Override runtime modules
         if new_runtime_modules:
-            for name, stream  in new_runtime_modules:
+            for name, stream in new_runtime_modules:
                 if name in old_runtime:
                     if stream:
                         new_deps.add_runtime_stream(name, stream)
                     else:
-                        new_deps.set_empty_runtime_dependencies_for_module(name)
+                        new_deps.set_empty_runtime_dependencies_for_module(
+                            name
+                        )
 
         for module in old_runtime:
             if module == "platform":
@@ -246,7 +272,9 @@ class ModuleWrapper:
             for name in deps.get_runtime_modules():
                 streams = deps.get_runtime_streams(name)
                 requires[name] = requires.get(name, set()).union(streams)
-        return {name: sorted(list(streams)) for name, streams in requires.items()}
+        return {
+            name: sorted(list(streams)) for name, streams in requires.items()
+        }
 
     def calc_build_context(self):
         build_deps = self.get_build_deps()
@@ -256,19 +284,24 @@ class ModuleWrapper:
 
     def cacl_runtime_context(self):
         runtime_deps = self.get_runtime_deps()
-        requires = {dep: sorted(list(streams)) for dep, streams in runtime_deps.items()}
+        requires = {
+            dep: sorted(list(streams)) for dep, streams in runtime_deps.items()
+        }
         js = json.dumps(collections.OrderedDict(sorted(requires.items())))
         return hashlib.sha1(js.encode("utf-8")).hexdigest()
 
     def set_arch_list(self, arch_list: typing.List[str]):
         for component_name in self._stream.get_rpm_component_names():
             component = self._stream.get_rpm_component(component_name)
-            component.reset_arches()
+            component.clear_arches()
             for arch in arch_list:
                 component.add_restricted_arch(arch)
 
     def add_rpm_artifact(
-        self, rpm_pkg: dict, devel: bool = False, multilib: bool = False
+        self,
+        rpm_pkg: dict,
+        devel: bool = False,
+        multilib: bool = False,
     ) -> bool:
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
         module_is_devel = self.is_devel
@@ -373,8 +406,10 @@ class ModuleWrapper:
 
     @property
     def nsvca(self) -> str:
-        return (f'{self.name}:{self.stream}:{self.version}:'
-                f'{self.context}:{self.arch}')
+        return (
+            f"{self.name}:{self.stream}:{self.version}:"
+            f"{self.context}:{self.arch}"
+        )
 
     def render(self) -> str:
         index = IndexWrapper()
@@ -428,11 +463,16 @@ class IndexWrapper:
     def from_template(template: str):
         index = Modulemd.ModuleIndex.new()
         ret, error = index.update_from_string(template, strict=True)
-        if not ret:
+        if ret:
+            return IndexWrapper(index)
+        # This may be a PackagerV3 thing, so try to read it differently
+        packager_v3 = Modulemd.read_packager_string(template)
+        if not packager_v3:
             raise ValueError(
                 f"Can not parse modules.yaml template, "
                 f"error: {error[0].get_gerror()}"
             )
+        index = packager_v3.convert_to_index()
         return IndexWrapper(index)
 
     def get_module(self, name: str, stream: str) -> ModuleWrapper:
@@ -445,7 +485,7 @@ class IndexWrapper:
         raise ModuleNotFoundError(f"Index doesn't contain {name}:{stream}")
 
     def add_module(self, module: ModuleWrapper):
-        self._index.add_module_stream(module._stream)
+        self._index.add_module_stream(module.raw_stream)
 
     def has_devel_module(self):
         for module_name in self._index.get_module_names():

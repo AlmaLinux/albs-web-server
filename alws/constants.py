@@ -2,15 +2,14 @@ import enum
 import re
 import typing
 from collections import namedtuple
-
 from dataclasses import dataclass
-
 
 __all__ = [
     "DEFAULT_PRODUCT",
     "DEFAULT_TEAM",
     "DRAMATIQ_TASK_TIMEOUT",
     "DEFAULT_FILE_CHUNK_SIZE",
+    "LOWEST_PRIORITY",
     "REQUEST_TIMEOUT",
     "SYSTEM_USER_NAME",
     "UPLOAD_FILE_CHUNK_SIZE",
@@ -28,6 +27,7 @@ __all__ = [
     "SignStatus",
     "TestTaskStatus",
     "debuginfo_regex",
+    "BeholderMatchMethod",
 ]
 
 
@@ -38,6 +38,8 @@ UPLOAD_FILE_CHUNK_SIZE = 52428800  # 50 MB
 SYSTEM_USER_NAME = "base_user"
 DEFAULT_PRODUCT = "AlmaLinux"
 DEFAULT_TEAM = "almalinux"
+# Release constants
+LOWEST_PRIORITY = 10
 
 
 class Permissions(enum.IntFlag):
@@ -51,6 +53,25 @@ class PermissionTriad:
     owner: Permissions
     group: Permissions
     other: Permissions
+
+
+class ReleasePackageTrustness(enum.IntEnum):
+    """
+    Enum representing the trustworthiness of a release package.
+    The trustworthiness is shown in different colors
+    on the web UI. The values correspond to:
+
+    UNKNOWN (0): The trustworthiness of the package is unknown,
+    represented in grey on the UI.
+    MAXIMUM (1): The package has maximum trustworthiness,
+    represented in green on the UI.
+    MEDIUM (2): The package has medium trustworthiness,
+    represented in yellow on the UI.
+    LOWEST (3): The package has the lowest trustworthiness,
+    represented in red on the UI.
+    """
+
+    UNKNOWN, MAXIMUM, MEDIUM, LOWEST = range(4)
 
 
 class BuildTaskStatus(enum.IntEnum):
@@ -72,6 +93,8 @@ class BuildTaskStatus(enum.IntEnum):
             status = cls.FAILED
         elif text == "excluded":
             status = cls.EXCLUDED
+        elif text == "cancelled":
+            status = cls.CANCELLED
         return status
 
 
@@ -154,6 +177,31 @@ class SignStatusEnum(enum.IntEnum):
     WRONG_SIGNATURE = 4
 
 
+class BeholderMatchMethod(enum.Enum):
+    EXACT = "exact"
+    CLOSEST = "closest"
+    NAME_VERSION = "name_version"
+    NAME_ONLY = "name_only"
+
+    @classmethod
+    def all(cls):
+        return [member.value for member in cls]
+
+    @classmethod
+    def green(cls):
+        # as Andrew mentioned exact = green in the Web user interface
+        return [cls.EXACT.value]
+
+    @classmethod
+    def yellow(cls):
+        # as Andrew mentioned closest\name_version\name_only = yellow in the Web user interface
+        return [
+            cls.CLOSEST.value,
+            cls.NAME_VERSION.value,
+            cls.NAME_ONLY.value
+        ]
+
+
 build_ref_str_mapping: typing.Dict[str, int] = {
     "git_branch": BuildTaskRefType.GIT_BRANCH,
     "git_tag": BuildTaskRefType.GIT_TAG,
@@ -168,6 +216,11 @@ build_ref_int_mapping: typing.Dict[int, str] = {
 debuginfo_regex = re.compile(r"debug(info|source)")
 
 RepoType = namedtuple("RepoType", ("name", "arch", "debug"))
+BeholderKey = namedtuple(
+    "BeholderKey",
+    ("name", "version", "arch", "is_beta", "is_devel"),
+)
 PackageNevra = namedtuple(
-    "PackageNevra", ("name", "epoch", "version", "release", "arch")
+    "PackageNevra",
+    ("name", "epoch", "version", "release", "arch"),
 )

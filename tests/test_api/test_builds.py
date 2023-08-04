@@ -2,6 +2,7 @@ import pytest
 
 from alws.constants import BuildTaskStatus
 from alws.models import Build
+from tests.constants import CUSTOM_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -42,3 +43,43 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         ]
         message = "Build doesn't contain cancelled tasks"
         assert cancelled_tasks, message
+
+    async def test_create_modular_build(
+        self,
+        modular_build_payload,
+    ):
+        response = await self.make_request(
+            "post",
+            "/api/v1/builds/",
+            json=modular_build_payload,
+        )
+        message = f"Cannot create modular build:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
+
+    async def test_create_modular_build_with_wrong_payload(
+        self,
+        nonvalid_modular_build_payload,
+    ):
+        response = await self.make_request(
+            "post",
+            "/api/v1/builds/",
+            json=nonvalid_modular_build_payload,
+        )
+        assert response.status_code == self.status_codes.HTTP_400_BAD_REQUEST
+
+    async def test_build_create_without_permissions(
+        self,
+        modular_build_payload,
+    ):
+        old_token = self.headers.pop("Authorization", None)
+        token = BaseAsyncTestCase.generate_jwt_token(str(CUSTOM_USER_ID))
+        response = await self.make_request(
+            "post",
+            "/api/v1/builds/",
+            json=modular_build_payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        assert response.status_code == self.status_codes.HTTP_403_FORBIDDEN
+        self.headers["Authorization"] = old_token

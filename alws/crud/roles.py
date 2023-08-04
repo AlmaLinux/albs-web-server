@@ -23,16 +23,18 @@ async def fix_roles_actions(db: Session, commit: bool = False):
     roles = (await db.execute(select(models.UserRole).options(
         selectinload(models.UserRole.actions)))).scalars().all()
 
+    roles_list = [{'name': r.name, 'actions': set(r.actions)}
+                  for r in RolesList]
     new_roles = []
 
     for role in roles:
         r_actions = None
-        for act_role in RolesList:
-            if role.name.endswith(act_role.name):
-                r_actions = set(act_role.actions)
+        for act_role in roles_list:
+            if role.name.endswith(act_role['name']):
+                r_actions = set(act_role['actions'])
                 break
-    if not r_actions:
-        raise ValueError(f'No actions found for the role {role.name}')
+        if not r_actions:
+            raise ValueError(f'No actions found for the role {role.name}')
 
         required_actions_mapping = {a.name: a for a in actions
                                     if a.name in r_actions}

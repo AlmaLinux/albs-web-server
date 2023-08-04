@@ -1,10 +1,9 @@
 import asyncio
 import logging
-import pprint
 import typing
-from collections import defaultdict
 
 from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
@@ -12,21 +11,16 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
+from alws.crud.teams import create_team, create_team_roles, get_teams
 from alws.crud.user import get_user
-from alws.crud.teams import (
-    create_team,
-    create_team_roles,
-    get_teams,
-)
-from alws.database import Session
 from alws.dramatiq import perform_product_modification
-from alws.errors import ProductError, PermissionDenied
+from alws.errors import DataNotFoundError, PermissionDenied, ProductError
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import create_product_repo
+from alws.utils.pulp_client import PulpClient
 
 __all__ = [
     'create_product',
@@ -40,12 +34,14 @@ logger = logging.getLogger(__name__)
 
 
 async def create_product(
-    db: Session,
+    db: AsyncSession,
     payload: ProductCreate,
 ) -> models.Product:
-
-    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                             settings.pulp_password)
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
     items_to_insert = []
     repo_tasks = []
 
@@ -61,8 +57,9 @@ async def create_product(
     existing_team = await get_teams(db, name=team_name)
     if existing_team:
         raise ProductError(
-            f"Product's team name intersects with the existing team, "
-            f"which may lead to permissions issues")
+            "Product's team name intersects with the existing team, "
+            "which may lead to permissions issues"
+        )
 
     team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
     team_roles = await create_team_roles(db, team_name)
@@ -72,26 +69,46 @@ async def create_product(
     product_payload['team_id'] = team.id
 
     product = models.Product(**product_payload)
-    product.platforms = (await db.execute(
-        select(models.Platform).where(
-            models.Platform.name.in_([
-                platform.name
-                for platform in payload.platforms
-            ]),
-        ),
-    )).scalars().all()
+    product.platforms = (
+        (
+            await db.execute(
+                select(models.Platform).where(
+                    models.Platform.name.in_(
+                        [platform.name for platform in payload.platforms]
+                    ),
+                ),
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     for platform in product.platforms:
         platform_name = platform.name.lower()
-        repo_tasks.extend((
-            create_product_repo(pulp_client, product.name, owner.username,
-                                platform_name, arch, is_debug)
-            for arch in platform.arch_list
-            for is_debug in (True, False)
-        ))
-        repo_tasks.append(create_product_repo(
-            pulp_client, product.name, owner.username,
-            platform_name, 'src', False))
+        repo_tasks.extend(
+            (
+                create_product_repo(
+                    pulp_client,
+                    product.name,
+                    owner.username,
+                    platform_name,
+                    arch,
+                    is_debug,
+                )
+                for arch in platform.arch_list
+                for is_debug in (True, False)
+            )
+        )
+        repo_tasks.append(
+            create_product_repo(
+                pulp_client,
+                product.name,
+                owner.username,
+                platform_name,
+                'src',
+                False,
+            )
+        )
     task_results = await asyncio.gather(*repo_tasks)
 
     for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
@@ -118,7 +135,7 @@ async def create_product(
 
 
 async def get_products(
-    db: Session,
+    db: AsyncSession,
     search_string: str = None,
     page_number: int = None,
     product_id: int = None,
@@ -126,34 +143,46 @@ async def get_products(
 ) -> typing.Union[
     typing.List[models.Product],
     models.Product,
+    typing.Dict[str, typing.Any],
+    None,
 ]:
-
     def generate_query(count=False):
-        query = select(models.Product).order_by(
-            models.Product.id.desc(),
-        ).options(
-            selectinload(models.Product.builds),
-            selectinload(models.Product.owner),
-            selectinload(models.Product.platforms),
-            selectinload(models.Product.repositories),
-            selectinload(models.Product.roles).selectinload(
-                models.UserRole.actions),
-            selectinload(models.Product.team).selectinload(
-                models.Team.owner),
-            selectinload(models.Product.team).selectinload(
-                models.Team.roles).selectinload(models.UserRole.actions),
-            selectinload(models.Product.team).selectinload(
-                models.Team.members),
-            selectinload(models.Product.team).selectinload(
-                models.Team.products),
+        query = (
+            select(models.Product)
+            .order_by(
+                models.Product.id.desc(),
+            )
+            .options(
+                selectinload(models.Product.builds),
+                selectinload(models.Product.owner),
+                selectinload(models.Product.platforms),
+                selectinload(models.Product.repositories),
+                selectinload(models.Product.roles).selectinload(
+                    models.UserRole.actions
+                ),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.owner
+                ),
+                selectinload(models.Product.team)
+                .selectinload(models.Team.roles)
+                .selectinload(models.UserRole.actions),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.members
+                ),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.products
+                ),
+            )
         )
         if count:
             query = select(func.count(models.Product.id))
         if search_string:
-            query = query.filter(or_(
-                models.Product.name.like(f'%{search_string}%'),
-                models.Product.title.like(f'%{search_string}%'),
-            ))
+            query = query.filter(
+                or_(
+                    models.Product.name.like(f'%{search_string}%'),
+                    models.Product.title.like(f'%{search_string}%'),
+                )
+            )
         if page_number and not count:
             query = query.slice(10 * page_number - 10, 10 * page_number)
         return query
@@ -167,20 +196,21 @@ async def get_products(
             'current_page': page_number,
         }
     if product_id or product_name:
-        query = generate_query().where(or_(
-            models.Product.id == product_id,
-            models.Product.name == product_name,
-        ))
+        query = generate_query().where(
+            or_(
+                models.Product.id == product_id,
+                models.Product.name == product_name,
+            )
+        )
         return (await db.execute(query)).scalars().first()
     return (await db.execute(generate_query())).scalars().all()
 
 
 async def remove_product(
-    db: Session,
+    db: AsyncSession,
     product_id: int,
     user_id: int,
 ):
-
     db_product = await get_products(db, product_id=product_id)
     db_user = await get_user(db, user_id=user_id)
     if not can_perform(db_product, db_user, actions.DeleteProduct.name):
@@ -188,9 +218,36 @@ async def remove_product(
             f"User has no permissions to delete the product {db_product.name}"
         )
     if not db_product:
-        raise Exception(f"Product={product_id} doesn't exist")
-    pulp_client = PulpClient(settings.pulp_host, settings.pulp_user,
-                             settings.pulp_password)
+        raise DataNotFoundError(f"Product={product_id} doesn't exist")
+    active_builds_by_team_id = (
+        (
+            await db.execute(
+                select(models.Build.id)
+                .join(models.BuildTask)
+                .where(
+                    models.Build.team_id == db_product.team_id,
+                    models.BuildTask.status.in_(
+                        [
+                            BuildTaskStatus.IDLE,
+                            BuildTaskStatus.STARTED,
+                        ]
+                    ),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if active_builds_by_team_id:
+        raise ProductError(
+            f'Cannot remove product, please wait until the following '
+            f'builds are finished: {str(active_builds_by_team_id)}'
+        )
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
     delete_tasks = []
     all_product_distros = await pulp_client.get_rpm_distros(
         include_fields=["pulp_href"],
@@ -208,18 +265,17 @@ async def remove_product(
 
 
 async def modify_product(
-    db: Session,
+    db: AsyncSession,
     build_id: int,
     product: str,
     user_id: int,
     modification: str,
 ):
-
     async with db.begin():
         db_product = await get_products(db, product_name=product)
         db_user = await get_user(db, user_id=user_id)
         if not db_user:
-            raise
+            raise DataNotFoundError(f"User={user_id} doesn't exist")
         if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
             raise PermissionDenied(
                 f'User has no permissions '
@@ -227,9 +283,11 @@ async def modify_product(
             )
 
         db_build = await db.execute(
-            select(models.Build).where(
-                models.Build.id.__eq__(build_id),
-            ).options(
+            select(models.Build)
+            .where(
+                models.Build.id == build_id,
+            )
+            .options(
                 selectinload(models.Build.repos),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.rpm_module
@@ -243,14 +301,18 @@ async def modify_product(
 
         if modification == 'add':
             if db_build in db_product.builds:
-                error_msg = f"Can't add build {build_id} to {product} " \
-                            f"as it's already part of the product"
+                error_msg = (
+                    f"Can't add build {build_id} to {product} "
+                    f"as it's already part of the product"
+                )
                 raise ProductError(error_msg)
         if modification == 'remove':
             if db_build not in db_product.builds:
-                error_msg = f"Can't remove build {build_id} " \
-                            f"from {product} as it's not part " \
-                            f"of the product"
+                error_msg = (
+                    f"Can't remove build {build_id} "
+                    f"from {product} as it's not part "
+                    f"of the product"
+                )
                 raise ProductError(error_msg)
 
     perform_product_modification.send(db_build.id, db_product.id, modification)

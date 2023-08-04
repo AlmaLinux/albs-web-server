@@ -4,17 +4,17 @@ import re
 from typing import Dict, List
 
 import sqlalchemy
-from sqlalchemy.sql import func
 from fastapi_users.db import (
-    SQLAlchemyBaseUserTable,
     SQLAlchemyBaseOAuthAccountTable,
+    SQLAlchemyBaseUserTable,
 )
 from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
 )
-from sqlalchemy.orm import relationship, declared_attr, declarative_mixin
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.orm import declarative_mixin, declared_attr, relationship
+from sqlalchemy.sql import func
 
 from alws.constants import (
     ErrataPackageStatus,
@@ -27,55 +27,61 @@ from alws.constants import (
 )
 from alws.database import Base, engine
 
-
 __all__ = [
-    'Build',
-    'BuildTask',
-    'Platform',
-    'SignKey',
-    'SignTask',
-    'User',
-    'UserAccessToken',
-    'UserAction',
-    'UserOauthAccount',
-    'UserRole',
-    'Team',
+    "Build",
+    "BuildTask",
+    "Platform",
+    "SignKey",
+    "SignTask",
+    "User",
+    "UserAccessToken",
+    "UserAction",
+    "UserOauthAccount",
+    "UserRole",
+    "Team",
 ]
 
 
 @declarative_mixin
 class TeamMixin:
-
     @declared_attr
     def team_id(cls):
         # FIXME: Change nullable to False after owner population
         return sqlalchemy.Column(
-            sqlalchemy.Integer, sqlalchemy.ForeignKey(
-                'teams.id', name=f'{cls.__tablename__}_team_id_fkey'),
-            nullable=True)
+            sqlalchemy.Integer,
+            sqlalchemy.ForeignKey(
+                "teams.id",
+                name=f"{cls.__tablename__}_team_id_fkey",
+            ),
+            nullable=True,
+        )
 
     @declared_attr
     def team(cls):
-        return relationship('Team')
+        return relationship("Team")
 
 
 @declarative_mixin
 class PermissionsMixin:
-
     @declared_attr
     def owner_id(cls):
         # FIXME: Change nullable to False after owner population
         return sqlalchemy.Column(
-            sqlalchemy.Integer, sqlalchemy.ForeignKey(
-                'users.id', name=f'{cls.__tablename__}_owner_id_fkey'),
-            nullable=True)
+            sqlalchemy.Integer,
+            sqlalchemy.ForeignKey(
+                "users.id",
+                name=f"{cls.__tablename__}_owner_id_fkey",
+            ),
+            nullable=True,
+        )
 
     @declared_attr
     def owner(cls):
-        return relationship('User')
+        return relationship("User")
 
-    permissions = sqlalchemy.Column(sqlalchemy.Integer, nullable=False,
-                                    default=764)
+    permissions = sqlalchemy.Column(
+        sqlalchemy.Integer, nullable=False, default=764
+    )
 
     @property
     def permissions_triad(self):
@@ -94,21 +100,21 @@ class PermissionsMixin:
     def validate_permissions(permissions: int):
         if len(str(permissions)) != 3:
             raise ValueError(
-                'Incorrect permissions set, should be a string of 3 digits')
+                "Incorrect permissions set, should be a string of 3 digits"
+            )
         test = permissions
         while test > 0:
             # We check that each digit in permissions
             # isn't greater than 7 (octal numbers).
             # This way we ensure our permissions will be correct.
             if test % 10 > 7:
-                raise ValueError('Incorrect permissions representation')
+                raise ValueError("Incorrect permissions representation")
             test //= 10
         return permissions
 
 
 @declarative_mixin
 class TimeMixin:
-
     @declared_attr
     def started_at(cls):
         return sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
@@ -119,97 +125,100 @@ class TimeMixin:
 
 
 PlatformRepo = sqlalchemy.Table(
-    'platform_repository',
+    "platform_repository",
     Base.metadata,
     sqlalchemy.Column(
-        'platform_id',
+        "platform_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'repository_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
-)
-
-FlavourRepo = sqlalchemy.Table(
-    'platform_flavour_repository',
-    Base.metadata,
-    sqlalchemy.Column(
-        'flavour_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platform_flavours.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'repository_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
-)
-
-BuildPlatformFlavour = sqlalchemy.Table(
-    'build_platform_flavour',
-    Base.metadata,
-    sqlalchemy.Column(
-        'flavour_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platform_flavours.id'),
-        primary_key=True
-    ),
-    sqlalchemy.Column(
-        'build_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
-    )
-)
-
-ReferencePlatforms = sqlalchemy.Table(
-    'reference_platforms',
-    Base.metadata,
-    sqlalchemy.Column(
-        'platform_id',
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
+        sqlalchemy.ForeignKey("platforms.id"),
         primary_key=True,
     ),
     sqlalchemy.Column(
-        'refefence_platform_id',
+        "repository_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
+        sqlalchemy.ForeignKey("repositories.id"),
+        primary_key=True,
+    ),
+)
+
+FlavourRepo = sqlalchemy.Table(
+    "platform_flavour_repository",
+    Base.metadata,
+    sqlalchemy.Column(
+        "flavour_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platform_flavours.id"),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "repository_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("repositories.id"),
+        primary_key=True,
+    ),
+)
+
+BuildPlatformFlavour = sqlalchemy.Table(
+    "build_platform_flavour",
+    Base.metadata,
+    sqlalchemy.Column(
+        "flavour_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platform_flavours.id"),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "build_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("builds.id"),
+        primary_key=True,
+    ),
+)
+
+ReferencePlatforms = sqlalchemy.Table(
+    "reference_platforms",
+    Base.metadata,
+    sqlalchemy.Column(
+        "platform_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platforms.id"),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "refefence_platform_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platforms.id"),
         primary_key=True,
     ),
 )
 
 
 PlatformRoleMapping = sqlalchemy.Table(
-    'platform_role_mapping',
+    "platform_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'platform_id',
+        "platform_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'platforms.id', name='platform_role_mapping_platform_id_fkey'),
-        primary_key=True
+            "platforms.id",
+            name="platform_role_mapping_platform_id_fkey",
+        ),
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id', name='platform_role_mapping_user_id_fkey'),
-        primary_key=True
-    )
+            "user_roles.id",
+            name="platform_role_mapping_user_id_fkey",
+        ),
+        primary_key=True,
+    ),
 )
 
 
 class Platform(PermissionsMixin, Base):
-
-    __tablename__ = 'platforms'
+    __tablename__ = "platforms"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
@@ -221,10 +230,7 @@ class Platform(PermissionsMixin, Base):
     modularity = sqlalchemy.Column(JSONB, nullable=True)
     test_dist_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     name = sqlalchemy.Column(
-        sqlalchemy.Text,
-        nullable=False,
-        unique=True,
-        index=True
+        sqlalchemy.Text, nullable=False, unique=True, index=True
     )
     priority = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
     arch_list = sqlalchemy.Column(JSONB, nullable=False)
@@ -232,33 +238,36 @@ class Platform(PermissionsMixin, Base):
     weak_arch_list = sqlalchemy.Column(JSONB, nullable=True)
     data = sqlalchemy.Column(JSONB, nullable=False)
     is_reference = sqlalchemy.Column(
-        sqlalchemy.Boolean, default=False, nullable=True)
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
     reference_platforms = relationship(
-        'Platform',
+        "Platform",
         secondary=ReferencePlatforms,
         primaryjoin=(ReferencePlatforms.c.platform_id == id),
         secondaryjoin=(ReferencePlatforms.c.refefence_platform_id == id),
     )
-    repos = relationship('Repository', secondary=PlatformRepo)
-    sign_keys = relationship('SignKey', back_populates='platform')
-    roles = relationship(
-        'UserRole', secondary=PlatformRoleMapping
-    )
+    repos = relationship("Repository", secondary=PlatformRepo)
+    sign_keys = relationship("SignKey", back_populates="platform")
+    roles = relationship("UserRole", secondary=PlatformRoleMapping)
 
 
 class CustomRepoRepr(Base):
     __abstract__ = True
 
     def __repr__(self):
-        return f'{self.__class__.__name__}: {self.name} {self.arch} {self.url}'
+        return f"{self.__class__.__name__}: {self.name} {self.arch} {self.url}"
 
 
 class Repository(CustomRepoRepr, PermissionsMixin):
-
-    __tablename__ = 'repositories'
+    __tablename__ = "repositories"
     __table_args__ = (
         sqlalchemy.UniqueConstraint(
-            'name', 'arch', 'type', 'debug', name='repos_uix'),
+            "name",
+            "arch",
+            "type",
+            "debug",
+            name="repos_uix",
+        ),
     )
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -268,27 +277,35 @@ class Repository(CustomRepoRepr, PermissionsMixin):
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     debug = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     mock_enabled = sqlalchemy.Column(
-        sqlalchemy.Boolean, default=True, nullable=True,
+        sqlalchemy.Boolean,
+        default=True,
+        nullable=True,
     )
-    production = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
-                                   nullable=True)
+    production = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
     pulp_href = sqlalchemy.Column(sqlalchemy.Text)
     export_path = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    priority = sqlalchemy.Column(sqlalchemy.Integer, default=10,
-                                 nullable=False)
+    priority = sqlalchemy.Column(
+        sqlalchemy.Integer, default=10, nullable=False
+    )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        nullable=True
+        sqlalchemy.ForeignKey("platforms.id"),
+        nullable=True,
     )
-    platform = relationship('Platform')
+    platform = relationship("Platform")
 
 
 class RepositoryRemote(CustomRepoRepr):
-    __tablename__ = 'repository_remotes'
+    __tablename__ = "repository_remotes"
     __tableargs__ = [
-        sqlalchemy.UniqueConstraint('name', 'arch', 'url',
-                                    name='repo_remote_uix')
+        sqlalchemy.UniqueConstraint(
+            "name",
+            "arch",
+            "url",
+            name="repo_remote_uix",
+        ),
     ]
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
@@ -299,44 +316,43 @@ class RepositoryRemote(CustomRepoRepr):
 
 
 BuildRepo = sqlalchemy.Table(
-    'build_repo',
+    "build_repo",
     Base.metadata,
     sqlalchemy.Column(
-        'build_id',
+        "build_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey("builds.id"),
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'repository_id',
+        "repository_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        primary_key=True
-    )
+        sqlalchemy.ForeignKey("repositories.id"),
+        primary_key=True,
+    ),
 )
 
 
 BuildDependency = sqlalchemy.Table(
-    'build_dependency',
+    "build_dependency",
     Base.metadata,
     sqlalchemy.Column(
-        'build_id',
+        "build_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey("builds.id"),
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'build_dependency',
+        "build_dependency",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        primary_key=True
-    )
+        sqlalchemy.ForeignKey("builds.id"),
+        primary_key=True,
+    ),
 )
 
 
 class Build(PermissionsMixin, TeamMixin, Base):
-
-    __tablename__ = 'builds'
+    __tablename__ = "builds"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     created_at = sqlalchemy.Column(
@@ -345,123 +361,142 @@ class Build(PermissionsMixin, TeamMixin, Base):
         default=func.current_timestamp(),
     )
     finished_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    tasks = relationship('BuildTask', back_populates='build')
-    sign_tasks = relationship('SignTask', back_populates='build',
-                              order_by='SignTask.id')
-    repos = relationship('Repository', secondary=BuildRepo)
+    tasks = relationship("BuildTask", back_populates="build")
+    sign_tasks = relationship(
+        "SignTask",
+        back_populates="build",
+        order_by="SignTask.id",
+    )
+    repos = relationship("Repository", secondary=BuildRepo)
     linked_builds = relationship(
-        'Build',
+        "Build",
         secondary=BuildDependency,
         primaryjoin=(BuildDependency.c.build_id == id),
-        secondaryjoin=(BuildDependency.c.build_dependency == id)
+        secondaryjoin=(BuildDependency.c.build_dependency == id),
     )
     mock_options = sqlalchemy.Column(JSONB)
     release_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_releases.id',
-                              name='build_releases_id_fkey'),
-        nullable=True
+        sqlalchemy.ForeignKey(
+            "build_releases.id",
+            name="build_releases_id_fkey",
+        ),
+        nullable=True,
     )
-    release = relationship('Release')
-    source_rpms = relationship('SourceRpm', back_populates='build')
-    binary_rpms = relationship('BinaryRpm', back_populates='build')
+    release = relationship("Release")
+    source_rpms = relationship("SourceRpm", back_populates="build")
+    binary_rpms = relationship("BinaryRpm", back_populates="build")
     platform_flavors = relationship(
-        'PlatformFlavour', secondary=BuildPlatformFlavour
+        "PlatformFlavour",
+        secondary=BuildPlatformFlavour,
     )
     products = relationship(
-        'Product',
-        secondary='product_packages',
-        back_populates='builds',
-        cascade='all, delete',
+        "Product",
+        secondary="product_packages",
+        back_populates="builds",
+        cascade="all, delete",
         passive_deletes=True,
     )
     released = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
-    signed = sqlalchemy.Column(sqlalchemy.Boolean, default=False,
-                               nullable=True)
+    signed = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
 
 
 BuildTaskDependency = sqlalchemy.Table(
-    'build_task_dependency',
+    "build_task_dependency",
     Base.metadata,
     sqlalchemy.Column(
-        'build_task_id',
+        "build_task_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'build_task_dependency',
+        "build_task_dependency",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id'),
-        primary_key=True
-    )
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        primary_key=True,
+    ),
 )
 
 
 class BuildTask(TimeMixin, Base):
-
-    __tablename__ = 'build_tasks'
+    __tablename__ = "build_tasks"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+    ts = sqlalchemy.Column(
+        sqlalchemy.DateTime,
+        nullable=True,
+        index=True,
+    )
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
+        sqlalchemy.ForeignKey("builds.id"),
         # saw https://stackoverflow.com/questions/
         # 5033547/sqlalchemy-cascade-delete
-        nullable=False
+        nullable=False,
+        index=True,
     )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("platforms.id"),
+        nullable=False,
     )
     ref_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_task_refs.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("build_task_refs.id"),
+        nullable=False,
+        index=True,
     )
     rpm_module_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('rpm_module.id'),
-        nullable=True
+        sqlalchemy.ForeignKey("rpm_module.id"),
+        nullable=True,
     )
-    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    status = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        nullable=False,
+        index=True,
+    )
     index = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    arch = sqlalchemy.Column(sqlalchemy.VARCHAR(length=50), nullable=False)
+    arch = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(length=50),
+        nullable=False,
+        index=True,
+    )
     is_secure_boot = sqlalchemy.Column(
-        sqlalchemy.Boolean, default=False, nullable=True)
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
     mock_options = sqlalchemy.Column(JSONB)
-    ref = relationship('BuildTaskRef')
+    ref = relationship("BuildTaskRef")
     alma_commit_cas_hash = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     is_cas_authenticated = sqlalchemy.Column(
-        sqlalchemy.Boolean, default=False, nullable=True)
-    artifacts = relationship('BuildTaskArtifact', back_populates='build_task')
-    platform = relationship('Platform')
-    build = relationship('Build', back_populates='tasks')
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
+    artifacts = relationship("BuildTaskArtifact", back_populates="build_task")
+    platform = relationship("Platform")
+    build = relationship("Build", back_populates="tasks")
     dependencies = relationship(
-        'BuildTask',
+        "BuildTask",
         secondary=BuildTaskDependency,
         primaryjoin=(BuildTaskDependency.c.build_task_id == id),
-        secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id)
+        secondaryjoin=(BuildTaskDependency.c.build_task_dependency == id),
     )
     test_tasks = relationship(
-        'TestTask',
-        back_populates='build_task',
-        order_by='TestTask.revision'
+        "TestTask", back_populates="build_task", order_by="TestTask.revision"
     )
-    rpm_module = relationship('RpmModule')
-    performance_stats: 'PerformanceStats' = relationship(
-        'PerformanceStats',
-        back_populates='build_task',
+    rpm_module = relationship("RpmModule")
+    performance_stats: "PerformanceStats" = relationship(
+        "PerformanceStats",
+        back_populates="build_task",
     )
     built_srpm_url = sqlalchemy.Column(sqlalchemy.VARCHAR, nullable=True)
     error = sqlalchemy.Column(sqlalchemy.Text, nullable=True, default=None)
 
 
 class BuildTaskRef(Base):
-
-    __tablename__ = 'build_task_refs'
+    __tablename__ = "build_task_refs"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     url = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
@@ -471,8 +506,7 @@ class BuildTaskRef(Base):
 
 
 class RpmModule(Base):
-
-    __tablename__ = 'rpm_module'
+    __tablename__ = "rpm_module"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
@@ -485,41 +519,44 @@ class RpmModule(Base):
 
     @property
     def nvsca(self):
-        return (f'{self.name}-{self.version}-{self.stream}'
-                f'-{self.context}-{self.arch}')
+        return (
+            f"{self.name}-{self.version}-{self.stream}"
+            f"-{self.context}-{self.arch}"
+        )
 
 
 class BuildTaskArtifact(Base):
-
-    __tablename__ = 'build_artifacts'
+    __tablename__ = "build_artifacts"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        nullable=False,
+        index=True,
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     type = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    build_task = relationship('BuildTask', back_populates='artifacts')
+    build_task = relationship("BuildTask", back_populates="artifacts")
     cas_hash = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     sign_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id',
-                              name='build_artifacts_sign_key_id_fkey'),
-        nullable=True)
-    sign_key = relationship('SignKey',
-                            back_populates='build_task_artifacts')
+        sqlalchemy.ForeignKey(
+            "sign_keys.id",
+            name="build_artifacts_sign_key_id_fkey",
+        ),
+        nullable=True,
+    )
+    sign_key = relationship("SignKey", back_populates="build_task_artifacts")
 
     def name_as_dict(self) -> dict:
         result = re.search(
-            r'^(?P<name>[\w+-.]+)-'
-            r'((?P<epoch>\d+):)?'
-            r'(?P<version>\d+?[\w.]*)-'
-            r'(?P<release>\d+?[\w.+]*?)'
-            r'\.(?P<arch>[\w]*)(\.rpm)?$',
-            self.name
+            r"^(?P<name>[\w+-.]+)-"
+            r"(?P<version>\d+?[\w.]*)-"
+            r"(?P<release>\d+?[\w.+]*?)"
+            r"\.(?P<arch>[\w]*)(\.rpm)?$",
+            self.name,
         )
         if not result:
             return {}
@@ -527,51 +564,49 @@ class BuildTaskArtifact(Base):
 
 
 class SourceRpm(Base):
-    __tablename__ = 'source_rpms'
+    __tablename__ = "source_rpms"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("builds.id"),
+        nullable=False,
+        index=True,
     )
-    build = relationship('Build', back_populates='source_rpms')
+    build = relationship("Build", back_populates="source_rpms")
     artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_artifacts.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("build_artifacts.id"),
+        nullable=False,
     )
-    artifact = relationship('BuildTaskArtifact')
-    binary_rpms = relationship('BinaryRpm', back_populates='source_rpm')
+    artifact = relationship("BuildTaskArtifact")
+    binary_rpms = relationship("BinaryRpm", back_populates="source_rpm")
 
 
 class BinaryRpm(Base):
-    __tablename__ = 'binary_rpms'
+    __tablename__ = "binary_rpms"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        nullable=False
+        sqlalchemy.Integer, sqlalchemy.ForeignKey("builds.id"), nullable=False
     )
-    build = relationship('Build', back_populates='binary_rpms')
+    build = relationship("Build", back_populates="binary_rpms")
     artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_artifacts.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("build_artifacts.id"),
+        nullable=False,
     )
-    artifact = relationship('BuildTaskArtifact')
+    artifact = relationship("BuildTaskArtifact")
     source_rpm_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('source_rpms.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("source_rpms.id"),
+        nullable=False,
     )
-    source_rpm = relationship('SourceRpm', back_populates='binary_rpms')
+    source_rpm = relationship("SourceRpm", back_populates="binary_rpms")
 
 
 class UserAction(Base):
-
-    __tablename__ = 'user_actions'
+    __tablename__ = "user_actions"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.String(100), unique=True)
@@ -579,140 +614,137 @@ class UserAction(Base):
 
 
 ActionRoleMapping = sqlalchemy.Table(
-    'action_role_mapping',
+    "action_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'action_id',
+        "action_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_actions.id',
-            ondelete='CASCADE',
-            name='fk_action_role_mapping_action_id',
+            "user_actions.id",
+            ondelete="CASCADE",
+            name="fk_action_role_mapping_action_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id',
-            ondelete='CASCADE',
-            name='fk_action_role_mapping_role_id',
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_action_role_mapping_role_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 
 class UserRole(Base):
-
-    __tablename__ = 'user_roles'
+    __tablename__ = "user_roles"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.String(100), unique=True)
-    actions = relationship(
-        'UserAction', secondary=ActionRoleMapping
-    )
+    actions = relationship("UserAction", secondary=ActionRoleMapping)
 
     def __repr__(self):
-        return f'{self.__class__.__name__}: {self.id} {self.name}'
+        return f"{self.__class__.__name__}: {self.id} {self.name}"
 
 
 UserRoleMapping = sqlalchemy.Table(
-    'user_role_mapping',
+    "user_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'user_id',
+        "user_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'users.id',
-            ondelete='CASCADE',
-            name='fk_user_role_mapping_user_id',
+            "users.id",
+            ondelete="CASCADE",
+            name="fk_user_role_mapping_user_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id',
-            ondelete='CASCADE',
-            name='fk_user_role_mapping_role_id',
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_user_role_mapping_role_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 ProductRoleMapping = sqlalchemy.Table(
-    'product_role_mapping',
+    "product_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'product_id',
+        "product_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'products.id',
-            ondelete='CASCADE',
-            name='fk_product_role_mapping_product_id',
+            "products.id",
+            ondelete="CASCADE",
+            name="fk_product_role_mapping_product_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id',
-            ondelete='CASCADE',
-            name='fk_product_role_mapping_role_id',
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_product_role_mapping_role_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 TeamRoleMapping = sqlalchemy.Table(
-    'team_role_mapping',
+    "team_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'team_id',
+        "team_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'teams.id',
-            ondelete='CASCADE',
-            name='fk_team_role_mapping_team_id',
+            "teams.id",
+            ondelete="CASCADE",
+            name="fk_team_role_mapping_team_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id',
-            ondelete='CASCADE',
-            name='fk_team_role_mapping_role_id',
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_team_role_mapping_role_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 TeamUserMapping = sqlalchemy.Table(
-    'team_user_mapping',
+    "team_user_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'team_id',
+        "team_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('teams.id'),
-        primary_key=True
+        sqlalchemy.ForeignKey("teams.id"),
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'user_id',
+        "user_id",
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('users.id'),
-        primary_key=True
-    )
+        sqlalchemy.ForeignKey("users.id"),
+        primary_key=True,
+    ),
 )
 
 
 class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
-    __tablename__ = 'user_oauth_accounts'
+    __tablename__ = "user_oauth_accounts"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
 
@@ -721,176 +753,171 @@ class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
         return sqlalchemy.Column(
             sqlalchemy.Integer,
             sqlalchemy.ForeignKey("users.id", ondelete="cascade"),
-            nullable=False
+            nullable=False,
         )
 
 
 class UserAccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
-    __tablename__ = 'user_access_tokens'
+    __tablename__ = "user_access_tokens"
 
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True,
-                           autoincrement=True)
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer, primary_key=True, autoincrement=True
+    )
 
     @declared_attr
     def user_id(cls):
         return sqlalchemy.Column(
             sqlalchemy.Integer,
             sqlalchemy.ForeignKey("users.id", ondelete="cascade"),
-            nullable=False
+            nullable=False,
         )
 
 
 class User(SQLAlchemyBaseUserTable[int], Base):
-
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     first_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     last_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     hashed_password: str = sqlalchemy.Column(
-        sqlalchemy.String(length=1024), nullable=True)
-    roles = relationship(
-        'UserRole', secondary=UserRoleMapping
+        sqlalchemy.String(length=1024),
+        nullable=True,
     )
+    roles = relationship("UserRole", secondary=UserRoleMapping)
     teams = relationship(
-        'Team', secondary=TeamUserMapping, back_populates='members'
+        "Team", secondary=TeamUserMapping, back_populates="members"
     )
-    oauth_accounts = relationship('UserOauthAccount', lazy='joined')
+    oauth_accounts = relationship("UserOauthAccount", lazy="joined")
 
 
 class Team(PermissionsMixin, Base):
-    __tablename__ = 'teams'
+    __tablename__ = "teams"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     members = relationship(
-        'User',
-        secondary=TeamUserMapping,
-        back_populates='teams'
+        "User", secondary=TeamUserMapping, back_populates="teams"
     )
-    products = relationship('Product', back_populates='team')
+    products = relationship("Product", back_populates="team")
     roles = relationship(
-        'UserRole',
+        "UserRole",
         secondary=TeamRoleMapping,
-        cascade='all, delete',
+        cascade="all, delete",
     )
 
 
 ProductRepositories = sqlalchemy.Table(
-    'product_repositories',
+    "product_repositories",
     Base.metadata,
     sqlalchemy.Column(
-        'product_id',
+        "product_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'products.id',
-            name='fk_product_repositories_products_id',
+            "products.id",
+            name="fk_product_repositories_products_id",
         ),
         primary_key=True,
     ),
     sqlalchemy.Column(
-        'repository_id',
+        "repository_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'repositories.id',
-            name='fk_product_repositories_repositories_id',
+            "repositories.id",
+            name="fk_product_repositories_repositories_id",
         ),
         primary_key=True,
-    )
+    ),
 )
 
 
 ProductBuilds = sqlalchemy.Table(
-    'product_packages',
+    "product_packages",
     Base.metadata,
     sqlalchemy.Column(
-        'product_id',
+        "product_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'products.id',
-            name='fk_product_packages_products_id',
+            "products.id",
+            name="fk_product_packages_products_id",
         ),
         primary_key=True,
     ),
     sqlalchemy.Column(
-        'build_id',
+        "build_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'builds.id',
-            name='fk_product_packages_builds_id',
+            "builds.id",
+            name="fk_product_packages_builds_id",
         ),
         primary_key=True,
-    )
+    ),
 )
 
 
 ProductPlatforms = sqlalchemy.Table(
-    'product_platforms',
+    "product_platforms",
     Base.metadata,
     sqlalchemy.Column(
-        'product_id',
+        "product_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'products.id',
-            name='fk_product_platforms_products_id',
+            "products.id",
+            name="fk_product_platforms_products_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'platform_id',
+        "platform_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'platforms.id',
-            name='fk_product_platforms_platforms_id',
+            "platforms.id",
+            name="fk_product_platforms_platforms_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 
 class Product(PermissionsMixin, TeamMixin, Base):
-
-    __tablename__ = 'products'
+    __tablename__ = "products"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     # FIXME: change nullable to False after population
     title = sqlalchemy.Column(sqlalchemy.String(100), nullable=True)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    team = relationship('Team', back_populates='products')
-    is_community = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False,
-                                     default=True)
-    roles = relationship(
-        'UserRole', secondary=ProductRoleMapping
+    team = relationship("Team", back_populates="products")
+    is_community = sqlalchemy.Column(
+        sqlalchemy.Boolean, nullable=False, default=True
     )
+    roles = relationship("UserRole", secondary=ProductRoleMapping)
     repositories = relationship(
-        'Repository',
+        "Repository",
         secondary=ProductRepositories,
-        cascade='all, delete',
+        cascade="all, delete",
     )
     platforms = relationship(
-        'Platform',
+        "Platform",
         secondary=ProductPlatforms,
     )
     builds = relationship(
-        'Build',
+        "Build",
         secondary=ProductBuilds,
-        back_populates='products',
+        back_populates="products",
     )
 
     @property
     def full_name(self) -> str:
-        return f'{self.owner.username}/{self.name}'
+        return f"{self.owner.username}/{self.name}"
 
     @property
     def pulp_base_distro_name(self) -> str:
-        return f'{self.owner.username}-{self.name}'
+        return f"{self.owner.username}-{self.name}"
 
 
 class TestTask(TimeMixin, Base):
-
-    __tablename__ = 'test_tasks'
+    __tablename__ = "test_tasks"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     package_name = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
@@ -899,112 +926,121 @@ class TestTask(TimeMixin, Base):
     env_arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     build_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_tasks.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        nullable=False,
+        index=True,
     )
-    build_task = relationship('BuildTask', back_populates='test_tasks')
-    status = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    build_task = relationship("BuildTask", back_populates="test_tasks")
+    status = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        nullable=False,
+        index=True,
+    )
     alts_response = sqlalchemy.Column(JSONB, nullable=True)
-    revision = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    artifacts = relationship('TestTaskArtifact', back_populates='test_task')
+    revision = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        nullable=False,
+        index=True,
+    )
+    artifacts = relationship("TestTaskArtifact", back_populates="test_task")
     repository_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id', name='test_task_repo_fk'),
-        nullable=True
+        sqlalchemy.ForeignKey("repositories.id", name="test_task_repo_fk"),
+        nullable=True,
     )
-    repository = relationship('Repository')
+    repository = relationship("Repository")
     scheduled_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    performance_stats: 'PerformanceStats' = relationship(
-        'PerformanceStats',
-        back_populates='test_task',
+    performance_stats: "PerformanceStats" = relationship(
+        "PerformanceStats",
+        back_populates="test_task",
     )
 
 
 class TestTaskArtifact(Base):
-
-    __tablename__ = 'test_task_artifacts'
+    __tablename__ = "test_task_artifacts"
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     test_task_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('test_tasks.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("test_tasks.id"),
+        nullable=False,
     )
-    test_task = relationship('TestTask', back_populates='artifacts')
+    test_task = relationship("TestTask", back_populates="artifacts")
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
 class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):
-    __tablename__ = 'build_releases'
+    __tablename__ = "build_releases"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_ids = sqlalchemy.Column(
-        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False)
+        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False
+    )
     created_at = sqlalchemy.Column(
         sqlalchemy.DateTime,
         nullable=True,
         default=func.current_timestamp(),
     )
     build_task_ids = sqlalchemy.Column(
-        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=True)
+        sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=True
+    )
     reference_platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        nullable=True
+        nullable=True,
     )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("platforms.id"),
+        nullable=False,
     )
-    platform = relationship('Platform')
+    platform = relationship("Platform")
     product_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'products.id',
-            name='build_releases_product_id_fkey'
+            "products.id",
+            name="build_releases_product_id_fkey",
         ),
         nullable=False,
     )
-    product = relationship('Product')
+    product = relationship("Product")
     plan = sqlalchemy.Column(JSONB, nullable=True)
     status = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        default=ReleaseStatus.SCHEDULED
+        sqlalchemy.Integer, default=ReleaseStatus.SCHEDULED
     )
-    performance_stats: List['PerformanceStats'] = relationship(
-        'PerformanceStats',
-        back_populates='release',
+    performance_stats: List["PerformanceStats"] = relationship(
+        "PerformanceStats",
+        back_populates="release",
     )
 
 
 SignKeyRoleMapping = sqlalchemy.Table(
-    'sign_key_role_mapping',
+    "sign_key_role_mapping",
     Base.metadata,
     sqlalchemy.Column(
-        'sign_key_id',
+        "sign_key_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'sign_keys.id',
-            ondelete='CASCADE',
-            name='fk_sign_key_role_mapping_sign_key_id',
+            "sign_keys.id",
+            ondelete="CASCADE",
+            name="fk_sign_key_role_mapping_sign_key_id",
         ),
-        primary_key=True
+        primary_key=True,
     ),
     sqlalchemy.Column(
-        'role_id',
+        "role_id",
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'user_roles.id',
-            ondelete='CASCADE',
-            name='fk_sign_key_role_mapping_role_id'
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_sign_key_role_mapping_role_id",
         ),
-        primary_key=True
-    )
+        primary_key=True,
+    ),
 )
 
 
 class SignKey(PermissionsMixin, Base):
-    __tablename__ = 'sign_keys'
+    __tablename__ = "sign_keys"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text)
@@ -1013,40 +1049,39 @@ class SignKey(PermissionsMixin, Base):
     fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True)
     public_url = sqlalchemy.Column(sqlalchemy.Text)
     inserted = sqlalchemy.Column(
-        sqlalchemy.DateTime, default=datetime.datetime.utcnow())
+        sqlalchemy.DateTime, default=datetime.datetime.utcnow()
+    )
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id',
-                              name='sign_keys_platform_id_fkey'),
-        nullable=True)
-    platform = relationship('Platform', back_populates='sign_keys')
-    build_task_artifacts = relationship('BuildTaskArtifact',
-                                        back_populates='sign_key')
-    roles = relationship(
-        'UserRole', secondary=SignKeyRoleMapping
+        sqlalchemy.ForeignKey(
+            "platforms.id",
+            name="sign_keys_platform_id_fkey",
+        ),
+        nullable=True,
     )
+    platform = relationship("Platform", back_populates="sign_keys")
+    build_task_artifacts = relationship(
+        "BuildTaskArtifact",
+        back_populates="sign_key",
+    )
+    roles = relationship("UserRole", secondary=SignKeyRoleMapping)
 
 
 class SignTask(TimeMixin, Base):
-    __tablename__ = 'sign_tasks'
+    __tablename__ = "sign_tasks"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     build_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('builds.id'),
-        nullable=False
+        sqlalchemy.Integer, sqlalchemy.ForeignKey("builds.id"), nullable=False
     )
-    build = relationship('Build')
+    build = relationship("Build")
     sign_key_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('sign_keys.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("sign_keys.id"),
+        nullable=False,
     )
-    sign_key = relationship('SignKey')
-    status = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        default=SignStatus.IDLE
-    )
+    sign_key = relationship("SignKey")
+    status = sqlalchemy.Column(sqlalchemy.Integer, default=SignStatus.IDLE)
     ts = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
     error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     log_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
@@ -1054,7 +1089,7 @@ class SignTask(TimeMixin, Base):
 
 
 class ExportTask(Base):
-    __tablename__ = 'export_tasks'
+    __tablename__ = "export_tasks"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1063,45 +1098,45 @@ class ExportTask(Base):
 
 
 class RepoExporter(Base):
-    __tablename__ = 'repo_exporters'
+    __tablename__ = "repo_exporters"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     path = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     exported_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('export_tasks.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("export_tasks.id"),
+        nullable=False,
     )
     repository_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('repositories.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("repositories.id"),
+        nullable=False,
     )
-    repository = relationship('Repository')
+    repository = relationship("Repository")
     fs_exporter_href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 
 class PlatformFlavour(PermissionsMixin, Base):
-    __tablename__ = 'platform_flavours'
+    __tablename__ = "platform_flavours"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
     modularity = sqlalchemy.Column(JSONB, nullable=True)
-    repos = relationship('Repository', secondary=FlavourRepo)
+    repos = relationship("Repository", secondary=FlavourRepo)
     data = sqlalchemy.Column(JSONB, nullable=True)
 
 
 # Errata/OVAL related tables
 class ErrataRecord(Base):
-    __tablename__ = 'errata_records'
+    __tablename__ = "errata_records"
 
     id = sqlalchemy.Column(sqlalchemy.Text, primary_key=True)
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('platforms.id'),
-        nullable=False
+        sqlalchemy.ForeignKey("platforms.id"),
+        nullable=False,
     )
-    platform = relationship('Platform')
+    platform = relationship("Platform")
     module = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     release_status = sqlalchemy.Column(
         sqlalchemy.Enum(ErrataReleaseStatus),
@@ -1141,8 +1176,8 @@ class ErrataRecord(Base):
     variables = sqlalchemy.Column(JSONB, nullable=True)
     original_variables = sqlalchemy.Column(JSONB, nullable=True)
 
-    references = relationship('ErrataReference', cascade="all, delete")
-    packages = relationship('ErrataPackage', cascade="all, delete")
+    references = relationship("ErrataReference", cascade="all, delete")
+    packages = relationship("ErrataPackage", cascade="all, delete")
 
     cves = association_proxy("references", "cve_id")
 
@@ -1160,16 +1195,16 @@ class ErrataRecord(Base):
         # Gets errata type from last part of errata id
         # For example, ALBS -> (BA) -> bugfix
         #              ALSA -> (SA) -> security
-        #              ALEA -> (EA) -> enchancement
+        #              ALEA -> (EA) -> enhancement
         return {
-            'BA': 'bugfix',
-            'SA': 'security',
-            'EA': 'enhancement',
+            "BA": "bugfix",
+            "SA": "security",
+            "EA": "enhancement",
         }[self.id[2:4]]
 
 
 class ErrataReference(Base):
-    __tablename__ = 'errata_references'
+    __tablename__ = "errata_references"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1181,26 +1216,27 @@ class ErrataReference(Base):
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey(
-            'errata_records.id',
-            name='errata_reference_errata_record_id_fk',
-            ondelete='CASCADE',
+            "errata_records.id",
+            name="errata_reference_errata_record_id_fk",
+            ondelete="CASCADE",
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
-    cve = relationship('ErrataCVE', cascade="all, delete")
+    cve = relationship("ErrataCVE", cascade="all, delete")
     cve_id = sqlalchemy.Column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey(
-            'errata_cves.id',
-            name='errata_reference_cve_id_fk',
-            ondelete='CASCADE',
+            "errata_cves.id",
+            name="errata_reference_cve_id_fk",
+            ondelete="CASCADE",
         ),
-        nullable=True
+        nullable=True,
     )
 
 
 class ErrataCVE(Base):
-    __tablename__ = 'errata_cves'
+    __tablename__ = "errata_cves"
 
     id = sqlalchemy.Column(sqlalchemy.Text, primary_key=True)
     cvss3 = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1210,17 +1246,18 @@ class ErrataCVE(Base):
 
 
 class ErrataPackage(Base):
-    __tablename__ = 'errata_packages'
+    __tablename__ = "errata_packages"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     errata_record_id = sqlalchemy.Column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey(
-            'errata_records.id',
-            name='errata_package_errata_record_id_fk',
-            ondelete='CASCADE'
+            "errata_records.id",
+            name="errata_package_errata_record_id_fk",
+            ondelete="CASCADE",
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1230,20 +1267,18 @@ class ErrataPackage(Base):
     source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
     albs_packages = relationship(
-        'ErrataToALBSPackage',
-        back_populates='errata_package',
-        cascade="all, delete"
+        "ErrataToALBSPackage",
+        back_populates="errata_package",
+        cascade="all, delete",
     )
 
 
 class ErrataToALBSPackage(Base):
-    __tablename__ = 'errata_to_albs_packages'
+    __tablename__ = "errata_to_albs_packages"
     __table_args___ = (
         sqlalchemy.CheckConstraint(
-            'albs_artifact_id IS NOT NULL '
-            'OR '
-            'pulp_href IS NOT NULL',
-            name='errata_to_albs_package_integrity_check'
+            "albs_artifact_id IS NOT NULL OR pulp_href IS NOT NULL",
+            name="errata_to_albs_package_integrity_check",
         ),
     )
 
@@ -1251,23 +1286,28 @@ class ErrataToALBSPackage(Base):
     errata_package_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            'errata_packages.id',
-            name='errata_to_albs_package_errata_package_id_fk',
-            ondelete='CASCADE',
+            "errata_packages.id",
+            name="errata_to_albs_package_errata_package_id_fk",
+            ondelete="CASCADE",
         ),
-        nullable=False
+        nullable=False,
+        index=True,
     )
-    errata_package = relationship('ErrataPackage',
-                                  back_populates='albs_packages')
+    errata_package = relationship(
+        "ErrataPackage",
+        back_populates="albs_packages",
+    )
     albs_artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('build_artifacts.id'),
-        nullable=True
+        sqlalchemy.ForeignKey("build_artifacts.id"),
+        nullable=True,
     )
-    build_artifact: BuildTaskArtifact = relationship('BuildTaskArtifact')
+    build_artifact: BuildTaskArtifact = relationship("BuildTaskArtifact")
     pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
-    status = sqlalchemy.Column(sqlalchemy.Enum(ErrataPackageStatus),
-                               nullable=False)
+    status = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataPackageStatus),
+        nullable=False,
+    )
 
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1301,8 +1341,12 @@ class PerformanceStats(Base):
     )
     build_task_id: int = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("build_tasks.id", name='perf_stats_build_task_id'),
+        sqlalchemy.ForeignKey(
+            "build_tasks.id",
+            name="perf_stats_build_task_id",
+        ),
         nullable=True,
+        index=True,
     )
     build_task: BuildTask = relationship(
         "BuildTask",
@@ -1310,8 +1354,9 @@ class PerformanceStats(Base):
     )
     test_task_id: int = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("test_tasks.id", name='perf_stats_test_task_id'),
+        sqlalchemy.ForeignKey("test_tasks.id", name="perf_stats_test_task_id"),
         nullable=True,
+        index=True,
     )
     test_task: BuildTask = relationship(
         "TestTask",
@@ -1320,8 +1365,11 @@ class PerformanceStats(Base):
     release_id: int = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
-            "build_releases.id", name='perf_stats_build_release_id'),
+            "build_releases.id",
+            name="perf_stats_build_release_id",
+        ),
         nullable=True,
+        index=True,
     )
     release: Release = relationship(
         "Release",
@@ -1329,10 +1377,61 @@ class PerformanceStats(Base):
     )
 
 
+idx_build_tasks_status_arch_ts = sqlalchemy.Index(
+    "idx_build_tasks_status_arch_ts",
+    BuildTask.status,
+    BuildTask.arch,
+    BuildTask.ts,
+)
+idx_build_tasks_build_id_index = sqlalchemy.Index(
+    "idx_build_tasks_build_id_index",
+    BuildTask.build_id,
+    BuildTask.index,
+)
+idx_build_tasks_build_id_index_status = sqlalchemy.Index(
+    "idx_build_tasks_build_id_index_status",
+    BuildTask.build_id,
+    BuildTask.index,
+    BuildTask.status,
+)
+idx_build_tasks_build_id_status = sqlalchemy.Index(
+    "idx_build_tasks_build_id_status",
+    BuildTask.build_id,
+    BuildTask.status,
+)
+idx_test_tasks_build_task_id_revision = sqlalchemy.Index(
+    "idx_test_tasks_build_task_id_revision",
+    TestTask.build_task_id,
+    TestTask.revision,
+)
+idx_build_artifacts_build_task_id_type = sqlalchemy.Index(
+    "idx_build_artifacts_build_task_id_type",
+    BuildTaskArtifact.build_task_id,
+    BuildTaskArtifact.type,
+)
+idx_build_artifacts_build_task_id_name_type = sqlalchemy.Index(
+    "idx_build_artifacts_build_task_id_name_type",
+    BuildTaskArtifact.build_task_id,
+    BuildTaskArtifact.name,
+    BuildTaskArtifact.type,
+)
+idx_errata_packages_name_version = sqlalchemy.Index(
+    "idx_errata_packages_name_version",
+    ErrataPackage.name,
+    ErrataPackage.version,
+)
+idx_errata_packages_name_version_arch = sqlalchemy.Index(
+    "idx_errata_packages_name_version_arch",
+    ErrataPackage.name,
+    ErrataPackage.version,
+    ErrataPackage.arch,
+)
+
+
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(create_tables())

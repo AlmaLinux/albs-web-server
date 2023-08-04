@@ -557,6 +557,7 @@ data:
     - supermin-devel-0:5.1.19-10.module+el8.3.0+6423+e4cb6418.x86_64
     - virt-dib-1:1.40.2-25.module+el8.3.0+7421+642fe24f.x86_64
     - virt-dib-debuginfo-1:1.40.2-25.module+el8.3.0+7421+642fe24f.x86_64
+    - virt-v2v-1:1.40.2-25.module+el8.3.0+7421+642fe24f.src
     - virt-v2v-1:1.40.2-25.module+el8.3.0+7421+642fe24f.x86_64
     - virt-v2v-debuginfo-1:1.40.2-25.module+el8.3.0+7421+642fe24f.x86_64
 ...

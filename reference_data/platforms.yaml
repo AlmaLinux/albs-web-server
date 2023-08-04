@@ -26,6 +26,9 @@
       - name: '8.7'
         version_prefix: '80700'
         dist_prefix: 'el8.7.0'
+      - name: '8.8'
+        version_prefix: '80800'
+        dist_prefix: 'el8.8.0'
   type: rpm
   arch_list:
     - i686
@@ -49,7 +52,6 @@
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
-        kernel-rpm-macros
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
@@ -62,14 +64,15 @@
         DFLTCC: '0'
       use_bootstrap_container: false
       nspawn_args:
-        - '--rlimit=RLIMIT_NOFILE=10240'
+        - '--rlimit=RLIMIT_NOFILE=20480'
+        - '--capability=cap_ipc_lock'
       secure_boot_macros:
         "%__pesign_cert": "%pe_signing_cert"
         "%__pesign_client_cert": "%pe_signing_cert"
         "%__pesign_client_token": "%pe_signing_token"
         "%__pesign_token": "-t %pe_signing_token"
-        "%pe_signing_cert": "'Cloud Linux Software, Inc'"
-        "%pe_signing_token": "'profil standardowy'"
+        "%pe_signing_cert": "'f4217b7b99a69128'"
+        "%pe_signing_token": "'AlmaLinux OS Foundation'"
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
@@ -389,6 +392,61 @@
       export_path: almalinux/8/cloud/aarch64/azure/
       production: true
       debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: src
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/Source/gcp/
+      export_path: vault/8/cloud/Source/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/cloud/aarch64/gcp/
+      export_path: almalinux/8/cloud/aarch64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/cloud/x86_64/gcp/
+      export_path: almalinux/8/cloud/x86_64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/aarch64/gcp/
+      export_path: vault/8/cloud/debug/aarch64/gcp/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-8-gcp-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/x86_64/gcp/
+      export_path: vault/8/cloud/debug/x86_64/gcp/
+      production: true
+      debug: true
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
@@ -1423,6 +1481,9 @@
       - name: '9.1'
         version_prefix: '90100'
         dist_prefix: 'el9.1.0'
+      - name: '9.2'
+        version_prefix: '90200'
+        dist_prefix: 'el9.2.0'
   type: rpm
   arch_list:
     - i686
@@ -1446,7 +1507,6 @@
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
-        kernel-rpm-macros
       dnf_common_opts:
         - --setopt=deltarpm=False
         - --allowerasing
@@ -1456,10 +1516,11 @@
       releasever: '9'
       use_bootstrap_container: false
       nspawn_args:
-        - '--rlimit=RLIMIT_NOFILE=10240'
+        - '--rlimit=RLIMIT_NOFILE=20480'
+        - '--capability=cap_ipc_lock'
       secure_boot_macros:
-        "%pe_signing_cert": "Cloud Linux Software, Inc"
-        "%pe_signing_token": "profil standardowy"
+        "%pe_signing_cert": 'f4217b7b99a69128'
+        "%pe_signing_token": 'AlmaLinux OS Foundation'
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
@@ -2751,6 +2812,61 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
       export_path: vault/9/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: src
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/Source/gcp/
+      export_path: vault/9/cloud/Source/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/cloud/aarch64/gcp/
+      export_path: almalinux/9/cloud/aarch64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/cloud/x86_64/gcp/
+      export_path: almalinux/9/cloud/x86_64/gcp/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/aarch64/gcp/
+      export_path: vault/9/cloud/debug/aarch64/gcp/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-gcp-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/x86_64/gcp/
+      export_path: vault/9/cloud/debug/x86_64/gcp/
       production: true
       debug: true
       remote_sync_policy: on_demand

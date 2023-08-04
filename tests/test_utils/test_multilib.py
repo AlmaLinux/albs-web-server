@@ -19,13 +19,12 @@ async def test_update_module_index(
         settings.beholder_host, token=settings.beholder_token
     )
 
-
     module_index_with_artifacts = IndexWrapper.from_template(
         modules_yaml_virt.decode()
     )
-    settings.package_beholder_enabled = True
+    #settings.package_beholder_enabled = True
 
-    build_task = build_virt_done.tasks[0]
+    #build_task = build_virt_done.tasks[0]
     modules_yaml = ''
     with open('/code/modules.yaml', 'r') as file:
         modules_yaml = file.read()
