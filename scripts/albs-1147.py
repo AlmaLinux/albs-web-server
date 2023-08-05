@@ -149,7 +149,7 @@ async def main(write=False):
         records = result.scalars().all()
         log.info(f'Found {len(records)} records.')
 
-        for record in records[::-1]:
+        for record in records:
             log.info(f'{record.id} - {record.title or record.original_title}')
             log_differences(record.original_title, affected_records[record.id]['title'])
             log_differences(record.original_description, affected_records[record.id]['description'])
