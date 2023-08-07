@@ -668,6 +668,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         product: typing.Optional[models.Product] = None,
     ) -> dict:
         release_plan = {"modules": {}}
+        added_packages = set()
 
         db_repos_mapping = self.get_production_repositories_mapping(
             product,
@@ -707,6 +708,8 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             ):
                 i686_pkgs_in_x86_64_repos.append(rpm_pkg.pulp_href)
         for pkg in pulp_packages:
+            if pkg["full_name"] in added_packages:
+                continue
             is_debug = is_debuginfo_rpm(pkg["full_name"])
             arch = pkg["arch"]
             if arch == "noarch":
@@ -731,6 +734,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                     "repo_arch_location": repo_arch_location,
                 }
             )
+            added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
         if pulp_rpm_modules:
