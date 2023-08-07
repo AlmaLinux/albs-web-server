@@ -29,7 +29,6 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger()
-CONTEXT_SIZE = 25
 
 
 def debrand_description_and_title(original_string: str) -> str:
@@ -120,7 +119,6 @@ async def main(write=False):
         records = result.scalars().all()
 
         log.info(f'Found {len(records)} records in Pulp\'s \'rpm_updaterecord\' table.')
-        record: UpdateRecord
         for record in records:
             log.info(f'{record.id} - {record.title}')
             debranded_title = debrand_description_and_title(record.title)
