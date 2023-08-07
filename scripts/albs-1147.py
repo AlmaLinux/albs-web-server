@@ -7,6 +7,8 @@ import logging
 import os
 import sys
 
+from contextlib import asynccontextmanager
+
 from sqlalchemy import select, or_, not_
 
 from alws.dependencies import get_pulp_db, get_db
@@ -140,7 +142,7 @@ async def main(write=False):
 
     log.info(f'{os.linesep * 2}Looking for records in almalinux\'s \'errata_records\' table...')
 
-    async with get_db() as session, session.begin():
+    async with asynccontextmanager(get_db)() as session, session.begin():
         result = await session.execute(
             select(ErrataRecord).where(
                 ErrataRecord.id.in_(list(affected_records.keys()))
