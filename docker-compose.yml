@@ -63,16 +63,14 @@ services:
       - rabbitmq
 
   web_server:
-    image: al-web-server:latest
+    image: quay.io/almalinuxorg/albs:latest
     env_file:
       - vars.env
     ports:
       - "8088:8000"
-    build:
-      dockerfile: Dockerfile
-      context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt:/code/requirements.txt"
       - "./tests:/code/tests"
       - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
@@ -82,6 +80,8 @@ services:
         bash -c 'source env/bin/activate &&
                  /wait_for_it.sh db:5432 &&
                  PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
+                 pip3 install --upgrade pip &&
+                 pip3 install -r requirements.txt
                  uvicorn --host 0.0.0.0 alws.app:app'
     restart: on-failure
     depends_on:
@@ -89,7 +89,7 @@ services:
       - pulp
 
   task_queue:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -97,10 +97,14 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./tests:/code/tests"
       - "./scripts:/code/scripts"
       - "./reference_data:/code/reference_data"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --threads 1 -Q default'
     restart: on-failure
     depends_on:
@@ -109,7 +113,7 @@ services:
       - rabbitmq
 
   task_queue_builds:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -117,8 +121,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --threads 1 -Q builds'
     restart: on-failure
     depends_on:
@@ -127,7 +134,7 @@ services:
       - rabbitmq
 
   task_queue_errata:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -135,8 +142,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q errata'
     restart: on-failure
     depends_on:
@@ -145,7 +155,7 @@ services:
       - rabbitmq
 
   task_queue_releases:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -153,8 +163,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases'
     restart: on-failure
     depends_on:
@@ -163,7 +176,7 @@ services:
       - rabbitmq
 
   task_queue_sign:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -171,12 +184,15 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
     restart: on-failure
 
   task_queue_product_modify:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -184,12 +200,15 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
     restart: on-failure
 
   task_queue_tests:
-    image: albs-task-queue:latest
+    image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
     build:
@@ -197,8 +216,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
+      - "./requirements.txt /code/requirements.txt"
     command: bash -c 'source env/bin/activate &&
                       /wait_for_it.sh rabbitmq:5672 &&
+                      pip3 install --upgrade pip && 
+                      pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q tests'
     restart: on-failure
     depends_on:
@@ -207,13 +229,9 @@ services:
       - rabbitmq
 
   frontend:
-    image: albs-frontend:latest
+    image: quay.io/almalinuxorg/albs-frontend:latest
     env_file:
       - vars.env
-    build:
-      dockerfile: Dockerfile
-      # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-frontend here instead
-      context: ../albs-frontend
     command: bash -c "npm install && npm run dev"
     volumes:
       - "../albs-frontend:/code"
@@ -223,57 +241,59 @@ services:
       - web_server
 
   build_node:
-    image: albs-node:latest
+    image: quay.io/almalinuxorg/albs-node:latest
     privileged: true
     env_file:
       - vars.env
-    build:
-      # TODO: Hack for developement, put https://github.com/AlmaLinux/albs-node here instead
-      context: ../albs-node
-      dockerfile: Dockerfile
     volumes:
       # TODO: Hack for developement, put placeholder here instead
       - "../albs-node/node-config:/home/alt/.config"
+      - "../albs-node/requirements.txt:/build-node/requirements.txt"
+      - "../albs-node/build_node:/build-node/build_node"
+      - "../albs-node/almalinux_build_node.py:/build-node/almalinux_build_node.py"
     restart: on-failure
-    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_build_node.py -v -t 2'"
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt --no-cache-dir && python3 almalinux_build_node.py -v -t 2'"
     depends_on:
       - web_server
 
   sign_node:
-    image: sign-node:latest
+    image: quay.io/almalinuxorg/albs-sign-node:latest
     env_file:
       - vars.env
-    build:
-      context: ../albs-sign-node
-      dockerfile: Dockerfile
     volumes:
       # TODO: Hack for developement, put placeholder here instead
       - "../albs-sign-node/node-config:/home/alt/.config"
       - "~/.gnupg:/home/alt/.gnupg"
+      - "../albs-sign-node/almalinux_sign_node.py:/sign-node/almalinux_sign_node.py"
+      - "../albs-sign-node:/sign-node/sign_node"
+      - "../albs-sign-node/requirements.txt:/sign-node/requirements.txt"
     restart: on-failure
-    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && ./almalinux_sign_node.py -v'"
+    command: "bash -c '/wait_for_it.sh web_server:8000 && source env/bin/activate && pip3 install --upgrade pip && pip3 install -r requirements.txt --no-cache-dir && python3 almalinux_sign_node.py -v'"
 
   gitea_listener:
-    image: albs-gitea-listener:latest
+    image: quay.io/almalinuxorg/gitea-listener:latest
     env_file:
       - vars.env
-    build:
-      context: .
-      dockerfile: Dockerfile.gitea-listener
     restart: on-failure
     depends_on:
       - mosquitto
+    volumes:
+      - "./alws/scripts/albs-gitea-listener:/code"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
+      - "./alws:/code/alws"
+      - "./alws/scripts/albs-gitea-listener/requirements.txt:/code/requirements.txt"
 
   git_cacher:
-    image: albs-git-cacher:latest
+    image: quay.io/almalinuxorg/git-cacher:latest
     env_file:
       - vars.env
-    build:
-      context: .
-      dockerfile: Dockerfile.git-cacher
     restart: on-failure
     depends_on:
       - redis
+    volumes:
+      - "./alws:/code/alws"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
+      - "./requirements.txt:/code/requirements.txt"
 
   pulp:
     # image: pulp/pulp
