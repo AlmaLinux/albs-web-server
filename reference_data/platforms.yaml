@@ -1580,6 +1580,127 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: i686
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/i686/os/
+      export_path: vault/8/synergy/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: x86_64
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/synergy/x86_64/os/
+      export_path: almalinux/8/synergy/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: aarch64
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/synergy/aarch64/os/
+      export_path: almalinux/8/synergy/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: ppc64le
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/synergy/ppc64le/os/
+      export_path: almalinux/8/synergy/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: s390x
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/8/synergy/s390x/os/
+      export_path: almalinux/8/synergy/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: src
+      name: almalinux-8-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/Source/
+      export_path: vault/8/synergy/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: i686
+      name: almalinux-8-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/i686/
+      export_path: vault/8/synergy/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: x86_64
+      name: almalinux-8-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/x86_64/
+      export_path: vault/8/synergy/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: aarch64
+      name: almalinux-8-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/aarch64/
+      export_path: vault/8/synergy/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: ppc64le
+      name: almalinux-8-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/ppc64le/
+      export_path: vault/8/synergy/debug/ppc64le/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: s390x
+      name: almalinux-8-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/s390x/
+      export_path: vault/8/synergy/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
 
 - name: AlmaLinux-9
   distr_type: rhel
@@ -3109,6 +3230,127 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/9/testing/debug/s390x/
       export_path: vault/9/testing/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: i686
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/i686/os/
+      export_path: vault/9/synergy/i686/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: x86_64
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/synergy/x86_64/os/
+      export_path: almalinux/9/synergy/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: aarch64
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/synergy/aarch64/os/
+      export_path: almalinux/9/synergy/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: ppc64le
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/synergy/ppc64le/os/
+      export_path: almalinux/9/synergy/ppc64le/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: s390x
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/synergy/s390x/os/
+      export_path: almalinux/9/synergy/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: src
+      name: almalinux-9-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/Source/
+      export_path: vault/9/synergy/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: i686
+      name: almalinux-9-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/i686/
+      export_path: vault/9/synergy/debug/i686/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: x86_64
+      name: almalinux-9-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/x86_64/
+      export_path: vault/9/synergy/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: aarch64
+      name: almalinux-9-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/aarch64/
+      export_path: vault/9/synergy/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: ppc64le
+      name: almalinux-9-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/ppc64le/
+      export_path: vault/9/synergy/debug/ppc64le/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: s390x
+      name: almalinux-9-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/s390x/
+      export_path: vault/9/synergy/debug/s390x/
       production: true
       debug: true
       remote_sync_policy: on_demand
