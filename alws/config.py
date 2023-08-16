@@ -34,8 +34,11 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
-    cas_api_key: typing.Optional[str]
-    cas_signer_id: typing.Optional[str]
+    immudb_username: typing.Optional[str]
+    immudb_password: typing.Optional[str]
+    immudb_database: typing.Optional[str]
+    immudb_address: typing.Optional[str]
+    immudb_public_key_file: typing.Optional[str]
 
     rabbitmq_default_user: str = 'test-system'
     rabbitmq_default_pass: str = 'test-system'
@@ -58,7 +61,7 @@ class Settings(BaseSettings):
 
     @property
     def codenotary_enabled(self) -> bool:
-        return bool(self.cas_api_key) and bool(self.cas_signer_id)
+        return bool(self.immudb_username) and bool(self.immudb_password)
 
     @property
     def github_callback_url(self) -> str:

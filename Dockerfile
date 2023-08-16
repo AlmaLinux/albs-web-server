@@ -1,9 +1,8 @@
 FROM fedora:34
 
-RUN curl https://packages.codenotary.org/codenotary.repo -o /etc/yum.repos.d/codenotary.repo
 RUN mkdir -p /code && \
     yum update -y && \
-    yum install --enablerepo="codenotary-repo" cas python3-virtualenv python39 libmodulemd python3-libmodulemd \
+    yum install python3-virtualenv python39 libmodulemd python3-libmodulemd \
                 python3-libmodulemd1 modulemd-tools python-gobject git -y && \
     yum clean all
 RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o wait_for_it.sh && chmod +x wait_for_it.sh
