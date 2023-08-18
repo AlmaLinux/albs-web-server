@@ -427,3 +427,41 @@
       production: false
       debug: false
       priority: 10
+
+- name: Synergy
+  repositories:
+    - name: almalinux-8-synergy
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-i686/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-8-synergy
+      arch: x86_64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-x86_64/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-8-synergy
+      arch: aarch64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-aarch64/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-8-synergy
+      arch: ppc64le
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-ppc64le/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-8-synergy
+      arch: s390x
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-s390x/
+      production: true
+      debug: false
+      priority: 10
