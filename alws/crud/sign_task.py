@@ -208,7 +208,8 @@ async def get_available_gen_key_task(
                 .where(models.GenKeyTask.id == gen_key_task.id)
                 .values(status=GenKeyStatus.IN_PROGRESS)
             )
-    await db.refresh(gen_key_task)
+    if gen_key_task:
+        await db.refresh(gen_key_task)
     return gen_key_task
 
 
