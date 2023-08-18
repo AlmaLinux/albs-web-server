@@ -1,24 +1,27 @@
-import difflib
 import argparse
-import re
 import asyncio
 import datetime
+import difflib
 import logging
 import os
 import sys
 
 from contextlib import asynccontextmanager
 
-from sqlalchemy import select, or_, not_, and_
+from sqlalchemy import select, or_, not_, distinct
 
 from alws.config import settings
 from alws.dependencies import get_pulp_db, get_db
+from alws.utils.errata import debrand_description_and_title
 from alws.utils.pulp_client import PulpClient
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws.models import ErrataRecord
-from alws.pulp_models import UpdateRecord, CoreRepository, CoreRepositoryContent, CoreContent
+from alws.pulp_models import (
+    CoreRepositoryContent,
+    UpdateRecord,
+)
 
 logging.basicConfig(
     format="%(message)s",
@@ -30,24 +33,6 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger()
-
-
-def debrand_description_and_title(original_string: str) -> str:
-    branding_patterns = (
-        (r'RHEL', 'AlmaLinux'),
-        (r'\[rhel', '[almalinux'),
-        (r'\(rhel', '(almalinux'),
-        (r'connect to rhel server', 'connect to almalinux server'),
-        (r'kvm-rhel8.3', 'kvm-almalinux8.3'),
-        ('rhel-9', 'almalinux-9'),
-        ('rhel-8', 'almalinux-8'),
-        ('rhel9.2', 'almalinux9.2'),
-        ('rhel-8.5', 'almalinux-8.5'),
-        ('rhel 8.4', 'almalinux 8.4')
-    )
-    for pattern, repl in branding_patterns:
-        original_string = re.sub(pattern, repl, original_string)
-    return original_string
 
 
 def log_differences(original: str, new: str):
@@ -101,6 +86,9 @@ async def main(write=False):
         'redhat'
     ]
     affected_records = {}
+    affected_records_content_ids = []
+    repos_to_publicate = set()
+    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
 
     with get_pulp_db() as session:
         result = session.execute(
@@ -128,19 +116,39 @@ async def main(write=False):
             log_differences(record.description, debranded_description)
             record.title = debranded_title
             record.description = debranded_description
+            record.updated_date = datetime.datetime.utcnow().strftime(
+                "%Y-%m-%d %H:%M:%S",
+            )
             affected_records[record.id] = {
                 'title': record.title,
                 'description': record.description,
                 'content_ptr_id': record.content_ptr_id
             }
-            record.updated_date = datetime.datetime.utcnow().strftime(
-                "%Y-%m-%d %H:%M:%S",
+            affected_records_content_ids.append(record.content_ptr_id)
+
+        query = (
+            select(distinct(CoreRepositoryContent.repository_id))
+            .where(
+                CoreRepositoryContent.version_removed_id.is_(None),
+                CoreRepositoryContent.content_id.in_(affected_records_content_ids)
             )
+        )
+        repos = session.execute(query).scalars().all()
+        for repo in repos:
+            repo_href = f"/pulp/api/v3/repositories/rpm/rpm/{repo}/"
+            repos_to_publicate.add(repo_href)
 
         if write:
+            session.add_all(records)
             session.commit()
+            publication_tasks = []
+            for repo_href in repos_to_publicate:
+                publication_tasks.append(pulp.create_rpm_publication(repo_href))
+            log.info("Publishing updated repos. This may take a while")
+            await asyncio.gather(*publication_tasks)
 
-    log.info(f'{os.linesep * 2}Looking for records in almalinux\'s \'errata_records\' table...')
+    log.info(f'{os.linesep * 2}Looking for records in almalinux\'s '
+             f'\'errata_records\' table...')
 
     async with asynccontextmanager(get_db)() as session, session.begin():
         result = await session.execute(
@@ -160,57 +168,8 @@ async def main(write=False):
             record.updated_date = datetime.datetime.utcnow()
 
         if write:
+            session.add_all(records)
             await session.commit()
-
-    repos_to_publicate = set()
-    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
-
-    with get_pulp_db() as pulp_db, pulp_db.begin():
-        repos = pulp_db.execute(select(CoreRepository)).scalars().all()
-        for repo in repos:
-            repo_href = f"/pulp/api/v3/repositories/rpm/rpm/{repo.pulp_id}/"
-
-            repo_subq = (
-                select(CoreRepository.pulp_id).where(
-                    CoreRepository.name == repo.name
-                )
-            )
-
-            repocontent_subq = (
-                select(CoreRepositoryContent.content_id).where(
-                    CoreRepositoryContent.repository_id.in_(repo_subq)
-                )
-            )
-
-            content_subq = (
-                select(CoreContent.pulp_id).where(
-                    CoreContent.pulp_type == 'rpm.advisory',
-                    CoreContent.pulp_id.in_(repocontent_subq)
-                )
-            )
-
-            updaterecord_subq = (
-                select(UpdateRecord).where(
-                    and_(
-                        UpdateRecord.content_ptr_id.in_(content_subq),
-                        UpdateRecord.content_ptr_id.in_(
-                            {v['content_ptr_id'] for k, v in affected_records.items()})
-                    )
-                )
-            )
-
-            records = pulp_db.execute(updaterecord_subq).scalars().all()
-
-            for record in records:
-                log.info(f"Updating {record.id} from {repo.name}")
-                if repo_href not in repos_to_publicate:
-                    repos_to_publicate.add(repo_href)
-    if write:
-        publication_tasks = []
-        for repo_href in repos_to_publicate:
-            publication_tasks.append(pulp.create_rpm_publication(repo_href))
-        log.info("Publicating updated repos. This may take a while")
-        await asyncio.gather(*publication_tasks)
 
 
 def confirm():
