@@ -13,7 +13,7 @@ from sqlalchemy import select, or_, not_, distinct
 from alws.config import settings
 from alws.dependencies import get_pulp_db, get_db
 from alws.utils.errata import debrand_description_and_title
-from alws.utils.pulp_client import PulpClient
+from alws.utils import pulp_client
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -88,7 +88,10 @@ async def main(write=False):
     affected_records = {}
     affected_records_content_ids = []
     repos_to_publicate = set()
-    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
+    pulp_client.PULP_SEMAPHORE = asyncio.Semaphore(10)
+    pulp = pulp_client.PulpClient(
+        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    )
 
     with get_pulp_db() as session:
         result = session.execute(
