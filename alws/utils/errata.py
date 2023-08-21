@@ -128,6 +128,14 @@ def debrand_description_and_title(string: str) -> str:
         (r"^RH", "AL"),
         (r"RHEL", "AlmaLinux"),
         (r"\[rhel", "[almalinux"),
+        (r'\(rhel', '(almalinux'),
+        (r'connect to rhel server', 'connect to almalinux server'),
+        (r'kvm-rhel8.3', 'kvm-almalinux8.3'),
+        ('rhel-9', 'almalinux-9'),
+        ('rhel-8', 'almalinux-8'),
+        ('rhel9.2', 'almalinux9.2'),
+        ('rhel-8.5', 'almalinux-8.5'),
+        ('rhel 8.4', 'almalinux 8.4')
     )
     for pattern, repl in regex_patterns:
         string = re.sub(pattern, repl, string)
