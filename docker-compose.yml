@@ -81,7 +81,7 @@ services:
                  /wait_for_it.sh db:5432 &&
                  PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
                  pip3 install --upgrade pip &&
-                 pip3 install -r requirements.txt
+                 pip3 install -r requirements.txt &&
                  uvicorn --host 0.0.0.0 alws.app:app'
     restart: on-failure
     depends_on:
