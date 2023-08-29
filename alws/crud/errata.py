@@ -457,7 +457,8 @@ async def load_platform_packages(
 
 
 async def update_errata_record(
-    db: AsyncSession, update_record: errata_schema.UpdateErrataRequest
+    db: AsyncSession,
+    update_record: errata_schema.UpdateErrataRequest,
 ) -> models.ErrataRecord:
     record = await get_errata_record(db, update_record.errata_record_id)
     if update_record.title is not None:
@@ -738,7 +739,10 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     return db_errata
 
 
-async def get_errata_record(db: AsyncSession, errata_record_id: str):
+async def get_errata_record(
+    db: AsyncSession,
+    errata_record_id: str,
+) -> Optional[models.ErrataRecord]:
     options = [
         selectinload(models.ErrataRecord.packages)
         .selectinload(models.ErrataPackage.albs_packages)
@@ -1291,16 +1295,6 @@ async def release_errata_record(record_id: str):
         settings.pulp_user,
         settings.pulp_password,
     )
-    async with asynccontextmanager(get_db)() as session:
-        await session.execute(
-            update(models.ErrataRecord)
-            .where(models.ErrataRecord.id == record_id)
-            .values(
-                release_status=ErrataReleaseStatus.IN_PROGRESS,
-                last_release_log=None,
-            )
-        )
-        await session.commit()
     async with asynccontextmanager(get_db)() as session:
         session: AsyncSession
         db_record = await session.execute(

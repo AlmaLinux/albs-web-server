@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws import database
 from alws.auth import get_current_user
 from alws.constants import ErrataReleaseStatus
 from alws.crud import errata as errata_crud
@@ -143,6 +142,9 @@ async def release_errata_record(
         return {"message": f"Record {record_id} doesn't exists"}
     if db_record.release_status == ErrataReleaseStatus.IN_PROGRESS:
         return {"message": f"Record {record_id} already in progress"}
+    db_record.release_status = ErrataReleaseStatus.IN_PROGRESS
+    db_record.last_release_log = None
+    await session.commit()
     release_errata.send(record_id)
     return {
         "message": f"Release updateinfo record {record_id} has been started"
