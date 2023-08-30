@@ -1,4 +1,4 @@
-aiohttp
-aioredis
-pydantic
+aiohttp==3.8.5
+aioredis==2.0.1
+pydantic==1.10.8
 sentry-sdk==1.12.1

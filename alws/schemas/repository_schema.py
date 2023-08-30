@@ -32,6 +32,7 @@ class RepositoryCreate(BaseModel):
     priority: int = 10
     production: bool = False
     mock_enabled: bool = True
+    export_path: typing.Optional[str]
     pulp_href: typing.Optional[str]
 
 

@@ -427,3 +427,97 @@
       production: false
       debug: false
       priority: 10
+
+- name: Synergy
+  repositories:
+    - name: almalinux-synergy
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-i686/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-synergy
+      arch: x86_64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-x86_64/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-synergy
+      arch: aarch64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-aarch64/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-synergy
+      arch: ppc64le
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-ppc64le/
+      production: true
+      debug: false
+      priority: 10
+    - name: almalinux-synergy
+      arch: s390x
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/prod/almalinux-$releasever-synergy-s390x/
+      production: true
+      debug: false
+      priority: 10
+    - name: epel
+      arch: x86_64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/x86_64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel-modular
+      arch: x86_64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/x86_64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel
+      arch: aarch64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel-modular
+      arch: aarch64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/aarch64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel
+      arch: ppc64le
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/ppc64le/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel-modular
+      arch: ppc64le
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/ppc64le/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel
+      arch: s390x
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/s390x/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel-modular
+      arch: s390x
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/s390x/
+      production: false
+      debug: false
+      priority: 10

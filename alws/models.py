@@ -40,6 +40,7 @@ __all__ = [
     "UserOauthAccount",
     "UserRole",
     "Team",
+    "TestRepository",
 ]
 
 
@@ -973,6 +974,45 @@ class TestTaskArtifact(Base):
     test_task = relationship("TestTask", back_populates="artifacts")
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+
+
+class PackageTestRepository(Base):
+    __tablename__ = "package_test_repository"
+    __tableargs__ = [
+        sqlalchemy.UniqueConstraint(
+            "package_name",
+            "folder_name",
+            name="package_test_repo_uix",
+        ),
+    ]
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    package_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    folder_name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    url = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    test_repository_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "test_repositories.id",
+            ondelete="CASCADE",
+            name="fk_package_test_repository_id",
+        ),
+        nullable = False,
+    )
+    test_repository = relationship("TestRepository", back_populates="packages")
+
+
+class TestRepository(Base):
+    __tablename__ = "test_repositories"
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    url = sqlalchemy.Column(sqlalchemy.Text, nullable=False, unique=True)
+    tests_dir = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    tests_prefix = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    packages: List["PackageTestRepository"] = relationship(
+        "PackageTestRepository",
+        back_populates="test_repository",
+        cascade="all, delete"
+    )
 
 
 class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):

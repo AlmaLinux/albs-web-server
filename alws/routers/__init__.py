@@ -16,5 +16,6 @@ __all__ = [
     'uploads',
     'users',
     'errata',
-    'platform_flavors'
+    'platform_flavors',
+    'test_repositories'
 ]
