@@ -15,8 +15,8 @@ __all__ = ["release_errata"]
     queue_name="errata",
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
-def release_errata(record_id: str):
-    event_loop.run_until_complete(release_errata_record(record_id))
+def release_errata(record_id: str, force: bool):
+    event_loop.run_until_complete(release_errata_record(record_id, force))
 
 
 @dramatiq.actor(

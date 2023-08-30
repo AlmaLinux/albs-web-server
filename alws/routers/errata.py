@@ -136,6 +136,7 @@ async def update_package_status(
 async def release_errata_record(
     record_id: str,
     session: AsyncSession = Depends(get_db),
+    force: bool = False,
 ):
     db_record = await errata_crud.get_errata_record(session, record_id)
     if not db_record:
@@ -145,7 +146,7 @@ async def release_errata_record(
     db_record.release_status = ErrataReleaseStatus.IN_PROGRESS
     db_record.last_release_log = None
     await session.commit()
-    release_errata.send(record_id)
+    release_errata.send(record_id, force)
     return {
         "message": f"Release updateinfo record {record_id} has been started"
     }

@@ -1120,6 +1120,7 @@ def append_update_packages_in_update_records(
 def get_albs_packages_from_record(
     record: models.ErrataRecord,
     pulp_packages: Dict[str, Any],
+    force: bool,
 ) -> DefaultDict[str, List[models.ErrataToALBSPackage]]:
     repo_mapping = collections.defaultdict(list)
     errata_packages = set()
@@ -1152,7 +1153,7 @@ def get_albs_packages_from_record(
                 pkg_names_mapping["albs"][clean_pkg_nevra] = raw_pkg_nevra
 
     missing_packages = errata_packages.difference(albs_packages)
-    if missing_packages:
+    if missing_packages and not force:
         missing_pkg_names = []
         for missing_pkg in missing_packages:
             full_name = pkg_names_mapping["raw"][missing_pkg]
@@ -1289,7 +1290,7 @@ async def get_release_logs(
     return "".join(release_log)
 
 
-async def release_errata_record(record_id: str):
+async def release_errata_record(record_id: str, force: bool):
     pulp = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -1314,7 +1315,9 @@ async def release_errata_record(record_id: str):
         )
         try:
             repo_mapping = get_albs_packages_from_record(
-                db_record, pulp_packages
+                db_record,
+                pulp_packages,
+                force,
             )
         except Exception as exc:
             db_record.release_status = ErrataReleaseStatus.FAILED
