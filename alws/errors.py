@@ -81,6 +81,10 @@ class RepositoryAddError(Exception):
     pass
 
 
+class TestRepositoryError(Exception):
+    pass
+
+
 class UploadError(Exception):
     def __init__(
         self,
