@@ -1121,10 +1121,11 @@ def get_albs_packages_from_record(
     record: models.ErrataRecord,
     pulp_packages: Dict[str, Any],
     force: bool,
-) -> DefaultDict[str, List[models.ErrataToALBSPackage]]:
+) -> Tuple[DefaultDict[str, List[models.ErrataToALBSPackage]], List[str]]:
     repo_mapping = collections.defaultdict(list)
     errata_packages = set()
     albs_packages = set()
+    missing_pkg_names = []
     pkg_names_mapping = {
         "raw": {},
         "albs": {},
@@ -1153,8 +1154,7 @@ def get_albs_packages_from_record(
                 pkg_names_mapping["albs"][clean_pkg_nevra] = raw_pkg_nevra
 
     missing_packages = errata_packages.difference(albs_packages)
-    if missing_packages and not force:
-        missing_pkg_names = []
+    if missing_packages:
         for missing_pkg in missing_packages:
             full_name = pkg_names_mapping["raw"][missing_pkg]
             full_albs_name = pkg_names_mapping["albs"].get(missing_pkg)
@@ -1165,8 +1165,9 @@ def get_albs_packages_from_record(
             "are missing from platform repositories or have wrong status: "
             + ", ".join(missing_pkg_names)
         )
-        raise ValueError(msg)
-    return repo_mapping
+        if not force:
+            raise ValueError(msg)
+    return repo_mapping, missing_pkg_names
 
 
 async def process_errata_release_for_repos(
@@ -1248,6 +1249,8 @@ async def get_release_logs(
     session: AsyncSession,
     repo_mapping: dict,
     db_record: list,
+    force_flag: bool,
+    missing_pkg_names: List[str],
 ) -> str:
     release_log = [
         f"Record {record_id} successfully released at {datetime.datetime.utcnow()}\n"
@@ -1265,9 +1268,9 @@ async def get_release_logs(
     )
     arches = set()
     pkgs = []
-    for pkg in pulp_pkgs:
-        arches.add(pulp_pkgs[pkg].arch)
-        pkgs.append(pulp_pkgs[pkg].nevra)
+    for pkg in pulp_pkgs.values():
+        arches.add(pkg.arch)
+        pkgs.append(pkg.nevra)
 
     repositories = await session.execute(
         select(models.Repository).where(
@@ -1283,6 +1286,8 @@ async def get_release_logs(
         [
             "Architecture(s): " + ", ".join(arches),
             "\nPackages:\n" + "\n".join(pkgs),
+            f"\nForce flag: {force_flag}",
+            "\nMissing packages:\n" + "\n".join(missing_pkg_names),
             "\nRepositories:\n"
             + "\n".join([repo.url for repo in repositories]),
         ]
@@ -1314,7 +1319,7 @@ async def release_errata_record(record_id: str, force: bool):
             for_release=True,
         )
         try:
-            repo_mapping = get_albs_packages_from_record(
+            repo_mapping, missing_pkg_names = get_albs_packages_from_record(
                 db_record,
                 pulp_packages,
                 force,
@@ -1340,6 +1345,8 @@ async def release_errata_record(record_id: str, force: bool):
             session=session,
             repo_mapping=repo_mapping,
             db_record=db_record,
+            force_flag=force,
+            missing_pkg_names=missing_pkg_names,
         )
         await session.commit()
     logging.info("Record %s successfully released", record_id)
