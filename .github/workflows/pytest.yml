@@ -49,10 +49,11 @@ jobs:
         with:
           pytest-coverage-path: /tmp/pytest-coverage.txt
           pytest-xml-coverage-path: /tmp/coverage.xml
-          title: Coverage report
+          title: Coverage report for changed files
           badge-title: Total coverage
           hide-badge: false
           hide-report: false
+          report-only-changed-files: true
           hide-comment: false
           remove-link-from-badge: false
           junitxml-path: /tmp/pytest.xml
