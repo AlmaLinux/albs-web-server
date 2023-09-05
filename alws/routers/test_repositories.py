@@ -68,7 +68,10 @@ async def create_repository(
     return created_repo
 
 
-@router.patch('/{repository_id}/')
+@router.patch(
+    '/{repository_id}/',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def update_test_repository(
     repository_id: int,
     payload: test_repository_schema.TestRepositoryUpdate,
@@ -104,7 +107,10 @@ async def remove_test_repository(
         )
 
 
-@router.post('/{repository_id}/packages/create/')
+@router.post(
+    '/{repository_id}/packages/create/',
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_package_mapping(
     repository_id: int,
     payload: test_repository_schema.PackageTestRepositoryCreate,
@@ -123,7 +129,10 @@ async def create_package_mapping(
         )
 
 
-@router.post('/{repository_id}/packages/bulk_create/')
+@router.post(
+    '/{repository_id}/packages/bulk_create/',
+    status_code=status.HTTP_201_CREATED,
+)
 async def bulk_create_package_mapping(
     repository_id: int,
     payload: typing.List[test_repository_schema.PackageTestRepositoryCreate],
@@ -142,19 +151,6 @@ async def bulk_create_package_mapping(
         )
 
 
-@router.post('/{repository_id}/packages/bulk_remove/')
-async def bulk_delete_package_mapping(
-    repository_id: int,
-    package_ids: typing.List[int],
-    session: AsyncSession = Depends(get_db),
-):
-    await test_repository.bulk_delete_package_mapping(
-        session=session,
-        package_ids=package_ids,
-        repository_id=repository_id,
-    )
-
-
 @router.delete(
     '/packages/{package_id}/remove/',
     status_code=status.HTTP_204_NO_CONTENT,
@@ -170,3 +166,19 @@ async def remove_package_mapping(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
+
+
+@router.post(
+    '/{repository_id}/packages/bulk_remove/',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def bulk_delete_package_mapping(
+    repository_id: int,
+    package_ids: typing.List[int],
+    session: AsyncSession = Depends(get_db),
+):
+    await test_repository.bulk_delete_package_mapping(
+        session=session,
+        package_ids=package_ids,
+        repository_id=repository_id,
+    )
