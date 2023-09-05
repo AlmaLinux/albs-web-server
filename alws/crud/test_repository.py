@@ -1,21 +1,20 @@
 import typing
 
-from sqlalchemy import or_
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.sql.expression import func
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.schemas import test_repository_schema
 from alws.errors import DataNotFoundError, TestRepositoryError
+from alws.schemas import test_repository_schema
 
 
 async def get_repositories(
-    db: AsyncSession,
-    page_number: int = None,
-    repository_id: int = None,
-    name: str = None,
+    session: AsyncSession,
+    page_number: typing.Optional[int] = None,
+    repository_id: typing.Optional[int] = None,
+    name: typing.Optional[str] = None,
 ) -> typing.Union[
     typing.List[models.TestRepository],
     typing.Dict[str, typing.Any],
@@ -37,11 +36,13 @@ async def get_repositories(
 
     if page_number:
         return {
-            "test_repositories": (await db.execute(generate_query()))
+            "test_repositories": (await session.execute(generate_query()))
             .unique()
             .scalars()
             .all(),
-            "total_test_repositories": (await db.execute(generate_query(count=True)))
+            "total_test_repositories": (
+                await session.execute(generate_query(count=True))
+            )
             .unique()
             .scalar(),
             "current_page": page_number,
@@ -51,15 +52,15 @@ async def get_repositories(
         query = generate_query().where(
             models.TestRepository.id == repository_id
         )
-        db_repo = (await db.execute(query)).unique().scalars().first()
+        db_repo = (await session.execute(query)).unique().scalars().first()
         return db_repo
-    return (await db.execute(generate_query())).unique().scalars().all()
+    return (await session.execute(generate_query())).unique().scalars().all()
 
 
 async def get_package_mapping(
-    db: AsyncSession,
-    package_id: int = None,
-    name: str = None,
+    session: AsyncSession,
+    package_id: typing.Optional[int] = None,
+    name: typing.Optional[str] = None,
 ) -> typing.Union[
     typing.List[models.PackageTestRepository],
     models.PackageTestRepository,
@@ -70,7 +71,7 @@ async def get_package_mapping(
         )
         if name:
             query = query.where(
-                models.PackageTestRepository.package_namename == name
+                models.PackageTestRepository.package_name == name
             )
         return query
 
@@ -78,27 +79,20 @@ async def get_package_mapping(
         query = generate_query().where(
             models.PackageTestRepository.id == package_id
         )
-        db_package = (await db.execute(query)).unique().scalars().first()
+        db_package = (await session.execute(query)).unique().scalars().first()
         return db_package
-    return (await db.execute(generate_query())).unique().scalars().all()
+    return (await session.execute(generate_query())).unique().scalars().all()
 
 
 async def create_package_mapping(
-    db: AsyncSession,
+    session: AsyncSession,
     payload: test_repository_schema.PackageTestRepositoryCreate,
     test_repository_id: int,
     flush: bool = False,
-):
-    test_repository = (
-        (
-            await db.execute(
-                select(models.TestRepository).where(
-                    models.TestRepository.id == test_repository_id
-                )
-            )
-        )
-        .scalars()
-        .first()
+) -> models.PackageTestRepository:
+    test_repository = await get_repositories(
+        session,
+        repository_id=test_repository_id,
     )
 
     if not test_repository:
@@ -107,33 +101,57 @@ async def create_package_mapping(
         )
 
     new_package = models.PackageTestRepository(
-        package_name=payload.package_name,
-        folder_name=payload.folder_name,
-        url=payload.url,
+        **payload.dict(),
         test_repository_id=test_repository_id,
     )
     new_package.test_repository = test_repository
-    db.add(new_package)
+    session.add(new_package)
     if flush:
-        await db.flush()
+        await session.flush()
     else:
-        await db.commit()
-    await db.refresh(new_package)
+        await session.commit()
+    await session.refresh(new_package)
     return new_package
 
 
+async def bulk_create_package_mapping(
+    session: AsyncSession,
+    payload: typing.List[test_repository_schema.PackageTestRepositoryCreate],
+    repository_id: int,
+):
+    test_repo = await get_repositories(
+        session,
+        repository_id=repository_id,
+    )
+    if not test_repo:
+        raise DataNotFoundError(f"Unknown test repository ID: {repository_id}")
+    existing_packages = [
+        (pkg.package_name, pkg.folder_name) for pkg in test_repo.packages
+    ]
+    new_packages = [
+        models.PackageTestRepository(
+            **pkg.dict(),
+            test_repository_id=repository_id,
+        )
+        for pkg in payload
+        if (pkg.package_name, pkg.folder_name) not in existing_packages
+    ]
+    session.add_all(new_packages)
+    await session.commit()
+
+
 async def create_repository(
-    db: AsyncSession,
+    session: AsyncSession,
     payload: test_repository_schema.TestRepositoryCreate,
     flush: bool = False,
-):
+) -> models.TestRepository:
     test_repository = (
         (
-            await db.execute(
+            await session.execute(
                 select(models.TestRepository).where(
                     or_(
                         models.TestRepository.name == payload.name,
-                        models.TestRepository.name == payload.url,
+                        models.TestRepository.url == payload.url,
                     )
                 )
             )
@@ -146,52 +164,62 @@ async def create_repository(
         raise TestRepositoryError("Test Repository already exists")
 
     repository = models.TestRepository(**payload.dict())
-    db.add(repository)
+    session.add(repository)
     if flush:
-        await db.flush()
+        await session.flush()
     else:
-        await db.commit()
-    await db.refresh(repository)
+        await session.commit()
+    await session.refresh(repository)
     return repository
 
 
 async def update_repository(
-    db: AsyncSession,
+    session: AsyncSession,
     repository_id: int,
     payload: test_repository_schema.TestRepositoryUpdate,
 ) -> models.TestRepository:
-    db_repo = await db.execute(
-        select(models.TestRepository).where(
-            models.TestRepository.id == repository_id
-        )
+    db_repo = await get_repositories(
+        session,
+        repository_id=repository_id,
     )
-    db_repo = db_repo.scalars().first()
     if not db_repo:
-        raise DataNotFoundError(
-            f"Unknown test repository ID: {repository_id}"
-        )
+        raise DataNotFoundError(f"Unknown test repository ID: {repository_id}")
 
     for field, value in payload.dict().items():
         setattr(db_repo, field, value)
-    db.add(db_repo)
-    await db.commit()
-    await db.refresh(db_repo)
+    session.add(db_repo)
+    await session.commit()
+    await session.refresh(db_repo)
     return db_repo
 
 
-async def delete_package_mapping(db: AsyncSession, package_id: int):
-    db_package = await get_package_mapping(db, package_id=package_id)
+async def delete_package_mapping(session: AsyncSession, package_id: int):
+    db_package = await get_package_mapping(session, package_id=package_id)
     if not db_package:
         raise DataNotFoundError(f"Package={package_id} doesn`t exist")
-    await db.delete(db_package)
-    await db.commit()
+    await session.delete(db_package)
+    await session.commit()
 
 
-async def delete_repository(db: AsyncSession, repository_id: int):
-    db_repo = await get_repositories(db, repository_id=repository_id)
+async def bulk_delete_package_mapping(
+    session: AsyncSession,
+    package_ids: typing.List[int],
+    repository_id: int,
+):
+    await session.execute(
+        delete(models.PackageTestRepository).where(
+            models.PackageTestRepository.id.in_(package_ids),
+            models.PackageTestRepository.test_repository_id == repository_id,
+        )
+    )
+    await session.commit()
+
+
+async def delete_repository(session: AsyncSession, repository_id: int):
+    db_repo = await get_repositories(session, repository_id=repository_id)
     if not db_repo:
         raise DataNotFoundError(
             f"Test repository={repository_id} doesn`t exist"
         )
-    await db.delete(db_repo)
-    await db.commit()
+    await session.delete(db_repo)
+    await session.commit()

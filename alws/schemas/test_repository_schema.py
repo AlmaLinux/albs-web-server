@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel, AnyHttpUrl
+from pydantic import AnyHttpUrl, BaseModel
 
 
 class PackageTestRepository(BaseModel):
