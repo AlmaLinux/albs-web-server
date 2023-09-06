@@ -9,8 +9,7 @@ import sentry_sdk
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings
 
 DEFAULT_REQUESTS_LIMIT = 5
-# DEFAULT_SLEEP_TIMEOUT = 600  # 10 minutes
-DEFAULT_SLEEP_TIMEOUT = 30  # 10 minutes
+DEFAULT_SLEEP_TIMEOUT = 600  # 10 minutes
 DEFAULT_ALBS_API_URL = 'http://web_server:8000'
 DEFAULT_LOGGING_LEVEL = 'DEBUG'
 
@@ -93,15 +92,15 @@ class TestsCacher:
 
     async def make_request(
         self,
-        url: str,
-        method: str = 'get',
+        method: str,
+        endpoint: str,
         headers: Optional[dict] = None,
         return_text: bool = False,
         json: Optional[Union[dict, List[int], List[dict]]] = None,
     ) -> Union[str, dict]:
-        self.logger.debug('Making new request %s', url)
+        self.logger.debug('Making new request %s', endpoint)
         async with self.requests_limit:
-            parsed_url = urllib.parse.urlsplit(url)
+            parsed_url = urllib.parse.urlsplit(endpoint)
             session = self.get_session(
                 f'{parsed_url.scheme}://{parsed_url.netloc}',
             )
@@ -120,7 +119,8 @@ class TestsCacher:
         test_repos = []
         try:
             response = await self.make_request(
-                url=urllib.parse.urljoin(
+                method='get',
+                endpoint=urllib.parse.urljoin(
                     self.albs_api_url,
                     '/api/v1/test_repositories/',
                 ),
@@ -142,7 +142,7 @@ class TestsCacher:
             return
         try:
             await self.make_request(
-                url=urllib.parse.urljoin(
+                endpoint=urllib.parse.urljoin(
                     self.albs_api_url,
                     f'/api/v1/test_repositories/{repository_id}/packages/bulk_remove/',
                 ),
@@ -162,7 +162,7 @@ class TestsCacher:
             return
         try:
             await self.make_request(
-                url=urllib.parse.urljoin(
+                endpoint=urllib.parse.urljoin(
                     self.albs_api_url,
                     f'/api/v1/test_repositories/{repository_id}/packages/bulk_create/',
                 ),
@@ -177,7 +177,8 @@ class TestsCacher:
         repo_content = ''
         try:
             repo_content = await self.make_request(
-                url,
+                method='get',
+                endpoint=url,
                 return_text=True,
             )
         except Exception:
@@ -242,7 +243,7 @@ class TestsCacher:
                 )
             self.logger.info('Repo "%s" is processed', db_repo.name)
 
-    async def run(self):
+    async def run(self, dry_run: bool = False):
         while True:
             self.logger.info('Start processing test repositories')
             try:
@@ -259,6 +260,8 @@ class TestsCacher:
                 self.sleep_timeout,
             )
             await asyncio.sleep(self.sleep_timeout)
+            if dry_run:
+                break
 
 
 async def main():
