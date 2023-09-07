@@ -25,6 +25,11 @@ from alws.utils.parsing import clean_release, get_clean_distr_name
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 
+class BuildTestConfiguration(BaseModel):
+    tests: typing.List[dict]
+    test_env: dict
+
+
 class BuildTaskRef(BaseModel):
     url: AnyHttpUrl
     git_ref: typing.Optional[str]
@@ -33,6 +38,7 @@ class BuildTaskRef(BaseModel):
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_module: typing.Optional[bool] = False
     enabled: bool = True
+    test_configuration: typing.Optional[BuildTestConfiguration] = None
     added_artifacts: typing.Optional[list] = []
     module_platform_version: typing.Optional[str] = None
     module_version: typing.Optional[str] = None
