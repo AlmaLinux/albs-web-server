@@ -193,24 +193,10 @@
       production: false
       debug: false
       priority: 10
-    - name: epel-modular
-      arch: x86_64
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/x86_64/
-      production: false
-      debug: false
-      priority: 10
     - name: epel
       arch: aarch64
       type: rpm
       url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/
-      production: false
-      debug: false
-      priority: 10
-    - name: epel-modular
-      arch: aarch64
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/aarch64/
       production: false
       debug: false
       priority: 10
@@ -221,24 +207,10 @@
       production: false
       debug: false
       priority: 10
-    - name: epel-modular
-      arch: ppc64le
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/ppc64le/
-      production: false
-      debug: false
-      priority: 10
     - name: epel
       arch: s390x
       type: rpm
       url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/s390x/
-      production: false
-      debug: false
-      priority: 10
-    - name: epel-modular
-      arch: s390x
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/s390x/
       production: false
       debug: false
       priority: 10
@@ -472,24 +444,10 @@
       production: false
       debug: false
       priority: 10
-    - name: epel-modular
-      arch: x86_64
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/x86_64/
-      production: false
-      debug: false
-      priority: 10
     - name: epel
       arch: aarch64
       type: rpm
       url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/
-      production: false
-      debug: false
-      priority: 10
-    - name: epel-modular
-      arch: aarch64
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/aarch64/
       production: false
       debug: false
       priority: 10
@@ -500,24 +458,10 @@
       production: false
       debug: false
       priority: 10
-    - name: epel-modular
-      arch: ppc64le
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/ppc64le/
-      production: false
-      debug: false
-      priority: 10
     - name: epel
       arch: s390x
       type: rpm
       url: https://download.fedoraproject.org/pub/epel/$releasever/Everything/s390x/
-      production: false
-      debug: false
-      priority: 10
-    - name: epel-modular
-      arch: s390x
-      type: rpm
-      url: https://download.fedoraproject.org/pub/epel/$releasever/Modular/s390x/
       production: false
       debug: false
       priority: 10
