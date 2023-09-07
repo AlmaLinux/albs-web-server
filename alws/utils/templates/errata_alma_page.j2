@@ -113,7 +113,7 @@
                                 <tr>
                                     <td>{{ pkg['arch'] }}</td>
                                     <td>{{ pkg['filename'] }}</td>
-                                    <td>{{ pkg['check'] }}</td>
+				    <td><span class="checksum">{{ pkg['sum'] }}</span></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
