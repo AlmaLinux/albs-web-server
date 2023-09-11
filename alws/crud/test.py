@@ -120,11 +120,12 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
     # Note that this functionality is triggered by frontend,
     # which only restarts tests for those builds that already
     # had passed the tests
-    build_task_ids = await db.execute(
-        select(models.BuildTask.id).where(
-            models.BuildTask.build_id == build_id))
-    build_task_ids = build_task_ids.scalars().all()
-    test_log_repository = await __get_log_repository(db, build_id)
+    async with db.begin():
+        build_task_ids = await db.execute(
+            select(models.BuildTask.id).where(
+                models.BuildTask.build_id == build_id))
+        build_task_ids = build_task_ids.scalars().all()
+        test_log_repository = await __get_log_repository(db, build_id)
     for build_task_id in build_task_ids:
         await create_test_tasks(db, build_task_id, test_log_repository.id)
 
