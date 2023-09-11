@@ -1,38 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <title>{{ errata['updateinfo_id'] }}</title>
     <link rel="stylesheet" href="../assets/foundation.min.css">
     <link rel="stylesheet" href="../assets/images-style.css">
+    <link rel="stylesheet" href="../assets/theme.default.min.css">
     <link rel="shortcut icon" type="image/png" href="../assets/hero-img.png">
     <script src="../assets/jquery.js" type="text/javascript"></script>
+    <script src="../assets/jquery.tablesorter.min.js" type="text/javascript"></script>
     <script src="../assets/foundation.min.js" type="text/javascript"></script>
     <script>
-      $(function () {
-        $(document).foundation();
-      });
+        $(function() {
+            $(document).foundation();
+            $('.sort-table').tablesorter({
+                sortList: [
+                    [0, 0]
+                ]
+            });
+        });
     </script>
 </head>
 
 <body>
-<div class="expanded row header" style="border-bottom: 1px solid lightgrey;">
-    <div class="row expanded">
-        <div class="small-12 columns text-center" style="display: inline-block;">
-            <ul class="no-bullet header-container">
-                <li>
-                    <img class="header-logo" src="../assets/almalinux-logo.png" alt="AlmaLinux"></li>
-                <li>
-            </ul>
+    <div class="expanded row header" style="border-bottom: 1px solid lightgrey;">
+        <div class="row expanded">
+            <div class="small-12 columns text-center" style="display: inline-block;">
+                <ul class="no-bullet header-container">
+                    <li>
+                        <img class="header-logo" src="../assets/almalinux-logo.png" alt="AlmaLinux">
+                    </li>
+                </ul>
+            </div>
+
         </div>
-
     </div>
-</div>
 
 
-<div class="tabs-content" data-tabs-content="images-tabs">
-
-    <div class="tabs-panel row is-active">
+    <div class="row">
         <div class="row card">
             <div class="medium-12 columns card-header">
                 <h5>[{{ errata['updateinfo_id'] }}] {{ errata['title'] }}</h5>
@@ -66,8 +72,7 @@
                     <div class="medium-3 columns text-left">
                         <strong>Description:</strong>
                     </div>
-                    <div style="white-space: pre-wrap; vertical-align: top;"
-                         class="medium-9 columns description">{{ errata['description'] }}</div>
+                    <div style="white-space: pre-wrap; vertical-align: top;" class="medium-9 columns description">{{ errata['description'] }}</div>
                 </div>
                 {% if errata['references'] %}
                 <div class="row">
@@ -88,25 +93,31 @@
                 {% endif %}
 
                 <div class="row">
-                    <div class="medium-3 columns text-left">
-                        <strong>Updated packages:</strong>
+                    <div class="medium-12 columns text-left">
+                        <strong>Updated packages listed below:</strong>
                     </div>
-                    <div class="medium-9 columns">
-                        <ul style="list-style: none; margin-left: 0;"
-                            class="package_list">
-                            {% for pkg in errata['pkglist']['packages'] %}
-                            <li name="{{ pkg['name']}}"
-                                version="{{ pkg['version']}}"
-                                epoch="{{ pkg['epoch']}}"
-                                release="{{ pkg['release']}}"
-                                arch="{{ pkg['arch']}}">
-                                {{ pkg['filename'] }}<br/>
-                                <span class="checksum">
-                                    {{ pkg['checksum'] }}
-                                </span>
-                            </li>
-                            {% endfor %}
-                        </ul>
+                </div>
+
+                <div class="row">
+                    <div class="medium-12 columns text-left">
+                        <table class="sort-table tablesorter">
+                            <thead>
+                                <tr>
+                                    <td>Architecture</td>
+                                    <td>Package</td>
+                                    <td>Checksum</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pkg in errata['pkglist']['packages'] %}
+                                <tr>
+                                    <td>{{ pkg['arch'] }}</td>
+                                    <td>{{ pkg['filename'] }}</td>
+				    <td><span class="checksum">{{ pkg['sum'] }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -117,10 +128,10 @@
                     <div class="medium-9 columns">
                         This page is generated automatically from <a href="https://www.redhat.com/security/data/oval/v2/">Red Hat security data</a> and has not been checked for errors. For clarification or corrections please contact the <a href="mailto:packager@almalinux.org">AlmaLinux Packaging Team</a>.
                     </div>
-            </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 </body>
+
 </html>

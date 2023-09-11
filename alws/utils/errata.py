@@ -361,6 +361,10 @@ def merge_errata_records_modern(a, b):
 
 
 def dump_errata_to_html(errata):
+    # sort package list by arch
+    packages = errata["pkglist"]["packages"]
+    errata["pkglist"]["packages"] = sorted(packages, key=lambda x: x["arch"])
+
     template_dir = pathlib.Path(__file__).absolute().parent / "templates"
     template = (template_dir / "errata_alma_page.j2").read_text()
     return jinja2.Template(template).render(errata=errata)
