@@ -29,7 +29,7 @@
             <div class="small-12 columns text-center" style="display: inline-block;">
                 <ul class="no-bullet header-container">
                     <li>
-                        <img class="header-logo" src="../assets/almalinux-logo.png" alt="AlmaLinux">
+                        <a href="/"><img class="header-logo" src="../assets/almalinux-logo.png" alt="AlmaLinux"></a>
                     </li>
                 </ul>
             </div>
@@ -113,7 +113,7 @@
                                 <tr>
                                     <td>{{ pkg['arch'] }}</td>
                                     <td>{{ pkg['filename'] }}</td>
-				    <td><span class="checksum">{{ pkg['sum'] }}</span></td>
+                                    <td><span class="checksum">{{ pkg['sum'] }}</span></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
