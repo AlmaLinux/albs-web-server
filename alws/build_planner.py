@@ -355,11 +355,15 @@ class BuildPlanner:
 
     async def add_task(self, task: build_schema.BuildTaskRef):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
-            await self._add_single_ref(models.BuildTaskRef(
-                url=task.url,
-                git_ref=task.git_ref,
-                ref_type=task.ref_type
-            ), mock_options=task.mock_options)
+            await self._add_single_ref(
+                models.BuildTaskRef(
+                    url=task.url,
+                    git_ref=task.git_ref,
+                    ref_type=task.ref_type,
+                    test_configuration=task.test_configuration.dict() if task.test_configuration else None,
+                ),
+                mock_options=task.mock_options,
+            )
             return
 
         if isinstance(task, build_schema.BuildTaskModuleRef):
@@ -384,7 +388,8 @@ class BuildPlanner:
             models.BuildTaskRef(
                 url=ref.url,
                 git_ref=ref.git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH
+                ref_type=BuildTaskRefType.GIT_BRANCH,
+                test_configuration=ref.test_configuration.dict() if ref.test_configuration else None,
             ) for ref in raw_refs
         ]
         if not refs:
@@ -488,10 +493,11 @@ class BuildPlanner:
         return response['commit']['id']
 
     async def _add_single_ref(
-            self,
-            ref: models.BuildTaskRef,
-            mock_options: typing.Optional[dict[str, typing.Any]] = None,
-            modularity_version: typing.Optional[dict] = None):
+        self,
+        ref: models.BuildTaskRef,
+        mock_options: typing.Optional[dict[str, typing.Any]] = None,
+        modularity_version: typing.Optional[dict] = None,
+    ):
         parsed_dist_macro = None
         if ref.git_ref is not None:
             parsed_dist_macro = parse_git_ref(r'(el[\d]+_[\d]+)', ref.git_ref)
