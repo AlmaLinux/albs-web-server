@@ -33,7 +33,7 @@ services:
       CELERY_CONFIG_PATH: "/celery_config.yaml"
       EXTERNAL_NETWORK: "albs-web-server_default"
     command: "bash -c 'source env/bin/activate && pip3 install --upgrade pip &&
-        pip3 install -r celery.txt --no-cache-dir && celery
+        pip3 install -r /tmp/requirements/celery.txt --no-cache-dir && celery
         -A alts.worker.app worker --pool=threads --concurrency=20
         --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
         --without-mingle --without-heartbeat'"
@@ -45,7 +45,7 @@ services:
       - ../alts/alts:/code/alts
       - ../alts/resources:/code/resources
       - ../alts/tests:/code/tests
-      - ../alts/requirements/celery.txt:/code/celery.txt
+      - ../alts/requirements:/tmp/requirements
     depends_on:
       - rabbitmq
 
@@ -60,15 +60,15 @@ services:
       CELERY_CONFIG_PATH: "/scheduler_config.yaml"
       SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
     command: "bash -c 'source env/bin/activate && pip3 install --upgrade pip &&
-        pip3 install -r scheduler.txt --no-cache-dir && uvicorn --host 0.0.0.0
-        alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+        pip3 install -r /tmp/requirements/scheduler.txt --no-cache-dir &&
+        uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
     restart: on-failure
     volumes:
       - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
       - ../alts/alts:/code/alts
       - ../alts/resources:/code/resources
       - ../alts/tests:/code/tests
-      - ../alts/requirements/scheduler.txt:/code/scheduler.txt
+      - ../alts/requirements:/tmp/requirements
     depends_on:
       - rabbitmq
 
@@ -313,7 +313,7 @@ services:
     volumes:
       - "./alws:/code/alws"
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
-      - "./requirements.txt:/code/requirements.txt"
+      - "./alws/scripts/git_cacher/requirements.txt:/code/requirements.txt"
 
   tests_cacher:
     image: albs-tests-cacher:latest
