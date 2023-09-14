@@ -17,15 +17,19 @@ class AltsClient:
         self._headers = {'authorization': f'Bearer {token}'}
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
-    async def schedule_task(self, dist_name: str,
-                            dist_version: typing.Union[int, str],
-                            dist_arch: str, package_name: str,
-                            package_version: str, callback_href: str,
-                            package_release: str = None,
-                            repositories: typing.List[dict] = None,
-                            module_name: str = None,
-                            module_stream: str = None,
-                            module_version: str = None):
+    async def schedule_task(
+        self,
+        dist_name: str,
+        dist_version: typing.Union[int, str],
+        dist_arch: str, package_name: str,
+        package_version: str, callback_href: str,
+        package_release: str = None,
+        repositories: typing.List[dict] = None,
+        module_name: str = None,
+        module_stream: str = None,
+        module_version: str = None,
+        test_configuration: dict = None,
+    ):
         if package_release:
             full_version = f'{package_version}-{package_release}'
         else:
@@ -45,6 +49,8 @@ class AltsClient:
             payload['module_version'] = module_version
         if repositories:
             payload['repositories'] = repositories
+        if test_configuration:
+            payload['test_configuration'] = test_configuration
 
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:

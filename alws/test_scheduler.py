@@ -127,6 +127,7 @@ class TestTaskScheduler(threading.Thread):
                                 module_name=module_name,
                                 module_stream=module_stream,
                                 module_version=module_version,
+                                test_configuration=task.build_task.ref.test_configuration
                             )
                             updated_tasks.append(task)
                             logging.debug('Got response from ALTS: %s', response)

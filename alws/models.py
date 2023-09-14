@@ -504,6 +504,7 @@ class BuildTaskRef(Base):
     git_ref = sqlalchemy.Column(sqlalchemy.TEXT)
     ref_type = sqlalchemy.Column(sqlalchemy.Integer)
     git_commit_hash = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
+    test_configuration = sqlalchemy.Column(JSONB, nullable=True)
 
 
 class RpmModule(Base):
