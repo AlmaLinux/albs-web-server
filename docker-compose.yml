@@ -298,7 +298,7 @@ services:
     volumes:
       - "./alws/scripts/albs-gitea-listener/gitea_listener.py:/code/gitea_listener.py"
       - "./alws/scripts/albs-gitea-listener/gitea_models.py:/code/gitea_models.py"
-      - "./alws/scripts/albs-gitea-listener/albs-gitea-listener.config.yaml:/code/albs-gitea-listener.config.yaml"
+      - "./alws/scripts/albs-gitea-listener/albs-gitea-listener-config.yaml:/code/albs-gitea-listener-config.yaml"
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
       - "./alws:/code/alws"
       - "./alws/scripts/albs-gitea-listener/requirements.txt:/code/requirements.txt"
