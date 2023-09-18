@@ -1,6 +1,7 @@
 import pytest
 
 pytest_plugins = [
+    "tests.fixtures.beholder",
     "tests.fixtures.builds",
     "tests.fixtures.database",
     "tests.fixtures.dramatiq",

@@ -2,6 +2,7 @@ import pytest
 
 from alws.constants import BuildTaskStatus
 from alws.models import Build
+from alws.utils.modularity import IndexWrapper
 from tests.constants import CUSTOM_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
@@ -83,3 +84,34 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         )
         assert response.status_code == self.status_codes.HTTP_403_FORBIDDEN
         self.headers["Authorization"] = old_token
+
+
+class TestModularBuilds(BaseAsyncTestCase):
+    async def test_multilib_virt(
+        self,
+        get_multilib_packages_from_pulp,
+        enable_beholder,
+        mock_beholder_call,
+        multilib_virt_with_artifacts: str,
+        virt_build_payload: dict,
+        virt_modular_build: Build,
+        start_modular_virt_build,
+        virt_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_virt_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{virt_modular_build.id}/'
+        )
+        with open(tmp_path / 'modules.x86_64.yaml') as fd:
+            build_index = IndexWrapper.from_template(fd.read())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )

@@ -1,5 +1,5 @@
 import hashlib
-from typing import AsyncIterable
+import typing
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +36,22 @@ async def start_modular_build(
 
 @pytest.mark.anyio
 @pytest.fixture
+async def start_modular_virt_build(
+    virt_modular_build: Build,
+    virt_build_payload: dict,
+    create_virt_module,
+    create_build_rpm_repo,
+    create_log_repo,
+    modify_repository,
+):
+    await _start_build(
+        virt_modular_build.id,
+        BuildCreate(**virt_build_payload),
+    )
+
+
+@pytest.mark.anyio
+@pytest.fixture
 async def start_build(
     regular_build: Build,
     build_payload: dict,
@@ -44,6 +60,23 @@ async def start_build(
     modify_repository,
 ):
     await _start_build(regular_build.id, BuildCreate(**build_payload))
+
+
+def prepare_build_done_payload(task_id: str, packages: typing.List[str]):
+    return {
+        'task_id': task_id,
+        'status': 'done',
+        'stats': {},
+        'artifacts': [
+            {
+                'name': name,
+                'type': 'rpm',
+                'href': get_artifact_href(),
+                'sha256': hashlib.sha256().hexdigest(),
+            }
+            for name in packages
+        ],
+    }
 
 
 @pytest.mark.anyio
@@ -58,24 +91,18 @@ async def build_done(
     build = await get_builds(db=session, build_id=regular_build.id)
     await session.close()
     for build_task in build.tasks:
-        payload = {
-            "task_id": build_task.id,
-            "status": "done",
-            "stats": {},
-            "artifacts": [
-                {
-                    "name": name,
-                    "type": "rpm",
-                    "href": get_artifact_href(),
-                    "sha256": hashlib.sha256().hexdigest(),
-                }
-                for name in (
-                    "chan-0.0.4-3.el8.src.rpm",
-                    f"chan-0.0.4-3.el8.{build_task.arch}.rpm",
+        await safe_build_done(
+            session,
+            BuildDone(
+                **prepare_build_done_payload(
+                    build_task.id,
+                    [
+                        "chan-0.0.4-3.el8.src.rpm",
+                        f"chan-0.0.4-3.el8.{build_task.arch}.rpm",
+                    ],
                 )
-            ],
-        }
-        await safe_build_done(session, BuildDone(**payload))
+            ),
+        )
 
 
 @pytest.mark.anyio
@@ -92,21 +119,48 @@ async def modular_build_done(
     build = await get_builds(db=session, build_id=modular_build.id)
     await session.close()
     for build_task in build.tasks:
-        payload = {
-            "task_id": build_task.id,
-            "status": "done",
-            "stats": {},
-            "artifacts": [
-                {
-                    "name": name,
-                    "type": "rpm",
-                    "href": get_artifact_href(),
-                    "sha256": hashlib.sha256().hexdigest(),
-                }
-                for name in (
-                    "go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.src.rpm",
-                    f"go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.{build_task.arch}.rpm",
+        await safe_build_done(
+            session,
+            BuildDone(
+                **prepare_build_done_payload(
+                    build_task.id,
+                    [
+                        "go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.src.rpm",
+                        f"go-toolset-1.18.9-1.module_el8.7.0+3397+4350156d.{build_task.arch}.rpm",
+                    ],
                 )
-            ],
-        }
-        await safe_build_done(session, BuildDone(**payload))
+            ),
+        )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def virt_build_done(
+    session: AsyncSession,
+    virt_modular_build: Build,
+    modify_repository,
+    start_modular_virt_build,
+    create_entity,
+    get_rpm_packages_info,
+    get_repo_virt_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=virt_modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        packages = [
+            'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.src.rpm',
+            f'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+            f'hivex-debuginfo-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+            f'hivex-debugsource-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+            f'hivex-devel-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+        ]
+        if 'SLOF' in build_task.ref.url:
+            packages = [
+                'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm',
+                'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.noarch.rpm',
+            ]
+        await safe_build_done(
+            session,
+            BuildDone(**prepare_build_done_payload(build_task.id, packages)),
+        )

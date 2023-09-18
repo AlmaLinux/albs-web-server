@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -170,6 +171,32 @@ def create_module(monkeypatch):
 
 
 @pytest.fixture
+def create_virt_module(monkeypatch, tmp_path: Path):
+    async def func(*args, **kwargs):
+        _, template, *_, arch = args
+        template_file = tmp_path / f'modules.{arch}.yaml'
+        result = get_module_href(), hashlib.sha256().hexdigest()
+        if not template_file.exists():
+            template_file.write_text(template)
+            return result
+        source_index = IndexWrapper.from_template(
+            template_file.read_text(),
+        )
+        build_index = IndexWrapper.from_template(template)
+        for build_module in build_index.iter_modules():
+            source_module = source_index.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            for artifact in build_module.get_rpm_artifacts():
+                source_module.raw_stream.add_rpm_artifact(artifact)
+        template_file.write_text(source_index.render())
+        return result
+
+    monkeypatch.setattr(PulpClient, "create_module", func)
+
+
+@pytest.fixture
 def create_build_rpm_repo(monkeypatch):
     async def func(*args, **kwargs):
         _, repo_name = args
@@ -271,6 +298,23 @@ def create_log_repo(monkeypatch):
     monkeypatch.setattr(PulpClient, "create_log_repo", func)
 
 
+async def read_repo_modules(
+    repo_url: str,
+    module_template: str,
+):
+    repo_arch = re.search(
+        r"-(?P<arch>\w+)-\d+-br/$",
+        repo_url,
+    )
+    if not repo_arch:
+        return module_template
+    repo_arch = repo_arch.groupdict()["arch"]
+    _index = IndexWrapper.from_template(module_template)
+    for _module in _index.iter_modules():
+        _module.arch = repo_arch
+    return _index.render()
+
+
 @pytest.fixture
 def create_file_repository(monkeypatch):
     async def func(*args, **kwargs):
@@ -289,19 +333,26 @@ def get_repo_modules_yaml(
     modular_build_payload: dict,
 ):
     async def func(*args, **kwargs):
-        modules_yaml = modular_build_payload["tasks"][0]["modules_yaml"]
         _, repo_url = args
-        repo_arch = re.search(
-            r"-(?P<arch>\w+)-\d+-br/$",
+        return await read_repo_modules(
             repo_url,
+            modular_build_payload['tasks'][0]['modules_yaml'],
         )
-        if not repo_arch:
-            return modules_yaml
-        repo_arch = repo_arch.groupdict()["arch"]
-        _index = IndexWrapper.from_template(modules_yaml)
-        for _module in _index.iter_modules():
-            _module.arch = repo_arch
-        return _index.render()
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_virt_modules_yaml(
+    monkeypatch,
+    virt_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        _, repo_url = args
+        return await read_repo_modules(
+            repo_url,
+            virt_build_payload['tasks'][0]['modules_yaml'],
+        )
 
     monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
 
@@ -340,11 +391,7 @@ def list_updateinfo_records(monkeypatch, pulp_updateinfos):
 @pytest.fixture
 def get_rpm_distros(monkeypatch):
     async def func(*args, **kwargs):
-        return [
-            {
-                "pulp_href": get_distros_href()
-            }
-        ]
+        return [{"pulp_href": get_distros_href()}]
 
     monkeypatch.setattr(PulpClient, "get_rpm_distros", func)
 
@@ -352,8 +399,6 @@ def get_rpm_distros(monkeypatch):
 @pytest.fixture
 def delete_by_href(monkeypatch):
     async def func(*args, **kwargs):
-        return {
-            "pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"
-        }
+        return {"pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"}
 
     monkeypatch.setattr(PulpClient, "delete_by_href", func)

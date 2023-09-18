@@ -180,7 +180,7 @@ class ModuleWrapper:
         return hashlib.sha1(hashes.encode("utf-8")).hexdigest()[:8]
 
     def get_name_and_stream(self, module) -> typing.Tuple[str, str]:
-        if not ":" in module:
+        if ":" not in module:
             return module, ""
         module_dep = module.split(":")
         if len(module_dep) != 2:
