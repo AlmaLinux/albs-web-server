@@ -119,3 +119,38 @@ async def iter_sync_sign_tasks(
         await websocket.send_text(message['data'].decode())
         response = await websocket.receive_text()
         await redis.publish(payload['task_id'], response)
+
+
+@router.post(
+    '/community/get_gen_sign_key_task/',
+    response_model=typing.Union[dict, sign_schema.AvailableGenKeyTask],
+)
+async def get_avaiable_gen_key_task(db: database.Session = Depends(get_db)):
+    gen_key_task = await sign_task.get_available_gen_key_task(db)
+    if gen_key_task:
+        return {
+            'id': gen_key_task.id,
+            'product_name': gen_key_task.product.name,
+            'user_name': gen_key_task.product.owner.username,
+            'user_email': gen_key_task.product.owner.email,
+        }
+    else:
+        return {}
+
+
+@router.post(
+    '/community/{gen_key_task_id}/complete/',
+    response_model=sign_schema.SignKey,
+)
+async def complete_gen_key_task(
+        gen_key_task_id: int,
+        payload: sign_schema.GenKeyTaskComplete,
+        db: database.Session = Depends(get_db),
+):
+    sign_key = await sign_task.complete_gen_key_task(
+        gen_key_task_id=gen_key_task_id,
+        payload=payload,
+        db=db,
+    )
+    return sign_key
+

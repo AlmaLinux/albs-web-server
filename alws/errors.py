@@ -101,3 +101,7 @@ class PermissionDenied(Exception):
 
 class UserError(Exception):
     pass
+
+
+class GenKeyError(Exception):
+    pass

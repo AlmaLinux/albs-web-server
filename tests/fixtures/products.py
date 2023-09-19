@@ -105,6 +105,7 @@ async def user_product(
     session: AsyncSession,
     user_product_create_payload: dict,
     create_repo,
+    create_file_repository,
 ) -> AsyncIterable[Product]:
     product = (
         (

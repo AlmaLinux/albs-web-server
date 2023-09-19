@@ -40,7 +40,7 @@ jobs:
             db
             web_server
       - name: Run unit tests (pytest)
-        run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -c 'source
+        run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -o pipefail -c 'source
           env/bin/activate && pytest -v --ignore alws/ --cov-report term-missing:skip-covered
           --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
           tests/ | tee /tmp/pytest-coverage.txt'

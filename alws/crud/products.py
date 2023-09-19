@@ -19,8 +19,11 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.copr import create_product_repo
 from alws.utils.pulp_client import PulpClient
+from alws.utils.copr import (
+    create_product_repo,
+    create_product_sign_key_repo,
+)
 
 __all__ = [
     'create_product',
@@ -120,6 +123,21 @@ async def create_product(
             type=arch,
             debug=is_debug,
             production=True,
+        )
+        product.repositories.append(repo)
+        items_to_insert.append(repo)
+    # Create sign key repository if a product is community
+    if payload.is_community:
+        repo_name, repo_url, repo_href = await create_product_sign_key_repo(
+            pulp_client, owner.username, product.name)
+        repo = models.Repository(
+            name=repo_name,
+            url=repo_url,
+            arch='sign_key',
+            pulp_href=repo_href,
+            debug=False,
+            production=True,
+            type='sign_key',
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)

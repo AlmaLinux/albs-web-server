@@ -8,6 +8,7 @@ __all__ = [
     "DEFAULT_PRODUCT",
     "DEFAULT_TEAM",
     "DRAMATIQ_TASK_TIMEOUT",
+    "DRAMATIQ_GEN_KEY_TASK_TIMEOUT",
     "DEFAULT_FILE_CHUNK_SIZE",
     "LOWEST_PRIORITY",
     "REQUEST_TIMEOUT",
@@ -25,6 +26,7 @@ __all__ = [
     "ReleaseStatus",
     "RepoType",
     "SignStatus",
+    "GenKeyStatus",
     "TestTaskStatus",
     "debuginfo_regex",
     "BeholderMatchMethod",
@@ -32,9 +34,9 @@ __all__ = [
 
 
 REQUEST_TIMEOUT = 60  # 1 minute
-DRAMATIQ_TASK_TIMEOUT = 36000000  # 10 hours in milliseconds
-DEFAULT_FILE_CHUNK_SIZE = 1048576  # 1 MB
-UPLOAD_FILE_CHUNK_SIZE = 52428800  # 50 MB
+DRAMATIQ_TASK_TIMEOUT = 60 * 60 * 1000  # 1 hour in milliseconds
+DEFAULT_FILE_CHUNK_SIZE = 1024 * 1024  # 1 MB
+UPLOAD_FILE_CHUNK_SIZE = 50 * 1024 * 1024  # 50 MB
 SYSTEM_USER_NAME = "base_user"
 DEFAULT_PRODUCT = "AlmaLinux"
 DEFAULT_TEAM = "almalinux"
@@ -142,6 +144,13 @@ class ReleaseStatus(enum.IntEnum):
 
 
 class SignStatus(enum.IntEnum):
+    IDLE = 1
+    IN_PROGRESS = 2
+    COMPLETED = 3
+    FAILED = 4
+
+
+class GenKeyStatus(enum.IntEnum):
     IDLE = 1
     IN_PROGRESS = 2
     COMPLETED = 3

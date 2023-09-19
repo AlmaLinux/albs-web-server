@@ -12,6 +12,7 @@ class SignKey(BaseModel):
     public_url: str
     inserted: datetime
     platform_id: typing.Optional[int] = None
+    product_id: typing.Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -44,6 +45,13 @@ class SignTask(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class GenKeyTask(BaseModel):
+    id: int
+    user_name: typing.Optional[str]
+    user_email: typing.Optional[str]
+    product_name: typing.Optional[str]
 
 
 class SignTaskCreate(BaseModel):
@@ -80,6 +88,23 @@ class AvailableSignTask(BaseModel):
     build_id: typing.Optional[int]
     keyid: typing.Optional[str]
     packages: typing.Optional[typing.List[SignRpmInfo]]
+
+
+class AvailableGenKeyTask(BaseModel):
+    id: typing.Optional[int]
+    user_name: typing.Optional[str]
+    user_email: typing.Optional[str]
+    product_name: typing.Optional[str]
+
+
+class GenKeyTaskComplete(BaseModel):
+    success: bool
+    error_message: typing.Optional[str]
+    sign_key_href: typing.Optional[str]
+    key_name: typing.Optional[str]
+    key_id: typing.Optional[str]
+    fingerprint: typing.Optional[str]
+    file_name: typing.Optional[str]
 
 
 class SignTaskComplete(BaseModel):

@@ -340,6 +340,7 @@ services:
     image: pulp/pulp:upgrade
     ports:
       - 8081:80
+      - 5431:5432
     volumes:
       - "../volumes/pulp/settings:/etc/pulp"
       - "../volumes/pulp/exports:/srv/exports"

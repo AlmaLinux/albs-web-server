@@ -24,6 +24,7 @@ from alws.constants import (
     PermissionTriad,
     ReleaseStatus,
     SignStatus,
+    GenKeyStatus,
 )
 from alws.database import Base, engine
 
@@ -908,6 +909,11 @@ class Product(PermissionsMixin, TeamMixin, Base):
         secondary=ProductBuilds,
         back_populates="products",
     )
+    sign_keys = relationship(
+        "SignKey",
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def full_name(self) -> str:
@@ -1085,6 +1091,10 @@ class SignKey(PermissionsMixin, Base):
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     name = sqlalchemy.Column(sqlalchemy.Text)
+    # FIXME: change nullable to False after population
+    is_community = sqlalchemy.Column(
+        sqlalchemy.Boolean, nullable=True, default=False,
+    )
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True)
     fingerprint = sqlalchemy.Column(sqlalchemy.String(40), unique=True)
@@ -1092,6 +1102,15 @@ class SignKey(PermissionsMixin, Base):
     inserted = sqlalchemy.Column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
     )
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'products.id',
+            name='sign_keys_product_id_fkey',
+        ),
+        nullable=True,
+    )
+    product = relationship('Product', back_populates='sign_keys')
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
@@ -1106,6 +1125,20 @@ class SignKey(PermissionsMixin, Base):
         back_populates="sign_key",
     )
     roles = relationship("UserRole", secondary=SignKeyRoleMapping)
+
+
+class GenKeyTask(Base):
+    __tablename__ = "gen_key_tasks"
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    status = sqlalchemy.Column(sqlalchemy.Integer, default=GenKeyStatus.IDLE)
+    error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    product = relationship("Product")
+    product_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("products.id"),
+        nullable=False,
+    )
 
 
 class SignTask(TimeMixin, Base):
