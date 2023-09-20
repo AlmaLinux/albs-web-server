@@ -142,7 +142,7 @@ async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
         if not test_log_repository:
             raise ValueError('Cannot create test tasks: '
                              'the log repository is not found')
-        await create_test_tasks(db, build_task_id, test_log_repository.id)
+    await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
