@@ -329,9 +329,9 @@ services:
               python tests_cacher.py'"
 
   pulp:
-    image: pulp/pulp
+    # image: pulp/pulp
     # after downgrading pulp you probably should to remove pulp volumes
-#    image: pulp/pulp:upgrade
+    image: pulp/pulp:upgrade
     ports:
       - 8081:80
       - 5431:5432
