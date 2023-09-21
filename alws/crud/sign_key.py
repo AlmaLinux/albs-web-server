@@ -15,7 +15,12 @@ async def get_sign_keys(
         db: Session,
         user: User,
 ) -> typing.List[models.SignKey]:
-    result = await db.execute(select(models.SignKey))
+    result = await db.execute(select(models.SignKey).options(
+        selectinload(models.SignKey.owner),
+        selectinload(models.SignKey.roles).selectinload(
+            models.UserRole.actions
+        ),
+    ))
     suitable_keys = [
         sign_key for sign_key in result.scalars().all()
         if can_perform(sign_key, user, actions.UseSignKey.name)
