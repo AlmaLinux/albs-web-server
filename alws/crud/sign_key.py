@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session, selectinload
 
 from alws import models
+from alws.crud.user import get_user
 from alws.errors import DataNotFoundError, SignKeyAlreadyExistsError
 from alws.models import User
 from alws.perms import actions
@@ -15,6 +16,7 @@ async def get_sign_keys(
         db: Session,
         user: User,
 ) -> typing.List[models.SignKey]:
+    limited_user = await get_user(db, user.id)
     result = await db.execute(select(models.SignKey).options(
         selectinload(models.SignKey.owner),
         selectinload(models.SignKey.roles).selectinload(
@@ -23,7 +25,7 @@ async def get_sign_keys(
     ))
     suitable_keys = [
         sign_key for sign_key in result.scalars().all()
-        if can_perform(sign_key, user, actions.UseSignKey.name)
+        if can_perform(sign_key, limited_user, actions.UseSignKey.name)
     ]
     return suitable_keys
 
