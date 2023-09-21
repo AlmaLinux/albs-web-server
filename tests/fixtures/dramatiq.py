@@ -11,6 +11,7 @@ from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate
 from tests.test_utils.pulp_utils import get_artifact_href
+from alws.constants import BuildTaskStatus
 
 
 @pytest.fixture(autouse=True)
@@ -62,10 +63,14 @@ async def start_build(
     await _start_build(regular_build.id, BuildCreate(**build_payload))
 
 
-def prepare_build_done_payload(task_id: str, packages: typing.List[str]):
+def prepare_build_done_payload(
+    task_id: str,
+    packages: typing.List[str],
+    status: str = "done",    
+):
     return {
         'task_id': task_id,
-        'status': 'done',
+        'status': status,
         'stats': {},
         'artifacts': [
             {
@@ -148,19 +153,43 @@ async def virt_build_done(
     build = await get_builds(db=session, build_id=virt_modular_build.id)
     await session.close()
     for build_task in build.tasks:
-        packages = [
-            'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.src.rpm',
-            f'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
-            f'hivex-debuginfo-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
-            f'hivex-debugsource-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
-            f'hivex-devel-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
-        ]
-        if 'SLOF' in build_task.ref.url:
+        status="done"
+        packages = []
+        if "hivex" in build_task.ref.url:
             packages = [
-                'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm',
-                'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.noarch.rpm',
+                "hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.src.rpm",
+                f'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'hivex-debuginfo-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'hivex-debugsource-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'hivex-devel-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'ocaml-hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'ocaml-hivex-devel-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
+                f'ocaml-hivex-debuginfo-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
             ]
+        if "qemu" in build_task.ref.url:
+            packages = ["qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.src.rpm"]
+            if build_task.arch == "i686":
+                status = "excluded"
+            else:
+                packages.extend([
+                    f'qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                    f'qemu-kvm-debugsource-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                    f'qemu-kvm-debuginfo-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                ])
+        if "SLOF" in build_task.ref.url:
+            packages = ["SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm"]
+            if build_task.arch == "ppc64le":
+                packages.append(
+                    "SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.noarch.rpm"
+                )
+            else:
+                status="excluded"
+
         await safe_build_done(
             session,
-            BuildDone(**prepare_build_done_payload(build_task.id, packages)),
+            BuildDone(**prepare_build_done_payload(
+                build_task.id,
+                packages,
+                status=status,
+            )),
         )

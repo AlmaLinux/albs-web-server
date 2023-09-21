@@ -208,7 +208,7 @@ def virt_build_payload():
         "platforms": [
             {
                 "name": "AlmaLinux-8",
-                "arch_list": ["i686", "x86_64"],
+                "arch_list": ["i686", "x86_64", "ppc64le"],
                 "parallel_mode_enabled": True,
             }
         ],
@@ -229,6 +229,18 @@ def virt_build_payload():
                     },
                     {
                         "url": "https://git.almalinux.org/rpms/hivex.git",
+                        "git_ref": "c8-stream-rhel",
+                        "exist": True,
+                        "enabled": True,
+                        "added_artifacts": [],
+                        "mock_options": {
+                            "definitions": {},
+                            "module_enable": ["virt:rhel", "virt-devel:rhel"],
+                        },
+                        "ref_type": 1,
+                    },
+                    {
+                        "url": "https://git.almalinux.org/rpms/qemu-kvm.git",
                         "git_ref": "c8-stream-rhel",
                         "exist": True,
                         "enabled": True,

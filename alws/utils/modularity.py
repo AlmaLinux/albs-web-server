@@ -302,28 +302,22 @@ class ModuleWrapper:
         rpm_pkg: dict,
         devel: bool = False,
         multilib: bool = False,
-    ) -> bool:
+        task_excluded: bool = False,
+    ):
         artifact = RpmArtifact.from_pulp_model(rpm_pkg).as_artifact()
         module_is_devel = self.is_devel
 
-        if multilib:
+        if multilib or devel and module_is_devel:
             self._stream.add_rpm_artifact(artifact)
-            return True
-
-        if devel and module_is_devel:
-            self._stream.add_rpm_artifact(artifact)
-            return True
-
-        if self.is_artifact_filtered(rpm_pkg):
+        elif self.is_artifact_filtered(rpm_pkg):
             if module_is_devel or rpm_pkg["arch"] == "src":
                 self._stream.add_rpm_artifact(artifact)
-                return True
         else:
-            if not module_is_devel:
+            if task_excluded:
+                if module_is_devel:
+                    self._stream.add_rpm_artifact(artifact)
+            elif not module_is_devel:
                 self._stream.add_rpm_artifact(artifact)
-                return True
-
-        return False
 
     def remove_rpm_artifact(self, artifact: str):
         self._stream.remove_rpm_artifact(artifact)

@@ -329,6 +329,7 @@ async def __process_rpms(
     repositories: list,
     built_srpm_url: str = None,
     module_index=None,
+    task_excluded=False,
 ):
     def get_repo(repo_arch, is_debug):
         return next(
@@ -466,7 +467,10 @@ async def __process_rpms(
         try:
             for module in module_index.iter_modules():
                 for artifact in module_artifacts:
-                    module.add_rpm_artifact(artifact)
+                    module.add_rpm_artifact(
+                        artifact,
+                        task_excluded=task_excluded
+                    )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
 
@@ -634,6 +638,7 @@ async def __process_build_task_artifacts(
         rpm_repositories,
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index,
+        task_excluded=status.value == BuildTaskStatus.EXCLUDED,
     )
     end_time = datetime.datetime.utcnow()
     processing_stats["packages_processing"] = {

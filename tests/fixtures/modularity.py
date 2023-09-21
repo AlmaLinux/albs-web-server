@@ -1,3 +1,4 @@
+from asyncio import streams
 import pytest
 
 
@@ -360,13 +361,15 @@ data:
         arches: [aarch64, i686, ppc64le, s390x, x86_64]
   artifacts:
     rpms:
-    - SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch
-    - SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src
     - hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src
     - hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
     - hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
     - hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
     - hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
+    - qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src
+    - qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.x86_64
+    - qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.x86_64
+    - qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.x86_64
 ...
 ---
 document: modulemd
@@ -499,8 +502,56 @@ data:
     - hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
     - hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
     - hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
+    - ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
+    - ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
+    - ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
+    - ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
+    - ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686
+    - ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.x86_64
 ...
     """
+
+
+@pytest.fixture
+def virt_artifacts():
+  return {
+    "virt:ppc64le":
+      [
+        "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
+        "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+        "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+        "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+        "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+        "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+      ],
+    "virt-devel:ppc64le":
+      [
+      "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+      "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+      "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+    ],
+    "virt:i686":
+      [ 
+        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+        "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+      ],
+    "virt-devel:i686":
+      [
+      "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+      "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+      "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+      "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+      "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+    ],
+  }
 
 
 @pytest.fixture
