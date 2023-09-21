@@ -40,7 +40,7 @@ async def start_modular_build(
 async def start_modular_virt_build(
     virt_modular_build: Build,
     virt_build_payload: dict,
-    create_virt_module,
+    create_multilib_module,
     create_build_rpm_repo,
     create_log_repo,
     modify_repository,
@@ -50,6 +50,21 @@ async def start_modular_virt_build(
         BuildCreate(**virt_build_payload),
     )
 
+
+@pytest.mark.anyio
+@pytest.fixture
+async def start_modular_ruby_build(
+    ruby_modular_build: Build,
+    ruby_build_payload: dict,
+    create_multilib_module,
+    create_build_rpm_repo,
+    create_log_repo,
+    modify_repository,
+):
+    await _start_build(
+        ruby_modular_build.id,
+        BuildCreate(**ruby_build_payload),
+    )
 
 @pytest.mark.anyio
 @pytest.fixture
@@ -153,7 +168,7 @@ async def virt_build_done(
     build = await get_builds(db=session, build_id=virt_modular_build.id)
     await session.close()
     for build_task in build.tasks:
-        status="done"
+        status = "done"
         packages = []
         if "hivex" in build_task.ref.url:
             packages = [
@@ -183,7 +198,7 @@ async def virt_build_done(
                     "SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.noarch.rpm"
                 )
             else:
-                status="excluded"
+                status = "excluded"
 
         await safe_build_done(
             session,
@@ -192,4 +207,42 @@ async def virt_build_done(
                 packages,
                 status=status,
             )),
+        )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def ruby_build_done(
+    session: AsyncSession,
+    ruby_modular_build: Build,
+    modify_repository,
+    start_modular_ruby_build,
+    create_entity,
+    get_rpm_packages_info,
+    get_repo_ruby_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=ruby_modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        packages = [
+            "ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.src.rpm",
+            f"ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+            f"ruby-devel-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+            f"ruby-debugsource-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+            f"ruby-debuginfo-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+            "rubygems-3.3.7-141.module_el8.1.0+8+503f6fbd.noarch.rpm",
+            "rubygems-devel-3.3.7-141.module_el8.1.0+8+503f6fbd.noarch.rpm",
+        ]
+        if "rubygem-pg" in build_task.ref.url:
+            packages = [
+                "rubygem-pg-1.3.5-1.module_el8.1.0+8+503f6fbd.src.rpm",
+                f"rubygem-pg-1.3.5-1-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+                f"rubygem-pg-debugsource-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+                f"rubygem-pg-debuginfo-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
+                "rubygem-pg-doc-3.3.7-141.module_el8.1.0+8+503f6fbd.noarch.rpm",
+            ]
+        await safe_build_done(
+            session,
+            BuildDone(**prepare_build_done_payload(build_task.id, packages)),
         )

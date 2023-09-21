@@ -93,7 +93,7 @@ class TestModularBuilds(BaseAsyncTestCase):
         enable_beholder,
         mock_beholder_call,
         multilib_virt_with_artifacts: str,
-        virt_artifacts: dict,
+        modules_artifacts: dict,
         virt_build_payload: dict,
         virt_modular_build: Build,
         start_modular_virt_build,
@@ -120,8 +120,48 @@ class TestModularBuilds(BaseAsyncTestCase):
 
         for arch in ["i686", "ppc64le"]:
             module_file = tmp_path / f"modules.{arch}.yaml"
-            build_ppc_index = IndexWrapper.from_template(module_file.read_text())
-            for build_module in build_ppc_index.iter_modules():
+            build_index = IndexWrapper.from_template(module_file.read_text())
+            for build_module in build_index.iter_modules():
+                artifacts = modules_artifacts[
+                    f"{build_module.name}:{arch}"
+                ]
+                assert (
+                    build_module.get_rpm_artifacts() == artifacts
+                )
+
+    async def test_multilib_ruby(
+        self,
+        get_multilib_packages_from_pulp,
+        enable_beholder,
+        mock_beholder_call,
+        multilib_ruby_with_artifacts: str,
+        modules_artifacts: dict,
+        ruby_build_payload: dict,
+        ruby_modular_build: Build,
+        start_modular_ruby_build,
+        ruby_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_ruby_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{ruby_modular_build.id}/'
+        )
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+        for arch in ["i686", "aarch64"]:
+            module_file = tmp_path / f"modules.{arch}.yaml"
+            build_index = IndexWrapper.from_template(module_file.read_text())
+            for build_module in build_index.iter_modules():
                 artifacts = modules_artifacts[
                     f"{build_module.name}:{arch}"
                 ]

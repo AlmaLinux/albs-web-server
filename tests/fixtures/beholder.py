@@ -753,6 +753,591 @@ def beholder_qemu_response():
 
 
 @pytest.fixture
+def beholder_ruby_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "ruby",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "ruby",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "ruby",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "ruby-debuginfo",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "ruby-debuginfo",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "ruby-debugsource",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "ruby-debugsource",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "ruby-devel",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "ruby-devel",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.1.2"
+                    },
+                    {
+                        "arch": "noarch",
+                        "epoch": 0,
+                        "name": "rubygems",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.3.7"
+                        },
+                    {
+                        "arch": "noarch",
+                        "epoch": 0,
+                        "name": "rubygems-devel",
+                        "release": "141.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "3.3.7"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "ruby",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "version": "3.1.2"
+                }
+            },
+            {
+                "packages": [
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "rubygem-pg",
+                        "release": "1.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.3.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "rubygem-pg",
+                        "release": "1.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.3.2"
+                        },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "rubygem-pg-debuginfo",
+                        "release": "1.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "1.3.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "rubygem-pg-debugsource",
+                        "release": "1.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream-debuginfo"
+                            }
+                        ],
+                        "version": "1.3.2"
+                    },
+                    {
+                        "arch": "noarch",
+                        "epoch": 0,
+                        "name": "rubygem-pg-doc",
+                        "release": "1.module_el8.7.0+3304+9392e77f",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.3.2"
+                    }
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "rubygem-pg",
+                    "release": "1.module_el8.7.0+3304+9392e77f",
+                    "version": "1.3.2"
+                }
+            }
+        ],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 101,
+                "name": "ruby",
+                "ref": "8b6300061cdae180a557fe428e1222871494d44a"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 102,
+                "name": "rubygem-pg",
+                "ref": "8e1861fdfbcfcd0ef40ded3de957231094e79565"
+            }
+        ],
+        "context": "9edba152",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "ruby",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-appstream"
+        },
+        "stream": "3.1",
+        "type": "module",
+        "version": 8070020221011155238
+        }
+
+
+@pytest.fixture
+def beholder_ruby_devel_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 101,
+                "name": "ruby",
+                "ref": "8b6300061cdae180a557fe428e1222871494d44a"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 102,
+                "name": "rubygem-abrt",
+                "ref": "442c59a0c182b1d4cedd92b0fbe492e9caac7e07"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 102,
+                "name": "rubygem-mysql2",
+                "ref": "3770965996f98254ff9dfb77cd2ce9a1b19f372c"
+            },
+            {   
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 102,
+                "name": "rubygem-pg",
+                "ref": "8e1861fdfbcfcd0ef40ded3de957231094e79565"
+            }
+        ],
+        "context": "9edba152",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "ruby-devel",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-devel"
+        },
+        "stream": "3.1",
+        "type": "module",
+        "version": 8070020221011155238
+        }
+
+
+@pytest.fixture
+def beholder_ruby_package_response():
+    return {
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "packages": {
+            "closest": [
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "ruby",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "ruby-devel",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "noarch",
+                    "epoch": 0,
+                    "name": "rubygems",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        },
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        },
+                    ],
+                    "version": "3.3.7"
+                },
+                {
+                    "arch": "noarch",
+                    "epoch": 0,
+                    "name": "rubygems-devel",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        },
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        },
+                    ],
+                    "version": "3.3.7"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "ruby-debuginfo",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "ruby-debugsource",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "ruby",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "ruby",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "ruby-devel",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "ruby-devel",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "ruby-debuginfo",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "ruby-debuginfo",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "ruby-debugsource",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "ruby-debugsource",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+                {
+                    "arch": "src",
+                    "epoch": 0,
+                    "name": "ruby",
+                    "release": "141.module_el8.7.0+3304+9392e77f",
+                    "repositories": [
+                        {
+                            "arch": "src",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "3.1.2"
+                },
+            ]
+        },
+        "sourcerpm": {
+            "epoch": 0,
+            "name": "ruby",
+            "release": "141.module_el8.7.0+3304+9392e77f",
+            "version": "3.1.2"
+        },
+        "type": "package"
+    }
+
+
+@pytest.fixture
+def beholder_rubygem_pg_response():
+    return {
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "packages": {
+            "closest": []
+        },
+        "type": "package"
+    }
+
+
+@pytest.fixture
 @pytest.mark.anyio
 def mock_beholder_call(
     monkeypatch,
@@ -760,6 +1345,11 @@ def mock_beholder_call(
     beholder_virt_devel_response: dict,
     beholder_slof_response: dict,
     beholder_hivex_response: dict,
+    beholder_qemu_response: dict,
+    beholder_rubygem_pg_response: dict,
+    beholder_ruby_package_response: dict,
+    beholder_ruby_devel_response: dict,
+    beholder_ruby_response: dict
 ):
     async def func(*args, **kwargs):
         *_, endpoint = args
@@ -773,6 +1363,14 @@ def mock_beholder_call(
             return beholder_virt_response
         if '/module/virt-devel/rhel/x86_64/' in endpoint:
             return beholder_virt_devel_response
+        if '/module/ruby/3.1/x86_64/' in endpoint:
+            return beholder_ruby_response
+        if '/module/ruby-devel/3.1/x86_64/' in endpoint:
+            return beholder_ruby_package_response
+        if 'ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
+            return beholder_ruby_devel_response
+        if 'rubygem-pg-1.3.5-1.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
+            return beholder_rubygem_pg_response
 
     monkeypatch.setattr(MultilibProcessor, 'call_beholder', func)
 

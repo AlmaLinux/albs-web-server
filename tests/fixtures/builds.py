@@ -284,6 +284,77 @@ def virt_build_payload():
 
 
 @pytest.fixture
+def ruby_build_payload():
+    return {
+        "platforms": [
+            {
+                "name": "AlmaLinux-8",
+                "arch_list": [
+                    "i686",
+                    "x86_64",
+                    "aarch64"
+                ],
+                "parallel_mode_enabled": True
+            }
+        ],
+        "tasks": [
+            {
+                "refs": [
+                    {
+                        "url": "https://git.almalinux.org/rpms/ruby.git",
+                        "git_ref": "c8-stream-3.1",
+                        "exist": True,
+                        "enabled": True,
+                        "added_artifacts": [],
+                        "mock_options": {
+                            "definitions": {},
+                            "module_enable": [
+                                "ruby:3.1",
+                                "ruby-devel:3.1"
+                            ]
+                        },
+                        "ref_type": 1,
+                        "test_configuration": {}
+                    },
+                    {
+                        "url": "https://git.almalinux.org/rpms/rubygem-pg.git",
+                        "git_ref": "c8-stream-3.1",
+                        "exist": True,
+                        "enabled": True,
+                        "added_artifacts": [],
+                        "mock_options": {
+                            "definitions": {},
+                            "module_enable": [
+                                "ruby:3.1",
+                                "ruby-devel:3.1"
+                            ]
+                        },
+                        "ref_type": 1,
+                        "test_configuration": {}
+                    }
+                ],
+                "modules_yaml": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: ruby\n  stream: \"3.1\"\n  summary: An interpreter of object-oriented scripting language\n  description: >-\n    Ruby is the interpreted scripting language for quick and easy object-oriented\n    programming.  It has many features to process text files and to do system management\n    tasks (as in Perl).  It is simple, straight-forward, and extensible.\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  references:\n    community: http://ruby-lang.org/\n    documentation: https://www.ruby-lang.org/en/documentation/\n    tracker: https://bugs.ruby-lang.org/\n  profiles:\n    common:\n      rpms:\n      - ruby\n  api:\n    rpms:\n    - ruby\n    - ruby-bundled-gems\n    - ruby-default-gems\n    - ruby-devel\n    - ruby-libs\n    - rubygem-abrt\n    - rubygem-bigdecimal\n    - rubygem-bundler\n    - rubygem-io-console\n    - rubygem-irb\n    - rubygem-json\n    - rubygem-minitest\n    - rubygem-mysql2\n    - rubygem-pg\n    - rubygem-power_assert\n    - rubygem-psych\n    - rubygem-rake\n    - rubygem-rdoc\n    - rubygem-test-unit\n    - rubygems\n    - rubygems-devel\n  components:\n    rpms:\n      ruby:\n        rationale: An interpreter of object-oriented scripting language\n        ref: f7bb4e8f3d0aefdb159718ac2164acdceeb2ce39\n        buildorder: 101\n        multilib: [x86_64]\n      rubygem-abrt:\n        rationale: ABRT support for Ruby\n        ref: 6f6f91e5b621808cf41fc475947950de56e71f56\n        buildorder: 102\n      rubygem-mysql2:\n        rationale: A simple, fast Mysql library for Ruby, binding to libmysql\n        ref: 7dce6c0006631d899b7b9b5836bf2aa321a24603\n        buildorder: 102\n      rubygem-pg:\n        rationale: A Ruby interface to the PostgreSQL RDBMS\n        ref: ccdbc3cfd207412b88cb787c25992b1162b1c326\n        buildorder: 102\n...\n\n---\ndocument: modulemd\nversion: 2\ndata:\n  name: ruby-devel\n  stream: \"3.1\"\n  summary: An interpreter of object-oriented scripting language\n  description: >-\n    Ruby is the interpreted scripting language for quick and easy object-oriented\n    programming.  It has many features to process text files and to do system management\n    tasks (as in Perl).  It is simple, straight-forward, and extensible.\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  references:\n    community: http://ruby-lang.org/\n    documentation: https://www.ruby-lang.org/en/documentation/\n    tracker: https://bugs.ruby-lang.org/\n  profiles:\n    common:\n      rpms:\n      - ruby\n  api:\n    rpms:\n    - ruby\n    - ruby-bundled-gems\n    - ruby-default-gems\n    - ruby-devel\n    - ruby-libs\n    - rubygem-abrt\n    - rubygem-bigdecimal\n    - rubygem-bundler\n    - rubygem-io-console\n    - rubygem-irb\n    - rubygem-json\n    - rubygem-minitest\n    - rubygem-mysql2\n    - rubygem-pg\n    - rubygem-power_assert\n    - rubygem-psych\n    - rubygem-rake\n    - rubygem-rdoc\n    - rubygem-test-unit\n    - rubygems\n    - rubygems-devel\n  components:\n    rpms:\n      ruby:\n        rationale: An interpreter of object-oriented scripting language\n        ref: f7bb4e8f3d0aefdb159718ac2164acdceeb2ce39\n        buildorder: 101\n        multilib: [x86_64]\n      rubygem-abrt:\n        rationale: ABRT support for Ruby\n        ref: 6f6f91e5b621808cf41fc475947950de56e71f56\n        buildorder: 102\n      rubygem-mysql2:\n        rationale: A simple, fast Mysql library for Ruby, binding to libmysql\n        ref: 7dce6c0006631d899b7b9b5836bf2aa321a24603\n        buildorder: 102\n      rubygem-pg:\n        rationale: A Ruby interface to the PostgreSQL RDBMS\n        ref: ccdbc3cfd207412b88cb787c25992b1162b1c326\n        buildorder: 102\n...\n",
+                "module_name": "ruby",
+                "module_stream": "3.1",
+                "enabled_modules": {
+                    "buildtime": [],
+                    "runtime": []
+                },
+                "git_ref": "c8s-stream-3.1",
+                "module_platform_version": "8.8",
+                "selectedModules": {}
+            }
+        ],
+        "linked_builds": [],
+        "is_secure_boot": False,
+        "mock_options": {},
+        "platform_flavors": [],
+        "test_configuration": {},
+        "product_id": 1
+    }
+
+
+@pytest.fixture
 def build_payload() -> typing.Dict[str, typing.Any]:
     return {
         "platforms": [
@@ -331,6 +402,19 @@ async def virt_modular_build(
     yield await create_build(
         session,
         BuildCreate(**virt_build_payload),
+        user_id=ADMIN_USER_ID,
+    )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def ruby_modular_build(
+    session: AsyncSession,
+    ruby_build_payload: dict,
+) -> typing.AsyncIterable:
+    yield await create_build(
+        session,
+        BuildCreate(**ruby_build_payload),
         user_id=ADMIN_USER_ID,
     )
 

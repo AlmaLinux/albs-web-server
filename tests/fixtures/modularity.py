@@ -513,164 +513,242 @@ data:
 
 
 @pytest.fixture
-def virt_artifacts():
-  return {
-    "virt:ppc64le":
-      [
-        "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
-        "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-        "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-        "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-        "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-        "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-        "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
-        "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-        "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+def modules_artifacts():
+    return {
+      "virt:ppc64le": [
+          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
+          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+          "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+          "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+          "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+        ],
+      "virt-devel:ppc64le": [
+          "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+          "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        ],
+      "virt:i686": [
+          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+          "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        ],
+      "virt-devel:i686": [
+          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+          "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+        ],
+      "ruby:aarch64": [
+          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+          "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+          "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+          "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+          "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+          "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
       ],
-    "virt-devel:ppc64le":
-      [
-      "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-      "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-      "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-    ],
-    "virt:i686":
-      [ 
-        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-        "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-        "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-        "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-        "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+      "ruby-devel:aarch64": [],
+      "ruby:i686": [
+          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+          "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+          "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.i686",
+          "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+          "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+          "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+          "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
       ],
-    "virt-devel:i686":
-      [
-      "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-      "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-      "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-      "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-      "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
-    ],
-  }
+      "ruby-devel:i686": [],
+    }
 
 
 @pytest.fixture
-def virt_template():
+def multilib_ruby_with_artifacts():
     return """
 ---
 document: modulemd
 version: 2
 data:
-  stream: rhel
-  summary: Virtualization module
-  description: A virtualization module
+  name: ruby
+  stream: "3.1"
+  version: 9010020221019142933
+  context: 8cf767d6
+  arch: x86_64
+  summary: An interpreter of object-oriented scripting language
+  description: >-
+    Ruby is the interpreted scripting language for quick and easy object-oriented
+    programming.  It has many features to process text files and to do system management
+    tasks (as in Perl).  It is simple, straight-forward, and extensible.
   license:
     module:
-      - MIT
+    - MIT
   dependencies:
-    - buildrequires:
-        platform: [el8]
-      requires:
-        platform: [el8]
+  - buildrequires:
+      platform: [el8]
+    requires:
+      platform: [el8]
+  references:
+    community: http://ruby-lang.org/
+    documentation: https://www.ruby-lang.org/en/documentation/
+    tracker: https://bugs.ruby-lang.org/
   profiles:
     common:
       rpms:
-        - libguestfs
-        - libvirt-client
-        - libvirt-daemon-config-network
-        - libvirt-daemon-kvm
-  filter:
+      - ruby
+  api:
     rpms:
-      - ocaml-hivex
-      - ocaml-hivex-debuginfo
-      - ocaml-hivex-devel
-      - ocaml-libguestfs
-      - ocaml-libguestfs-debuginfo
-      - ocaml-libguestfs-devel
-      - ocaml-libnbd
-      - ocaml-libnbd-debuginfo
-      - ocaml-libnbd-devel
-      - qemu-kvm-tests
-      - qemu-kvm-tests-debuginfo
+    - ruby
+    - ruby-bundled-gems
+    - ruby-default-gems
+    - ruby-devel
+    - ruby-libs
+    - rubygem-bigdecimal
+    - rubygem-bundler
+    - rubygem-io-console
+    - rubygem-irb
+    - rubygem-json
+    - rubygem-minitest
+    - rubygem-mysql2
+    - rubygem-pg
+    - rubygem-power_assert
+    - rubygem-psych
+    - rubygem-rake
+    - rubygem-rbs
+    - rubygem-rdoc
+    - rubygem-rexml
+    - rubygem-rss
+    - rubygem-test-unit
+    - rubygem-typeprof
+    - rubygems
+    - rubygems-devel
   components:
     rpms:
-      SLOF:
-        rationale: qemu-kvm dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-        arches: [ppc64le]
-      hivex:
-        rationale: libguestfs dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-      libguestfs:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 4
-      libguestfs-winsupport:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 5
-      libiscsi:
-        rationale: qemu-kvm dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-      libvirt:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 3
-      libvirt-dbus:
-        rationale: libvirt-dbus is part of the virtualization module
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 4
-      libvirt-python:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 4
-      libnbd:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-      nbdkit:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 5
-      netcf:
-        rationale: libvirt dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-      perl-Sys-Virt:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 4
-      qemu-kvm:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 2
-      seabios:
-        rationale: qemu-kvm dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-        arches: [ppc64le, x86_64]
-      sgabios:
-        rationale: qemu-kvm dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-        arches: [ppc64le, x86_64]
-      supermin:
-        rationale: libguestfs dep
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 2
-      libtpms:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 1
-      swtpm:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 2
-      virt-v2v:
-        rationale: Primary module content
-        ref: stream-rhel-rhel-8.8.0
-        buildorder: 6
-    """
+      ruby:
+        rationale: An interpreter of object-oriented scripting language
+        ref: 4f1e5e9f48df872a4595494f58bfc3eb8a9b7a31
+        buildorder: 101
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      rubygem-mysql2:
+        rationale: A simple, fast Mysql library for Ruby, binding to libmysql
+        ref: e8b82bc12045089bbdb262c6ef4bb610d187c707
+        buildorder: 102
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      rubygem-pg:
+        rationale: A Ruby interface to the PostgreSQL RDBMS
+        ref: c65bdee50421e88eb4042cdffa712ddaac9ff11b
+        buildorder: 102
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686
+    - ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src
+    - ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686
+    - ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686
+    - ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686
+    - ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src
+    - rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.x86_64
+    - rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.x86_64
+    - rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch
+    - rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch
+    - rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch
+...
+---
+document: modulemd
+version: 2
+data:
+  name: ruby-devel
+  stream: "3.1"
+  version: 9010020221019142933
+  context: 8cf767d6
+  arch: x86_64
+  summary: An interpreter of object-oriented scripting language
+  description: >-
+    Ruby is the interpreted scripting language for quick and easy object-oriented
+    programming.  It has many features to process text files and to do system management
+    tasks (as in Perl).  It is simple, straight-forward, and extensible.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      platform: [el8]
+    requires:
+      platform: [el8]
+  references:
+    community: http://ruby-lang.org/
+    documentation: https://www.ruby-lang.org/en/documentation/
+    tracker: https://bugs.ruby-lang.org/
+  profiles:
+    common:
+      rpms:
+      - ruby
+  api:
+    rpms:
+    - ruby
+    - ruby-bundled-gems
+    - ruby-default-gems
+    - ruby-devel
+    - ruby-libs
+    - rubygem-bigdecimal
+    - rubygem-bundler
+    - rubygem-io-console
+    - rubygem-irb
+    - rubygem-json
+    - rubygem-minitest
+    - rubygem-mysql2
+    - rubygem-pg
+    - rubygem-power_assert
+    - rubygem-psych
+    - rubygem-rake
+    - rubygem-rbs
+    - rubygem-rdoc
+    - rubygem-rexml
+    - rubygem-rss
+    - rubygem-test-unit
+    - rubygem-typeprof
+    - rubygems
+    - rubygems-devel
+  components:
+    rpms:
+      ruby:
+        rationale: An interpreter of object-oriented scripting language
+        ref: 4f1e5e9f48df872a4595494f58bfc3eb8a9b7a31
+        buildorder: 101
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      rubygem-mysql2:
+        rationale: A simple, fast Mysql library for Ruby, binding to libmysql
+        ref: e8b82bc12045089bbdb262c6ef4bb610d187c707
+        buildorder: 102
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      rubygem-pg:
+        rationale: A Ruby interface to the PostgreSQL RDBMS
+        ref: c65bdee50421e88eb4042cdffa712ddaac9ff11b
+        buildorder: 102
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+...
+"""

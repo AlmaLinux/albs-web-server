@@ -171,7 +171,7 @@ def create_module(monkeypatch):
 
 
 @pytest.fixture
-def create_virt_module(monkeypatch, tmp_path: Path):
+def create_multilib_module(monkeypatch, tmp_path: Path):
     async def func(*args, **kwargs):
         _, template, *_, arch = args
         template_file = tmp_path / f'modules.{arch}.yaml'
@@ -318,7 +318,7 @@ async def read_repo_modules(
 @pytest.fixture
 def create_file_repository(monkeypatch):
     async def func(*args, **kwargs):
-        _, repo_name, repo_prefix  = args
+        _, repo_name, repo_prefix = args
         return (
             f"{settings.pulp_host}/pulp/content/{repo_prefix}/{repo_name}/",
             get_repo_href(),
@@ -352,6 +352,21 @@ def get_repo_virt_modules_yaml(
         return await read_repo_modules(
             repo_url,
             virt_build_payload['tasks'][0]['modules_yaml'],
+        )
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
+def get_repo_ruby_modules_yaml(
+    monkeypatch,
+    ruby_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        _, repo_url = args
+        return await read_repo_modules(
+            repo_url,
+            ruby_build_payload['tasks'][0]['modules_yaml'],
         )
 
     monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
