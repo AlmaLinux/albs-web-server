@@ -1,12 +1,12 @@
 - name: AlmaLinux-8-beta
   modularity:
     git_tag_prefix:
-      modified: a8
-      non_modified: c8
+      modified: a8-beta
+      non_modified: c8-beta
     versions:
-      - name: '8.8'
-        version_prefix: '80800'
-        dist_prefix: 'el8.8.0'
+      - name: '8.9'
+        version_prefix: '80900'
+        dist_prefix: 'el8.9.0'
   data:
      mock:
        secure_boot_macros:
@@ -97,9 +97,9 @@
       modified: a9-beta
       non_modified: c9-beta
     versions:
-      - name: '9.2'
-        version_prefix: '90200'
-        dist_prefix: 'el9.2.0'
+      - name: '9.3'
+        version_prefix: '90300'
+        dist_prefix: 'el9.3.0'
   data:
      mock:
        secure_boot_macros:
