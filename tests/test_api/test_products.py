@@ -15,13 +15,13 @@ from tests.mock_classes import BaseAsyncTestCase
 class TestProductsEndpoints(BaseAsyncTestCase):
     async def test_product_create(
             self,
-            user_product_create_payload,
+            product_create_payload,
             create_file_repository,
     ):
         response = await self.make_request(
             "post",
             "/api/v1/products/",
-            json=user_product_create_payload,
+            json=product_create_payload,
         )
         message = self.get_assertion_message(
             response.text,
