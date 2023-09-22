@@ -54,18 +54,23 @@ def get_rpm_module_packages_from_repository(
         repo_modules_yaml = get_modules_yaml_from_repo(repo_name)
     except Exception:
         return result
+    if not repo_modules_yaml:
+        return result
 
     module_name, module_stream = module.split(":")
     devel_module_name = (
         f"{module_name}-devel" if not module_name.endswith("-devel") else ""
     )
     repo_modules = []
-    for name in (module_name, devel_module_name):
-        try:
-            repo_module = IndexWrapper.from_template(
-                repo_modules_yaml,
-            ).get_module(name, module_stream)
-        except Exception:
+    try:
+        repo_index = IndexWrapper.from_template(repo_modules_yaml)
+    except Exception:
+        return result
+    for repo_module in repo_index.iter_modules():
+        if (
+            repo_module.name not in (module_name, devel_module_name)
+            or repo_module.stream != module_stream
+        ):
             continue
         repo_modules.append(repo_module)
     if not repo_modules:
