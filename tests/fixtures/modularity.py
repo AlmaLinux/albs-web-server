@@ -515,68 +515,88 @@ data:
 @pytest.fixture
 def modules_artifacts():
     return {
-      "virt:ppc64le": [
-          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
-          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-          "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
-          "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-          "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+        "virt:ppc64le": [
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+            "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+            "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
         ],
-      "virt-devel:ppc64le": [
-          "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-          "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        "virt-devel:ppc64le": [
+            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
         ],
-      "virt:i686": [
-          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-          "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        "virt:i686": [
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
         ],
-      "virt-devel:i686": [
-          "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-          "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-          "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+        "virt-devel:i686": [
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
         ],
-      "ruby:aarch64": [
-          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
-          "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
-          "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-          "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-          "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-          "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-      ],
-      "ruby-devel:aarch64": [],
-      "ruby:i686": [
-          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
-          "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
-          "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.i686",
-          "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-          "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-          "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-          "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-      ],
-      "ruby-devel:i686": [],
+        "ruby:aarch64": [
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+        ],
+        "ruby-devel:aarch64": [],
+        "ruby:i686": [
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+        ],
+        "ruby-devel:i686": [],
+        "subversion:aarch64": [
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
+            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+        ],
+        "subversion-devel:aarch64": [
+            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+        ],
+        "subversion:i686": [
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
+            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+        ],
+        "subversion-devel:i686": [
+            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+        ],
     }
 
 
@@ -750,5 +770,176 @@ data:
         ref: c65bdee50421e88eb4042cdffa712ddaac9ff11b
         buildorder: 102
         arches: [aarch64, i686, ppc64le, s390x, x86_64]
+...
+"""
+
+
+@pytest.fixture
+def multilib_subversion_with_artifacts():
+    return """
+---
+document: modulemd
+version: 2
+data:
+  name: subversion
+  stream: "1.10"
+  version: 8060020221109095619
+  context: a51370e3
+  arch: x86_64
+  summary: Apache Subversion
+  description: >-
+    Apache Subversion, a Modern Version Control System
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      httpd: [2.4]
+      platform: [el8]
+      swig: [3.0]
+    requires:
+      platform: [el8]
+  references:
+    documentation: http://subversion.apache.org/docs/
+    tracker: https://issues.apache.org/jira/projects/SVN
+  profiles:
+    common:
+      rpms:
+      - subversion
+      - subversion-libs
+      - subversion-tools
+    server:
+      rpms:
+      - mod_dav_svn
+      - subversion
+      - subversion-libs
+      - subversion-tools
+  api:
+    rpms:
+    - mod_dav_svn
+    - subversion
+    - subversion-devel
+    - subversion-libs
+  filter:
+    rpms:
+    - libserf-devel
+    - python3-subversion
+    - subversion-ruby
+    - utf8proc-devel
+  buildopts:
+    rpms:
+      macros: >
+        %_without_kwallet 1
+        %_without_python2 1
+        %_with_python3 1
+        %_without_bdb 1
+        %_without_pyswig 1
+  components:
+    rpms:
+      libserf:
+        rationale: Build dependency.
+        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54
+        buildorder: 10
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      subversion:
+        rationale: Module API.
+        ref: a757409c2fc92983ed4ba21058e47f22941be59e
+        buildorder: 20
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      utf8proc:
+        rationale: Build dependency.
+        ref: 3a752429dbff2f4dc394a579715b23253339d776
+        buildorder: 10
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src
+    - subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
+    - subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
+    - subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
+    - subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
+...
+---
+document: modulemd
+version: 2
+data:
+  name: subversion-devel
+  stream: "1.10"
+  version: 8060020221109095619
+  context: a51370e3
+  arch: x86_64
+  summary: Apache Subversion
+  description: >-
+    Apache Subversion, a Modern Version Control System
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      httpd: [2.4]
+      platform: [el8]
+      swig: [3.0]
+    requires:
+      platform: [el8]
+  references:
+    documentation: http://subversion.apache.org/docs/
+    tracker: https://issues.apache.org/jira/projects/SVN
+  profiles:
+    common:
+      rpms:
+      - subversion
+      - subversion-libs
+      - subversion-tools
+    server:
+      rpms:
+      - mod_dav_svn
+      - subversion
+      - subversion-libs
+      - subversion-tools
+  api:
+    rpms:
+    - mod_dav_svn
+    - subversion
+    - subversion-devel
+    - subversion-libs
+  filter:
+    rpms:
+    - libserf-devel
+    - python3-subversion
+    - subversion-ruby
+    - utf8proc-devel
+  buildopts:
+    rpms:
+      macros: >
+        %_without_kwallet 1
+        %_without_python2 1
+        %_with_python3 1
+        %_without_bdb 1
+        %_without_pyswig 1
+  components:
+    rpms:
+      libserf:
+        rationale: Build dependency.
+        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54
+        buildorder: 10
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      subversion:
+        rationale: Module API.
+        ref: a757409c2fc92983ed4ba21058e47f22941be59e
+        buildorder: 20
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+      utf8proc:
+        rationale: Build dependency.
+        ref: 3a752429dbff2f4dc394a579715b23253339d776
+        buildorder: 10
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686
+    - subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686
+    - subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686
+    - subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686
+    - subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686
+    - subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
 ...
 """

@@ -355,6 +355,71 @@ def ruby_build_payload():
 
 
 @pytest.fixture
+def subversion_build_payload():
+    return {
+        "platforms": [
+            {
+                "name": "AlmaLinux-8",
+                "arch_list": [
+                    "i686",
+                    "x86_64",
+                    "aarch64"
+                ],
+                "parallel_mode_enabled": True
+            }
+        ],
+        "tasks": [
+            {
+                "refs": [
+                    {
+                        "url": "https://git.almalinux.org/rpms/subversion.git",
+                        "git_ref": "c8-stream-1.10",
+                        "exist": True,
+                        "enabled": True,
+                        "added_artifacts": [],
+                        "mock_options": {
+                            "definitions": {
+                                "_without_kwallet": "1",
+                                "_without_python2": "1",
+                                "_with_python3": "1",
+                                "_without_bdb": "1",
+                                "_without_pyswig": "1"
+                            },
+                            "module_enable": [
+                                "subversion:1.10",
+                                "subversion-devel:1.10",
+                                "httpd:2.4",
+                                "swig:3.0"
+                            ]
+                        },
+                        "ref_type": 1,
+                        "test_configuration": {}
+                    }
+                ],
+                "modules_yaml": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: subversion\n  stream: \"1.10\"\n  summary: Apache Subversion\n  description: >-\n    Apache Subversion, a Modern Version Control System\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      httpd: [2.4]\n      platform: [el8]\n      swig: [3.0]\n    requires:\n      platform: [el8]\n  references:\n    documentation: http://subversion.apache.org/docs/\n    tracker: https://issues.apache.org/jira/projects/SVN\n  profiles:\n    common:\n      rpms:\n      - subversion\n      - subversion-libs\n      - subversion-tools\n    server:\n      rpms:\n      - mod_dav_svn\n      - subversion\n      - subversion-libs\n      - subversion-tools\n  api:\n    rpms:\n    - mod_dav_svn\n    - subversion\n    - subversion-devel\n    - subversion-libs\n  filter:\n    rpms:\n    - libserf-devel\n    - python3-subversion\n    - subversion-ruby\n    - utf8proc-devel\n  buildopts:\n    rpms:\n      macros: >\n        %_without_kwallet 1\n\n        %_without_python2 1\n\n        %_with_python3 1\n\n        %_without_bdb 1\n\n        %_without_pyswig 1\n  components:\n    rpms:\n      libserf:\n        rationale: Build dependency.\n        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54\n        buildorder: 10\n      subversion:\n        rationale: Module API.\n        ref: a757409c2fc92983ed4ba21058e47f22941be59e\n        buildorder: 20\n      utf8proc:\n        rationale: Build dependency.\n        ref: 3a752429dbff2f4dc394a579715b23253339d776\n        buildorder: 10\n...\n\n---\ndocument: modulemd\nversion: 2\ndata:\n  name: subversion-devel\n  stream: \"1.10\"\n  summary: Apache Subversion\n  description: >-\n    Apache Subversion, a Modern Version Control System\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      httpd: [2.4]\n      platform: [el8]\n      swig: [3.0]\n    requires:\n      platform: [el8]\n  references:\n    documentation: http://subversion.apache.org/docs/\n    tracker: https://issues.apache.org/jira/projects/SVN\n  profiles:\n    common:\n      rpms:\n      - subversion\n      - subversion-libs\n      - subversion-tools\n    server:\n      rpms:\n      - mod_dav_svn\n      - subversion\n      - subversion-libs\n      - subversion-tools\n  api:\n    rpms:\n    - mod_dav_svn\n    - subversion\n    - subversion-devel\n    - subversion-libs\n  filter:\n    rpms:\n    - libserf-devel\n    - python3-subversion\n    - subversion-ruby\n    - utf8proc-devel\n  buildopts:\n    rpms:\n      macros: >\n        %_without_kwallet 1\n\n        %_without_python2 1\n\n        %_with_python3 1\n\n        %_without_bdb 1\n\n        %_without_pyswig 1\n  components:\n    rpms:\n      libserf:\n        rationale: Build dependency.\n        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54\n        buildorder: 10\n      subversion:\n        rationale: Module API.\n        ref: a757409c2fc92983ed4ba21058e47f22941be59e\n        buildorder: 20\n      utf8proc:\n        rationale: Build dependency.\n        ref: 3a752429dbff2f4dc394a579715b23253339d776\n        buildorder: 10\n...\n",
+                "module_name": "subversion",
+                "module_stream": "1.10",
+                "enabled_modules": {
+                    "buildtime": [
+                        "httpd:2.4",
+                        "swig:3.0"
+                    ],
+                    "runtime": []
+                },
+                "git_ref": "c8-stream-1.10",
+                "module_platform_version": "8.8",
+                "selectedModules": {}
+            }
+        ],
+        "linked_builds": [],
+        "is_secure_boot": False,
+        "mock_options": {},
+        "platform_flavors": [],
+        "product_id": 1
+    }
+
+
+@pytest.fixture
 def build_payload() -> typing.Dict[str, typing.Any]:
     return {
         "platforms": [
@@ -415,6 +480,19 @@ async def ruby_modular_build(
     yield await create_build(
         session,
         BuildCreate(**ruby_build_payload),
+        user_id=ADMIN_USER_ID,
+    )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def subversion_modular_build(
+    session: AsyncSession,
+    subversion_build_payload: dict,
+) -> typing.AsyncIterable:
+    yield await create_build(
+        session,
+        BuildCreate(**subversion_build_payload),
         user_id=ADMIN_USER_ID,
     )
 

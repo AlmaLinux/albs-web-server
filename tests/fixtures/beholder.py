@@ -888,7 +888,7 @@ def beholder_ruby_response():
                             }
                         ],
                         "version": "3.3.7"
-                        },
+                    },
                     {
                         "arch": "noarch",
                         "epoch": 0,
@@ -937,7 +937,7 @@ def beholder_ruby_response():
                             }
                         ],
                         "version": "1.3.2"
-                        },
+                    },
                     {
                         "arch": "x86_64",
                         "epoch": 0,
@@ -1025,7 +1025,7 @@ def beholder_ruby_response():
         "stream": "3.1",
         "type": "module",
         "version": 8070020221011155238
-        }
+    }
 
 
 @pytest.fixture
@@ -1070,7 +1070,7 @@ def beholder_ruby_devel_response():
                 "name": "rubygem-mysql2",
                 "ref": "3770965996f98254ff9dfb77cd2ce9a1b19f372c"
             },
-            {   
+            {
                 "arches": [
                     "aarch64",
                     "i686",
@@ -1096,7 +1096,7 @@ def beholder_ruby_devel_response():
         "stream": "3.1",
         "type": "module",
         "version": 8070020221011155238
-        }
+    }
 
 
 @pytest.fixture
@@ -1338,6 +1338,459 @@ def beholder_rubygem_pg_response():
 
 
 @pytest.fixture
+def beholder_subversion_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [
+            {
+                "packages": [
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "subversion",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "subversion",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "subversion-devel",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "subversion-debuginfo",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "subversion-debugsource",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [],
+                        "version": "1.10.2"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "version": "1.10.2"
+                }
+            },
+        ],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "x86_64"
+                ],
+                "buildorder": 20,
+                "name": "subversion",
+                "ref": "422d6ce5d5ac80f246ecaf58a6be1957d18a9147"
+            }
+        ],
+        "context": "78111232",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "subversion",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-appstream"
+        },
+        "stream": "1.10",
+        "type": "module",
+        "version": 8070020220711155714
+    }
+
+
+@pytest.fixture
+def beholder_subversion_devel_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "subversion",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "subversion-devel",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "subversion-ruby",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "subversion-ruby",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools"
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "subversion-debuginfo",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools-debuginfo",
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "subversion-debugsource",
+                        "release": "5.module_el8.7.0+1146+633d65ff",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-powertools-debuginfo",
+
+                            }
+                        ],
+                        "version": "1.10.2"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "version": "1.10.2"
+                }
+            },
+        ],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "x86_64"
+                ],
+                "buildorder": 20,
+                "name": "subversion",
+                "ref": "422d6ce5d5ac80f246ecaf58a6be1957d18a9147"
+            }
+        ],
+        "context": "78111232",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "subversion-devel",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-powertools"
+        },
+        "stream": "1.10",
+        "type": "module",
+        "version": 8070020220711155714
+    }
+
+
+@pytest.fixture
+def beholder_subversion_package_response():
+    return {
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "packages": {
+            "closest": [
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "subversion-devel",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "subversion-ruby",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-powertools"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "subversion-devel",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-powertools"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "subversion-devel",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-powertools"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "subversion-debugsource",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "subversion-debugsource",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "subversion-debugsource",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "aarch64",
+                    "epoch": 0,
+                    "name": "subversion-debuginfo",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "aarch64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "subversion-debuginfo",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "subversion-debuginfo",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-appstream-debuginfo"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "i686",
+                    "epoch": 0,
+                    "name": "subversion-ruby",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-powertools"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "x86_64",
+                    "epoch": 0,
+                    "name": "subversion-ruby",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "x86_64",
+                            "name": "almalinux-8-powertools"
+                        }
+                    ],
+                    "version": "1.10.2"
+                },
+                {
+                    "arch": "src",
+                    "epoch": 0,
+                    "name": "subversion",
+                    "release": "5.module_el8.7.0+1146+633d65ff",
+                    "repositories": [
+                        {
+                            "arch": "src",
+                            "name": "almalinux-8-appstream"
+                        }
+                    ],
+                    "version": "1.10.2"
+                }
+            ]
+        },
+        "sourcerpm": {
+            "epoch": 0,
+            "name": "subversion",
+            "release": "5.module_el8.7.0+1146+633d65ff",
+            "version": "1.10.2"
+        },
+        "type": "package"
+    }
+
+
+@pytest.fixture
 @pytest.mark.anyio
 def mock_beholder_call(
     monkeypatch,
@@ -1349,7 +1802,10 @@ def mock_beholder_call(
     beholder_rubygem_pg_response: dict,
     beholder_ruby_package_response: dict,
     beholder_ruby_devel_response: dict,
-    beholder_ruby_response: dict
+    beholder_ruby_response: dict,
+    beholder_subversion_devel_response: dict,
+    beholder_subversion_response: dict,
+    beholder_subversion_package_response: dict,
 ):
     async def func(*args, **kwargs):
         *_, endpoint = args
@@ -1371,6 +1827,12 @@ def mock_beholder_call(
             return beholder_ruby_devel_response
         if 'rubygem-pg-1.3.5-1.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
             return beholder_rubygem_pg_response
+        if '/module/subversion-devel/1.10/x86_64/' in endpoint:
+            return beholder_subversion_devel_response
+        if '/module/subversion/1.10/x86_64/' in endpoint:
+            return beholder_subversion_response
+        if 'subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm' in endpoint:
+            return beholder_subversion_package_response
 
     monkeypatch.setattr(MultilibProcessor, 'call_beholder', func)
 

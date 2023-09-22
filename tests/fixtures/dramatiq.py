@@ -66,6 +66,23 @@ async def start_modular_ruby_build(
         BuildCreate(**ruby_build_payload),
     )
 
+
+@pytest.mark.anyio
+@pytest.fixture
+async def start_modular_subversion_build(
+    subversion_modular_build: Build,
+    subversion_build_payload: dict,
+    create_multilib_module,
+    create_build_rpm_repo,
+    create_log_repo,
+    modify_repository,
+):
+    await _start_build(
+        subversion_modular_build.id,
+        BuildCreate(**subversion_build_payload),
+    )
+
+
 @pytest.mark.anyio
 @pytest.fixture
 async def start_build(
@@ -242,6 +259,35 @@ async def ruby_build_done(
                 f"rubygem-pg-debuginfo-3.1.2-141.module_el8.1.0+8+503f6fbd.{build_task.arch}.rpm",
                 "rubygem-pg-doc-3.3.7-141.module_el8.1.0+8+503f6fbd.noarch.rpm",
             ]
+        await safe_build_done(
+            session,
+            BuildDone(**prepare_build_done_payload(build_task.id, packages)),
+        )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def subversion_build_done(
+    session: AsyncSession,
+    subversion_modular_build: Build,
+    modify_repository,
+    start_modular_subversion_build,
+    create_entity,
+    get_rpm_packages_info,
+    get_repo_subversion_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=subversion_modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        packages = [
+            "subversion-1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm",
+            f"subversion-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
+            f"subversion-debuginfo-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
+            f"subversion-debugsource-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
+            f"subversion-devel-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
+            f"subversion-ruby-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
+        ]
         await safe_build_done(
             session,
             BuildDone(**prepare_build_done_payload(build_task.id, packages)),
