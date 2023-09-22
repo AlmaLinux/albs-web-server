@@ -1,7 +1,7 @@
 """Gen community sign key
 
 Revision ID: cd510df3fa79
-Revises: cd510df3fa78
+Revises: 9b1d146ab424
 Create Date: 2023-06-22 12:35:00.000000
 
 """
@@ -12,7 +12,7 @@ from alws.constants import GenKeyStatus
 
 # revision identifiers, used by Alembic.
 revision = 'cd510df3fa79'
-down_revision = 'cd510df3fa78'
+down_revision = '9b1d146ab424'
 branch_labels = None
 depends_on = None
 
@@ -42,7 +42,7 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["product_id"],
             ["products.id"],
-            name='gen_key_task_product_id_fkey'
+            name='gen_key_task_product_id_fkey',
         ),
         sa.PrimaryKeyConstraint("id"),
     )
