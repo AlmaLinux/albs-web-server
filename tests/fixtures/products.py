@@ -16,30 +16,30 @@ from tests.constants import ADMIN_USER_ID
         ADMIN_USER_ID,
     ]
 )
-def product_create_payload(request) -> dict:
-    return {
-        "name": "AlmaLinux",
-        "owner_id": request.param,
-        "title": "AlmaLinux",
-        "description": "",
-        "platforms": [
-            {
-                "id": 1,
-                "name": "AlmaLinux-8",
-                "distr_type": "rhel",
-                "distr_version": "8",
-                "arch_list": [
-                    "i686",
-                    "x86_64",
-                    "ppc64le",
-                    "aarch64",
-                    "s390x",
-                ],
-                "modularity": {},
-            },
-        ],
-        "is_community": False,
-    }
+# def product_create_payload(request) -> dict:
+#     return {
+#         "name": "AlmaLinux",
+#         "owner_id": request.param,
+#         "title": "AlmaLinux",
+#         "description": "",
+#         "platforms": [
+#             {
+#                 "id": 1,
+#                 "name": "AlmaLinux-8",
+#                 "distr_type": "rhel",
+#                 "distr_version": "8",
+#                 "arch_list": [
+#                     "i686",
+#                     "x86_64",
+#                     "ppc64le",
+#                     "aarch64",
+#                     "s390x",
+#                 ],
+#                 "modularity": {},
+#             },
+#         ],
+#         "is_community": False,
+#     }
 
 
 @pytest.fixture(
