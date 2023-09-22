@@ -11,11 +11,11 @@ from alws.schemas.product_schema import ProductCreate
 from tests.constants import ADMIN_USER_ID
 
 
-@pytest.fixture(
-    params=[
-        ADMIN_USER_ID,
-    ]
-)
+# @pytest.fixture(
+#     params=[
+#         ADMIN_USER_ID,
+#     ]
+# )
 # def product_create_payload(request) -> dict:
 #     return {
 #         "name": "AlmaLinux",
