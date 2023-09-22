@@ -13,6 +13,23 @@ from tests.mock_classes import BaseAsyncTestCase
     "create_repo",
 )
 class TestProductsEndpoints(BaseAsyncTestCase):
+
+    async def _remove_products_team(self, product_payload):
+        endpoint = "/api/v1/teams/"
+        response = await self.make_request(
+            "get",
+            endpoint
+        )
+        team_id = [
+            team['id'] for team in response.json()
+            if team['name'] == f'{product_payload.name}_team'
+        ][0]
+        endpoint = f"/api/v1/teams/{team_id}/remove/"
+        response = await self.make_request(
+            "delete",
+            endpoint
+        )
+
     async def test_product_create(
             self,
             product_create_payload,
@@ -42,6 +59,9 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot remove product:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
+
+        # remove a product's team
+        await self._remove_products_team(user_product)
 
     async def test_add_to_product(
         self,
@@ -130,6 +150,9 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         await session.delete(regular_build_with_user_product)
         await session.commit()
 
+        # remove a product's team
+        await self._remove_products_team(user_product)
+
     async def test_user_product_remove(
         self,
         session: AsyncSession,
@@ -144,3 +167,6 @@ class TestProductsEndpoints(BaseAsyncTestCase):
             "Cannot remove product:",
         )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
+
+        # remove a product's team
+        await self._remove_products_team(user_product)
