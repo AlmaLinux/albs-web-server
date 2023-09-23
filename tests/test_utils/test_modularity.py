@@ -1,4 +1,4 @@
-from alws.utils.modularity import ModuleWrapper, IndexWrapper
+from alws.utils.modularity import IndexWrapper
 from alws.utils.parsing import parse_rpm_nevra
 
 
@@ -25,12 +25,12 @@ def test_add_rpm_artifact(
                 "epoch": pkg_nevra.epoch,
                 "version": pkg_nevra.version,
                 "release": pkg_nevra.release,
-                "arch": pkg_nevra.arch
+                "arch": pkg_nevra.arch,
             }
             _module.add_rpm_artifact(pkg)
         module_with_artifacts = module_index_with_artifacts.get_module(
             name=_module.name,
-            stream=_module.stream
+            stream=_module.stream,
         )
         artifacts = module_with_artifacts.get_rpm_artifacts()
 
