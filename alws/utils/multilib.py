@@ -134,7 +134,7 @@ class MultilibProcessor:
         endpoint = f"api/v1/distros/{ref_name}/{ref_ver}/project/{src_rpm}"
         response = await self.call_beholder(self._beholder_client, endpoint)
         query = (
-            "packages[?arch=='i686']"
+            "packages.*[?arch=='i686'][]"
             ".{name: name, version: version, repos: repositories}"
         )
         return await self.parse_response(query, response)
