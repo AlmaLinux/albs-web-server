@@ -529,7 +529,6 @@ async def __process_build_task_artifacts(
     status: BuildTaskStatus,
     git_commit_hash: typing.Optional[str],
 ) -> typing.Tuple[models.BuildTask, typing.Dict[str, typing.Dict[str, str]]]:
-
     def _get_srpm_name(
         artifacts: list[BuildDoneArtifact],
         task: models.BuildTask,
