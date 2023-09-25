@@ -22,6 +22,7 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema
+from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.modularity import IndexWrapper
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
@@ -524,10 +525,30 @@ async def __process_build_task_artifacts(
     db: AsyncSession,
     pulp_client: PulpClient,
     task_id: int,
-    task_artifacts: list,
+    task_artifacts: list[BuildDoneArtifact],
     status: BuildTaskStatus,
     git_commit_hash: typing.Optional[str],
 ) -> typing.Tuple[models.BuildTask, typing.Dict[str, typing.Dict[str, str]]]:
+
+    def _get_srpm_name(
+        artifacts: list[BuildDoneArtifact],
+        task: models.BuildTask,
+    ) -> str:
+        srpm_url = task.built_srpm_url
+        srpm_name = next(
+            (
+                artifact.name
+                for artifact in artifacts
+                if artifact.arch == "src" and artifact.type == "rpm"
+            ),
+            # We extract a source RPM name from its URL
+            # if sRPM is absent in artifacts
+            # URL looks like
+            # AlmaLinux-9-src-20-br/Packages/b/bind-9.16.23-11.el9_2.1.src.rpm
+            srpm_url.rsplit(sep='/', maxsplit=1)[-1] if srpm_url else None,
+        )
+        return srpm_name
+
     processing_stats = {}
     build_tasks = await db.execute(
         select(models.BuildTask)
@@ -580,13 +601,9 @@ async def __process_build_task_artifacts(
     log_repository = [
         repo for repo in repositories if repo.type == "build_log"
     ][0]
-    src_rpm = next(
-        (
-            artifact.name
-            for artifact in task_artifacts
-            if artifact.arch == "src" and artifact.type == "rpm"
-        ),
-        None,
+    src_rpm = _get_srpm_name(
+        artifacts=task_artifacts,
+        task=build_task,
     )
     # If we have RPM artifacts but missing source RPM
     # then we should throw an error
