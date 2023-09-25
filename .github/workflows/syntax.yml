@@ -47,4 +47,4 @@ jobs:
       - name: Run black
         run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alembic --check -l 79 --skip-string-normalization --diff --color
       - name: Run isort
-        run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --profile black --check-only --py 39
+        run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39 --split-on-trailing-comma
