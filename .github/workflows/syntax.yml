@@ -1,0 +1,50 @@
+name: syntax
+on:
+  pull_request_target:
+    branches:
+      - "**"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v39
+        with:
+          files: |
+            **/*.py
+      - name: Prepare python env
+        run: |
+          python -m venv env
+          source env/bin/activate
+          pip install -U pip
+          pip install -r requirements.txt
+          pip install isort[colors] black pylint[spelling]
+      - name: Run pylint
+        id: pylint
+        run: |
+          delimiter='$(openssl rand -hex 8)'
+          echo 'report<<$(delimiter)' >> $GITHUB_OUTPUT
+          env/bin/pylint ${{ steps.changed-files.outputs.all_changed_files }} --py-version 3.9 --max-line-length 80 --spelling-dict en_US --fail-under=8 >> $GITHUB_OUTPUT
+          echo '$(delimiter)' >> $GITHUB_OUTPUT
+      - name: Post pylint output
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            <details>
+              <summary>pylint output</summary>
+
+            ```
+            ${{ steps.pylint.outputs.report }}
+            ```
+            </details>
+          message-id: pylint-report
+      - name: Run black
+        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alembic --check -l 79 --skip-string-normalization --diff --color
+      - name: Run isort
+        run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --profile black --check-only --py 39
