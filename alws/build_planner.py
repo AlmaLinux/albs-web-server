@@ -177,12 +177,12 @@ class BuildPlanner:
 
     @staticmethod
     async def get_platform_multilib_artifacts(
-            beholder_client: BeholderClient,
-            platform_name: str, platform_version: str,
-            task: build_schema.BuildTaskModuleRef,
-            has_devel: bool = False
-    ) -> typing.List[dict]:
-        multilib_artifacts = []
+        beholder_client: BeholderClient,
+        platform_name: str, platform_version: str,
+        task: build_schema.BuildTaskModuleRef,
+        has_devel: bool = False
+    ) -> typing.Dict[str, typing.List[dict]]:
+        multilib_artifacts = {}
 
         multilib_packages = await MultilibProcessor.get_module_multilib_data(
             beholder_client, platform_name, platform_version,
@@ -193,18 +193,28 @@ class BuildPlanner:
             # Skip packages that are scheduled to be built
             if ref.enabled:
                 continue
+            if not ref.added_artifacts:
+                continue
+
+            project_name = ref.url.split('/')[-1].strip()
+            project_name = re.sub(r'\.git$', '', project_name)
+            if project_name not in multilib_artifacts:
+                multilib_artifacts[project_name] = []
+
             for artifact in ref.added_artifacts:
                 parsed_artifact = RpmArtifact.from_str(artifact)
                 if (parsed_artifact.arch == 'i686'
                         and parsed_artifact.name in multilib_set):
-                    multilib_artifacts.append(parsed_artifact.as_dict())
+                    multilib_artifacts[project_name].append(
+                        parsed_artifact.as_dict()
+                    )
 
         return multilib_artifacts
 
     async def get_multilib_artifacts(
             self, task: build_schema.BuildTaskModuleRef,
             has_devel: bool = False
-    ) -> typing.Dict[str, typing.List[dict]]:
+    ) -> typing.Dict[str, dict]:
 
         if not settings.package_beholder_enabled:
             return {}
@@ -325,6 +335,13 @@ class BuildPlanner:
         built_artifacts = await self.get_prebuilt_module_artifacts(
             task, platform.name, platform.distr_version, task_arch)
 
+        multilib_artifacts = {}
+        if task_arch == 'x86_64':
+            multilib_artifacts = await self.get_multilib_artifacts(
+                task,
+                has_devel=index.has_devel_module()
+            )
+            multilib_artifacts = multilib_artifacts.get(platform.name, {})
         for module in index.iter_modules():
             for ref in task.refs:
                 if ref.enabled:
@@ -332,6 +349,21 @@ class BuildPlanner:
 
                 project_name = ref.url.split('/')[-1].strip()
                 project_name = re.sub(r'\.git$', '', project_name)
+
+                for artifact in ref.added_artifacts:
+                    parsed_artifact = RpmArtifact.from_str(artifact)
+                    if parsed_artifact.arch in allowed_arches:
+                        module.add_rpm_artifact(parsed_artifact.as_dict())
+
+                if multilib_artifacts:
+                    await MultilibProcessor.update_module_index(
+                        index,
+                        task.module_name,
+                        task.module_stream,
+                        multilib_artifacts[project_name],
+                        src_name=project_name,
+                    )
+
                 project_built_artifacts = built_artifacts.get(
                     module.name, {}).get(project_name, [])
                 if not project_built_artifacts:
@@ -339,18 +371,6 @@ class BuildPlanner:
                 for artifact in project_built_artifacts:
                     if artifact['arch'] in allowed_arches:
                         module.add_rpm_artifact(artifact)
-
-        if task_arch == 'x86_64':
-            # FIXME: For now we have only 1 platform, so pass multilib findings
-            #  accordingly
-            multilib_artifacts = await self.get_multilib_artifacts(
-                task, has_devel=index.has_devel_module())
-            multilib_artifacts = multilib_artifacts.get(platform.name, [])
-            await MultilibProcessor.update_module_index(
-                index, task.module_name, task.module_stream,
-                multilib_artifacts
-            )
-
         return index
 
     async def add_task(self, task: build_schema.BuildTaskRef):

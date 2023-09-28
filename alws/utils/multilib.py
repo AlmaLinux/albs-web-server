@@ -313,14 +313,20 @@ class MultilibProcessor:
         module_name: str,
         module_stream: str,
         packages: typing.List[typing.Dict[str, typing.Any]],
+        src_name: str,
     ):
         if not packages:
             return
 
-        # Ruby and Python modules should have multilib in their main module
-        if "ruby" in module_name or "python" in module_name:
-            module = module_index.get_module(module_name, module_stream)
-        else:
+        module = module_index.get_module(module_name, module_stream)
+        devel = False
+        for component_name, component in module.iter_components():
+            if component_name != src_name:
+                continue
+
+            arches = component.get_multilib_arches()
+            devel = not arches
+        if devel:
             module = module_index.get_module(
                 f"{module_name}-devel", module_stream
             )
@@ -330,6 +336,7 @@ class MultilibProcessor:
 
     async def add_multilib_module_artifacts(
         self,
+        src_name: str,
         prepared_artifacts: typing.Optional[typing.List[dict]] = None,
     ):
         if not self._module_index:
@@ -364,6 +371,7 @@ class MultilibProcessor:
                 module_name,
                 module_stream,
                 packages,
+                src_name
             )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e

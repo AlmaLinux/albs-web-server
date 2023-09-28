@@ -23,7 +23,7 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import clean_release, parse_rpm_nevra
@@ -669,7 +669,9 @@ async def __process_build_task_artifacts(
                 {i["name"]: i["version"] for i in multilib_module_artifacts}
             )
             await processor.add_multilib_packages(multilib_packages)
+            parsed_src = RpmArtifact.from_str(src_rpm)
             await processor.add_multilib_module_artifacts(
+                src_name=parsed_src.name,
                 prepared_artifacts=multilib_module_artifacts
             )
         else:
