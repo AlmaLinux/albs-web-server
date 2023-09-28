@@ -2,26 +2,26 @@ import asyncio
 import collections
 import itertools
 import logging
-import typing
 import re
+import typing
 
-from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
 
 from alws import models
-from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.config import settings
+from alws.constants import BuildTaskRefType, BuildTaskStatus
+from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.schemas import build_schema
-from alws.constants import BuildTaskStatus, BuildTaskRefType
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import (
     GiteaClient,
 )
 from alws.utils.modularity import (
-    calc_dist_macro,
     IndexWrapper,
     ModuleWrapper,
     RpmArtifact,
+    calc_dist_macro,
 )
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.parsing import get_clean_distr_name, parse_git_ref
@@ -31,25 +31,21 @@ __all__ = ['BuildPlanner']
 
 
 class BuildPlanner:
-
     def __init__(
-                self,
-                db: Session,
-                build: models.Build,
-                platforms: typing.List[build_schema.BuildCreatePlatforms],
-                platform_flavors: typing.Optional[typing.List[int]],
-                is_secure_boot: bool,
-                module_build_index: typing.Optional[dict],
-            ):
+        self,
+        db: Session,
+        build: models.Build,
+        platforms: typing.List[build_schema.BuildCreatePlatforms],
+        platform_flavors: typing.Optional[typing.List[int]],
+        is_secure_boot: bool,
+        module_build_index: typing.Optional[dict],
+    ):
         self._db = db
         self._gitea_client = GiteaClient(
-            settings.gitea_host,
-            logging.getLogger(__name__)
+            settings.gitea_host, logging.getLogger(__name__)
         )
         self._pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
+            settings.pulp_host, settings.pulp_user, settings.pulp_password
         )
         self._build = build
         self._task_index = 0
@@ -64,15 +60,20 @@ class BuildPlanner:
         self._is_secure_boot = is_secure_boot
         for platform in platforms:
             self._request_platforms[platform.name] = platform.arch_list
-            self._parallel_modes[platform.name] = platform.parallel_mode_enabled
+            self._parallel_modes[
+                platform.name
+            ] = platform.parallel_mode_enabled
         self.load_platforms()
         if platform_flavors:
             self.load_platform_flavors(platform_flavors)
 
     def load_platforms(self):
         platform_names = list(self._request_platforms.keys())
-        self._platforms = self._db.execute(select(models.Platform).where(
-            models.Platform.name.in_(platform_names)))
+        self._platforms = self._db.execute(
+            select(models.Platform).where(
+                models.Platform.name.in_(platform_names)
+            )
+        )
         self._platforms = self._platforms.scalars().all()
         if len(self._platforms) != len(platform_names):
             found_platforms = {platform.name for platform in self._platforms}
@@ -84,11 +85,15 @@ class BuildPlanner:
             )
 
     def load_platform_flavors(self, flavors):
-        db_flavors = self._db.execute(
-            select(models.PlatformFlavour)
-            .where(models.PlatformFlavour.id.in_(flavors))
-            .options(selectinload(models.PlatformFlavour.repos))
-        ).scalars().all()
+        db_flavors = (
+            self._db.execute(
+                select(models.PlatformFlavour)
+                .where(models.PlatformFlavour.id.in_(flavors))
+                .options(selectinload(models.PlatformFlavour.repos))
+            )
+            .scalars()
+            .all()
+        )
         if db_flavors:
             self._platform_flavors = db_flavors
 
@@ -97,23 +102,24 @@ class BuildPlanner:
             return False
         found = False
         for flavor in self._platform_flavors:
-            if found := bool(re.search(r'(-beta)$', flavor.name, re.IGNORECASE)):
+            if found := bool(
+                re.search(r'(-beta)$', flavor.name, re.IGNORECASE)
+            ):
                 break
         return found
 
     async def create_build_repo(
-                self,
-                platform: models.Platform,
-                arch: str,
-                repo_type: str,
-                is_debug: typing.Optional[bool] = False,
-            ):
+        self,
+        platform: models.Platform,
+        arch: str,
+        repo_type: str,
+        is_debug: typing.Optional[bool] = False,
+    ):
         debug_suffix = 'debug-' if is_debug else ''
-        repo_name = (
-            f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}br'
-        )
+        repo_name = f'{platform.name}-{arch}-{self._build.id}-{debug_suffix}br'
         repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
-            repo_name)
+            repo_name
+        )
         modules = self._modules_by_target.get((platform.name, arch), [])
         if modules and not is_debug:
             await self._pulp_client.modify_repository(
@@ -125,22 +131,24 @@ class BuildPlanner:
             arch=arch,
             pulp_href=pulp_href,
             type=repo_type,
-            debug=is_debug
+            debug=is_debug,
         )
         self._build.repos.append(repo)
 
-    async def create_log_repo(self, repo_type: str,
-                              repo_prefix: str = 'build_logs'):
+    async def create_log_repo(
+        self, repo_type: str, repo_prefix: str = 'build_logs'
+    ):
         repo_name = f'build-{self._build.id}-{repo_type}'
         repo_url, repo_href = await self._pulp_client.create_log_repo(
-            repo_name, distro_path_start=repo_prefix)
+            repo_name, distro_path_start=repo_prefix
+        )
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
             arch='log',
             pulp_href=repo_href,
             type=repo_type,
-            debug=False
+            debug=False,
         )
         self._build.repos.append(repo)
 
@@ -149,23 +157,21 @@ class BuildPlanner:
 
         # Add build log and test log repositories
         for repo_type, repo_prefix in (
-                ('build_log', 'build_logs'), ('test_log', 'test_logs')):
-            tasks.append(self.create_log_repo(
-                repo_type, repo_prefix=repo_prefix))
+            ('build_log', 'build_logs'),
+            ('test_log', 'test_logs'),
+        ):
+            tasks.append(
+                self.create_log_repo(repo_type, repo_prefix=repo_prefix)
+            )
 
         for platform in self._platforms:
             for arch in self._request_platforms[platform.name]:
-                tasks.append(self.create_build_repo(
-                    platform,
-                    arch,
-                    'rpm'
-                ))
-                tasks.append(self.create_build_repo(
-                    platform,
-                    arch,
-                    'rpm',
-                    is_debug=True
-                ))
+                tasks.append(self.create_build_repo(platform, arch, 'rpm'))
+                tasks.append(
+                    self.create_build_repo(
+                        platform, arch, 'rpm', is_debug=True
+                    )
+                )
 
             # Add source RPM repository
             tasks.append(self.create_build_repo(platform, 'src', 'rpm'))
@@ -178,15 +184,21 @@ class BuildPlanner:
     @staticmethod
     async def get_platform_multilib_artifacts(
         beholder_client: BeholderClient,
-        platform_name: str, platform_version: str,
+        platform_name: str,
+        platform_version: str,
         task: build_schema.BuildTaskModuleRef,
-        has_devel: bool = False
+        has_devel: bool = False,
     ) -> typing.Dict[str, typing.List[dict]]:
         multilib_artifacts = {}
 
         multilib_packages = await MultilibProcessor.get_module_multilib_data(
-            beholder_client, platform_name, platform_version,
-            task.module_name, task.module_stream, has_devel=has_devel)
+            beholder_client,
+            platform_name,
+            platform_version,
+            task.module_name,
+            task.module_stream,
+            has_devel=has_devel,
+        )
         multilib_set = {pkg['name'] for pkg in multilib_packages}
 
         for ref in task.refs:
@@ -203,8 +215,10 @@ class BuildPlanner:
 
             for artifact in ref.added_artifacts:
                 parsed_artifact = RpmArtifact.from_str(artifact)
-                if (parsed_artifact.arch == 'i686'
-                        and parsed_artifact.name in multilib_set):
+                if (
+                    parsed_artifact.arch == 'i686'
+                    and parsed_artifact.name in multilib_set
+                ):
                     multilib_artifacts[project_name].append(
                         parsed_artifact.as_dict()
                     )
@@ -212,23 +226,27 @@ class BuildPlanner:
         return multilib_artifacts
 
     async def get_multilib_artifacts(
-            self, task: build_schema.BuildTaskModuleRef,
-            has_devel: bool = False
+        self, task: build_schema.BuildTaskModuleRef, has_devel: bool = False
     ) -> typing.Dict[str, dict]:
-
         if not settings.package_beholder_enabled:
             return {}
 
         beholder_client = BeholderClient(
-            settings.beholder_host, token=settings.beholder_token)
+            settings.beholder_host, token=settings.beholder_token
+        )
         multilib_artifacts = {}
 
         for platform in self._platforms:
             platform_name = get_clean_distr_name(platform.name)
-            multilib_artifacts[platform.name] = \
-                await self.get_platform_multilib_artifacts(
-                    beholder_client, platform_name, platform.distr_version,
-                    task, has_devel=has_devel)
+            multilib_artifacts[
+                platform.name
+            ] = await self.get_platform_multilib_artifacts(
+                beholder_client,
+                platform_name,
+                platform.distr_version,
+                task,
+                has_devel=has_devel,
+            )
 
         return multilib_artifacts
 
@@ -265,8 +283,10 @@ class BuildPlanner:
                     stable_pkg_name = stable_pkg['name']
                     stable_pkg_arch = stable_pkg['arch']
                     for beta_pkg in beta_projects[proj_name]:
-                        if (stable_pkg_name == beta_pkg['name']
-                                and stable_pkg_arch == beta_pkg['arch']):
+                        if (
+                            stable_pkg_name == beta_pkg['name']
+                            and stable_pkg_arch == beta_pkg['arch']
+                        ):
                             update_found = True
                             new_packages.append(beta_pkg)
                             break
@@ -280,33 +300,43 @@ class BuildPlanner:
         return merged
 
     async def get_prebuilt_module_artifacts(
-            self,
-            task: build_schema.BuildTaskModuleRef,
-            platform_name: str, platform_version: str, task_arch: str,
+        self,
+        task: build_schema.BuildTaskModuleRef,
+        platform_name: str,
+        platform_version: str,
+        task_arch: str,
     ) -> dict:
-
         if not settings.package_beholder_enabled:
             return {}
 
         beholder = BeholderClient(
-            settings.beholder_host, token=settings.beholder_token)
+            settings.beholder_host, token=settings.beholder_token
+        )
         clean_name = get_clean_distr_name(platform_name)
         arch = task_arch
         if task_arch == 'i686':
             arch = 'x86_64'
         artifacts = await beholder.get_module_artifacts(
-            clean_name, platform_version, task.module_name,
-            task.module_stream, arch)
+            clean_name,
+            platform_version,
+            task.module_name,
+            task.module_stream,
+            arch,
+        )
 
         # Include data from beta flavor for partial updates
         if self.is_beta_build():
             beta_artifacts = await beholder.get_module_artifacts(
-                f'{clean_name}-beta', platform_version, task.module_name,
-                task.module_stream, arch
+                f'{clean_name}-beta',
+                platform_version,
+                task.module_name,
+                task.module_stream,
+                arch,
             )
             if beta_artifacts:
                 artifacts = self.merge_beta_module_artifacts(
-                    artifacts, beta_artifacts)
+                    artifacts, beta_artifacts
+                )
 
         reprocessed = {}
         for module_name, projects in artifacts.items():
@@ -321,8 +351,10 @@ class BuildPlanner:
         return reprocessed
 
     async def prepare_module_index(
-            self, platform: models.Platform,
-            task: build_schema.BuildTaskModuleRef, task_arch: str
+        self,
+        platform: models.Platform,
+        task: build_schema.BuildTaskModuleRef,
+        task_arch: str,
     ) -> IndexWrapper:
         allowed_arches = (task_arch, 'src', 'noarch')
         index = IndexWrapper.from_template(task.modules_yaml)
@@ -333,13 +365,13 @@ class BuildPlanner:
 
         # Refill modules index with data from beholder
         built_artifacts = await self.get_prebuilt_module_artifacts(
-            task, platform.name, platform.distr_version, task_arch)
+            task, platform.name, platform.distr_version, task_arch
+        )
 
         multilib_artifacts = {}
         if task_arch == 'x86_64':
             multilib_artifacts = await self.get_multilib_artifacts(
-                task,
-                has_devel=index.has_devel_module()
+                task, has_devel=index.has_devel_module()
             )
             multilib_artifacts = multilib_artifacts.get(platform.name, {})
         for module in index.iter_modules():
@@ -365,7 +397,8 @@ class BuildPlanner:
                     )
 
                 project_built_artifacts = built_artifacts.get(
-                    module.name, {}).get(project_name, [])
+                    module.name, {}
+                ).get(project_name, [])
                 if not project_built_artifacts:
                     continue
                 for artifact in project_built_artifacts:
@@ -380,7 +413,9 @@ class BuildPlanner:
                     url=task.url,
                     git_ref=task.git_ref,
                     ref_type=task.ref_type,
-                    test_configuration=task.test_configuration.dict() if task.test_configuration else None,
+                    test_configuration=task.test_configuration.dict()
+                    if task.test_configuration
+                    else None,
                 ),
                 mock_options=task.mock_options,
             )
@@ -409,8 +444,11 @@ class BuildPlanner:
                 url=ref.url,
                 git_ref=ref.git_ref,
                 ref_type=BuildTaskRefType.GIT_BRANCH,
-                test_configuration=ref.test_configuration.dict() if ref.test_configuration else None,
-            ) for ref in raw_refs
+                test_configuration=ref.test_configuration.dict()
+                if ref.test_configuration
+                else None,
+            )
+            for ref in raw_refs
         ]
         if not refs:
             raise EmptyBuildError
@@ -431,15 +469,18 @@ class BuildPlanner:
                 flavour_versions = [
                     flavour.modularity['versions']
                     for flavour in self._platform_flavors
-                    if flavour.modularity and flavour.modularity.get('versions')
+                    if flavour.modularity
+                    and flavour.modularity.get('versions')
                 ]
                 modularity_version = next(
-                    item for item in itertools.chain(
-                        platform.modularity['versions'], *flavour_versions)
+                    item
+                    for item in itertools.chain(
+                        platform.modularity['versions'], *flavour_versions
+                    )
                     if item['name'] == task.module_platform_version
                 )
             module_version = ModuleWrapper.generate_new_version(
-               modularity_version['version_prefix']
+                modularity_version['version_prefix']
             )
             if task.module_version:
                 module_version = int(task.module_version)
@@ -451,22 +492,24 @@ class BuildPlanner:
                 )
             for arch in self._request_platforms[platform.name]:
                 module_index = await self.prepare_module_index(
-                    platform, task, arch)
+                    platform, task, arch
+                )
                 module = module_index.get_module(
-                    task.module_name, task.module_stream)
+                    task.module_name, task.module_stream
+                )
                 module.add_module_dependencies_from_mock_defs(
-                    enabled_modules=task.enabled_modules)
+                    enabled_modules=task.enabled_modules
+                )
                 mock_options['module_enable'] = mock_enabled_modules
                 module.version = module_version
                 module.context = module.generate_new_context()
                 module.arch = arch
-                module.set_arch_list(
-                    self._request_platforms[platform.name]
-                )
+                module.set_arch_list(self._request_platforms[platform.name])
                 module_index.add_module(module)
                 if module_index.has_devel_module() and not module.is_devel:
                     devel_module = module_index.get_module(
-                        f'{task.module_name}-devel', task.module_stream)
+                        f'{task.module_name}-devel', task.module_stream
+                    )
                     devel_module.version = module.version
                     devel_module.context = module.context
                     devel_module.arch = module.arch
@@ -474,13 +517,17 @@ class BuildPlanner:
                         self._request_platforms[platform.name]
                     )
                     devel_module.add_module_dependency_to_devel_module(
-                        module=module)
-                module_pulp_href, sha256 = await self._pulp_client.create_module(
+                        module=module
+                    )
+                (
+                    module_pulp_href,
+                    sha256,
+                ) = await self._pulp_client.create_module(
                     module_index.render(),
                     module.name,
                     module.stream,
                     module.context,
-                    module.arch
+                    module.arch,
                 )
                 db_module = models.RpmModule(
                     name=module.name,
@@ -489,10 +536,11 @@ class BuildPlanner:
                     context=module.context,
                     arch=module.arch,
                     pulp_href=module_pulp_href,
-                    sha256=sha256
+                    sha256=sha256,
                 )
                 self._modules_by_target[(platform.name, arch)].append(
-                    db_module)
+                    db_module
+                )
         all_modules = []
         for modules in self._modules_by_target.values():
             all_modules.extend(modules)
@@ -537,13 +585,15 @@ class BuildPlanner:
                 self._request_platforms[platform.name] = arch_list
             for arch in self._request_platforms[platform.name]:
                 modules = self._modules_by_target.get(
-                    (platform.name, arch), [])
+                    (platform.name, arch), []
+                )
                 if modules:
                     module = modules[0]
                     build_index = self._module_build_index.get(platform.name)
                     if not build_index:
                         raise ValueError(
-                            f'Build index for {platform.name} is not defined')
+                            f'Build index for {platform.name} is not defined'
+                        )
                     platform_dist = modularity_version['dist_prefix']
                     dist_macro = calc_dist_macro(
                         module.name,
@@ -551,12 +601,14 @@ class BuildPlanner:
                         int(module.version),
                         module.context,
                         build_index,
-                        platform_dist
+                        platform_dist,
                     )
                     if not dist_taken_by_user:
                         mock_options['definitions']['dist'] = dist_macro
                 if not dist_taken_by_user and parsed_dist_macro:
-                    mock_options['definitions']['dist'] = f'.{parsed_dist_macro}'
+                    mock_options['definitions'][
+                        'dist'
+                    ] = f'.{parsed_dist_macro}'
                 build_task = models.BuildTask(
                     arch=arch,
                     platform=platform,

@@ -371,7 +371,7 @@ class MultilibProcessor:
                 module_name,
                 module_stream,
                 packages,
-                src_name
+                src_name,
             )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e

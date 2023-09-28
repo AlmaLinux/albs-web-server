@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.crud.products import create_product
 from alws.models import Product
 from alws.schemas.product_schema import ProductCreate
-
 from tests.constants import ADMIN_USER_ID
 
 
@@ -76,9 +75,7 @@ def user_product_create_payload(request) -> dict:
 @pytest.mark.anyio
 @pytest.fixture
 async def base_product(
-    session: AsyncSession,
-    product_create_payload: dict,
-    create_repo
+    session: AsyncSession, product_create_payload: dict, create_repo
 ) -> AsyncIterable[Product]:
     product = (
         (

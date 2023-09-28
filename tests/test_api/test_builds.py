@@ -122,12 +122,8 @@ class TestModularBuilds(BaseAsyncTestCase):
             module_file = tmp_path / f"modules.{arch}.yaml"
             build_index = IndexWrapper.from_template(module_file.read_text())
             for build_module in build_index.iter_modules():
-                artifacts = modules_artifacts[
-                    f"{build_module.name}:{arch}"
-                ]
-                assert (
-                    build_module.get_rpm_artifacts() == artifacts
-                )
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_ruby(
         self,
@@ -162,12 +158,8 @@ class TestModularBuilds(BaseAsyncTestCase):
             module_file = tmp_path / f"modules.{arch}.yaml"
             build_index = IndexWrapper.from_template(module_file.read_text())
             for build_module in build_index.iter_modules():
-                artifacts = modules_artifacts[
-                    f"{build_module.name}:{arch}"
-                ]
-                assert (
-                    build_module.get_rpm_artifacts() == artifacts
-                )
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_subversion(
         self,
@@ -202,12 +194,8 @@ class TestModularBuilds(BaseAsyncTestCase):
             module_file = tmp_path / f"modules.{arch}.yaml"
             build_index = IndexWrapper.from_template(module_file.read_text())
             for build_module in build_index.iter_modules():
-                artifacts = modules_artifacts[
-                    f"{build_module.name}:{arch}"
-                ]
-                assert (
-                    build_module.get_rpm_artifacts() == artifacts
-                )
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_llvm(
         self,
@@ -241,9 +229,5 @@ class TestModularBuilds(BaseAsyncTestCase):
         module_file = tmp_path / "modules.i686.yaml"
         build_index = IndexWrapper.from_template(module_file.read_text())
         for build_module in build_index.iter_modules():
-            artifacts = modules_artifacts[
-                f"{build_module.name}:i686"
-            ]
-            assert (
-                build_module.get_rpm_artifacts() == artifacts
-            )
+            artifacts = modules_artifacts[f"{build_module.name}:i686"]
+            assert build_module.get_rpm_artifacts() == artifacts

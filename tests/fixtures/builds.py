@@ -289,12 +289,8 @@ def ruby_build_payload():
         "platforms": [
             {
                 "name": "AlmaLinux-8",
-                "arch_list": [
-                    "i686",
-                    "x86_64",
-                    "aarch64"
-                ],
-                "parallel_mode_enabled": True
+                "arch_list": ["i686", "x86_64", "aarch64"],
+                "parallel_mode_enabled": True,
             }
         ],
         "tasks": [
@@ -308,12 +304,9 @@ def ruby_build_payload():
                         "added_artifacts": [],
                         "mock_options": {
                             "definitions": {},
-                            "module_enable": [
-                                "ruby:3.1",
-                                "ruby-devel:3.1"
-                            ]
+                            "module_enable": ["ruby:3.1", "ruby-devel:3.1"],
                         },
-                        "ref_type": 1
+                        "ref_type": 1,
                     },
                     {
                         "url": "https://git.almalinux.org/rpms/rubygem-pg.git",
@@ -323,24 +316,18 @@ def ruby_build_payload():
                         "added_artifacts": [],
                         "mock_options": {
                             "definitions": {},
-                            "module_enable": [
-                                "ruby:3.1",
-                                "ruby-devel:3.1"
-                            ]
+                            "module_enable": ["ruby:3.1", "ruby-devel:3.1"],
                         },
-                        "ref_type": 1
-                    }
+                        "ref_type": 1,
+                    },
                 ],
                 "modules_yaml": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: ruby\n  stream: \"3.1\"\n  summary: An interpreter of object-oriented scripting language\n  description: >-\n    Ruby is the interpreted scripting language for quick and easy object-oriented\n    programming.  It has many features to process text files and to do system management\n    tasks (as in Perl).  It is simple, straight-forward, and extensible.\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  references:\n    community: http://ruby-lang.org/\n    documentation: https://www.ruby-lang.org/en/documentation/\n    tracker: https://bugs.ruby-lang.org/\n  profiles:\n    common:\n      rpms:\n      - ruby\n  api:\n    rpms:\n    - ruby\n    - ruby-bundled-gems\n    - ruby-default-gems\n    - ruby-devel\n    - ruby-libs\n    - rubygem-abrt\n    - rubygem-bigdecimal\n    - rubygem-bundler\n    - rubygem-io-console\n    - rubygem-irb\n    - rubygem-json\n    - rubygem-minitest\n    - rubygem-mysql2\n    - rubygem-pg\n    - rubygem-power_assert\n    - rubygem-psych\n    - rubygem-rake\n    - rubygem-rdoc\n    - rubygem-test-unit\n    - rubygems\n    - rubygems-devel\n  components:\n    rpms:\n      ruby:\n        rationale: An interpreter of object-oriented scripting language\n        ref: f7bb4e8f3d0aefdb159718ac2164acdceeb2ce39\n        buildorder: 101\n        multilib: [x86_64]\n      rubygem-abrt:\n        rationale: ABRT support for Ruby\n        ref: 6f6f91e5b621808cf41fc475947950de56e71f56\n        buildorder: 102\n      rubygem-mysql2:\n        rationale: A simple, fast Mysql library for Ruby, binding to libmysql\n        ref: 7dce6c0006631d899b7b9b5836bf2aa321a24603\n        buildorder: 102\n      rubygem-pg:\n        rationale: A Ruby interface to the PostgreSQL RDBMS\n        ref: ccdbc3cfd207412b88cb787c25992b1162b1c326\n        buildorder: 102\n...\n\n---\ndocument: modulemd\nversion: 2\ndata:\n  name: ruby-devel\n  stream: \"3.1\"\n  summary: An interpreter of object-oriented scripting language\n  description: >-\n    Ruby is the interpreted scripting language for quick and easy object-oriented\n    programming.  It has many features to process text files and to do system management\n    tasks (as in Perl).  It is simple, straight-forward, and extensible.\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  references:\n    community: http://ruby-lang.org/\n    documentation: https://www.ruby-lang.org/en/documentation/\n    tracker: https://bugs.ruby-lang.org/\n  profiles:\n    common:\n      rpms:\n      - ruby\n  api:\n    rpms:\n    - ruby\n    - ruby-bundled-gems\n    - ruby-default-gems\n    - ruby-devel\n    - ruby-libs\n    - rubygem-abrt\n    - rubygem-bigdecimal\n    - rubygem-bundler\n    - rubygem-io-console\n    - rubygem-irb\n    - rubygem-json\n    - rubygem-minitest\n    - rubygem-mysql2\n    - rubygem-pg\n    - rubygem-power_assert\n    - rubygem-psych\n    - rubygem-rake\n    - rubygem-rdoc\n    - rubygem-test-unit\n    - rubygems\n    - rubygems-devel\n  components:\n    rpms:\n      ruby:\n        rationale: An interpreter of object-oriented scripting language\n        ref: f7bb4e8f3d0aefdb159718ac2164acdceeb2ce39\n        buildorder: 101\n        multilib: [x86_64]\n      rubygem-abrt:\n        rationale: ABRT support for Ruby\n        ref: 6f6f91e5b621808cf41fc475947950de56e71f56\n        buildorder: 102\n      rubygem-mysql2:\n        rationale: A simple, fast Mysql library for Ruby, binding to libmysql\n        ref: 7dce6c0006631d899b7b9b5836bf2aa321a24603\n        buildorder: 102\n      rubygem-pg:\n        rationale: A Ruby interface to the PostgreSQL RDBMS\n        ref: ccdbc3cfd207412b88cb787c25992b1162b1c326\n        buildorder: 102\n...\n",
                 "module_name": "ruby",
                 "module_stream": "3.1",
-                "enabled_modules": {
-                    "buildtime": [],
-                    "runtime": []
-                },
+                "enabled_modules": {"buildtime": [], "runtime": []},
                 "git_ref": "c8s-stream-3.1",
                 "module_platform_version": "8.8",
-                "selectedModules": {}
+                "selectedModules": {},
             }
         ],
         "linked_builds": [],
@@ -348,7 +335,7 @@ def ruby_build_payload():
         "mock_options": {},
         "platform_flavors": [],
         "test_configuration": {},
-        "product_id": 1
+        "product_id": 1,
     }
 
 
@@ -358,12 +345,8 @@ def subversion_build_payload():
         "platforms": [
             {
                 "name": "AlmaLinux-8",
-                "arch_list": [
-                    "i686",
-                    "x86_64",
-                    "aarch64"
-                ],
-                "parallel_mode_enabled": True
+                "arch_list": ["i686", "x86_64", "aarch64"],
+                "parallel_mode_enabled": True,
             }
         ],
         "tasks": [
@@ -381,38 +364,35 @@ def subversion_build_payload():
                                 "_without_python2": "1",
                                 "_with_python3": "1",
                                 "_without_bdb": "1",
-                                "_without_pyswig": "1"
+                                "_without_pyswig": "1",
                             },
                             "module_enable": [
                                 "subversion:1.10",
                                 "subversion-devel:1.10",
                                 "httpd:2.4",
-                                "swig:3.0"
-                            ]
+                                "swig:3.0",
+                            ],
                         },
-                        "ref_type": 1
+                        "ref_type": 1,
                     }
                 ],
                 "modules_yaml": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: subversion\n  stream: \"1.10\"\n  summary: Apache Subversion\n  description: >-\n    Apache Subversion, a Modern Version Control System\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      httpd: [2.4]\n      platform: [el8]\n      swig: [3.0]\n    requires:\n      platform: [el8]\n  references:\n    documentation: http://subversion.apache.org/docs/\n    tracker: https://issues.apache.org/jira/projects/SVN\n  profiles:\n    common:\n      rpms:\n      - subversion\n      - subversion-libs\n      - subversion-tools\n    server:\n      rpms:\n      - mod_dav_svn\n      - subversion\n      - subversion-libs\n      - subversion-tools\n  api:\n    rpms:\n    - mod_dav_svn\n    - subversion\n    - subversion-devel\n    - subversion-libs\n  filter:\n    rpms:\n    - libserf-devel\n    - python3-subversion\n    - subversion-ruby\n    - utf8proc-devel\n  buildopts:\n    rpms:\n      macros: >\n        %_without_kwallet 1\n\n        %_without_python2 1\n\n        %_with_python3 1\n\n        %_without_bdb 1\n\n        %_without_pyswig 1\n  components:\n    rpms:\n      libserf:\n        rationale: Build dependency.\n        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54\n        buildorder: 10\n      subversion:\n        rationale: Module API.\n        ref: a757409c2fc92983ed4ba21058e47f22941be59e\n        buildorder: 20\n      utf8proc:\n        rationale: Build dependency.\n        ref: 3a752429dbff2f4dc394a579715b23253339d776\n        buildorder: 10\n...\n\n---\ndocument: modulemd\nversion: 2\ndata:\n  name: subversion-devel\n  stream: \"1.10\"\n  summary: Apache Subversion\n  description: >-\n    Apache Subversion, a Modern Version Control System\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      httpd: [2.4]\n      platform: [el8]\n      swig: [3.0]\n    requires:\n      platform: [el8]\n  references:\n    documentation: http://subversion.apache.org/docs/\n    tracker: https://issues.apache.org/jira/projects/SVN\n  profiles:\n    common:\n      rpms:\n      - subversion\n      - subversion-libs\n      - subversion-tools\n    server:\n      rpms:\n      - mod_dav_svn\n      - subversion\n      - subversion-libs\n      - subversion-tools\n  api:\n    rpms:\n    - mod_dav_svn\n    - subversion\n    - subversion-devel\n    - subversion-libs\n  filter:\n    rpms:\n    - libserf-devel\n    - python3-subversion\n    - subversion-ruby\n    - utf8proc-devel\n  buildopts:\n    rpms:\n      macros: >\n        %_without_kwallet 1\n\n        %_without_python2 1\n\n        %_with_python3 1\n\n        %_without_bdb 1\n\n        %_without_pyswig 1\n  components:\n    rpms:\n      libserf:\n        rationale: Build dependency.\n        ref: 6ebf0093af090cf5c8d082e04ba3d028458e0f54\n        buildorder: 10\n      subversion:\n        rationale: Module API.\n        ref: a757409c2fc92983ed4ba21058e47f22941be59e\n        buildorder: 20\n      utf8proc:\n        rationale: Build dependency.\n        ref: 3a752429dbff2f4dc394a579715b23253339d776\n        buildorder: 10\n...\n",
                 "module_name": "subversion",
                 "module_stream": "1.10",
                 "enabled_modules": {
-                    "buildtime": [
-                        "httpd:2.4",
-                        "swig:3.0"
-                    ],
-                    "runtime": []
+                    "buildtime": ["httpd:2.4", "swig:3.0"],
+                    "runtime": [],
                 },
                 "git_ref": "c8-stream-1.10",
                 "module_platform_version": "8.8",
-                "selectedModules": {}
+                "selectedModules": {},
             }
         ],
         "linked_builds": [],
         "is_secure_boot": False,
         "mock_options": {},
         "platform_flavors": [],
-        "product_id": 1
+        "product_id": 1,
     }
 
 
@@ -426,7 +406,7 @@ def llvm_build_payload():
                     "i686",
                     "x86_64",
                 ],
-                "parallel_mode_enabled": True
+                "parallel_mode_enabled": True,
             }
         ],
         "tasks": [
@@ -442,10 +422,10 @@ def llvm_build_payload():
                             "definitions": {},
                             "module_enable": [
                                 "llvm-toolset:rhel8",
-                                "llvm-toolset-devel:rhel8"
-                            ]
+                                "llvm-toolset-devel:rhel8",
+                            ],
                         },
-                        "ref_type": 1
+                        "ref_type": 1,
                     },
                     {
                         "url": "https://git.almalinux.org/rpms/python-lit.git",
@@ -457,10 +437,10 @@ def llvm_build_payload():
                             "definitions": {},
                             "module_enable": [
                                 "llvm-toolset:rhel8",
-                                "llvm-toolset-devel:rhel8"
-                            ]
+                                "llvm-toolset-devel:rhel8",
+                            ],
                         },
-                        "ref_type": 1
+                        "ref_type": 1,
                     },
                     {
                         "url": "https://git.almalinux.org/rpms/compiler-rt.git",
@@ -476,11 +456,10 @@ def llvm_build_payload():
                             "definitions": {},
                             "module_enable": [
                                 "llvm-toolset:rhel8",
-                                "llvm-toolset-devel:rhel8"
-                            ]
+                                "llvm-toolset-devel:rhel8",
+                            ],
                         },
                         "ref_type": 1,
-
                     },
                     {
                         "url": "https://git.almalinux.org/rpms/clang.git",
@@ -496,29 +475,26 @@ def llvm_build_payload():
                             "definitions": {},
                             "module_enable": [
                                 "llvm-toolset:rhel8",
-                                "llvm-toolset-devel:rhel8"
-                            ]
+                                "llvm-toolset-devel:rhel8",
+                            ],
                         },
-                        "ref_type": 1
-                    }
+                        "ref_type": 1,
+                    },
                 ],
                 "modules_yaml": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: llvm-toolset\n  stream: \"rhel8\"\n  summary: LLVM\n  description: >-\n    LLVM Tools and libraries\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  profiles:\n    common:\n      rpms:\n      - llvm-toolset\n  api:\n    rpms:\n    - clang\n    - clang-analyzer\n    - clang-devel\n    - clang-libs\n    - clang-tools-extra\n    - git-clang-format\n    - lld\n    - lld-libs\n    - lldb\n    - lldb-devel\n    - llvm\n    - llvm-devel\n    - llvm-libs\n  components:\n    rpms:\n      clang:\n        rationale: clang tools and libraries\n        ref: 5cab2f5c202ed9f3f37bfa89ccd1d009340697f8\n        buildorder: 1\n        multilib: [x86_64]\n      compiler-rt:\n        rationale: LLVM compiler intrinsic and sanitizer libraries\n        ref: e078d98d28afceca1e7b1ca30c8926afabe520e0\n        buildorder: 1\n        multilib: [x86_64]\n      libomp:\n        rationale: LLVM OpenMP runtime\n        ref: 745d59987920ce8491daf7a32dac96705f76303f\n        buildorder: 2\n        multilib: [x86_64]\n      lld:\n        rationale: LLVM linker\n        ref: 4f810a0149c260b27df0568a115a8875f9fa1b2f\n        buildorder: 1\n        multilib: [x86_64]\n      lldb:\n        rationale: lldb debugger\n        ref: 47eead6e7a852635ba3a4017910abc2c3f716445\n        buildorder: 2\n        multilib: [x86_64]\n      llvm:\n        rationale: LLVM tools and libraries\n        ref: c143e4f101a5cc14014ea3b5bceeb13fe697bb5a\n        multilib: [x86_64]\n      python-lit:\n        rationale: Lit test runner for LLVM\n        ref: 861093e065602d0e1cb1e220d160af14565ac8e6\n...\n\n---\ndocument: modulemd\nversion: 2\ndata:\n  name: llvm-toolset-devel\n  stream: \"rhel8\"\n  summary: LLVM\n  description: >-\n    LLVM Tools and libraries\n  license:\n    module:\n    - MIT\n  dependencies:\n  - buildrequires:\n      platform: [el8]\n    requires:\n      platform: [el8]\n  profiles:\n    common:\n      rpms:\n      - llvm-toolset\n  api:\n    rpms:\n    - clang\n    - clang-analyzer\n    - clang-devel\n    - clang-libs\n    - clang-tools-extra\n    - git-clang-format\n    - lld\n    - lld-libs\n    - lldb\n    - lldb-devel\n    - llvm\n    - llvm-devel\n    - llvm-libs\n  components:\n    rpms:\n      clang:\n        rationale: clang tools and libraries\n        ref: 5cab2f5c202ed9f3f37bfa89ccd1d009340697f8\n        buildorder: 1\n        multilib: [x86_64]\n      compiler-rt:\n        rationale: LLVM compiler intrinsic and sanitizer libraries\n        ref: e078d98d28afceca1e7b1ca30c8926afabe520e0\n        buildorder: 1\n        multilib: [x86_64]\n      libomp:\n        rationale: LLVM OpenMP runtime\n        ref: 745d59987920ce8491daf7a32dac96705f76303f\n        buildorder: 2\n        multilib: [x86_64]\n      lld:\n        rationale: LLVM linker\n        ref: 4f810a0149c260b27df0568a115a8875f9fa1b2f\n        buildorder: 1\n        multilib: [x86_64]\n      lldb:\n        rationale: lldb debugger\n        ref: 47eead6e7a852635ba3a4017910abc2c3f716445\n        buildorder: 2\n        multilib: [x86_64]\n      llvm:\n        rationale: LLVM tools and libraries\n        ref: c143e4f101a5cc14014ea3b5bceeb13fe697bb5a\n        multilib: [x86_64]\n      python-lit:\n        rationale: Lit test runner for LLVM\n        ref: 861093e065602d0e1cb1e220d160af14565ac8e6\n...\n",
                 "module_name": "llvm-toolset",
                 "module_stream": "rhel8",
-                "enabled_modules": {
-                    "buildtime": [],
-                    "runtime": []
-                },
+                "enabled_modules": {"buildtime": [], "runtime": []},
                 "git_ref": "c8s-stream-rhel8",
                 "module_platform_version": "8.6",
-                "selectedModules": {}
+                "selectedModules": {},
             }
         ],
         "linked_builds": [],
         "is_secure_boot": False,
         "mock_options": {},
         "platform_flavors": [],
-        "product_id": 1
+        "product_id": 1,
     }
 
 

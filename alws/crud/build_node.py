@@ -468,8 +468,7 @@ async def __process_rpms(
             for module in module_index.iter_modules():
                 for artifact in module_artifacts:
                     module.add_rpm_artifact(
-                        artifact,
-                        task_excluded=task_excluded
+                        artifact, task_excluded=task_excluded
                     )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
@@ -672,7 +671,7 @@ async def __process_build_task_artifacts(
             parsed_src = RpmArtifact.from_str(src_rpm)
             await processor.add_multilib_module_artifacts(
                 src_name=parsed_src.name,
-                prepared_artifacts=multilib_module_artifacts
+                prepared_artifacts=multilib_module_artifacts,
             )
         else:
             await processor.add_multilib_packages(multilib_packages)
