@@ -85,6 +85,22 @@ async def start_modular_subversion_build(
 
 @pytest.mark.anyio
 @pytest.fixture
+async def start_modular_llvm_build(
+    llvm_modular_build: Build,
+    llvm_build_payload: dict,
+    create_multilib_module,
+    create_build_rpm_repo,
+    create_log_repo,
+    modify_repository,
+):
+    await _start_build(
+        llvm_modular_build.id,
+        BuildCreate(**llvm_build_payload),
+    )
+
+
+@pytest.mark.anyio
+@pytest.fixture
 async def start_build(
     regular_build: Build,
     build_payload: dict,
@@ -98,7 +114,7 @@ async def start_build(
 def prepare_build_done_payload(
     task_id: str,
     packages: typing.List[str],
-    status: str = "done",    
+    status: str = "done",
 ):
     return {
         'task_id': task_id,
@@ -199,7 +215,9 @@ async def virt_build_done(
                 f'ocaml-hivex-debuginfo-1.3.18-23.module_el8.6.0+2880+7d9e3703.{build_task.arch}.rpm',
             ]
         if "qemu" in build_task.ref.url:
-            packages = ["qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.src.rpm"]
+            packages = [
+                "qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.src.rpm"
+            ]
             if build_task.arch == "i686":
                 status = "excluded"
             else:
@@ -288,6 +306,38 @@ async def subversion_build_done(
             f"subversion-devel-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
             f"subversion-ruby-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
         ]
+        await safe_build_done(
+            session,
+            BuildDone(**prepare_build_done_payload(build_task.id, packages)),
+        )
+
+
+@pytest.mark.anyio
+@pytest.fixture
+async def llvm_build_done(
+    session: AsyncSession,
+    llvm_modular_build: Build,
+    modify_repository,
+    start_modular_llvm_build,
+    create_entity,
+    get_rpm_packages_info,
+    get_repo_llvm_modules_yaml,
+    get_repo_modules,
+):
+    build = await get_builds(db=session, build_id=llvm_modular_build.id)
+    await session.close()
+    for build_task in build.tasks:
+        packages = []
+        if "python" in build_task.ref.url:
+            packages = [
+                "python-lit-13.0.1-1.module+el8.6.0+14118+d530a951.src.rpm",
+                "python3-lit-13.0.1-1.module+el8.6.0+14118+d530a951.noarch.rpm",
+            ]
+        if "llvm" in build_task.ref.url:
+            packages = [
+                "llvm-13.0.1-1.module+el8.6.0+14118+d530a951.src.rpm",
+                f"llvm-13.0.1-1.module+el8.6.0+14118+d530a951.{build_task.arch}.rpm",
+            ]
         await safe_build_done(
             session,
             BuildDone(**prepare_build_done_payload(build_task.id, packages)),

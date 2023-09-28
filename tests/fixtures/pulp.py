@@ -388,6 +388,21 @@ def get_repo_subversion_modules_yaml(
 
 
 @pytest.fixture
+def get_repo_llvm_modules_yaml(
+    monkeypatch,
+    llvm_build_payload: dict,
+):
+    async def func(*args, **kwargs):
+        _, repo_url = args
+        return await read_repo_modules(
+            repo_url,
+            llvm_build_payload['tasks'][0]['modules_yaml'],
+        )
+
+    monkeypatch.setattr(PulpClient, "get_repo_modules_yaml", func)
+
+
+@pytest.fixture
 def get_repo_modules(
     monkeypatch,
     modular_build_payload: dict,

@@ -1,9 +1,11 @@
 import pytest
+import copy
 
 from alws.models import BuildTaskArtifact
 from alws.pulp_models import RpmPackage
 from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.multilib import MultilibProcessor
+from alws.utils.beholder_client import BeholderClient
 from alws.utils.parsing import parse_rpm_nevra
 
 
@@ -1055,30 +1057,6 @@ def beholder_ruby_devel_response():
                     "x86_64"
                 ],
                 "buildorder": 102,
-                "name": "rubygem-abrt",
-                "ref": "442c59a0c182b1d4cedd92b0fbe492e9caac7e07"
-            },
-            {
-                "arches": [
-                    "aarch64",
-                    "i686",
-                    "ppc64le",
-                    "s390x",
-                    "x86_64"
-                ],
-                "buildorder": 102,
-                "name": "rubygem-mysql2",
-                "ref": "3770965996f98254ff9dfb77cd2ce9a1b19f372c"
-            },
-            {
-                "arches": [
-                    "aarch64",
-                    "i686",
-                    "ppc64le",
-                    "s390x",
-                    "x86_64"
-                ],
-                "buildorder": 102,
                 "name": "rubygem-pg",
                 "ref": "8e1861fdfbcfcd0ef40ded3de957231094e79565"
             }
@@ -1791,6 +1769,355 @@ def beholder_subversion_package_response():
 
 
 @pytest.fixture
+def beholder_llvm_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "clang",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "clang",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "clang",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    }
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "clang",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            },
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "llvm",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "llvm",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "llvm",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "llvm",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            },
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "compiler-rt",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "compiler-rt",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "x86_64",
+                        "epoch": 0,
+                        "name": "compiler-rt",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "compiler-rt",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            },
+            {
+                "packages": [
+                    {
+                        "arch": "noarch",
+                        "epoch": 0,
+                        "name": "python3-lit",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                    {
+                        "arch": "src",
+                        "epoch": 0,
+                        "name": "python-lit",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "src",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    }
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "python-lit",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            }
+        ],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 1,
+                "name": "clang",
+                "ref": "be957384a20cc280264d9e33925924d97557f7f5"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 0,
+                "name": "llvm",
+                "ref": "379eb95ac2106298eaa546f7e18e6c7a6ae77f6d"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 0,
+                "name": "python-lit",
+                "ref": "e6248214a5c6f8929607c13e8e10f64a95099e23"
+            }
+        ],
+        "context": "9edba152",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "llvm-toolset",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-appstream"
+        },
+        "stream": "rhel8",
+        "type": "module",
+        "version": 8080020230403095228
+    }
+
+
+@pytest.fixture
+def beholder_llvm_devel_response():
+    return {
+        "arch": "x86_64",
+        "artifacts": [
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "clang",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "clang",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            },
+            {
+                "packages": [
+                    {
+                        "arch": "i686",
+                        "epoch": 0,
+                        "name": "llvm",
+                        "release": "1.module+el8.6.0+14118+d530a951",
+                        "repositories": [
+                            {
+                                "arch": "x86_64",
+                                "name": "almalinux-8-appstream"
+                            }
+                        ],
+                        "version": "13.0.1"
+                    },
+                ],
+                "sourcerpm": {
+                    "epoch": 0,
+                    "name": "llvm",
+                    "release": "1.module+el8.6.0+14118+d530a951",
+                    "version": "13.0.1"
+                }
+            }
+        ],
+        "components": [
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 1,
+                "name": "clang",
+                "ref": "be957384a20cc280264d9e33925924d97557f7f5"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 0,
+                "name": "llvm",
+                "ref": "379eb95ac2106298eaa546f7e18e6c7a6ae77f6d"
+            },
+            {
+                "arches": [
+                    "aarch64",
+                    "i686",
+                    "ppc64le",
+                    "s390x",
+                    "x86_64"
+                ],
+                "buildorder": 0,
+                "name": "python-lit",
+                "ref": "e6248214a5c6f8929607c13e8e10f64a95099e23"
+            }
+        ],
+        "context": "9edba152",
+        "distribution": {
+            "name": "AlmaLinux",
+            "version": "8"
+        },
+        "name": "llvm-toolset-devel",
+        "repository": {
+            "arch": "x86_64",
+            "name": "almalinux-8-devel"
+        },
+        "stream": "rhel8",
+        "type": "module",
+        "version": 8080020230403095228
+    }
+
+
+@pytest.fixture
 @pytest.mark.anyio
 def mock_beholder_call(
     monkeypatch,
@@ -1806,35 +2133,41 @@ def mock_beholder_call(
     beholder_subversion_devel_response: dict,
     beholder_subversion_response: dict,
     beholder_subversion_package_response: dict,
+    beholder_llvm_response: dict,
+    beholder_llvm_devel_response: dict,
 ):
     async def func(*args, **kwargs):
         *_, endpoint = args
         if 'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm' in endpoint:
-            return beholder_slof_response
+            return copy.deepcopy(beholder_slof_response)
         if 'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.src.rpm' in endpoint:
-            return beholder_hivex_response
+            return copy.deepcopy(beholder_hivex_response)
         if 'qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.src.rpm' in endpoint:
-            return beholder_qemu_response
+            return copy.deepcopy(beholder_qemu_response)
         if '/module/virt/rhel/x86_64' in endpoint:
-            return beholder_virt_response
+            return copy.deepcopy(beholder_virt_response)
         if '/module/virt-devel/rhel/x86_64/' in endpoint:
-            return beholder_virt_devel_response
+            return copy.deepcopy(beholder_virt_devel_response)
         if '/module/ruby/3.1/x86_64/' in endpoint:
-            return beholder_ruby_response
+            return copy.deepcopy(beholder_ruby_response)
         if '/module/ruby-devel/3.1/x86_64/' in endpoint:
-            return beholder_ruby_package_response
+            return copy.deepcopy(beholder_ruby_package_response)
         if 'ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
-            return beholder_ruby_devel_response
+            return copy.deepcopy(beholder_ruby_devel_response)
         if 'rubygem-pg-1.3.5-1.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
-            return beholder_rubygem_pg_response
+            return copy.deepcopy(beholder_rubygem_pg_response)
         if '/module/subversion-devel/1.10/x86_64/' in endpoint:
-            return beholder_subversion_devel_response
+            return copy.deepcopy(beholder_subversion_devel_response)
         if '/module/subversion/1.10/x86_64/' in endpoint:
-            return beholder_subversion_response
-        if 'subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm' in endpoint:
-            return beholder_subversion_package_response
+            return copy.deepcopy(beholder_subversion_response)
+        if 'subversion-1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm' in endpoint:
+            return copy.deepcopy(beholder_subversion_package_response)
+        if '/module/llvm-toolset/rhel8/x86_64/' in endpoint:
+            return copy.deepcopy(beholder_llvm_response)
+        if '/module/llvm-toolset-devel/rhel8/x86_64/' in endpoint:
+            return copy.deepcopy(beholder_llvm_devel_response)
 
-    monkeypatch.setattr(MultilibProcessor, 'call_beholder', func)
+    monkeypatch.setattr(BeholderClient, 'get', func)
 
 
 @pytest.fixture

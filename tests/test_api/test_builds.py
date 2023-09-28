@@ -208,3 +208,42 @@ class TestModularBuilds(BaseAsyncTestCase):
                 assert (
                     build_module.get_rpm_artifacts() == artifacts
                 )
+
+    async def test_multilib_llvm(
+        self,
+        get_multilib_packages_from_pulp,
+        enable_beholder,
+        mock_beholder_call,
+        multilib_llvm_with_artifacts: str,
+        modules_artifacts: dict,
+        llvm_build_payload: dict,
+        llvm_modular_build: Build,
+        start_modular_llvm_build,
+        llvm_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_llvm_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{llvm_modular_build.id}/'
+        )
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+        module_file = tmp_path / "modules.i686.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            artifacts = modules_artifacts[
+                f"{build_module.name}:i686"
+            ]
+            assert (
+                build_module.get_rpm_artifacts() == artifacts
+            )

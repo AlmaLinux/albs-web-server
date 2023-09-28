@@ -513,94 +513,6 @@ data:
 
 
 @pytest.fixture
-def modules_artifacts():
-    return {
-        "virt:ppc64le": [
-            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
-            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
-            "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-            "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
-        ],
-        "virt-devel:ppc64le": [
-            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
-        ],
-        "virt:i686": [
-            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
-            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-        ],
-        "virt-devel:i686": [
-            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
-            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
-            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
-        ],
-        "ruby:aarch64": [
-            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
-            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
-            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
-            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-        ],
-        "ruby-devel:aarch64": [],
-        "ruby:i686": [
-            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
-            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
-            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.i686",
-            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
-            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
-        ],
-        "ruby-devel:i686": [],
-        "subversion:aarch64": [
-            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
-            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
-            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
-            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
-            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
-        ],
-        "subversion-devel:aarch64": [
-            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
-        ],
-        "subversion:i686": [
-            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
-            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
-            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
-            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
-            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
-        ],
-        "subversion-devel:i686": [
-            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
-        ],
-    }
-
-
-@pytest.fixture
 def multilib_ruby_with_artifacts():
     return """
 ---
@@ -943,3 +855,293 @@ data:
     - subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.x86_64
 ...
 """
+
+
+@pytest.fixture
+def multilib_llvm_with_artifacts():
+    return """
+---
+document: modulemd
+version: 2
+data:
+  name: llvm-toolset
+  stream: "rhel8"
+  version: 8060020220204053142
+  context: d63f516d
+  arch: x86_64
+  summary: LLVM
+  description: >-
+    LLVM Tools and libraries
+  license:
+    module:
+    - MIT
+    content:
+    - NCSA
+    - NCSA and MIT
+    - NCSA or MIT
+  xmd: {}
+  dependencies:
+  - buildrequires:
+      platform: [el8.6.0]
+    requires:
+      platform: [el8]
+  profiles:
+    common:
+      rpms:
+      - llvm-toolset
+  api:
+    rpms:
+    - clang
+    - clang-analyzer
+    - clang-devel
+    - clang-libs
+    - clang-tools-extra
+    - git-clang-format
+    - lld
+    - lld-libs
+    - lldb
+    - lldb-devel
+    - llvm
+    - llvm-devel
+    - llvm-libs
+  components:
+    rpms:
+      clang:
+        rationale: clang tools and libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      compiler-rt:
+        rationale: LLVM compiler intrinsic and sanitizer libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      libomp:
+        rationale: LLVM OpenMP runtime
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 2
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      lld:
+        rationale: LLVM linker
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      lldb:
+        rationale: lldb debugger
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 2
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      llvm:
+        rationale: LLVM tools and libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      python-lit:
+        rationale: Lit test runner for LLVM
+        ref: stream-rhel-8-rhel-8.6.0
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+  artifacts:
+    rpms:
+    - clang-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686
+    - clang-0:13.0.1-1.module+el8.6.0+14118+d530a951.src
+    - clang-0:13.0.1-1.module+el8.6.0+14118+d530a951.x86_64
+    - compiler-rt-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686
+    - compiler-rt-0:13.0.1-1.module+el8.6.0+14118+d530a951.src
+    - compiler-rt-0:13.0.1-1.module+el8.6.0+14118+d530a951.x86_64
+    - llvm-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686
+    - llvm-0:13.0.1-1.module+el8.6.0+14118+d530a951.src
+    - llvm-0:13.0.1-1.module+el8.6.0+14118+d530a951.x86_64
+    - python-lit-0:13.0.1-1.module+el8.6.0+14118+d530a951.src
+    - python3-lit-0:13.0.1-1.module+el8.6.0+14118+d530a951.noarch
+...
+---
+document: modulemd
+version: 2
+data:
+  name: llvm-toolset-devel
+  stream: "rhel8"
+  version: 8060020220204053142
+  context: d63f516d
+  arch: x86_64
+  summary: LLVM
+  description: >-
+    LLVM Tools and libraries
+  license:
+    module:
+    - MIT
+    content:
+    - NCSA
+    - NCSA and MIT
+    - NCSA or MIT
+  xmd: {}
+  dependencies:
+  - buildrequires:
+      platform: [el8.6.0]
+    requires:
+      platform: [el8]
+  profiles:
+    common:
+      rpms:
+      - llvm-toolset
+  api:
+    rpms:
+    - clang
+    - clang-analyzer
+    - clang-devel
+    - clang-libs
+    - clang-tools-extra
+    - git-clang-format
+    - lld
+    - lld-libs
+    - lldb
+    - lldb-devel
+    - llvm
+    - llvm-devel
+    - llvm-libs
+  components:
+    rpms:
+      clang:
+        rationale: clang tools and libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      compiler-rt:
+        rationale: LLVM compiler intrinsic and sanitizer libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      libomp:
+        rationale: LLVM OpenMP runtime
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 2
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      lld:
+        rationale: LLVM linker
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 1
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      lldb:
+        rationale: lldb debugger
+        ref: stream-rhel-8-rhel-8.6.0
+        buildorder: 2
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      llvm:
+        rationale: LLVM tools and libraries
+        ref: stream-rhel-8-rhel-8.6.0
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+        multilib: [x86_64]
+      python-lit:
+        rationale: Lit test runner for LLVM
+        ref: stream-rhel-8-rhel-8.6.0
+        arches: [aarch64, i686, ppc64le, s390x, x86_64]
+...
+"""
+
+
+@pytest.fixture
+def modules_artifacts():
+    return {
+        "virt:ppc64le": [
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.noarch",
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+            "qemu-kvm-debuginfo-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+            "qemu-kvm-debugsource-0:6.2.0-32.module_el8.8.0+3553+bd08596b.ppc64le",
+        ],
+        "virt-devel:ppc64le": [
+            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.ppc64le",
+        ],
+        "virt:i686": [
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.src",
+            "hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-debugsource-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+        ],
+        "virt-devel:i686": [
+            "SLOF-0:20210217-1.module_el8.6.0+2880+7d9e3703.src",
+            "ocaml-hivex-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "ocaml-hivex-debuginfo-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "ocaml-hivex-devel-0:1.3.18-23.module_el8.6.0+2880+7d9e3703.i686",
+            "qemu-kvm-0:6.2.0-32.module_el8.8.0+3553+bd08596b.src",
+        ],
+        "ruby:aarch64": [
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.aarch64",
+            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+        ],
+        "ruby-devel:aarch64": [],
+        "ruby:i686": [
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-0:3.1.2-141.module_el8.1.0+8+503f6fbd.src",
+            "ruby-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "ruby-devel-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-0:1.3.5-1.module_el8.1.0+8+503f6fbd.src",
+            "rubygem-pg-1.3.5-0:1-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-debuginfo-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-debugsource-0:3.1.2-141.module_el8.1.0+8+503f6fbd.i686",
+            "rubygem-pg-doc-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+            "rubygems-devel-0:3.3.7-141.module_el8.1.0+8+503f6fbd.noarch",
+        ],
+        "ruby-devel:i686": [],
+        "subversion:aarch64": [
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
+            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+        ],
+        "subversion-devel:aarch64": [
+            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.aarch64",
+        ],
+        "subversion:i686": [
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.src",
+            "subversion-debuginfo-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-debugsource-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+            "subversion-devel-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+        ],
+        "subversion-devel:i686": [
+            "subversion-ruby-0:1.10.2-5.module_el8.6.0+3347+66c1e1d6.i686",
+        ],
+        "llvm-toolset:i686": [
+            "clang-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686",
+            "clang-0:13.0.1-1.module+el8.6.0+14118+d530a951.src",
+            "compiler-rt-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686",
+            "compiler-rt-0:13.0.1-1.module+el8.6.0+14118+d530a951.src",
+            "llvm-0:13.0.1-1.module+el8.6.0+14118+d530a951.i686",
+            "llvm-0:13.0.1-1.module+el8.6.0+14118+d530a951.src",
+            "python-lit-0:13.0.1-1.module+el8.6.0+14118+d530a951.src",
+            "python3-lit-0:13.0.1-1.module+el8.6.0+14118+d530a951.noarch",
+        ],
+        "llvm-toolset-devel:i686": [],
+    }
