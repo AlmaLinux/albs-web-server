@@ -1879,40 +1879,42 @@ def mock_beholder_call(
 ):
     async def func(*args, **kwargs):
         *_, endpoint = args
+        response = {}
         if 'SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm' in endpoint:
-            return copy.deepcopy(beholder_slof_response)
+            response = beholder_slof_response
         if 'hivex-1.3.18-23.module_el8.6.0+2880+7d9e3703.src.rpm' in endpoint:
-            return copy.deepcopy(beholder_hivex_response)
+            response = beholder_hivex_response
         if (
             'qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.src.rpm'
             in endpoint
         ):
-            return copy.deepcopy(beholder_qemu_response)
+            response = beholder_qemu_response
         if '/module/virt/rhel/x86_64' in endpoint:
-            return copy.deepcopy(beholder_virt_response)
+            response = beholder_virt_response
         if '/module/virt-devel/rhel/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_virt_devel_response)
+            response = beholder_virt_devel_response
         if '/module/ruby/3.1/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_ruby_response)
+            response = beholder_ruby_response
         if '/module/ruby-devel/3.1/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_ruby_package_response)
+            response = beholder_ruby_package_response
         if 'ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
-            return copy.deepcopy(beholder_ruby_devel_response)
+            response = beholder_ruby_devel_response
         if 'rubygem-pg-1.3.5-1.module_el8.1.0+8+503f6fbd.src.rpm' in endpoint:
-            return copy.deepcopy(beholder_rubygem_pg_response)
+            response = beholder_rubygem_pg_response
         if '/module/subversion-devel/1.10/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_subversion_devel_response)
+            response = beholder_subversion_devel_response
         if '/module/subversion/1.10/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_subversion_response)
+            response = beholder_subversion_response
         if (
             'subversion-1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm'
             in endpoint
         ):
-            return copy.deepcopy(beholder_subversion_package_response)
+            response = beholder_subversion_package_response
         if '/module/llvm-toolset/rhel8/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_llvm_response)
+            response = beholder_llvm_response
         if '/module/llvm-toolset-devel/rhel8/x86_64/' in endpoint:
-            return copy.deepcopy(beholder_llvm_devel_response)
+            response = beholder_llvm_devel_response
+        return copy.deepcopy(response)
 
     monkeypatch.setattr(BeholderClient, 'get', func)
 

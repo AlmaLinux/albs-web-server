@@ -86,17 +86,17 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         self.headers["Authorization"] = old_token
 
 
+@pytest.mark.usefixtures(
+    "get_multilib_packages_from_pulp",
+    "enable_beholder",
+    "mock_beholder_call",
+)
 class TestModularBuilds(BaseAsyncTestCase):
     async def test_multilib_virt(
         self,
-        get_multilib_packages_from_pulp,
-        enable_beholder,
-        mock_beholder_call,
         multilib_virt_with_artifacts: str,
         modules_artifacts: dict,
-        virt_build_payload: dict,
         virt_modular_build: Build,
-        start_modular_virt_build,
         virt_build_done,
         tmp_path,
     ):
@@ -127,14 +127,9 @@ class TestModularBuilds(BaseAsyncTestCase):
 
     async def test_multilib_ruby(
         self,
-        get_multilib_packages_from_pulp,
-        enable_beholder,
-        mock_beholder_call,
         multilib_ruby_with_artifacts: str,
         modules_artifacts: dict,
-        ruby_build_payload: dict,
         ruby_modular_build: Build,
-        start_modular_ruby_build,
         ruby_build_done,
         tmp_path,
     ):
@@ -163,14 +158,9 @@ class TestModularBuilds(BaseAsyncTestCase):
 
     async def test_multilib_subversion(
         self,
-        get_multilib_packages_from_pulp,
-        enable_beholder,
-        mock_beholder_call,
         multilib_subversion_with_artifacts: str,
         modules_artifacts: dict,
-        subversion_build_payload: dict,
         subversion_modular_build: Build,
-        start_modular_subversion_build,
         subversion_build_done,
         tmp_path,
     ):
@@ -199,14 +189,9 @@ class TestModularBuilds(BaseAsyncTestCase):
 
     async def test_multilib_llvm(
         self,
-        get_multilib_packages_from_pulp,
-        enable_beholder,
-        mock_beholder_call,
         multilib_llvm_with_artifacts: str,
         modules_artifacts: dict,
-        llvm_build_payload: dict,
         llvm_modular_build: Build,
-        start_modular_llvm_build,
         llvm_build_done,
         tmp_path,
     ):
