@@ -2,6 +2,7 @@ import pytest
 
 from alws.constants import BuildTaskStatus
 from alws.models import Build
+from alws.utils.modularity import IndexWrapper
 from tests.constants import CUSTOM_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
@@ -83,3 +84,135 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         )
         assert response.status_code == self.status_codes.HTTP_403_FORBIDDEN
         self.headers["Authorization"] = old_token
+
+
+@pytest.mark.usefixtures(
+    "get_multilib_packages_from_pulp",
+    "enable_beholder",
+    "mock_beholder_call",
+)
+class TestModularBuilds(BaseAsyncTestCase):
+    async def test_multilib_virt(
+        self,
+        multilib_virt_with_artifacts: str,
+        modules_artifacts: dict,
+        virt_modular_build: Build,
+        virt_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_virt_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{virt_modular_build.id}/'
+        )
+
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+
+        for arch in ["i686", "ppc64le"]:
+            module_file = tmp_path / f"modules.{arch}.yaml"
+            build_index = IndexWrapper.from_template(module_file.read_text())
+            for build_module in build_index.iter_modules():
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
+
+    async def test_multilib_ruby(
+        self,
+        multilib_ruby_with_artifacts: str,
+        modules_artifacts: dict,
+        ruby_modular_build: Build,
+        ruby_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_ruby_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{ruby_modular_build.id}/'
+        )
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+        for arch in ["i686", "aarch64"]:
+            module_file = tmp_path / f"modules.{arch}.yaml"
+            build_index = IndexWrapper.from_template(module_file.read_text())
+            for build_module in build_index.iter_modules():
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
+
+    async def test_multilib_subversion(
+        self,
+        multilib_subversion_with_artifacts: str,
+        modules_artifacts: dict,
+        subversion_modular_build: Build,
+        subversion_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_subversion_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{subversion_modular_build.id}/'
+        )
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+        for arch in ["i686", "aarch64"]:
+            module_file = tmp_path / f"modules.{arch}.yaml"
+            build_index = IndexWrapper.from_template(module_file.read_text())
+            for build_module in build_index.iter_modules():
+                artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
+                assert build_module.get_rpm_artifacts() == artifacts
+
+    async def test_multilib_llvm(
+        self,
+        multilib_llvm_with_artifacts: str,
+        modules_artifacts: dict,
+        llvm_modular_build: Build,
+        llvm_build_done,
+        tmp_path,
+    ):
+        index_with_artifacts = IndexWrapper.from_template(
+            multilib_llvm_with_artifacts,
+        )
+        response = await self.make_request(
+            'get', f'/api/v1/builds/{llvm_modular_build.id}/'
+        )
+        module_file = tmp_path / "modules.x86_64.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            module = index_with_artifacts.get_module(
+                build_module.name,
+                build_module.stream,
+            )
+            assert (
+                build_module.get_rpm_artifacts() == module.get_rpm_artifacts()
+            )
+        module_file = tmp_path / "modules.i686.yaml"
+        build_index = IndexWrapper.from_template(module_file.read_text())
+        for build_module in build_index.iter_modules():
+            artifacts = modules_artifacts[f"{build_module.name}:i686"]
+            assert build_module.get_rpm_artifacts() == artifacts

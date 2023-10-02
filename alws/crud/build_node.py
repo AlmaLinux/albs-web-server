@@ -23,7 +23,7 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
-from alws.utils.modularity import IndexWrapper
+from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import clean_release, parse_rpm_nevra
@@ -329,6 +329,7 @@ async def __process_rpms(
     repositories: list,
     built_srpm_url: str = None,
     module_index=None,
+    task_excluded=False,
 ):
     def get_repo(repo_arch, is_debug):
         return next(
@@ -454,22 +455,21 @@ async def __process_rpms(
                 rpm_info,
             )
 
-    if module_index and rpms:
-        srpm_info = None
-        # we need to put source RPM in module as well, but it can be skipped
-        # because it's built before
-        if built_srpm_url is not None:
-            db_srpm = await get_srpm_artifact_by_build_task_id(db, task_id)
-            if db_srpm is not None:
-                srpms_info = get_rpm_packages_info([db_srpm])
-                srpm_info = srpms_info[db_srpm.href]
+    # we need to put source RPM in module as well, but it can be skipped
+    # because it's built before
+    module_artifacts = [rpms_info[rpm.href] for rpm in rpms]
+    if built_srpm_url is not None:
+        db_srpm = await get_srpm_artifact_by_build_task_id(db, task_id)
+        if db_srpm is not None:
+            srpms_info = get_rpm_packages_info([db_srpm])
+            module_artifacts.append(srpms_info[db_srpm.href])
+    if module_index and module_artifacts:
         try:
             for module in module_index.iter_modules():
-                for rpm in rpms:
-                    rpm_package = rpms_info[rpm.href]
-                    module.add_rpm_artifact(rpm_package)
-                if srpm_info:
-                    module.add_rpm_artifact(srpm_info)
+                for artifact in module_artifacts:
+                    module.add_rpm_artifact(
+                        artifact, task_excluded=task_excluded
+                    )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
 
@@ -637,6 +637,7 @@ async def __process_build_task_artifacts(
         rpm_repositories,
         built_srpm_url=build_task.built_srpm_url,
         module_index=module_index,
+        task_excluded=status.value == BuildTaskStatus.EXCLUDED,
     )
     end_time = datetime.datetime.utcnow()
     processing_stats["packages_processing"] = {
@@ -667,8 +668,10 @@ async def __process_build_task_artifacts(
                 {i["name"]: i["version"] for i in multilib_module_artifacts}
             )
             await processor.add_multilib_packages(multilib_packages)
+            parsed_src = RpmArtifact.from_str(src_rpm)
             await processor.add_multilib_module_artifacts(
-                prepared_artifacts=multilib_module_artifacts
+                src_name=parsed_src.name,
+                prepared_artifacts=multilib_module_artifacts,
             )
         else:
             await processor.add_multilib_packages(multilib_packages)

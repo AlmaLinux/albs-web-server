@@ -12,7 +12,6 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus
 from alws.errors import ModuleUpdateError
 from alws.pulp_models import RpmPackage
-from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import is_debuginfo_rpm
 from alws.utils.modularity import IndexWrapper
@@ -31,7 +30,7 @@ __all__ = [
 async def get_build_task_artifacts(
     db: AsyncSession,
     build_task: models.BuildTask,
-):
+) -> typing.List[models.BuildTaskArtifact]:
     subquery = (
         select(models.BuildTask.id)
         .where(
@@ -50,9 +49,7 @@ async def get_build_task_artifacts(
             models.BuildTaskArtifact.name.not_like("%src.rpm%"),
         )
     )
-    db_artifacts = await db.execute(query)
-    db_artifacts = list(db_artifacts.scalars().all())
-    return db_artifacts
+    return (await db.execute(query)).scalars().all()
 
 
 class MultilibProcessor:
@@ -68,11 +65,14 @@ class MultilibProcessor:
         self._pulp_client = pulp_client
         if not pulp_client:
             self._pulp_client = PulpClient(
-                settings.pulp_host, settings.pulp_user, settings.pulp_password
+                settings.pulp_host,
+                settings.pulp_user,
+                settings.pulp_password,
             )
         self._module_index = module_index
         self._beholder_client = BeholderClient(
-            settings.beholder_host, token=settings.beholder_token
+            settings.beholder_host,
+            token=settings.beholder_token,
         )
         self._is_multilib_needed = None
 
@@ -244,13 +244,7 @@ class MultilibProcessor:
         db_artifacts = await get_build_task_artifacts(
             self._db, self._build_task
         )
-        pulp_packages = get_rpm_packages_by_ids(
-            [
-                get_uuid_from_pulp_href(artifact.href)
-                for artifact in db_artifacts
-            ],
-            [RpmPackage.content_ptr_id, RpmPackage.name, RpmPackage.version],
-        )
+        pulp_packages = self.get_packages_info_from_pulp(db_artifacts)
         for artifact in db_artifacts:
             href = artifact.href
             rpm_pkg = pulp_packages[artifact.href]
@@ -297,11 +291,11 @@ class MultilibProcessor:
             ),
         )
 
-    async def get_packages_info_from_pulp(
+    def get_packages_info_from_pulp(
         self,
-        rpm_packages: typing.List[BuildDoneArtifact],
-    ) -> typing.List[typing.Dict[str, typing.Any]]:
-        results = get_rpm_packages_by_ids(
+        rpm_packages: typing.List[models.BuildTaskArtifact],
+    ) -> typing.Dict[str, RpmPackage]:
+        return get_rpm_packages_by_ids(
             [get_uuid_from_pulp_href(rpm.href) for rpm in rpm_packages],
             [
                 RpmPackage.content_ptr_id,
@@ -312,7 +306,6 @@ class MultilibProcessor:
                 RpmPackage.arch,
             ],
         )
-        return [pkg.as_dict() for pkg in results.values()]
 
     @staticmethod
     async def update_module_index(
@@ -320,14 +313,20 @@ class MultilibProcessor:
         module_name: str,
         module_stream: str,
         packages: typing.List[typing.Dict[str, typing.Any]],
+        src_name: str,
     ):
         if not packages:
             return
 
-        # Ruby and Python modules should have multilib in their main module
-        if "ruby" in module_name or "python" in module_name:
-            module = module_index.get_module(module_name, module_stream)
-        else:
+        module = module_index.get_module(module_name, module_stream)
+        devel = False
+        for component_name, component in module.iter_components():
+            if component_name != src_name:
+                continue
+
+            arches = component.get_multilib_arches()
+            devel = not arches
+        if devel:
             module = module_index.get_module(
                 f"{module_name}-devel", module_stream
             )
@@ -337,6 +336,7 @@ class MultilibProcessor:
 
     async def add_multilib_module_artifacts(
         self,
+        src_name: str,
         prepared_artifacts: typing.Optional[typing.List[dict]] = None,
     ):
         if not self._module_index:
@@ -358,9 +358,12 @@ class MultilibProcessor:
                     packages_to_process[artifact["name"]] = package
 
         try:
-            packages = await self.get_packages_info_from_pulp(
-                list(packages_to_process.values())
-            )
+            packages = [
+                pkg.as_dict()
+                for pkg in self.get_packages_info_from_pulp(
+                    packages_to_process.values()
+                ).values()
+            ]
             module_name = self._build_task.rpm_module.name
             module_stream = self._build_task.rpm_module.stream
             await self.update_module_index(
@@ -368,6 +371,7 @@ class MultilibProcessor:
                 module_name,
                 module_stream,
                 packages,
+                src_name,
             )
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
