@@ -57,7 +57,7 @@ class TestRepositoriesEndpoints(BaseAsyncTestCase):
             'patch',
             '/api/v1/test_repositories/1/',
             json={
-                'tests_dir': 'foo',
+                'tests_dir': 'foo/',
                 'tests_prefix': 'bar',
             },
         )

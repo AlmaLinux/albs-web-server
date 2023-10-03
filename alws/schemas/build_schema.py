@@ -26,7 +26,7 @@ __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
 
 class BuildTestConfiguration(BaseModel):
-    tests: typing.Optional[typing.List[dict]]
+    tests: typing.Optional[typing.List[dict]] = []
     test_env: typing.Optional[dict]
 
 

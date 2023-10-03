@@ -220,7 +220,7 @@ class TestsCacher:
                         remote_test_folder,
                     ),
                     url=urllib.parse.urljoin(
-                        db_repo.url,
+                        urllib.parse.urljoin(db_repo.url, db_repo.tests_dir),
                         remote_test_folder,
                     ),
                 )

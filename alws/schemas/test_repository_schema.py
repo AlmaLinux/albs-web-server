@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import AnyHttpUrl, BaseModel
+from pydantic import AnyHttpUrl, BaseModel, validator
 
 
 class PackageTestRepository(BaseModel):
@@ -37,10 +37,22 @@ class TestRepositoryCreate(BaseModel):
     tests_dir: str
     tests_prefix: typing.Optional[str]
 
+    @validator('tests_dir', pre=True)
+    def tests_dir_validator(cls, tests_dir: str):
+        if not tests_dir.endswith('/'):
+            raise ValueError('tests_dir field should ends with "/"')
+        return tests_dir
+
 
 class TestRepositoryUpdate(BaseModel):
     tests_dir: typing.Optional[str]
     tests_prefix: typing.Optional[str]
+
+    @validator('tests_dir', pre=True)
+    def tests_dir_validator(cls, tests_dir: str):
+        if not tests_dir.endswith('/'):
+            raise ValueError('tests_dir field should ends with "/"')
+        return tests_dir
 
 
 class TestRepositoryResponse(BaseModel):

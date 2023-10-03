@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 from alws.schemas.perf_stats_schema import PerformanceStats
 
-
 __all__ = ['TestTaskResult']
 
 
@@ -31,6 +30,7 @@ class TestTask(BaseModel):
 class TestLog(BaseModel):
     id: int
     log: str
+    log_name: str
     success: bool
     logs_format: str
     tap_results: typing.List[dict]
