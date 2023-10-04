@@ -384,6 +384,7 @@ class Exporter:
 
             entry = feed.add_entry()
             entry.title(title)
+            entry.link(href=link)
             entry.content(content, type='CDATA')
             entry.pubDate(pubDate)
 
