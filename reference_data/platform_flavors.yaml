@@ -465,3 +465,90 @@
       production: false
       debug: false
       priority: 10
+
+- name: CenotOS-9-Stream
+  repositories:
+    - name: baseos-cs9
+      arch: x86_64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: baseos-cs9
+      arch: aarch64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/BaseOS/aarch64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: baseos-cs9
+      arch: ppc64le
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/BaseOS/ppc64le/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: baseos-cs9
+      arch: s390x
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/BaseOS/s390x/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: appstream-cs9
+      arch: x86_64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: appstream-cs9
+      arch: aarch64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/AppStream/aarch64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: appstream-cs9
+      arch: ppc64le
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/AppStream/ppc64le/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: appstream-cs9
+      arch: s390x
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/AppStream/s390x/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: crb-cs9
+      arch: x86_64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: crb-cs9
+      arch: aarch64
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/CRB/aarch64/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: crb-cs9
+      arch: ppc64le
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/CRB/ppc64le/os/
+      production: true
+      debug: false
+      priority: 10
+    - name: crb-cs9
+      arch: s390x
+      type: rpm
+      url: https://mirror.stream.centos.org/9-stream/CRB/s390x/os/
+      production: true
+      debug: false
+      priority: 10
