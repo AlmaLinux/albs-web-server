@@ -11,6 +11,7 @@ import tempfile
 import typing
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from time import time
 
@@ -20,15 +21,13 @@ import pgpy
 import rpm
 import sentry_sdk
 import sqlalchemy
+
+# Required for generating RSS
+from feedgen.feed import FeedGenerator
 from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from syncer import sync
-
-# Required for generating RSS
-from feedgen.feed import FeedGenerator
-from datetime import datetime
-from datetime import timezone
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
