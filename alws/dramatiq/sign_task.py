@@ -2,19 +2,20 @@ import typing
 
 import dramatiq
 
-from alws.crud import sign_task
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
+from alws.crud import sign_task
 from alws.dramatiq import event_loop
 from alws.schemas import sign_schema
-
 
 __all__ = ['complete_sign_task']
 
 
 async def _complete_sign_task(
-        task_id: int, payload: typing.Dict[str, typing.Any]):
+    task_id: int, payload: typing.Dict[str, typing.Any]
+):
     await sign_task.complete_sign_task(
-        task_id, sign_schema.SignTaskComplete(**payload))
+        task_id, sign_schema.SignTaskComplete(**payload)
+    )
 
 
 # Timeout for the task is set to 1 hour in milliseconds. This is needed

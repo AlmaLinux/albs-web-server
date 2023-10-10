@@ -12,17 +12,15 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
+from alws.constants import GenKeyStatus, SignStatus
 from alws.crud.user import get_user
-from alws.constants import (
-    SignStatus,
-    GenKeyStatus
-)
 from alws.database import Session
 from alws.errors import (
     BuildAlreadySignedError,
     DataNotFoundError,
+    GenKeyError,
     PermissionDenied,
-    SignError, GenKeyError,
+    SignError,
 )
 from alws.perms import actions
 from alws.perms.authorization import can_perform
@@ -37,8 +35,9 @@ from alws.utils.pulp_utils import get_rpm_packages_by_checksums
 async def __get_build_repos(
     db: AsyncSession,
     build_id: int,
-    build: models.Build = None,
+    build: typing.Optional[models.Build] = None,
 ) -> dict:
+    logging.info("Get repositories for %s Build", build_id)
     if not build:
         builds = await db.execute(
             select(models.Build)
@@ -62,8 +61,9 @@ def __get_package_url(base_url: str, package_name: str) -> str:
 
 async def get_sign_tasks(
     db: AsyncSession,
-    build_id: int = None,
+    build_id: typing.Optional[int] = None,
 ) -> typing.List[models.SignTask]:
+    logging.info("Get sign tasks")
     query = select(models.SignTask)
     if build_id:
         query = query.where(models.SignTask.build_id == build_id)
@@ -80,10 +80,12 @@ async def get_gen_key_task(
         select(models.GenKeyTask)
         .where(models.GenKeyTask.id == gen_key_task_id)
         .options(
-            selectinload(models.GenKeyTask.product)
-            .selectinload(models.Product.repositories),
-            selectinload(models.GenKeyTask.product)
-            .selectinload(models.Product.owner),
+            selectinload(models.GenKeyTask.product).selectinload(
+                models.Product.repositories
+            ),
+            selectinload(models.GenKeyTask.product).selectinload(
+                models.Product.owner
+            ),
             selectinload(models.GenKeyTask.product)
             .selectinload(models.Product.team)
             .selectinload(models.Team.roles),
@@ -93,9 +95,9 @@ async def get_gen_key_task(
 
 
 async def create_gen_key_task(
-        db: AsyncSession,
-        product: models.Product,
-        user: models.User,
+    db: AsyncSession,
+    product: models.Product,
+    user: models.User,
 ) -> models.GenKeyTask:
     if not can_perform(product, user, actions.GenKey.name):
         raise PermissionDenied(
@@ -118,6 +120,7 @@ async def create_sign_task(
     payload: sign_schema.SignTaskCreate,
     user_id: int,
 ) -> models.SignTask:
+    logging.info("Create sign task for %s Build", payload.build_id)
     async with db.begin():
         user = await get_user(db, user_id)
         builds = await db.execute(
@@ -166,11 +169,11 @@ async def create_sign_task(
 
         if not can_perform(build, user, actions.SignBuild.name):
             raise PermissionDenied(
-                "User does not have permissions to sign " "this build"
+                "User does not have permissions to sign this build"
             )
         if not can_perform(sign_key, user, actions.UseSignKey.name):
             raise PermissionDenied(
-                "User does not have permissions to use " "this sign key"
+                "User does not have permissions to use this sign key"
             )
 
         sign_task = models.SignTask(
@@ -190,15 +193,16 @@ async def create_sign_task(
 
 
 async def get_available_gen_key_task(
-        db: AsyncSession,
+    db: AsyncSession,
 ) -> typing.Optional[models.GenKeyTask]:
     async with db.begin():
         gen_key_tasks = await db.execute(
             select(models.GenKeyTask)
             .where(models.GenKeyTask.status == GenKeyStatus.IDLE)
             .options(
-                selectinload(models.GenKeyTask.product)
-                .selectinload(models.Product.owner),
+                selectinload(models.GenKeyTask.product).selectinload(
+                    models.Product.owner
+                ),
             )
         )
         gen_key_task = gen_key_tasks.scalars().first()
@@ -217,6 +221,7 @@ async def get_available_sign_task(
     db: AsyncSession,
     key_ids: typing.List[str],
 ) -> typing.Dict[str, typing.Any]:
+    logging.info("Get available sign task")
     sign_tasks = await db.execute(
         select(models.SignTask)
         .join(models.SignTask.sign_key)
@@ -232,6 +237,7 @@ async def get_available_sign_task(
     )
     sign_task = sign_tasks.scalars().first()
     if not sign_task:
+        logging.info("No sign task")
         return {}
 
     await db.execute(
@@ -247,6 +253,7 @@ async def get_available_sign_task(
     )
     build_src_rpms = build_src_rpms.scalars().all()
     if not build_src_rpms:
+        logging.info("No src rpm")
         return {}
     build_binary_rpms = await db.execute(
         select(models.BinaryRpm)
@@ -259,6 +266,7 @@ async def get_available_sign_task(
     )
     build_binary_rpms = build_binary_rpms.scalars().all()
     if not build_binary_rpms:
+        logging.info("No binary rpms")
         return {}
     sign_task_payload = {
         "id": sign_task.id,
@@ -307,6 +315,7 @@ async def get_sign_task(
     db: AsyncSession,
     sign_task_id: int,
 ) -> models.SignTask:
+    logging.info("Get sign task %s", sign_task_id)
     sign_tasks = await db.execute(
         select(models.SignTask)
         .where(models.SignTask.id == sign_task_id)
@@ -319,7 +328,7 @@ async def complete_gen_key_task(
     gen_key_task_id: int,
     payload: sign_schema.GenKeyTaskComplete,
     db: AsyncSession,
-) -> typing.Optional[models.GenKeyTask]:
+) -> typing.Optional[models.SignKey]:
     gen_key_task = await get_gen_key_task(
         db=db,
         gen_key_task_id=gen_key_task_id,
@@ -343,13 +352,11 @@ async def complete_gen_key_task(
         )
     )
     if not payload.success:
+        logging.info("Task failed")
         return
     sign_key_repo = next(
-        (
-            r for r in gen_key_task.product.repositories
-            if r.type == 'sign_key'
-        ),
-        None
+        (r for r in gen_key_task.product.repositories if r.type == 'sign_key'),
+        None,
     )
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -357,6 +364,7 @@ async def complete_gen_key_task(
         settings.pulp_password,
     )
     if not sign_key_repo:
+        logging.debug("No product sign key repository")
         repo_name, repo_url, repo_href = await create_product_sign_key_repo(
             pulp_client=pulp_client,
             owner_name=gen_key_task.product.owner.username,
@@ -368,13 +376,14 @@ async def complete_gen_key_task(
             arch='sign_key',
             pulp_href=repo_href,
             debug=False,
-            production=True
+            production=True,
         )
         db.add(sign_key_repo)
     result = await pulp_client.get_files(
         relative_path=payload.file_name,
     )
     if not result:
+        logging.info("Create file %s in Pulp", payload.file_name)
         await pulp_client.create_file(
             file_name=payload.file_name,
             artifact_href=payload.sign_key_href,
@@ -384,9 +393,7 @@ async def complete_gen_key_task(
         sign_key_repo.url,
         payload.file_name,
     )
-    roles = [
-        r for r in gen_key_task.product.team.roles if 'signer' in r.name
-    ]
+    roles = [r for r in gen_key_task.product.team.roles if 'signer' in r.name]
     sign_key = models.SignKey(
         name=payload.key_name,
         description=f'Community key "{payload.key_name}"',
@@ -426,6 +433,7 @@ async def complete_sign_task(
                     new_pkg_href, include_fields=["sha256"]
                 )
                 sha256 = package_info["sha256"]
+        logging.debug("Process single package %s", pkg.id)
         return pkg.name, {
             "id": pkg.id,
             "href": new_pkg_href,
@@ -438,6 +446,7 @@ async def complete_sign_task(
         task: models.SignTask,
         statistics: dict,
     ) -> models.SignTask:
+        logging.info("Sign task %s failed", sign_task_id)
         finish_time = datetime.datetime.utcnow()
         statistics["web_server_processing_time"] = int(
             (finish_time - start_time).total_seconds()
@@ -465,6 +474,7 @@ async def complete_sign_task(
     packages_to_add = defaultdict(list)
     srpms_mapping = defaultdict(list)
 
+    logging.info("Start processing task %s", sign_task_id)
     async with Session() as db, db.begin():
         builds = await db.execute(
             select(models.Build)
@@ -510,11 +520,14 @@ async def complete_sign_task(
             sign_task.status = SignStatus.FAILED
             sign_task.error_message = payload.error_message
             db.add(sign_task)
+            logging.info("Sign task %s failed", sign_task_id)
+            logging.info(payload.error_message)
             return sign_task
 
         if payload.packages:
             # Check packages sign fingerprint, if it's not matching then
             # fast-fail the process
+            logging.debug("Check packages sign fingerprint")
             for package in payload.packages:
                 # Check that package fingerprint matches the requested
                 if package.fingerprint != sign_task.sign_key.fingerprint:
@@ -542,6 +555,7 @@ async def complete_sign_task(
             pulp_db_packages = get_rpm_packages_by_checksums(
                 [pkg.sha256 for pkg in packages_to_convert.values()],
             )
+            logging.info("Start processing packages for task %s", sign_task_id)
             results = await asyncio.gather(
                 *(
                     __process_single_package(package, pulp_db_packages)
@@ -549,7 +563,12 @@ async def complete_sign_task(
                 )
             )
             converted_packages = dict(results)
-
+            logging.info(
+                "Finish processing packages for task %s", sign_task_id
+            )
+            logging.info(
+                "Updating href and add sign key for every srpm in project"
+            )
             for pkg_name, pkg_info in converted_packages.items():
                 new_href = pkg_info["href"]
                 if not pkg_info["href"]:
@@ -592,18 +611,20 @@ async def complete_sign_task(
             if sign_failed:
                 sign_task = await __failed_post_processing(sign_task, stats)
                 return sign_task
-
+            logging.info("Start modify repository for task %s", sign_task_id)
             await asyncio.gather(
                 *(
                     pulp_client.modify_repository(repo_href, add=packages)
                     for repo_href, packages in packages_to_add.items()
                 )
             )
+            logging.info("Finish modify repository for task %s", sign_task_id)
 
         if payload.success and not sign_failed:
             sign_task.status = SignStatus.COMPLETED
             build.signed = True
         else:
+            logging.info("Sign task %s failed", sign_task_id)
             sign_task.status = SignStatus.FAILED
             build.signed = False
         sign_task.log_href = payload.log_href
@@ -621,6 +642,7 @@ async def complete_sign_task(
         db.add(build)
         if modified_items:
             db.add_all(modified_items)
+        logging.info("Sign task %s is finished", sign_task_id)
         return sign_task
 
 
