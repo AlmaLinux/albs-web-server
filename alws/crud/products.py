@@ -19,11 +19,11 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import (
     create_product_repo,
     create_product_sign_key_repo,
 )
+from alws.utils.pulp_client import PulpClient
 
 __all__ = [
     'create_product',

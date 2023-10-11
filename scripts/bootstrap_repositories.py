@@ -11,10 +11,8 @@ import yaml
 from syncer import sync
 
 from alws import database
-from alws.crud import (
-    platform as pl_crud,
-    repository as repo_crud,
-)
+from alws.crud import platform as pl_crud
+from alws.crud import repository as repo_crud
 from alws.schemas import platform_schema, remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
 
