@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from alws import models
 from alws.config import settings
-from alws.schemas import repository_schema, remote_schema
+from alws.schemas import remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
 
 
