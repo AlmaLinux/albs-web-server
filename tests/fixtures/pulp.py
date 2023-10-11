@@ -441,7 +441,6 @@ def get_rpm_distros(monkeypatch):
                 "pulp_href": get_distros_href(),
                 "name": "rpm_distro_name",
             },
-
         ]
 
     monkeypatch.setattr(PulpClient, "get_rpm_distros", func)

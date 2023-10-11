@@ -3,8 +3,13 @@ import typing
 from pydantic import BaseModel
 
 
-__all__ = ['Repository', 'RepositoryCreate', 'RepositoryUpdate',
-           'RepositorySearch', 'RepositorySync']
+__all__ = [
+    'Repository',
+    'RepositoryCreate',
+    'RepositoryUpdate',
+    'RepositorySearch',
+    'RepositorySync',
+]
 
 
 class Repository(BaseModel):

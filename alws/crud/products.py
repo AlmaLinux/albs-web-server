@@ -61,7 +61,9 @@ async def create_product(
     if teams:
         team = teams[0]
     else:
-        team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+        team_payload = TeamCreate(
+            team_name=team_name, user_id=payload.owner_id
+        )
         team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
 
@@ -126,7 +128,8 @@ async def create_product(
     # Create sign key repository if a product is community
     if payload.is_community:
         repo_name, repo_url, repo_href = await create_product_sign_key_repo(
-            pulp_client, owner.username, product.name)
+            pulp_client, owner.username, product.name
+        )
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -272,8 +275,8 @@ async def remove_product(
         # some repos from db can be absent in pulp
         # in case if you reset pulp db, but didn't reset non-pulp db
         if all(
-                product_repo.name != product_distro['name'] for product_distro
-                in all_product_distros
+            product_repo.name != product_distro['name']
+            for product_distro in all_product_distros
         ):
             continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
