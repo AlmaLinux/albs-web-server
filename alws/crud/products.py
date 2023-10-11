@@ -57,16 +57,13 @@ async def create_product(
         raise ProductError(f'Product with name={payload.name} already exist')
 
     team_name = f'{payload.name}_team'
-    existing_team = await get_teams(db, name=team_name)
-    if existing_team:
-        raise ProductError(
-            "Product's team name intersects with the existing team, "
-            "which may lead to permissions issues"
-        )
-
-    team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+    teams = await get_teams(db, name=team_name)
+    if teams:
+        team = teams[0]
+    else:
+        team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+        team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
-    team = await create_team(db, team_payload, flush=True)
 
     product_payload = payload.dict()
     product_payload['team_id'] = team.id
@@ -272,6 +269,13 @@ async def remove_product(
         **{"name__startswith": db_product.pulp_base_distro_name},
     )
     for product_repo in db_product.repositories:
+        # some repos from db can be absent in pulp
+        # in case if you reset pulp db, but didn't reset non-pulp db
+        if all(
+                product_repo.name != product_distro['name'] for product_distro
+                in all_product_distros
+        ):
+            continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
     for product_distro in all_product_distros:
         delete_tasks.append(

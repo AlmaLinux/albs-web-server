@@ -194,9 +194,9 @@ async def create_repository_remote(
     )
     result = await db.execute(query)
     remote = result.scalars().first()
-    if remote:
-        return remote
     pulp_remote = await pulp_client.get_rpm_remote(payload.name)
+    # we need update db_remote according to pulp_remote in case if
+    # we reset only pulp db
     if pulp_remote:
         remote_href = pulp_remote['pulp_href']
         await pulp_client.update_rpm_remote(
@@ -204,6 +204,8 @@ async def create_repository_remote(
     else:
         remote_href = await pulp_client.create_rpm_remote(
             payload.name, payload.url, remote_policy=payload.policy)
+    if remote:
+        return remote
     remote = models.RepositoryRemote(
         name=payload.name,
         arch=payload.arch,
@@ -221,7 +223,10 @@ async def update_repository_remote(
         payload: remote_schema.RemoteUpdate
 ) -> models.RepositoryRemote:
     async with db.begin():
-        remote = select(models.RepositoryRemote).get(remote_id)
+        result = await db.execute(select(models.RepositoryRemote).where(
+            models.RepositoryRemote.id == remote_id
+        ))
+        remote = result.scalars().first()
         for key, value in payload.dict().items():
             setattr(remote, key, value)
         db.add(remote)

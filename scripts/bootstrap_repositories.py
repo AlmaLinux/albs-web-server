@@ -102,6 +102,20 @@ async def get_repository(
                 repository = await repo_crud.create_repository(
                     db, repository_schema.RepositoryCreate(**payload_dict)
                 )
+            elif repository.pulp_href != repo_href:
+                logger.info(
+                    'Founded repository by data %s has another pulp_href %s',
+                    payload_dict,
+                    repository.pulp_href,
+                )
+                repository = await repo_crud.update_repository(
+                    db=db,
+                    repository_id=repository.id,
+                    payload=repository_schema.RepositoryUpdate(**{
+                        'pulp_href': repo_href,
+                    }),
+                )
+
         else:
             payload = repo_info.copy()
             payload["url"] = payload["remote_url"]
@@ -128,6 +142,15 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
             db, remote_schema.RemoteCreate(**remote_payload)
         )
         return remote
+
+
+async def update_remote(remote_id, remote_data: dict):
+    async with database.Session() as db:
+        return await repo_crud.update_repository_remote(
+            db=db,
+            remote_id=remote_id,
+            payload=remote_schema.RemoteUpdate(**remote_data)
+        )
 
 
 async def update_platform(platform_data: dict):
@@ -250,7 +273,19 @@ def main():
                 continue
 
             remote = sync(get_remote(repo_info, remote_sync_policy))
-
+            pulp_remote = sync(pulp_client.get_rpm_remote(
+                f'{repo_info["name"]}-{repo_info["arch"]}',
+            ))
+            if pulp_remote['pulp_href'] != remote.pulp_href:
+                remote = sync(update_remote(
+                    remote_id=remote.id,
+                    remote_data={
+                        'name': remote.name,
+                        'pulp_href': pulp_remote['pulp_href'],
+                        'arch': remote.arch,
+                        'url': remote.url,
+                    },
+                ))
             if args.no_sync:
                 logger.info("Synchronization from remote is disabled, skipping")
                 continue

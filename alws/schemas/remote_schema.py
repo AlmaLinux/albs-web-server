@@ -26,3 +26,4 @@ class RemoteUpdate(BaseModel):
     name: typing.Optional[str]
     arch: typing.Optional[str]
     url: typing.Optional[str]
+    pulp_href: typing.Optional[str]
