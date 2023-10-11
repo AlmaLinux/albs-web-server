@@ -12,8 +12,8 @@ from alws.utils.pulp_client import PulpClient
 
 
 async def get_repositories(
-        db: Session,
-        repository_id: int = None,
+    db: Session,
+    repository_id: int = None,
 ) -> typing.List[models.Repository]:
     repo_q = select(models.Repository)
     if repository_id:
@@ -23,8 +23,8 @@ async def get_repositories(
 
 
 async def get_repositories_by_platform_name(
-        db: Session,
-        platform_name: str,
+    db: Session,
+    platform_name: str,
 ) -> typing.List[models.Repository]:
     result = await db.execute(
         select(models.Platform)
@@ -38,8 +38,8 @@ async def get_repositories_by_platform_name(
 
 
 async def create_repositories(
-        db: Session,
-        payload: typing.List[repository_schema.RepositoryCreate],
+    db: Session,
+    payload: typing.List[repository_schema.RepositoryCreate],
 ) -> typing.List[models.Repository]:
     # We need to update existing repositories instead of trying to create
     # new ones if they have the same parameters
@@ -79,8 +79,8 @@ async def create_repositories(
 
 
 async def create_repository(
-        db: Session,
-        payload: repository_schema.RepositoryCreate,
+    db: Session,
+    payload: repository_schema.RepositoryCreate,
 ) -> models.Repository:
     query = select(models.Repository).where(
         models.Repository.name == payload.name,
@@ -99,8 +99,8 @@ async def create_repository(
 
 
 async def search_repository(
-        db: Session,
-        payload: repository_schema.RepositorySearch,
+    db: Session,
+    payload: repository_schema.RepositorySearch,
 ) -> models.Repository:
     query = select(models.Repository)
     for key, value in payload.dict().items():
@@ -118,9 +118,9 @@ async def search_repository(
 
 
 async def update_repository(
-        db: Session,
-        repository_id: int,
-        payload: repository_schema.RepositoryUpdate,
+    db: Session,
+    repository_id: int,
+    payload: repository_schema.RepositoryUpdate,
 ) -> models.Repository:
     async with db.begin():
         db_repo = await db.execute(
@@ -141,16 +141,16 @@ async def delete_repository(db: Session, repository_id: int):
     async with db.begin():
         await db.execute(
             delete(models.Repository).where(
-            models.Repository.id == repository_id,
+                models.Repository.id == repository_id,
             )
         )
         await db.commit()
 
 
 async def add_to_platform(
-        db: Session,
-        platform_id: int,
-        repository_ids: typing.List[int],
+    db: Session,
+    platform_id: int,
+    repository_ids: typing.List[int],
 ) -> models.Platform:
     platform_result = await db.execute(
         select(models.Platform)
@@ -184,9 +184,9 @@ async def add_to_platform(
 
 
 async def remove_from_platform(
-        db: Session,
-        platform_id: int,
-        repository_ids: typing.List[int],
+    db: Session,
+    platform_id: int,
+    repository_ids: typing.List[int],
 ) -> models.Platform:
     await db.execute(
         delete(models.PlatformRepo).where(
@@ -205,8 +205,8 @@ async def remove_from_platform(
 
 
 async def create_repository_remote(
-        db: Session,
-        payload: remote_schema.RemoteCreate,
+    db: Session,
+    payload: remote_schema.RemoteCreate,
 ) -> models.RepositoryRemote:
     query = select(models.RepositoryRemote).where(
         models.RepositoryRemote.name == payload.name,
@@ -216,7 +216,7 @@ async def create_repository_remote(
     pulp_client = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
-        settings.pulp_password
+        settings.pulp_password,
     )
     result = await db.execute(query)
     remote = result.scalars().first()
@@ -226,11 +226,15 @@ async def create_repository_remote(
     if pulp_remote:
         remote_href = pulp_remote['pulp_href']
         await pulp_client.update_rpm_remote(
-            remote_href, payload.url, remote_policy=payload.policy,
+            remote_href,
+            payload.url,
+            remote_policy=payload.policy,
         )
     else:
         remote_href = await pulp_client.create_rpm_remote(
-            payload.name, payload.url, remote_policy=payload.policy,
+            payload.name,
+            payload.url,
+            remote_policy=payload.policy,
         )
     if remote:
         return remote
@@ -247,9 +251,9 @@ async def create_repository_remote(
 
 
 async def update_repository_remote(
-        db: Session,
-        remote_id: int,
-        payload: remote_schema.RemoteUpdate,
+    db: Session,
+    remote_id: int,
+    payload: remote_schema.RemoteUpdate,
 ) -> models.RepositoryRemote:
     async with db.begin():
         result = await db.execute(
@@ -267,17 +271,19 @@ async def update_repository_remote(
 
 
 async def sync_repo_from_remote(
-        db: Session,
-        repository_id: int,
-        payload: repository_schema.RepositorySync,
-        wait_for_result: bool = False,
+    db: Session,
+    repository_id: int,
+    payload: repository_schema.RepositorySync,
+    wait_for_result: bool = False,
 ):
     async with db.begin():
         repository = select(models.Repository).get(repository_id)
         remote = select(models.RepositoryRemote).get(payload.remote_id)
 
     pulp_client = PulpClient(
-        settings.pulp_host, settings.pulp_user, settings.pulp_password,
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
     )
     return await pulp_client.sync_rpm_repo_from_remote(
         repository.pulp_href,

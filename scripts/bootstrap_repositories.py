@@ -255,7 +255,7 @@ def main():
         for repo_info in repositories_data:
             logger.info(
                 "Creating repository from the following data: %s",
-                str(repo_info)
+                str(repo_info),
             )
             # If repository is not marked as production, do not remove `url` field
             repo_name = f'{repo_info["name"]}-{repo_info["arch"]}'
