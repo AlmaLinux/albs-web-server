@@ -436,7 +436,13 @@ def list_updateinfo_records(monkeypatch, pulp_updateinfos):
 @pytest.fixture
 def get_rpm_distros(monkeypatch):
     async def func(*args, **kwargs):
-        return [{"pulp_href": get_distros_href()}]
+        return [
+            {
+                "pulp_href": get_distros_href(),
+                "name": "rpm_distro_name",
+            },
+
+        ]
 
     monkeypatch.setattr(PulpClient, "get_rpm_distros", func)
 

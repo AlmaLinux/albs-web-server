@@ -271,12 +271,11 @@ async def remove_product(
     for product_repo in db_product.repositories:
         # some repos from db can be absent in pulp
         # in case if you reset pulp db, but didn't reset non-pulp db
-        #FIXME: uncomment after tests
-        # if all(
-        #         product_repo.name != product_distro['name'] for product_distro
-        #         in all_product_distros
-        # ):
-        #     continue
+        if all(
+                product_repo.name != product_distro['name'] for product_distro
+                in all_product_distros
+        ):
+            continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
     for product_distro in all_product_distros:
         delete_tasks.append(
