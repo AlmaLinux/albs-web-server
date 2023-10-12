@@ -32,11 +32,11 @@ class TestProductsEndpoints(BaseAsyncTestCase):
     async def test_add_to_product(
         self,
         regular_build: Build,
-        base_product: Product,
+        user_product: Product,
         session: AsyncSession,
     ):
-        product_id = base_product.id
-        product_name = base_product.name
+        product_id = user_product.id
+        product_name = user_product.name
         build_id = regular_build.id
         endpoint = f"/api/v1/products/add/{build_id}/{product_name}/"
         response = await self.make_request("post", endpoint)
@@ -68,11 +68,11 @@ class TestProductsEndpoints(BaseAsyncTestCase):
 
     async def test_remove_from_product(
         self,
-        base_product: Product,
+        user_product: Product,
         session: AsyncSession,
     ):
-        product_id = base_product.id
-        product_name = base_product.name
+        product_id = user_product.id
+        product_name = user_product.name
         # We remove the build created in the previous test
         build_id = 1
         endpoint = f"/api/v1/products/remove/{build_id}/{product_name}/"
