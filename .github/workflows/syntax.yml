@@ -1,6 +1,6 @@
 name: syntax
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - "**"
 jobs:
@@ -19,6 +19,7 @@ jobs:
           files: |
             **/*.py
       - name: Prepare python env
+        if: ${{ steps.changed-files.all_changed_files }}
         run: |
           python -m venv env
           source env/bin/activate
@@ -27,6 +28,7 @@ jobs:
           pip install isort[colors] black pylint
       - name: Run pylint
         id: pylint
+        if: ${{ steps.changed-files.all_changed_files }}
         run: |
           delimiter='$(openssl rand -hex 8)'
           echo 'report<<$(delimiter)' >> $GITHUB_OUTPUT
@@ -34,6 +36,7 @@ jobs:
           echo '$(delimiter)' >> $GITHUB_OUTPUT
       - name: Post pylint output
         uses: mshick/add-pr-comment@v2
+        if: ${{ steps.pylint.outputs.report }}
         with:
           message: |
             <details>
@@ -45,6 +48,8 @@ jobs:
             </details>
           message-id: pylint-report
       - name: Run black
+        if: ${{ steps.changed-files.all_changed_files }}
         run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alembic --check --diff --color --target-version py39
       - name: Run isort
+        if: ${{ steps.changed-files.all_changed_files }}
         run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39

@@ -1,0 +1,49 @@
+name: check-migrations
+on:
+  pull_request:
+    branches:
+      - "**"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out repository
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Rebase
+        uses: cirrus-actions/rebase@1.8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create dirs
+        run: |
+          mkdir -p /home/runner/work/albs-web-server/alts
+          mkdir -p /home/runner/work/albs-web-server/albs-frontend
+          mkdir -p /home/runner/work/albs-web-server/albs-node
+          mkdir -p /home/runner/work/albs-web-server/albs-sign-node
+      - name: Add env file
+        run: |
+          touch ./vars.env
+          echo ALTS_TOKEN="secret" >> ./vars.env
+          echo GITHUB_CLIENT="secret" >> ./vars.env
+          echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
+          echo POSTGRES_PASSWORD="password" >> ./vars.env
+          echo JWT_SECRET="secret" >> ./vars.env
+          echo POSTGRES_DB="test-almalinux-bs" >> ./vars.env
+          echo PACKAGE_BEHOLDER_ENABLED="False" >> ./vars.env
+          echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
+          echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
+          echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
+          cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
+      - uses: isbang/compose-action@v1.5.1
+        name: Run docker-compose
+        with:
+          up-flags: "--build --no-deps"
+          down-flags: "--volumes"
+          services: |
+            db
+            web_server
+      - name: Check migratrions
+        run: docker-compose run --rm --no-deps web_server bash -c 'source env/bin/activate && alembic --config alws/alembic.ini upgrade head'
