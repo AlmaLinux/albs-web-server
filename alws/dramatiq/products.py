@@ -136,6 +136,7 @@ async def prepare_repo_modify_dict(
             )
         )
 
+    logger.debug('Retrieving packages from pulp')
     results = await asyncio.gather(*tasks)
     modify.update(**dict(results))
 
@@ -173,9 +174,6 @@ async def set_platform_for_products_repos(
     if all(repo.platform for repo in product.repositories):
         return
     for repo in product.repositories:
-        # we don't need a repo with a sign key here
-        if repo.name.endswith('-sign-key-repo'):
-            continue
         repo.platform = repos_per_platform[repo.name]
 
 
@@ -257,7 +255,11 @@ async def _perform_product_modification(
         settings.pulp_user,
         settings.pulp_password,
     )
-
+    logger.info(
+        'Adding packages from the build %d to the product %d',
+        build_id,
+        product_id,
+    )
     async with Session() as db, db.begin():
         db_product = (
             (
@@ -268,9 +270,13 @@ async def _perform_product_modification(
                         selectinload(models.Product.builds),
                         selectinload(models.Product.owner),
                         selectinload(models.Product.platforms),
-                        selectinload(models.Product.repositories).selectinload(
-                            models.Repository.platform
-                        ),
+                        selectinload(
+                            models.Product.repositories.and_(
+                                models.Repository.name.not_like(
+                                    '%-sign-key-repo'
+                                )
+                            ),
+                        ).selectinload(models.Repository.platform),
                     )
                 )
             )
@@ -308,7 +314,11 @@ async def _perform_product_modification(
     await set_platform_for_build_repos(db=db, build=db_build)
 
     modify = await prepare_repo_modify_dict(
-        db_build, db_product, pulp_client, modification, pkgs_blacklist
+        db_build,
+        db_product,
+        pulp_client,
+        modification,
+        pkgs_blacklist,
     )
     tasks = []
     publish_tasks = []
@@ -323,7 +333,9 @@ async def _perform_product_modification(
         # automatic publications, so now we need
         # to manually publish them after modification
         publish_tasks.append(pulp_client.create_rpm_publication(key))
+    logger.debug('Adding packages to pulp repositories')
     await asyncio.gather(*tasks)
+    logger.debug('Creating RPM publications for pulp repositories')
     await asyncio.gather(*publish_tasks)
 
     if modification == "add":
@@ -339,7 +351,13 @@ async def _perform_product_modification(
     try:
         await db.commit()
     except Exception:
+        logger.exception('Cannot commit changes:')
         await db.rollback()
+    logger.info(
+        'Packages from the build %d were added to the product %d',
+        build_id,
+        product_id,
+    )
 
 
 @dramatiq.actor(
