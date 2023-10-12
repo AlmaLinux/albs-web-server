@@ -143,6 +143,9 @@ async def set_platform_for_products_repos(
     if all(repo.platform for repo in product.repositories):
         return
     for repo in product.repositories:
+        # we don't need a repo with a sign key here
+        if repo.name.endswith('-sign-key-repo'):
+            continue
         repo.platform = repos_per_platform[repo.name]
 
 
