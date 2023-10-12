@@ -1,12 +1,10 @@
 import logging
-import typing
 import urllib.parse
+from typing import List, Optional, Union
 
 import aiohttp
 
-
 from alws.constants import REQUEST_TIMEOUT
-
 
 __all__ = ['AltsClient']
 
@@ -20,20 +18,21 @@ class AltsClient:
     async def schedule_task(
         self,
         dist_name: str,
-        dist_version: typing.Union[int, str],
-        dist_arch: str, package_name: str,
-        package_version: str, callback_href: str,
-        package_release: str = None,
-        repositories: typing.List[dict] = None,
-        module_name: str = None,
-        module_stream: str = None,
-        module_version: str = None,
-        test_configuration: dict = None,
+        dist_version: Union[int, str],
+        dist_arch: str,
+        package_name: str,
+        package_version: str,
+        callback_href: str,
+        package_release: Optional[str] = None,
+        repositories: Optional[List[dict]] = None,
+        module_name: Optional[str] = None,
+        module_stream: Optional[str] = None,
+        module_version: Optional[str] = None,
+        test_configuration: Optional[dict] = None,
     ):
+        full_version = package_version
         if package_release:
             full_version = f'{package_version}-{package_release}'
-        else:
-            full_version = package_version
         payload = {
             'runner_type': 'docker',
             'dist_name': dist_name,
@@ -50,12 +49,17 @@ class AltsClient:
         if repositories:
             payload['repositories'] = repositories
         if test_configuration:
+            if test_configuration['tests'] is None:
+                test_configuration['tests'] = []
             payload['test_configuration'] = test_configuration
 
         full_url = urllib.parse.urljoin(self._base_url, '/tasks/schedule')
         async with aiohttp.ClientSession(headers=self._headers) as session:
-            async with session.post(full_url, json=payload,
-                                    timeout=self.__timeout) as response:
+            async with session.post(
+                full_url,
+                json=payload,
+                timeout=self.__timeout,
+            ) as response:
                 resp_json = None
                 try:
                     resp_json = await response.json()
