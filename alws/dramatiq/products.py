@@ -4,6 +4,7 @@ import typing
 from collections import defaultdict
 
 import dramatiq
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -56,7 +57,7 @@ async def get_packages(
         return filtered
 
     dist_packages = await get_existing_packages(pulp_client, dist_repo)
-    search_by_href = set([pkg["pulp_href"] for pkg in dist_packages])
+    search_by_href = {pkg["pulp_href"] for pkg in dist_packages}
     build_packages = await get_existing_packages(pulp_client, build_repo)
     filtered_build_packages = filter_by_arch(build_packages, dist_repo.arch)
     logger.debug(
@@ -153,7 +154,7 @@ async def prepare_repo_modify_dict(
 
 
 async def set_platform_for_products_repos(
-    db: Session,
+    db: AsyncSession,
     product: models.Product,
 ) -> None:
     repo_debug_dict = {
@@ -179,7 +180,7 @@ async def set_platform_for_products_repos(
 
 
 async def set_platform_for_build_repos(
-    db: Session,
+    db: AsyncSession,
     build: models.Build,
 ) -> None:
     repo_debug_dict = {
@@ -205,18 +206,16 @@ async def set_platform_for_build_repos(
 
 def group_tasks_by_ref_id(build_tasks: typing.List[models.BuildTask]) -> dict:
     tasks_by_ref = defaultdict(list)
-    {
-        tasks_by_ref[task_ref].append((task_id, task_status))
-        for (task_ref, task_id, task_status) in [
-            (task.ref_id, task.id, (task.status == BuildTaskStatus.COMPLETED))
-            for task in build_tasks
-        ]
-    }
+    for task in build_tasks:
+        tasks_by_ref[task.ref_id].append(
+            (task.id, task.status == BuildTaskStatus.COMPLETED)
+        )
     return tasks_by_ref
 
 
 async def get_packages_to_blacklist(
-    db: Session, build_tasks: typing.List[models.BuildTask]
+    db: AsyncSession,
+    build_tasks: typing.List[models.BuildTask],
 ) -> typing.List:
     # We should skip src.rpms coming from failed tasks
     tasks_by_ref = group_tasks_by_ref_id(build_tasks)
@@ -226,7 +225,7 @@ async def get_packages_to_blacklist(
     failed_build_tasks = [
         tasks[0][0]
         for tasks in tasks_by_ref.values()
-        if not any([task[1] for task in tasks])
+        if not any(task[1] for task in tasks)
     ]
 
     pkgs_blacklist = (
@@ -282,7 +281,7 @@ async def _perform_product_modification(
         db_build = await db.execute(
             select(models.Build)
             .where(
-                models.Build.id.__eq__(build_id),
+                models.Build.id == (build_id),
             )
             .options(
                 selectinload(models.Build.repos).selectinload(
