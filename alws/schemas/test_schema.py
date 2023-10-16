@@ -1,4 +1,4 @@
-import typing
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -10,18 +10,18 @@ __all__ = ['TestTaskResult']
 class TestTaskResult(BaseModel):
     api_version: str
     result: dict
-    stats: typing.Optional[dict]
+    stats: Optional[dict]
 
 
 class TestTask(BaseModel):
     id: int
     package_name: str
     package_version: str
-    package_release: typing.Optional[str]
+    package_release: Optional[str]
     status: int
     revision: int
-    alts_response: typing.Optional[dict]
-    performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
+    alts_response: Optional[dict]
+    performance_stats: Optional[List[PerformanceStats]] = None
 
     class Config:
         orm_mode = True
@@ -33,4 +33,19 @@ class TestLog(BaseModel):
     log_name: str
     success: bool
     logs_format: str
-    tap_results: typing.List[dict]
+    tap_results: List[dict]
+
+
+class TestTaskPayload(BaseModel):
+    runner_type: str
+    dist_name: str
+    dist_version: Union[str, int]
+    dist_arch: str
+    package_name: str
+    package_version: str
+    callback_href: str
+    repositories: Optional[List[dict]] = None
+    module_name: Optional[str] = None
+    module_stream: Optional[str] = None
+    module_version: Optional[str] = None
+    test_configuration: Optional[dict] = None

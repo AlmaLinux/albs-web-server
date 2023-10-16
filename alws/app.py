@@ -1,8 +1,5 @@
-import asyncio
-
 import importlib
 import logging
-import threading
 
 import sentry_sdk
 
@@ -16,7 +13,6 @@ from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers
-from alws.test_scheduler import TestTaskScheduler
 
 
 logging.basicConfig(level=settings.logging_level)
@@ -37,23 +33,6 @@ if settings.sentry_dsn:
 
 app = FastAPI()
 app.add_middleware(ExceptionMiddleware, handlers=handlers)
-
-
-if settings.test_task_scheduler_enabled:
-    scheduler = None
-    terminate_event = threading.Event()
-    graceful_terminate_event = threading.Event()
-
-    @app.on_event('startup')
-    async def startup():
-        global scheduler, terminate_event, graceful_terminate_event
-        scheduler = TestTaskScheduler(terminate_event, graceful_terminate_event)
-        asyncio.create_task(scheduler.run())
-
-    @app.on_event('shutdown')
-    async def shutdown():
-        global terminate_event
-        terminate_event.set()
 
 for module in ROUTERS:
     for router_type in (

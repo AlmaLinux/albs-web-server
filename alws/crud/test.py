@@ -3,9 +3,9 @@ import datetime
 import gzip
 import logging
 import re
-import typing
 import urllib.parse
 from io import BytesIO
+from typing import List, Optional, Union
 
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,10 +22,124 @@ from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
 
 
+def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
+    repos = []
+    # Build task repos
+    build_repositories = [
+        {'name': item.name, 'baseurl': item.url}
+        for item in task.build_task.build.repos
+        if item.type == 'rpm' and item.arch == task.env_arch
+    ]
+
+    # Linked build repos
+    linked_build_repos = [
+        {'name': item.name, 'baseurl': item.url}
+        for build in task.build_task.build.linked_builds
+        for item in build.repos
+        if item.type == 'rpm' and item.arch == task.env_arch
+    ]
+
+    # Flavor repos
+    platform = task.build_task.platform
+    flavor_repos = [
+        {
+            'name': item.name,
+            'baseurl': item.url.replace('$releasever', platform.distr_version),
+        }
+        for flavor in task.build_task.build.platform_flavors
+        for item in flavor.repos
+        if item.type == 'rpm' and item.arch == task.env_arch
+    ]
+
+    for repo_arr in (build_repositories, linked_build_repos, flavor_repos):
+        repos.extend(repo_arr)
+
+    return repos
+
+
+async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
+    response = []
+    async with session.begin():
+        updated_tasks = []
+        test_tasks = await session.execute(
+            select(models.TestTask)
+            .where(
+                models.TestTask.status == TestTaskStatus.CREATED,
+            )
+            .with_for_update()
+            .options(
+                selectinload(models.TestTask.build_task)
+                .selectinload(models.BuildTask.build)
+                .selectinload(models.Build.repos),
+                selectinload(models.TestTask.build_task).selectinload(
+                    models.BuildTask.ref
+                ),
+                selectinload(models.TestTask.build_task)
+                .selectinload(models.BuildTask.build)
+                .selectinload(models.Build.linked_builds),
+                selectinload(models.TestTask.build_task)
+                .selectinload(models.BuildTask.build)
+                .selectinload(models.Build.platform_flavors)
+                .selectinload(models.PlatformFlavour.repos),
+                selectinload(models.TestTask.build_task).selectinload(
+                    models.BuildTask.platform
+                ),
+                selectinload(models.TestTask.build_task).selectinload(
+                    models.BuildTask.rpm_module
+                ),
+            )
+            .order_by(models.TestTask.id.asc())
+            .limit(10)
+        )
+        for task in test_tasks.scalars().all():
+            platform = task.build_task.platform
+            module_info = task.build_task.rpm_module
+            module_name = module_info.name if module_info else None
+            module_stream = module_info.stream if module_info else None
+            module_version = module_info.version if module_info else None
+            repositories = get_repos_for_test_task(task)
+            task.status = TestTaskStatus.STARTED
+            task.scheduled_at = datetime.datetime.utcnow()
+            test_configuration = task.build_task.ref.test_configuration
+            payload = {
+                'runner_type': 'docker',
+                'dist_name': platform.test_dist_name,
+                'dist_version': platform.distr_version,
+                'dist_arch': task.env_arch,
+                'package_name': task.package_name,
+                'package_version': (
+                    f'{task.package_version}-{task.package_release}'
+                    if task.package_release
+                    else task.package_version
+                ),
+                'callback_href': f'/api/v1/tests/{task.id}/result/',
+            }
+            if module_name and module_stream and module_version:
+                payload.update(
+                    {
+                        'module_name': module_name,
+                        'module_stream': module_stream,
+                        'module_version': module_version,
+                    }
+                )
+            if repositories:
+                payload['repositories'] = repositories
+            if test_configuration:
+                if test_configuration['tests'] is None:
+                    test_configuration['tests'] = []
+                payload['test_configuration'] = test_configuration
+            response.append(payload)
+            updated_tasks.append(task)
+        if updated_tasks:
+            session.add_all(updated_tasks)
+            await session.commit()
+    return response
+
+
 async def __get_log_repository(
     db: AsyncSession,
     build_id: int,
-) -> typing.Optional[models.Repository]:
+) -> Optional[models.Repository]:
     build = (
         (
             await db.execute(
@@ -294,7 +408,7 @@ async def get_test_tasks_by_build_task(
     db: AsyncSession,
     build_task_id: int,
     latest: bool = True,
-    revision: typing.Optional[int] = None,
+    revision: Optional[int] = None,
 ):
     query = (
         select(models.TestTask)
