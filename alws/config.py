@@ -1,16 +1,17 @@
-import typing
 import urllib.parse
+from typing import Optional
 
 from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-
     pulp_host: str = 'http://pulp'
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
-    pulp_database_url: str = 'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
+    pulp_database_url: str = (
+        'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
+    )
 
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
@@ -18,13 +19,19 @@ class Settings(BaseSettings):
 
     package_beholder_enabled: bool = True
     beholder_host: str = 'http://beholder-web:5000'
-    beholder_token: typing.Optional[str]
+    beholder_token: Optional[str]
 
     redis_url: str = 'redis://redis:6379'
 
-    database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
-    test_database_url: str = 'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
-    sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
+    database_url: str = (
+        'postgresql+asyncpg://postgres:password@db/almalinux-bs'
+    )
+    test_database_url: str = (
+        'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
+    )
+    sync_database_url: str = (
+        'postgresql+psycopg2://postgres:password@db/almalinux-bs'
+    )
 
     github_client: str
     github_client_secret: str
@@ -32,29 +39,29 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
-    immudb_username: typing.Optional[str]
-    immudb_password: typing.Optional[str]
-    immudb_database: typing.Optional[str]
-    immudb_address: typing.Optional[str]
-    immudb_public_key_file: typing.Optional[str]
+    immudb_username: Optional[str]
+    immudb_password: Optional[str]
+    immudb_database: Optional[str]
+    immudb_address: Optional[str]
+    immudb_public_key_file: Optional[str]
 
     rabbitmq_default_user: str = 'test-system'
     rabbitmq_default_pass: str = 'test-system'
     rabbitmq_default_host: str = 'rabbitmq'
     rabbitmq_default_vhost: str = 'test_system'
 
-    sign_server_url: typing.Optional[str] = 'http://web_server:8000/api/v1/'
-    sign_server_token: typing.Optional[str]
+    sign_server_url: Optional[str] = 'http://web_server:8000/api/v1/'
+    sign_server_token: Optional[str]
 
     documentation_path: str = 'alws/documentation/'
 
-    logging_level: typing.Optional[str] = 'INFO'
+    logging_level: Optional[str] = 'INFO'
 
     frontend_baseurl: str = 'http://localhost:8080'
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
 
     sentry_environment: str = 'dev'
-    sentry_dsn: typing.Optional[str]
+    sentry_dsn: Optional[str]
     sentry_traces_sample_rate: float = 0.2
 
     @property
@@ -64,7 +71,9 @@ class Settings(BaseSettings):
     @property
     def github_callback_url(self) -> str:
         return urllib.parse.urljoin(
-            settings.frontend_baseurl, settings.github_callback_endpoint)
+            settings.frontend_baseurl,
+            settings.github_callback_endpoint,
+        )
 
 
 settings = Settings()
