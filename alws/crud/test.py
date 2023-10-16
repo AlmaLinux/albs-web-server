@@ -5,7 +5,7 @@ import logging
 import re
 import urllib.parse
 from io import BytesIO
-from typing import List, Optional, Union
+from typing import Dict, List, Optional
 
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,10 +16,15 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
+from alws.pulp_models import RpmPackage
 from alws.schemas import test_schema
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import (
+    get_rpm_packages_by_ids,
+    get_uuid_from_pulp_href,
+)
 
 
 def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
@@ -185,16 +190,26 @@ async def create_test_tasks_for_build_id(db: AsyncSession, build_id: int):
         await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
+def get_pulp_packages(
+    artifacts: List[models.BuildTaskArtifact],
+) -> Dict[str, RpmPackage]:
+    return get_rpm_packages_by_ids(
+        [get_uuid_from_pulp_href(artifact.href) for artifact in artifacts],
+        [
+            RpmPackage.name,
+            RpmPackage.version,
+            RpmPackage.release,
+            RpmPackage.arch,
+            RpmPackage.content_ptr_id,
+        ],
+    )
+
+
 async def create_test_tasks(
     db: AsyncSession,
     build_task_id: int,
     repository_id: int,
 ):
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
     async with db.begin():
         build_task_query = await db.execute(
             select(models.BuildTask)
@@ -217,36 +232,32 @@ async def create_test_tasks(
             new_revision = latest_revision + 1
 
         test_tasks = []
+        pulp_packages = get_pulp_packages(build_task.artifacts)
         for artifact in build_task.artifacts:
             if artifact.type != 'rpm':
                 continue
-            artifact_info = None
-            try:
-                artifact_info = await pulp_client.get_rpm_package(
-                    artifact.href,
-                    include_fields=['name', 'version', 'release', 'arch'],
-                )
-                if artifact_info['arch'] == 'src':
-                    continue
-            except Exception:
-                logging.exception(
+            artifact_info = pulp_packages.get(artifact.href)
+            if not artifact_info:
+                logging.error(
                     'Cannot get information about artifact %s with href %s',
                     artifact.name,
                     artifact.href,
                 )
-            if artifact_info:
-                task = models.TestTask(
-                    build_task_id=build_task_id,
-                    package_name=artifact_info['name'],
-                    package_version=artifact_info['version'],
-                    env_arch=build_task.arch,
-                    status=TestTaskStatus.CREATED,
-                    revision=new_revision,
-                    repository_id=repository_id,
-                )
-                if artifact_info.get('release'):
-                    task.package_release = artifact_info['release']
-                test_tasks.append(task)
+                continue
+            if artifact_info.arch == 'src':
+                continue
+            task = models.TestTask(
+                build_task_id=build_task_id,
+                package_name=artifact_info.name,
+                package_version=artifact_info.version,
+                env_arch=build_task.arch,
+                status=TestTaskStatus.CREATED,
+                revision=new_revision,
+                repository_id=repository_id,
+            )
+            if artifact_info.release:
+                task.package_release = artifact_info.release
+            test_tasks.append(task)
         if test_tasks:
             db.add_all(test_tasks)
             await db.commit()

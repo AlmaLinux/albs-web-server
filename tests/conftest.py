@@ -12,6 +12,7 @@ pytest_plugins = [
     "tests.fixtures.pulp",
     "tests.fixtures.releases",
     "tests.fixtures.repositories",
+    "tests.fixtures.tests",
 ]
 
 

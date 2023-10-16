@@ -5,9 +5,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.constants import BuildTaskStatus
+from alws.crud import test
 from alws.crud.build import get_builds
 from alws.crud.build_node import safe_build_done
-from alws.crud import test
 from alws.dramatiq.build import _start_build
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
@@ -141,6 +141,7 @@ async def build_done(
     start_build,
     create_entity,
     get_rpm_packages_info,
+    mock_get_pulp_packages,
 ):
     build = await get_builds(db=session, build_id=regular_build.id)
     await session.close()
@@ -157,6 +158,10 @@ async def build_done(
                 )
             ),
         )
+    build = await get_builds(db=session, build_id=regular_build.id)
+    for build_task in build.tasks:
+        assert build_task.status == BuildTaskStatus.COMPLETED
+    await session.close()
     await test.create_test_tasks_for_build_id(session, build.id)
 
 
