@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.constants import BuildTaskStatus
 from alws.crud.build import get_builds
 from alws.crud.build_node import safe_build_done
+from alws.crud import test
 from alws.dramatiq.build import _start_build
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
@@ -156,6 +157,7 @@ async def build_done(
                 )
             ),
         )
+    await test.create_test_tasks_for_build_id(session, build.id)
 
 
 @pytest.mark.anyio

@@ -30,6 +30,7 @@ __all__ = ['start_build', 'build_done']
 
 logger = logging.getLogger(__name__)
 
+
 def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
     result = db.execute(query)
