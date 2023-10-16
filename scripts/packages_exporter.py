@@ -11,6 +11,7 @@ import tempfile
 import typing
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from time import time
 
@@ -20,6 +21,9 @@ import pgpy
 import rpm
 import sentry_sdk
 import sqlalchemy
+
+# Required for generating RSS
+from feedgen.feed import FeedGenerator
 from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -354,6 +358,36 @@ class Exporter:
         return await self.make_request(
             "GET", endpoint, params={"platform_name": platform_name}
         )
+
+    async def generate_rss(self, platform, modern_cache):
+        # Expect "AlmaLinux-9" here:
+        dist_name = platform.replace('-', ' ')
+        dist_version = platform.split('-')[-1]
+
+        errata_data = modern_cache['data']
+
+        feed = FeedGenerator()
+        feed.title(f'Errata Feed for {dist_name}')
+        feed.link(href='https://errata.almalinux.org', rel='alternate')
+        feed.description(f'Errata Feed for AlmaLinux')
+        feed.author(name='AlmaLinux Team', email='packager@almalinux.org')
+
+        for erratum in errata_data:
+            html_erratum_id = erratum['id'].replace(':', '-')
+            title = f"[{erratum['id']}] {erratum['title']}"
+            link = f"https://errata.almalinux.org/{dist_version}/{html_erratum_id}.html"
+            pubDate = datetime.fromtimestamp(
+                erratum['updated_date'], timezone.utc
+            )
+            content = f"<pre>{erratum['description']}</pre>"
+
+            entry = feed.add_entry()
+            entry.title(title)
+            entry.link(href=link)
+            entry.content(content, type='CDATA')
+            entry.pubDate(pubDate)
+
+        return feed.rss_str(pretty=True).decode('utf-8')
 
     async def download_repodata(self, repodata_path, repodata_url):
         file_links = await get_repodata_file_links(repodata_url)
@@ -948,6 +982,19 @@ def main():
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
                 exporter.logger.debug("OVAL is generated")
+
+                exporter.logger.debug(f"Generating RSS feed for {platform}")
+                rss = sync(
+                    exporter.generate_rss(
+                        platform,
+                        platform_errata_cache[platform]["modern_cache"],
+                    )
+                )
+                with open(
+                    os.path.join(platform_path, "errata.rss"), "w"
+                ) as fd:
+                    fd.write(rss)
+                exporter.logger.debug(f"RSS generation for {platform} is done")
         except Exception:
             exporter.logger.exception("Error happened:\n")
         finally:
