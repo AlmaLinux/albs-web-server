@@ -100,6 +100,7 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         assert response.status_code == self.status_codes.HTTP_204_NO_CONTENT
 
 
+
 @pytest.mark.usefixtures(
     "get_multilib_packages_from_pulp",
     "enable_beholder",
