@@ -8,9 +8,8 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.errors import DataNotFoundError, ProductError
-from alws.schemas import release_schema
 from alws.release_planner import get_releaser_class
-
+from alws.schemas import release_schema
 
 __all__ = [
     "get_releases",
@@ -27,6 +26,7 @@ async def get_releases(
     product_id: typing.Optional[int] = None,
     platform_id: typing.Optional[int] = None,
     status: typing.Optional[int] = None,
+    package_name: typing.Optional[str] = None,
 ) -> typing.Union[
     models.Release,
     typing.Dict[str, typing.Any],
@@ -47,10 +47,12 @@ async def get_releases(
             query = select(func.count(models.Release.id))
         if release_id:
             query = query.where(models.Release.id == release_id)
-        # TODO: Add here filter by packages and modules
-        # These links could be helpful for filtering by JSON
-        # https://github.com/sqlalchemy/sqlalchemy/discussions/7991
-        # https://www.postgresql.org/docs/9.5/functions-json.html
+        if package_name:
+            query = query.filter(
+                models.Release.plan["packages"].astext.like(
+                    f'%"name": "{package_name}%'
+                ),
+            )
         if status:
             query = query.filter(
                 models.Release.status == status,

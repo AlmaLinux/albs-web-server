@@ -1,17 +1,16 @@
 import typing
 
+from fastapi import APIRouter, Depends
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends
 
-from alws import database, models
+from alws import models
 from alws.auth import get_current_user
+from alws.constants import ReleaseStatus
 from alws.crud import release as r_crud
 from alws.dependencies import get_db
-from alws.schemas import release_schema
 from alws.dramatiq import execute_release_plan, revert_release
-from alws.constants import ReleaseStatus
-
+from alws.schemas import release_schema
 
 router = APIRouter(
     prefix="/releases",
@@ -37,6 +36,7 @@ async def get_releases(
     product_id: typing.Optional[int] = None,
     platform_id: typing.Optional[int] = None,
     status: typing.Optional[int] = None,
+    package_name: typing.Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     return await r_crud.get_releases(
@@ -45,6 +45,7 @@ async def get_releases(
         product_id=product_id,
         platform_id=platform_id,
         status=status,
+        package_name=package_name,
     )
 
 
