@@ -1373,7 +1373,11 @@ class ErrataToALBSPackage(Base):
     )
     albs_artifact_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("build_artifacts.id"),
+        sqlalchemy.ForeignKey(
+            "build_artifacts.id",
+            name="errata_to_albs_packages_albs_artifact_id_fkey",
+            ondelete="CASCADE",
+        ),
         nullable=True,
     )
     build_artifact: BuildTaskArtifact = relationship("BuildTaskArtifact")

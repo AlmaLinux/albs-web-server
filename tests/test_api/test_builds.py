@@ -85,6 +85,20 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         assert response.status_code == self.status_codes.HTTP_403_FORBIDDEN
         self.headers["Authorization"] = old_token
 
+    async def test_build_delete(
+        self,
+        session,
+        base_platform,
+        base_product,
+        create_errata,
+        build_done,
+        build_for_release,
+    ):
+        response = await self.make_request(
+            "delete", f"/api/v1/builds/{build_for_release.id}/remove"
+        )
+        assert response.status_code == self.status_codes.HTTP_204_NO_CONTENT
+
 
 @pytest.mark.usefixtures(
     "get_multilib_packages_from_pulp",
