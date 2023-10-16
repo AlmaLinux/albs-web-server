@@ -2,9 +2,13 @@ import typing
 
 from pydantic import BaseModel
 
-
-__all__ = ['Repository', 'RepositoryCreate', 'RepositoryUpdate',
-           'RepositorySearch', 'RepositorySync']
+__all__ = [
+    'Repository',
+    'RepositoryCreate',
+    'RepositoryUpdate',
+    'RepositorySearch',
+    'RepositorySync',
+]
 
 
 class Repository(BaseModel):
@@ -51,6 +55,7 @@ class RepositoryUpdate(BaseModel):
     priority: int = 10
     production: typing.Optional[bool]
     export_path: typing.Optional[str]
+    pulp_href: typing.Optional[str]
     mock_enabled: bool = True
 
 

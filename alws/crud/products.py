@@ -19,11 +19,11 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.pulp_client import PulpClient
 from alws.utils.copr import (
     create_product_repo,
     create_product_sign_key_repo,
 )
+from alws.utils.pulp_client import PulpClient
 
 __all__ = [
     'create_product',
@@ -57,16 +57,15 @@ async def create_product(
         raise ProductError(f'Product with name={payload.name} already exist')
 
     team_name = f'{payload.name}_team'
-    existing_team = await get_teams(db, name=team_name)
-    if existing_team:
-        raise ProductError(
-            "Product's team name intersects with the existing team, "
-            "which may lead to permissions issues"
+    teams = await get_teams(db, name=team_name)
+    if teams:
+        team = teams[0]
+    else:
+        team_payload = TeamCreate(
+            team_name=team_name, user_id=payload.owner_id
         )
-
-    team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+        team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
-    team = await create_team(db, team_payload, flush=True)
 
     product_payload = payload.dict()
     product_payload['team_id'] = team.id
@@ -129,7 +128,8 @@ async def create_product(
     # Create sign key repository if a product is community
     if payload.is_community:
         repo_name, repo_url, repo_href = await create_product_sign_key_repo(
-            pulp_client, owner.username, product.name)
+            pulp_client, owner.username, product.name
+        )
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -272,6 +272,13 @@ async def remove_product(
         **{"name__startswith": db_product.pulp_base_distro_name},
     )
     for product_repo in db_product.repositories:
+        # some repos from db can be absent in pulp
+        # in case if you reset pulp db, but didn't reset non-pulp db
+        if all(
+            product_repo.name != product_distro['name']
+            for product_distro in all_product_distros
+        ):
+            continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
     for product_distro in all_product_distros:
         delete_tasks.append(

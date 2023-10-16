@@ -11,10 +11,8 @@ import yaml
 from syncer import sync
 
 from alws import database
-from alws.crud import (
-    platform as pl_crud,
-    repository as repo_crud,
-)
+from alws.crud import platform as pl_crud
+from alws.crud import repository as repo_crud
 from alws.schemas import platform_schema, remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
 
@@ -102,6 +100,22 @@ async def get_repository(
                 repository = await repo_crud.create_repository(
                     db, repository_schema.RepositoryCreate(**payload_dict)
                 )
+            elif repository.pulp_href != repo_href:
+                logger.info(
+                    'Founded repository by data %s has another pulp_href %s',
+                    payload_dict,
+                    repository.pulp_href,
+                )
+                repository = await repo_crud.update_repository(
+                    db=db,
+                    repository_id=repository.id,
+                    payload=repository_schema.RepositoryUpdate(
+                        **{
+                            'pulp_href': repo_href,
+                        }
+                    ),
+                )
+
         else:
             payload = repo_info.copy()
             payload["url"] = payload["remote_url"]
@@ -130,6 +144,15 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
         return remote
 
 
+async def update_remote(remote_id, remote_data: dict):
+    async with database.Session() as db:
+        return await repo_crud.update_repository_remote(
+            db=db,
+            remote_id=remote_id,
+            payload=remote_schema.RemoteUpdate(**remote_data),
+        )
+
+
 async def update_platform(platform_data: dict):
     async with database.Session() as db:
         await pl_crud.modify_platform(
@@ -146,7 +169,9 @@ async def update_repository(repo_id: int, repo_data: dict):
 
 async def get_repositories_for_update(platform_name: str):
     async with database.Session() as db:
-        return await repo_crud.get_repositories_by_platform_name(db, platform_name)
+        return await repo_crud.get_repositories_by_platform_name(
+            db, platform_name
+        )
 
 
 async def add_repositories_to_platform(
@@ -165,7 +190,9 @@ async def add_repositories_to_platform(
             platform_instance = await pl_crud.create_platform(
                 db, platform_schema.PlatformCreate(**platform_data)
             )
-        await repo_crud.add_to_platform(db, platform_instance.id, repositories_ids)
+        await repo_crud.add_to_platform(
+            db, platform_instance.id, repositories_ids
+        )
 
 
 def main():
@@ -225,7 +252,8 @@ def main():
 
         for repo_info in repositories_data:
             logger.info(
-                "Creating repository from the following data: %s", str(repo_info)
+                "Creating repository from the following data: %s",
+                str(repo_info),
             )
             # If repository is not marked as production, do not remove `url` field
             repo_name = f'{repo_info["name"]}-{repo_info["arch"]}'
@@ -233,13 +261,17 @@ def main():
             repo_sync_policy = repo_info.pop("repository_sync_policy", None)
             remote_sync_policy = repo_info.pop("remote_sync_policy", None)
             repository = sync(
-                get_repository(pulp_client, repo_info, repo_name, is_production, logger)
+                get_repository(
+                    pulp_client, repo_info, repo_name, is_production, logger
+                )
             )
             repository_ids.append(repository.id)
 
             logger.debug("Repository instance: %s", repository)
             if args.no_remotes:
-                logger.warning("Not creating a remote for repository %s", repository)
+                logger.warning(
+                    "Not creating a remote for repository %s", repository
+                )
                 continue
             if not is_production:
                 logger.info(
@@ -250,9 +282,27 @@ def main():
                 continue
 
             remote = sync(get_remote(repo_info, remote_sync_policy))
-
+            pulp_remote = sync(
+                pulp_client.get_rpm_remote(
+                    f'{repo_info["name"]}-{repo_info["arch"]}',
+                )
+            )
+            if pulp_remote['pulp_href'] != remote.pulp_href:
+                remote = sync(
+                    update_remote(
+                        remote_id=remote.id,
+                        remote_data={
+                            'name': remote.name,
+                            'pulp_href': pulp_remote['pulp_href'],
+                            'arch': remote.arch,
+                            'url': remote.url,
+                        },
+                    )
+                )
             if args.no_sync:
-                logger.info("Synchronization from remote is disabled, skipping")
+                logger.info(
+                    "Synchronization from remote is disabled, skipping"
+                )
                 continue
             try:
                 logger.info("Syncing %s from %s...", repository, remote)
@@ -267,7 +317,9 @@ def main():
                 sync(pulp_client.create_rpm_publication(repository.pulp_href))
                 logger.info("Repository %s sync is completed", repository)
             except Exception as e:
-                logger.info("Repository %s sync is failed: \n%s", repository, str(e))
+                logger.info(
+                    "Repository %s sync is failed: \n%s", repository, str(e)
+                )
         sync(add_repositories_to_platform(platform_data, repository_ids))
 
 
