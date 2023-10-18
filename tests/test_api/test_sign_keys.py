@@ -1,7 +1,5 @@
-import pytest
-
-from tests.mock_classes import BaseAsyncTestCase
 from tests.fixtures.sign_keys import BASIC_SIGN_KEY_PAYLOAD
+from tests.mock_classes import BaseAsyncTestCase
 
 
 class TestSignKeys(BaseAsyncTestCase):

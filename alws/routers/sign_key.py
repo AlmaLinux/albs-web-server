@@ -14,7 +14,6 @@ from alws.dependencies import get_db
 from alws.errors import PlatformMissingError, SignKeyAlreadyExistsError
 from alws.schemas import sign_schema
 
-
 router = APIRouter(
     prefix='/sign-keys',
     tags=['sign-keys'],

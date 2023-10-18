@@ -8,7 +8,6 @@ from alws.crud.sign_key import create_sign_key
 from alws.models import Platform, SignKey
 from alws.schemas.sign_schema import SignKeyCreate
 
-
 BASIC_SIGN_KEY_PAYLOAD = {
     "name": "Test key",
     "description": "Test sign key",
