@@ -20,8 +20,10 @@ BASIC_SIGN_KEY_PAYLOAD = {
 
 async def __create_sign_key(session: AsyncSession, payload: dict) -> SignKey:
     await create_sign_key(session, SignKeyCreate(**payload))
-    sign_key = (await session.execute(select(SignKey).where(
-        SignKey.keyid == payload['keyid']))).scalars().first()
+    sign_key_cursor = await session.execute(
+        select(SignKey).where(SignKey.keyid == payload['keyid'])
+    )
+    sign_key = sign_key_cursor.scalars().first()
     return sign_key
 
 
