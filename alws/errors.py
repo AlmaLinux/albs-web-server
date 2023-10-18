@@ -105,3 +105,7 @@ class UserError(Exception):
 
 class GenKeyError(Exception):
     pass
+
+
+class PlatformMissingError(ValueError):
+    pass
