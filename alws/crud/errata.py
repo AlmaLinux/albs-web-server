@@ -934,7 +934,7 @@ async def release_errata_packages(
                 "version": int(db_module.version),
                 "context": db_module.context,
                 # we use here repository arch, because looking by
-                # noarch package (that can be refered to other arch)
+                # noarch package (that can be referred to other arch)
                 # we can get module with different arch
                 "arch": arch,
             }
@@ -982,6 +982,11 @@ async def release_errata_packages(
         ],
         "reboot_suggested": reboot_suggested,
     }
+    logging.info(
+        'Adding the "%s" record to the "%s" repo',
+        record.id,
+        repo_href,
+    )
     await pulp_client.add_errata_record(pulp_record, repo_href)
     if publish:
         await pulp_client.create_rpm_publication(repo_href)
@@ -1030,23 +1035,23 @@ async def prepare_updateinfo_mapping(
                     selectinload(models.ErrataToALBSPackage.build_artifact),
                 )
             )
+            pulp_pkg = await pulp.get_rpm_package(
+                db_pkg.href,
+                include_fields=[
+                    "name",
+                    "version",
+                    "release",
+                    "epoch",
+                    "arch",
+                    "location_href",
+                    "sha256",
+                    "rpm_sourcerpm",
+                ],
+            )
             for errata_pkg in errata_pkgs.scalars().all():
                 errata_id = errata_pkg.errata_package.errata_record_id
                 if errata_id in blacklist_updateinfo:
                     continue
-                pulp_pkg = await pulp.get_rpm_package(
-                    db_pkg.href,
-                    include_fields=[
-                        "name",
-                        "version",
-                        "release",
-                        "epoch",
-                        "arch",
-                        "location_href",
-                        "sha256",
-                        "rpm_sourcerpm",
-                    ],
-                )
                 updateinfo_mapping[errata_id].append(
                     (db_pkg, pulp_pkg, errata_pkg),
                 )
@@ -1120,7 +1125,7 @@ def append_update_packages_in_update_records(
 def get_albs_packages_from_record(
     record: models.ErrataRecord,
     pulp_packages: Dict[str, Any],
-    force: bool,
+    force: bool = False,
 ) -> Tuple[DefaultDict[str, List[models.ErrataToALBSPackage]], List[str]]:
     repo_mapping = collections.defaultdict(list)
     errata_packages = set()
@@ -1184,6 +1189,7 @@ async def process_errata_release_for_repos(
         for pkg in packages:
             pkg.status = ErrataPackageStatus.released
             pkg_hrefs.append(pkg.get_pulp_href())
+        logging.info("Preparing udpateinfo mapping")
         updateinfo_mapping = await prepare_updateinfo_mapping(
             db=session,
             pulp=pulp,
@@ -1200,6 +1206,7 @@ async def process_errata_release_for_repos(
                 ],
                 repository_version=latest_repo_version,
             )
+            logging.info("Appending packages to existing errata records")
             with get_pulp_db() as pulp_db:
                 append_update_packages_in_update_records(
                     pulp_db=pulp_db,
@@ -1214,14 +1221,16 @@ async def process_errata_release_for_repos(
                 packages,
                 db_record.platform,
                 repo_href,
-                publish=publish,
+                publish=False,
             )
         )
         if publish:
             publish_tasks.append(pulp.create_rpm_publication(repo_href))
     if not publish:
         return release_tasks
+    logging.info("Releasing errata packages in async tasks")
     await asyncio.gather(*release_tasks)
+    logging.info("Publicating repositories in async tasks")
     await asyncio.gather(*publish_tasks)
 
 
@@ -1313,6 +1322,7 @@ async def release_errata_record(record_id: str, force: bool):
 
         logging.info("Record release %s has been started", record_id)
         search_params = prepare_search_params(db_record)
+        logging.info("Retrieving platform packages from pulp")
         pulp_packages = await load_platform_packages(
             db_record.platform,
             search_params,
@@ -1397,9 +1407,10 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 for_release=True,
             )
             try:
-                repo_mapping = get_albs_packages_from_record(
-                    db_record, pulp_packages
-                )
+                (
+                    repo_mapping,
+                    missing_pkg_names,
+                ) = get_albs_packages_from_record(db_record, pulp_packages)
             except Exception as exc:
                 db_record.release_status = ErrataReleaseStatus.FAILED
                 db_record.last_release_log = str(exc)
@@ -1420,6 +1431,8 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 session=session,
                 repo_mapping=repo_mapping,
                 db_record=db_record,
+                missing_pkg_names=missing_pkg_names,
+                force_flag=False,
             )
             if not tasks:
                 continue
