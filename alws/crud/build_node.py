@@ -549,21 +549,27 @@ async def __process_build_task_artifacts(
         return srpm_name
 
     processing_stats = {}
-    build_task = (await db.execute(
-        select(models.BuildTask)
-        .where(models.BuildTask.id == task_id)
-        .with_for_update()
-        .options(
-            selectinload(models.BuildTask.platform).selectinload(
-                models.Platform.reference_platforms
-            ),
-            selectinload(models.BuildTask.rpm_module),
-            selectinload(models.BuildTask.ref),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos
-            ),
+    build_task = (
+        (
+            await db.execute(
+                select(models.BuildTask)
+                .where(models.BuildTask.id == task_id)
+                .with_for_update()
+                .options(
+                    selectinload(models.BuildTask.platform).selectinload(
+                        models.Platform.reference_platforms
+                    ),
+                    selectinload(models.BuildTask.rpm_module),
+                    selectinload(models.BuildTask.ref),
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.repos
+                    ),
+                )
+            )
         )
-    )).scalars().first()
+        .scalars()
+        .first()
+    )
     module_index = None
     module_repo = None
     query = (
@@ -573,21 +579,36 @@ async def __process_build_task_artifacts(
             models.BuildRepo.c.build_id == build_task.build_id,
         )
     )
-    rpm_repositories = (await db.execute(query.where(
-        models.Repository.platform_id == build_task.platform_id,
-        models.Repository.type == 'rpm',
-    ))).scalars().all()
-    log_repository = (await db.execute(query.where(
-        models.Repository.type == 'build_log',
-    ))).scalars().first()
+    rpm_repositories = (
+        (
+            await db.execute(
+                query.where(
+                    models.Repository.platform_id == build_task.platform_id,
+                    models.Repository.type == 'rpm',
+                )
+            )
+         )
+        .scalars()
+        .all()
+    )
+    log_repository = (
+        (
+            await db.execute(
+                query.where(
+                    models.Repository.type == 'build_log',
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
     if git_commit_hash:
         build_task.ref.git_commit_hash = git_commit_hash
     if build_task.rpm_module:
         module_repo = next(
             build_repo
             for build_repo in rpm_repositories
-            if build_repo.arch == build_task.arch
-            and build_repo.debug is False
+            if build_repo.arch == build_task.arch and build_repo.debug is False
         )
         try:
             repo_modules_yaml = await pulp_client.get_repo_modules_yaml(

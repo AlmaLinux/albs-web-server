@@ -141,8 +141,7 @@ class BuildPlanner:
     async def create_log_repo(
         self,
         repo_type: str,
-        repo_prefix:
-        str = 'build_logs',
+        repo_prefix: str = 'build_logs',
     ):
         repo_name = f'build-{self._build.id}-{repo_type}'
         repo_url, repo_href = await self._pulp_client.create_log_repo(
@@ -166,9 +165,7 @@ class BuildPlanner:
             ('test_log', 'test_logs'),
         ):
             tasks.append(
-                self.create_log_repo(
-                    repo_type, repo_prefix=repo_prefix
-                )
+                self.create_log_repo(repo_type, repo_prefix=repo_prefix)
             )
 
         for platform in self._platforms:
@@ -419,11 +416,11 @@ class BuildPlanner:
         return index
 
     async def add_task(
-            self,
-            task: typing.Union[
-                build_schema.BuildTaskRef,
-                build_schema.BuildTaskModuleRef,
-            ],
+        self,
+        task: typing.Union[
+            build_schema.BuildTaskRef,
+            build_schema.BuildTaskModuleRef,
+        ],
     ):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
             await self._add_single_ref(
@@ -455,7 +452,8 @@ class BuildPlanner:
                 module_templates.append(devel_module.render())
         else:
             raw_refs = [
-                ref[0] for platform in self._platforms
+                ref[0]
+                for platform in self._platforms
                 for ref in await build_schema.get_module_refs(
                     task, platform, self._platform_flavors
                 )
