@@ -307,7 +307,7 @@ async def get_module_data_from_beholder(
 
 def compare_module_data(
     component_name: str,
-    beholder_data: typing.List[dict],
+    beholder_data: tuple[typing.Any],
     tag_name: str,
 ) -> typing.List[dict]:
     pkgs_to_add = []

@@ -452,9 +452,9 @@ class BuildPlanner:
                 module_templates.append(devel_module.render())
         else:
             raw_refs = [
-                ref[0]
+                ref
                 for platform in self._platforms
-                for ref in await build_schema.get_module_refs(
+                for ref, *_ in await build_schema.get_module_refs(
                     task, platform, self._platform_flavors
                 )
             ]

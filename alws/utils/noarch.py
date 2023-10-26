@@ -62,7 +62,9 @@ async def save_noarch_packages(
         .options(
             selectinload(models.BuildTask.artifacts),
             selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos
+                models.Build.repos.and_(
+                    models.Repository.platform_id == build_task.platform_id,
+                )
             ),
         )
     )
