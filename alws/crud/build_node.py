@@ -587,7 +587,7 @@ async def __process_build_task_artifacts(
                     models.Repository.type == 'rpm',
                 )
             )
-         )
+        )
         .scalars()
         .all()
     )

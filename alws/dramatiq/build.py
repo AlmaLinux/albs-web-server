@@ -50,11 +50,11 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
         with SyncSession() as db, db.begin():
             platforms = (
                 db.execute(
-                        select(models.Platform).where(
-                            models.Platform.name.in_(
-                                [p.name for p in build_request.platforms]
-                            )
+                    select(models.Platform).where(
+                        models.Platform.name.in_(
+                            [p.name for p in build_request.platforms]
                         )
+                    )
                 )
                 .scalars()
                 .all()
@@ -62,8 +62,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
             for platform in platforms:
                 db.execute(
                     update(models.Platform)
-                    .where(
-                    models.Platform.id == platform.id)
+                    .where(models.Platform.id == platform.id)
                     .values(
                         {
                             'module_build_index': models.Platform.module_build_index
@@ -110,7 +109,8 @@ async def _build_done(request: build_node_schema.BuildDone):
             logger.exception(
                 'Unable to complete safe_build_done for build task "%d", '
                 'marking it as failed.\nError: %s',
-                request.task_id, str(e)
+                request.task_id,
+                str(e),
             )
             build_task = (
                 (
@@ -144,7 +144,8 @@ async def _build_done(request: build_node_schema.BuildDone):
             except Exception as e:
                 logger.exception(
                     'Unable to create test tasks for build "%d". Error: %s',
-                    build_id, str(e)
+                    build_id,
+                    str(e),
                 )
             build_id = await _get_build_id(db, request.task_id)
             await db.execute(
@@ -179,9 +180,7 @@ async def _check_build_and_completed_tasks(
             await db.execute(
                 select(func.count())
                 .select_from(models.BuildTask)
-                .where(
-                    models.BuildTask.build_id == build_id
-                )
+                .where(models.BuildTask.build_id == build_id)
             )
         ).scalar()
 
@@ -196,7 +195,7 @@ async def _check_build_and_completed_tasks(
                             BuildTaskStatus.IDLE,
                             BuildTaskStatus.STARTED,
                         ]
-                    )
+                    ),
                 )
             )
         ).scalar()
@@ -234,7 +233,7 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
         NoarchProcessingError,
         RepositoryAddError,
         SrpmProvisionError,
-    )
+    ),
 )
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)

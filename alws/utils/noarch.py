@@ -20,8 +20,7 @@ __all__ = [
 
 
 async def get_noarch_packages(
-    db: AsyncSession,
-    build_task_ids: typing.List[int]
+    db: AsyncSession, build_task_ids: typing.List[int]
 ) -> typing.Tuple[dict, dict]:
     query = select(models.BuildTaskArtifact).where(
         sqlalchemy.and_(
@@ -60,7 +59,8 @@ async def save_noarch_packages(
                 models.BuildTask.index == build_task.index,
                 models.BuildTask.platform_id == build_task.platform_id,
             )
-        ).options(
+        )
+        .options(
             selectinload(models.BuildTask.artifacts),
             selectinload(models.BuildTask.build).selectinload(
                 models.Build.repos
@@ -153,7 +153,7 @@ async def save_noarch_packages(
             pulp_client.modify_repository(
                 repo_href,
                 add=content_dict['add'],
-                remove=content_dict['remove']
+                remove=content_dict['remove'],
             )
             for repo_href, content_dict in repos_to_update.items()
         )
