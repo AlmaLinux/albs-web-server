@@ -1,9 +1,8 @@
 import datetime
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 import dramatiq
-
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -25,7 +24,7 @@ from alws.errors import (
     RepositoryAddError,
     SrpmProvisionError,
 )
-from alws.schemas import build_schema, build_node_schema
+from alws.schemas import build_node_schema, build_schema
 
 __all__ = ['start_build', 'build_done']
 
