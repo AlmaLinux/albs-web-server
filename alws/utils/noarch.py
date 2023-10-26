@@ -51,6 +51,7 @@ async def save_noarch_packages(
     query = select(models.BuildTask).where(sqlalchemy.and_(
         models.BuildTask.build_id == build_task.build_id,
         models.BuildTask.index == build_task.index,
+        models.BuildTask.platform_id == build_task.platform_id,
     )).options(
         selectinload(models.BuildTask.artifacts),
         selectinload(models.BuildTask.build).selectinload(models.Build.repos),
