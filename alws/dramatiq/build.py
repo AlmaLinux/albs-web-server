@@ -204,7 +204,7 @@ async def _check_build_and_completed_tasks(
 
 
 async def _all_build_tasks_completed(
-        db: AsyncSession, build_task_id: int
+    db: AsyncSession, build_task_id: int
 ) -> bool:
     build_id = await _get_build_id(db, build_task_id)
     all_completed = await _check_build_and_completed_tasks(db, build_id)
