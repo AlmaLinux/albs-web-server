@@ -549,7 +549,7 @@ async def __process_build_task_artifacts(
         return srpm_name
 
     processing_stats = {}
-    build_tasks = await db.execute(
+    build_task = (await db.execute(
         select(models.BuildTask)
         .where(models.BuildTask.id == task_id)
         .with_for_update()
@@ -563,25 +563,31 @@ async def __process_build_task_artifacts(
                 models.Build.repos
             ),
         )
-    )
-    build_task = build_tasks.scalars().first()
+    )).scalars().first()
     module_index = None
     module_repo = None
     query = (
         select(models.Repository)
         .join(models.BuildRepo)
-        .where(models.BuildRepo.c.build_id == build_task.build_id)
+        .where(
+            models.BuildRepo.c.build_id == build_task.build_id,
+        )
     )
-    repositories = list((await db.execute(query)).scalars().all())
+    rpm_repositories = (await db.execute(query.where(
+        models.Repository.platform_id == build_task.platform_id,
+        models.Repository.type == 'rpm',
+    ))).scalars().all()
+    log_repository = (await db.execute(query.where(
+        models.Repository.type == 'build_log',
+    ))).scalars().first()
     if git_commit_hash:
         build_task.ref.git_commit_hash = git_commit_hash
     if build_task.rpm_module:
         module_repo = next(
             build_repo
-            for build_repo in repositories
+            for build_repo in rpm_repositories
             if build_repo.arch == build_task.arch
             and build_repo.debug is False
-            and build_repo.type == "rpm"
         )
         try:
             repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
@@ -596,10 +602,6 @@ async def __process_build_task_artifacts(
     log_artifacts = [
         item for item in task_artifacts if item.type == "build_log"
     ]
-    rpm_repositories = [repo for repo in repositories if repo.type == "rpm"]
-    log_repository = [
-        repo for repo in repositories if repo.type == "build_log"
-    ][0]
     src_rpm = _get_srpm_name(
         artifacts=task_artifacts,
         task=build_task,
@@ -740,6 +742,7 @@ async def __update_built_srpm_url(
                 models.BuildTask.id != build_task.id,
                 models.BuildTask.ref_id == build_task.ref_id,
                 models.BuildTask.status == BuildTaskStatus.IDLE,
+                models.BuildTask.platform_id == build_task.platform_id,
             )
         )
         uncompleted_tasks_ids = uncompleted_tasks_ids.scalars().all()
@@ -793,6 +796,7 @@ async def __update_built_srpm_url(
             update(models.BuildTask)
             .where(
                 models.BuildTask.ref_id == build_task.ref_id,
+                models.BuildTask.platform_id == build_task.platform_id,
             )
             .values(
                 built_srpm_url=srpm_url,
