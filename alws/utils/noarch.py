@@ -12,7 +12,6 @@ from alws import models
 from alws.constants import BuildTaskStatus
 from alws.utils.pulp_client import PulpClient
 
-
 __all__ = [
     'get_noarch_packages',
     'save_noarch_packages',

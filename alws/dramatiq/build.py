@@ -1,8 +1,8 @@
 import datetime
+import logging
 from typing import Dict, Any
 
 import dramatiq
-import logging
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,8 +10,13 @@ from sqlalchemy.future import select
 from sqlalchemy.sql.expression import func
 
 from alws import models
+from alws.build_planner import BuildPlanner
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
-from alws.crud import build_node as build_node_crud, test
+from alws.crud import build_node as build_node_crud
+from alws.crud import test
+from alws.database import SyncSession
+from alws.dependencies import get_db
+from alws.dramatiq import event_loop
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
@@ -20,11 +25,7 @@ from alws.errors import (
     RepositoryAddError,
     SrpmProvisionError,
 )
-from alws.build_planner import BuildPlanner
 from alws.schemas import build_schema, build_node_schema
-from alws.database import SyncSession
-from alws.dependencies import get_db
-from alws.dramatiq import event_loop
 
 __all__ = ['start_build', 'build_done']
 
