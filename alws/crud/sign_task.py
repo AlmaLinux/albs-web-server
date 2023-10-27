@@ -4,6 +4,7 @@ import logging
 import typing
 import urllib.parse
 from collections import defaultdict
+from dataclasses import dataclass
 
 from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,11 +33,18 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import get_rpm_packages_by_checksums
 
 
+@dataclass(eq=True, frozen=True)
+class RepoUniqueKey:
+    arch: str
+    debug: bool
+    platform_id: int
+
+
 async def __get_build_repos(
     db: AsyncSession,
     build_id: int,
     build: typing.Optional[models.Build] = None,
-) -> dict:
+) -> dict[RepoUniqueKey, models.Repository]:
     logging.info("Get repositories for %s Build", build_id)
     if not build:
         builds = await db.execute(
@@ -46,7 +54,11 @@ async def __get_build_repos(
         )
         build = builds.scalars().first()
     return {
-        (repo.arch, repo.debug): repo
+        RepoUniqueKey(
+            arch=repo.arch,
+            debug=repo.debug,
+            platform_id=repo.platform_id,
+        ): repo
         for repo in build.repos
         if repo.type == "rpm" and not repo.production
     }
@@ -249,7 +261,11 @@ async def get_available_sign_task(
     build_src_rpms = await db.execute(
         select(models.SourceRpm)
         .where(models.SourceRpm.build_id == sign_task.build_id)
-        .options(selectinload(models.SourceRpm.artifact))
+        .options(
+            selectinload(models.SourceRpm.artifact).selectinload(
+                models.BuildTaskArtifact.build_task,
+            )
+        )
     )
     build_src_rpms = build_src_rpms.scalars().all()
     if not build_src_rpms:
@@ -260,7 +276,7 @@ async def get_available_sign_task(
         .where(models.BinaryRpm.build_id == sign_task.build_id)
         .options(
             selectinload(models.BinaryRpm.artifact).selectinload(
-                models.BuildTaskArtifact.build_task
+                models.BuildTaskArtifact.build_task,
             )
         )
     )
@@ -276,8 +292,13 @@ async def get_available_sign_task(
     packages = []
 
     repo_mapping = await __get_build_repos(db, sign_task.build_id)
-    repo = repo_mapping.get(("src", False))
     for src_rpm in build_src_rpms:
+        repo_unique_key = RepoUniqueKey(
+            arch='src',
+            debug=False,
+            platform_id=src_rpm.artifact.build_task.platform_id,
+        )
+        repo = repo_mapping[repo_unique_key]
         packages.append(
             {
                 "id": src_rpm.artifact.id,
@@ -293,7 +314,12 @@ async def get_available_sign_task(
 
     for binary_rpm in build_binary_rpms:
         debug = is_debuginfo_rpm(binary_rpm.artifact.name)
-        repo = repo_mapping.get((binary_rpm.artifact.build_task.arch, debug))
+        repo_unique_key = RepoUniqueKey(
+            arch=binary_rpm.artifact.build_task.arch,
+            debug=debug,
+            platform_id=binary_rpm.artifact.build_task.platform_id,
+        )
+        repo = repo_mapping[repo_unique_key]
         packages.append(
             {
                 "id": binary_rpm.artifact.id,
@@ -411,6 +437,14 @@ async def complete_gen_key_task(
     return sign_key
 
 
+def _get_mapping_rpm_per_platform(
+    rpms: list[typing.Union[models.SourceRpm, models.BinaryRpm]]
+) -> dict[str, int]:
+    return {
+        rpm.artifact.name: rpm.artifact.build_task.platform_id for rpm in rpms
+    }
+
+
 async def complete_sign_task(
     sign_task_id: int,
     payload: sign_schema.SignTaskComplete,
@@ -485,13 +519,21 @@ async def complete_sign_task(
         source_rpms = await db.execute(
             select(models.SourceRpm)
             .where(models.SourceRpm.build_id == payload.build_id)
-            .options(selectinload(models.SourceRpm.artifact))
+            .options(
+                selectinload(models.SourceRpm.artifact).selectinload(
+                    models.BuildTaskArtifact.build_task,
+                )
+            )
         )
         source_rpms = source_rpms.scalars().all()
         binary_rpms = await db.execute(
             select(models.BinaryRpm)
             .where(models.BinaryRpm.build_id == payload.build_id)
-            .options(selectinload(models.BinaryRpm.artifact))
+            .options(
+                selectinload(models.BinaryRpm.artifact).selectinload(
+                    models.BuildTaskArtifact.build_task,
+                )
+            )
         )
         binary_rpms = binary_rpms.scalars().all()
 
@@ -499,6 +541,7 @@ async def complete_sign_task(
             srpms_mapping[srpm.artifact.href].append(srpm.artifact)
 
         all_rpms = source_rpms + binary_rpms
+        rpms_per_platforms_mapping = _get_mapping_rpm_per_platform(all_rpms)
         for rpm in all_rpms:
             similar_rpms_mapping[rpm.artifact.name].append(rpm)
         modified_items = []
@@ -605,7 +648,12 @@ async def complete_sign_task(
                     modified_items.append(db_pkg.artifact)
 
                 for arch in package_arches_mapping.get(pkg_name, []):
-                    repo = repo_mapping[(arch, debug)]
+                    repo_unique_key = RepoUniqueKey(
+                        arch=arch,
+                        debug=debug,
+                        platform_id=rpms_per_platforms_mapping[pkg_name]
+                    )
+                    repo = repo_mapping[repo_unique_key]
                     packages_to_add[repo.pulp_href].append(new_href)
 
             if sign_failed:

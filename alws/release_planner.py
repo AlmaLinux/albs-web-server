@@ -241,6 +241,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
+        platform_id: int,
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
@@ -253,9 +254,13 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Build.platform_flavors),
                 selectinload(models.Build.source_rpms).selectinload(
                     models.SourceRpm.artifact
+                ).selectinload(
+                    models.BuildTaskArtifact.build_task
                 ),
                 selectinload(models.Build.binary_rpms).selectinload(
                     models.BinaryRpm.artifact
+                ).selectinload(
+                    models.BuildTaskArtifact.build_task
                 ),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.source_rpm)
@@ -269,7 +274,14 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         build_result = await self.db.execute(builds_q)
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
-            build_rpms = build.source_rpms + build.binary_rpms
+            build_rpms = [
+                build_rpm for rpms_list in [
+                    build.source_rpms,
+                    build.binary_rpms,
+                ]
+                for build_rpm in rpms_list
+                if build_rpm.artifact.build_task.platform_id == platform_id
+            ]
             pulp_artifacts = await self.get_pulp_packages_info(
                 build_rpms,
                 build_tasks,
@@ -321,6 +333,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
+                        and build.repo.platform_id == platform_id
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url
@@ -687,6 +700,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
+            platform_id=base_platform.id,
             build_tasks=build_tasks,
         )
 
@@ -1273,7 +1287,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pulp_packages,
             src_rpm_names,
             pulp_rpm_modules,
-        ) = await self.get_pulp_packages(build_ids, build_tasks=build_tasks)
+        ) = await self.get_pulp_packages(
+            build_ids,
+            platform_id=base_platform.id,
+            build_tasks=build_tasks,
+        )
 
         clean_base_dist_name = get_clean_distr_name(base_platform.name)
         if clean_base_dist_name is None:
