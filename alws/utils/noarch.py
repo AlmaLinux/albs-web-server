@@ -62,9 +62,7 @@ async def save_noarch_packages(
         .options(
             selectinload(models.BuildTask.artifacts),
             selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos.and_(
-                    models.Repository.platform_id == build_task.platform_id,
-                )
+                models.Build.repos
             ),
         )
     )
@@ -133,6 +131,7 @@ async def save_noarch_packages(
                 repo.arch == 'src'
                 or repo.type != 'rpm'
                 or repo.arch != task.arch
+                or repo.platform_id != task.platform_id
             ):
                 continue
             repo_href = repo.pulp_href
