@@ -150,12 +150,10 @@ async def delete_release(
         )
         if release is None:
             return {
-                'message':
-                f'There is no scheduled release plant with ID "{release_id}"',
+                'message': f'There is no scheduled release plant with ID "{release_id}"',
             }
         else:
             await db.delete(release)
             return {
-                'message':
-                f'Scheduled release with ID "{release_id}" is removed',
+                'message': f'Scheduled release with ID "{release_id}" is removed',
             }

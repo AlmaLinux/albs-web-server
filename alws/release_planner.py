@@ -261,8 +261,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
-                selectinload(models.Build.tasks)
-                .selectinload(models.BuildTask.rpm_module),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.rpm_module
+                ),
                 selectinload(models.Build.repos),
             )
         )
@@ -329,7 +330,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
-                        and build.repo.platform_id == platform_id
+                        and build_repo.platform_id == platform_id
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url
