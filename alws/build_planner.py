@@ -134,6 +134,8 @@ class BuildPlanner:
             debug=is_debug,
             platform=platform,
         )
+        if repo_type == 'rpm':
+            repo.platform_id = platform.id
         self._build.repos.append(repo)
 
     async def create_log_repo(

@@ -19,12 +19,12 @@ from alws.config import settings
 from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
+    BeholderMatchMethod,
     ErrataPackageStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
-    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -241,6 +241,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
+        platform_id: int,
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
@@ -251,12 +252,12 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             .where(models.Build.id.in_(build_ids))
             .options(
                 selectinload(models.Build.platform_flavors),
-                selectinload(models.Build.source_rpms).selectinload(
-                    models.SourceRpm.artifact
-                ),
-                selectinload(models.Build.binary_rpms).selectinload(
-                    models.BinaryRpm.artifact
-                ),
+                selectinload(models.Build.source_rpms)
+                .selectinload(models.SourceRpm.artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
+                selectinload(models.Build.binary_rpms)
+                .selectinload(models.BinaryRpm.artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
@@ -269,7 +270,16 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         build_result = await self.db.execute(builds_q)
         modules_to_release = defaultdict(list)
         for build in build_result.scalars().all():
-            build_rpms = build.source_rpms + build.binary_rpms
+            build_rpms = [
+                build_rpm
+                for rpms_list in [
+                    build.source_rpms,
+                    build.binary_rpms,
+                ]
+                for build_rpm in rpms_list
+                if build_rpm.artifact.build_task.platform_id == platform_id
+            ]
+            logging.info('Build RPMs "%s"', build_rpms)
             pulp_artifacts = await self.get_pulp_packages_info(
                 build_rpms,
                 build_tasks,
@@ -315,12 +325,21 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     )
                     if key in modules_to_release:
                         continue
+                    for repo in task.build.repos:
+                        logging.info(
+                            'Repo name "%s", Repo type "%s", '
+                            'Repo platfomr_id "%s"',
+                            repo.name,
+                            repo.type,
+                            repo.platform_id,
+                        )
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
+                        and build_repo.platform_id == platform_id
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url
@@ -331,17 +350,15 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append(
-                            {
-                                "build_id": build.id,
-                                "name": module.name,
-                                "stream": module.stream,
-                                "version": module.version,
-                                "context": module.context,
-                                "arch": module.arch,
-                                "template": module.render(),
-                            }
-                        )
+                        modules_to_release[key].append({
+                            "build_id": build.id,
+                            "name": module.name,
+                            "stream": module.stream,
+                            "version": module.version,
+                            "context": module.context,
+                            "arch": module.arch,
+                            "template": module.render(),
+                        })
         pulp_rpm_modules = [
             module_dict
             for module_list in modules_to_release.values()
@@ -437,7 +454,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             self.db,
             product_id=payload.product_id,
         )
-
+        logging.info('Platform ID "%s"', platform.id)
         builds = (
             (
                 await self.db.execute(
@@ -460,7 +477,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         for build in builds:
             if not can_perform(build, user, actions.ReleaseBuild.name):
                 raise PermissionDenied(
-                    f"User does not have permissions to release build {build.id}"
+                    "User does not have permissions to release build"
+                    f" {build.id}"
                 )
 
         if not can_perform(product, user, actions.ReleaseToProduct.name):
@@ -647,7 +665,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE
+                re.IGNORECASE,
             ):
                 continue
             main_info = {
@@ -687,6 +705,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
+            platform_id=base_platform.id,
             build_tasks=build_tasks,
         )
 
@@ -731,13 +750,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 repo_arch_location.append("x86_64")
             if arch == "noarch":
                 repo_arch_location = base_platform.arch_list
-            plan_packages.append(
-                {
-                    "package": pkg,
-                    "repositories": repositories,
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            plan_packages.append({
+                "package": pkg,
+                "repositories": repositories,
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
@@ -746,9 +763,9 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             for module in pulp_rpm_modules:
                 # Modules go only in non-debug repos
                 repository = db_repos_mapping[(module["arch"], False)]
-                plan_modules.append(
-                    {"module": module, "repositories": [repository]}
-                )
+                plan_modules.append({
+                    "module": module, "repositories": [repository]
+                })
             release_plan["modules"] = plan_modules
 
         return release_plan
@@ -833,7 +850,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 )
                 if module_already_in_repo:
                     additional_messages.append(
-                        f"Module {release_module_nvsca} skipped,"
+                        f'Module {release_module_nvsca} skipped, '
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
@@ -1104,13 +1121,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             repo_arch_location = [package_arch]
             if package_arch == "noarch":
                 repo_arch_location = self.base_platform.arch_list
-            packages.append(
-                {
-                    "package": package,
-                    "repositories": [devel_repo],
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            packages.append({
+                "package": package,
+                "repositories": [devel_repo],
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(full_name)
         (
             pkgs_from_repos,
@@ -1273,13 +1288,16 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pulp_packages,
             src_rpm_names,
             pulp_rpm_modules,
-        ) = await self.get_pulp_packages(build_ids, build_tasks=build_tasks)
+        ) = await self.get_pulp_packages(
+            build_ids,
+            platform_id=base_platform.id,
+            build_tasks=build_tasks,
+        )
 
         clean_base_dist_name = get_clean_distr_name(base_platform.name)
         if clean_base_dist_name is None:
             raise ValueError(
-                f"Base distribution name is malformed: "
-                f"{base_platform.name}"
+                f"Base distribution name is malformed: {base_platform.name}"
             )
         self.clean_base_dist_name_lower = clean_base_dist_name.lower()
 
@@ -1322,7 +1340,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            platforms_list = base_platform.reference_platforms + [base_platform]
+            platforms_list = base_platform.reference_platforms + [
+                base_platform
+            ]
             module_responses = await self._beholder_client.retrieve_responses(
                 platforms_list,
                 module_name=module_name,
@@ -1358,7 +1378,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
-                        matched
+                        matched,
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
@@ -1394,7 +1414,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
-                    "matched": matched
+                    "matched": matched,
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
@@ -1403,7 +1423,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
             platforms_list,
-            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
+            data={
+                "source_rpms": src_rpm_names,
+                "match": BeholderMatchMethod.all(),
+            },
         )
 
         for beholder_response in beholder_responses:
@@ -1414,12 +1437,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # we should apply matches in reversed order to overwrite less accurate results by more accurate
                 # name_only -> name_version -> closest -> exact
                 ordered_keys = [
-                    method for method in BeholderMatchMethod.all()[::-1]
+                    method
+                    for method in BeholderMatchMethod.all()[::-1]
                     if method in pkg_list["packages"].keys()
                 ]
 
                 for matched in ordered_keys:
-                    response_priority = self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(
+                        matched
+                    )
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
@@ -1427,7 +1453,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         response_priority,
-                        matched
+                        matched,
                     )
         if not beholder_cache:
             return await self.get_pulp_based_response(
@@ -1498,7 +1524,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness, matched in release_repository_keys:
+            for (
+                release_repo_key,
+                trustness,
+                matched,
+            ) in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1539,13 +1569,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for repo_key, repo_arches in release_repositories.items():
                 repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
-                copy_pkg_info.update(
-                    {
-                        # TODO: need to send only one repo instead of list
-                        "repositories": [repo],
-                        "repo_arch_location": list(repo_arches),
-                    }
-                )
+                copy_pkg_info.update({
+                    # TODO: need to send only one repo instead of list
+                    "repositories": [repo],
+                    "repo_arch_location": list(repo_arches),
+                })
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
@@ -1696,7 +1724,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
                 if module_already_in_repo:
                     additional_messages.append(
-                        f"Module {release_module_nvsca} skipped,"
+                        f'Module {release_module_nvsca} skipped, '
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
@@ -1728,7 +1756,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if not repo:
                     raise MissingRepository(
                         f"Repository with name {repository_name} is missing "
-                        f"or doesn't have pulp_href field"
+                        "or doesn't have pulp_href field"
                     )
                 modify_tasks.append(
                     self.pulp_client.modify_repository(

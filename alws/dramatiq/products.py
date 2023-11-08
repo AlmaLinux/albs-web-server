@@ -165,10 +165,15 @@ async def set_platform_for_products_repos(
     # name of a product's repo:
     # some-username-some-product-some-platform-x86_64-debug-dr
     repos_per_platform = {
-        f"{product.owner.username}-{product.name}-{platform.name.lower()}-"
-        f"{repo.arch}-{repo_debug_dict[repo.debug]}": platform
+        # fmt: off
+        (
+            f"{product.owner.username}-{product.name}-{platform.name.lower()}"
+            f"-{repo.arch}-{repo_debug_dict[repo.debug]}"
+        ): platform
+        # fmt: on
         for repo in product.repositories
         for platform in product.platforms
+        if repo.type != 'sign_key'
     }
     # we do nothing if all repos have platform
     if all(repo.platform for repo in product.repositories):
@@ -188,8 +193,12 @@ async def set_platform_for_build_repos(
     # name of a build's repo:
     # some-platform-x86_64-some-build-id-debug-br
     repos_per_platform = {
-        f"{task.platform.name}-{repo.arch}-{build.id}-"
-        f"{repo_debug_dict[repo.debug]}": task.platform
+        # fmt: off
+        (
+            f"{task.platform.name}-{repo.arch}-{build.id}"
+            f"-{repo_debug_dict[repo.debug]}"
+        ): task.platform
+        # fmt: on
         for repo in build.repos
         for task in build.tasks
     }
@@ -223,6 +232,8 @@ async def get_packages_to_blacklist(
     failed_build_tasks = [
         tasks[0][0]
         for tasks in tasks_by_ref.values()
+        # task[0] is its ID
+        # task[1] is status. True if it's completed, False if not
         if not any(task[1] for task in tasks)
     ]
 
@@ -272,9 +283,7 @@ async def _perform_product_modification(
                         selectinload(models.Product.platforms),
                         selectinload(
                             models.Product.repositories.and_(
-                                models.Repository.name.not_like(
-                                    '%-sign-key-repo'
-                                )
+                                models.Repository.type != 'sign_key',
                             ),
                         ).selectinload(models.Repository.platform),
                     )
@@ -287,7 +296,7 @@ async def _perform_product_modification(
         db_build = await db.execute(
             select(models.Build)
             .where(
-                models.Build.id == (build_id),
+                models.Build.id == build_id,
             )
             .options(
                 selectinload(models.Build.repos).selectinload(
@@ -342,12 +351,10 @@ async def _perform_product_modification(
         db_product.builds.append(db_build)
     else:
         db_product.builds.remove(db_build)
-    db.add_all(
-        [
-            db_product,
-            db_build,
-        ]
-    )
+    db.add_all([
+        db_product,
+        db_build,
+    ])
     try:
         await db.commit()
     except Exception:
