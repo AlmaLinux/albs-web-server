@@ -586,21 +586,21 @@
     - name: appstream-ubi
       arch: x86_64
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/x86_64/appstream/os/
       production: true
       debug: false
       priority: 11
     - name: appstream-ubi
       arch: aarch64
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/aarch64/appstream/os/
       production: true
       debug: false
       priority: 11
     - name: appstream-ubi
       arch: ppc64le
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/ppc64le/appstream/os/
       production: true
       debug: false
       priority: 11
@@ -614,21 +614,21 @@
     - name: crb-ubi
       arch: x86_64
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/x86_64/codeready-builder/os/
       production: true
       debug: false
       priority: 11
     - name: crb-ubi
       arch: aarch64
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/aarch64/codeready-builder/os/
       production: true
       debug: false
       priority: 11
     - name: crb-ubi
       arch: ppc64le
       type: rpm
-      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/ppc64le/codeready-builder/os/
       production: true
       debug: false
       priority: 11
