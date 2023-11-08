@@ -1,7 +1,7 @@
 import typing
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import update
+from sqlalchemy import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
@@ -120,3 +120,42 @@ async def revert_db_release(
         )
     revert_release.send(release_id, user.id)
     return {"message": "Release plan revert has been started"}
+
+
+@router.delete(
+    '/{release_id}/delete',
+    response_model=release_schema.ReleaseCommitResult,
+)
+async def delete_release(
+    release_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """
+    Delete only a scheduled release
+    """
+
+    async with db.begin():
+        release = (
+            (
+                await db.execute(
+                    select(models.Release).where(
+                        models.Release.id == release_id,
+                        models.Release.status == ReleaseStatus.SCHEDULED,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if release is None:
+            return {
+                'message':
+                f'There is no scheduled release plant with ID "{release_id}"',
+            }
+        else:
+            await db.delete(release)
+            return {
+                'message':
+                f'Scheduled release with ID "{release_id}" is removed',
+            }
