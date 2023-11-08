@@ -45,7 +45,6 @@ async def __get_build_repos(
     build_id: int,
     build: typing.Optional[models.Build] = None,
 ) -> dict[RepoUniqueKey, models.Repository]:
-    logging.info("Get repositories for %s Build", build_id)
     if not build:
         builds = await db.execute(
             select(models.Build)
@@ -75,7 +74,6 @@ async def get_sign_tasks(
     db: AsyncSession,
     build_id: typing.Optional[int] = None,
 ) -> typing.List[models.SignTask]:
-    logging.info("Get sign tasks")
     query = select(models.SignTask)
     if build_id:
         query = query.where(models.SignTask.build_id == build_id)
@@ -132,7 +130,6 @@ async def create_sign_task(
     payload: sign_schema.SignTaskCreate,
     user_id: int,
 ) -> models.SignTask:
-    logging.info("Create sign task for %s Build", payload.build_id)
     async with db.begin():
         user = await get_user(db, user_id)
         builds = await db.execute(
@@ -233,7 +230,6 @@ async def get_available_sign_task(
     db: AsyncSession,
     key_ids: typing.List[str],
 ) -> typing.Dict[str, typing.Any]:
-    logging.info("Get available sign task")
     sign_tasks = await db.execute(
         select(models.SignTask)
         .join(models.SignTask.sign_key)
@@ -249,7 +245,6 @@ async def get_available_sign_task(
     )
     sign_task = sign_tasks.scalars().first()
     if not sign_task:
-        logging.info("No sign task")
         return {}
 
     await db.execute(
@@ -269,7 +264,6 @@ async def get_available_sign_task(
     )
     build_src_rpms = build_src_rpms.scalars().all()
     if not build_src_rpms:
-        logging.info("No src rpm")
         return {}
     build_binary_rpms = await db.execute(
         select(models.BinaryRpm)
@@ -282,7 +276,6 @@ async def get_available_sign_task(
     )
     build_binary_rpms = build_binary_rpms.scalars().all()
     if not build_binary_rpms:
-        logging.info("No binary rpms")
         return {}
     sign_task_payload = {
         "id": sign_task.id,
@@ -341,7 +334,6 @@ async def get_sign_task(
     db: AsyncSession,
     sign_task_id: int,
 ) -> models.SignTask:
-    logging.info("Get sign task %s", sign_task_id)
     sign_tasks = await db.execute(
         select(models.SignTask)
         .where(models.SignTask.id == sign_task_id)
@@ -378,7 +370,6 @@ async def complete_gen_key_task(
         )
     )
     if not payload.success:
-        logging.info("Task failed")
         return
     sign_key_repo = next(
         (r for r in gen_key_task.product.repositories if r.type == 'sign_key'),
@@ -390,7 +381,6 @@ async def complete_gen_key_task(
         settings.pulp_password,
     )
     if not sign_key_repo:
-        logging.debug("No product sign key repository")
         repo_name, repo_url, repo_href = await create_product_sign_key_repo(
             pulp_client=pulp_client,
             owner_name=gen_key_task.product.owner.username,
@@ -409,7 +399,6 @@ async def complete_gen_key_task(
         relative_path=payload.file_name,
     )
     if not result:
-        logging.info("Create file %s in Pulp", payload.file_name)
         await pulp_client.create_file(
             file_name=payload.file_name,
             artifact_href=payload.sign_key_href,
@@ -672,7 +661,6 @@ async def complete_sign_task(
             sign_task.status = SignStatus.COMPLETED
             build.signed = True
         else:
-            logging.info("Sign task %s failed", sign_task_id)
             sign_task.status = SignStatus.FAILED
             build.signed = False
         sign_task.log_href = payload.log_href
