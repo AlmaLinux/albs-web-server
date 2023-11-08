@@ -51,7 +51,7 @@ async def build_done(
     return {"ok": True}
 
 
-@router.post(
+@router.get(
     "/get_task",
     response_model=typing.Optional[build_node_schema.Task],
 )
