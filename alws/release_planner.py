@@ -350,17 +350,15 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append(
-                            {
-                                "build_id": build.id,
-                                "name": module.name,
-                                "stream": module.stream,
-                                "version": module.version,
-                                "context": module.context,
-                                "arch": module.arch,
-                                "template": module.render(),
-                            }
-                        )
+                        modules_to_release[key].append({
+                            "build_id": build.id,
+                            "name": module.name,
+                            "stream": module.stream,
+                            "version": module.version,
+                            "context": module.context,
+                            "arch": module.arch,
+                            "template": module.render(),
+                        })
         pulp_rpm_modules = [
             module_dict
             for module_list in modules_to_release.values()
@@ -479,7 +477,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         for build in builds:
             if not can_perform(build, user, actions.ReleaseBuild.name):
                 raise PermissionDenied(
-                    f"User does not have permissions to release build {build.id}"
+                    "User does not have permissions to release build"
+                    f" {build.id}"
                 )
 
         if not can_perform(product, user, actions.ReleaseToProduct.name):
@@ -751,13 +750,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 repo_arch_location.append("x86_64")
             if arch == "noarch":
                 repo_arch_location = base_platform.arch_list
-            plan_packages.append(
-                {
-                    "package": pkg,
-                    "repositories": repositories,
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            plan_packages.append({
+                "package": pkg,
+                "repositories": repositories,
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
@@ -766,9 +763,9 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             for module in pulp_rpm_modules:
                 # Modules go only in non-debug repos
                 repository = db_repos_mapping[(module["arch"], False)]
-                plan_modules.append(
-                    {"module": module, "repositories": [repository]}
-                )
+                plan_modules.append({
+                    "module": module, "repositories": [repository]
+                })
             release_plan["modules"] = plan_modules
 
         return release_plan
@@ -853,7 +850,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 )
                 if module_already_in_repo:
                     additional_messages.append(
-                        f"Module {release_module_nvsca} skipped,"
+                        f'Module {release_module_nvsca} skipped, '
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
@@ -1124,13 +1121,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             repo_arch_location = [package_arch]
             if package_arch == "noarch":
                 repo_arch_location = self.base_platform.arch_list
-            packages.append(
-                {
-                    "package": package,
-                    "repositories": [devel_repo],
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            packages.append({
+                "package": package,
+                "repositories": [devel_repo],
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(full_name)
         (
             pkgs_from_repos,
@@ -1302,8 +1297,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         clean_base_dist_name = get_clean_distr_name(base_platform.name)
         if clean_base_dist_name is None:
             raise ValueError(
-                f"Base distribution name is malformed: "
-                f"{base_platform.name}"
+                f"Base distribution name is malformed: {base_platform.name}"
             )
         self.clean_base_dist_name_lower = clean_base_dist_name.lower()
 
@@ -1575,13 +1569,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for repo_key, repo_arches in release_repositories.items():
                 repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
-                copy_pkg_info.update(
-                    {
-                        # TODO: need to send only one repo instead of list
-                        "repositories": [repo],
-                        "repo_arch_location": list(repo_arches),
-                    }
-                )
+                copy_pkg_info.update({
+                    # TODO: need to send only one repo instead of list
+                    "repositories": [repo],
+                    "repo_arch_location": list(repo_arches),
+                })
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
@@ -1732,7 +1724,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
                 if module_already_in_repo:
                     additional_messages.append(
-                        f"Module {release_module_nvsca} skipped,"
+                        f'Module {release_module_nvsca} skipped, '
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
@@ -1764,7 +1756,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if not repo:
                     raise MissingRepository(
                         f"Repository with name {repository_name} is missing "
-                        f"or doesn't have pulp_href field"
+                        "or doesn't have pulp_href field"
                     )
                 modify_tasks.append(
                     self.pulp_client.modify_repository(

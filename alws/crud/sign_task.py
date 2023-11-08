@@ -292,18 +292,14 @@ async def get_available_sign_task(
             platform_id=src_rpm.artifact.build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
-        packages.append(
-            {
-                "id": src_rpm.artifact.id,
-                "name": src_rpm.artifact.name,
-                "cas_hash": src_rpm.artifact.cas_hash,
-                "arch": "src",
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, src_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": src_rpm.artifact.id,
+            "name": src_rpm.artifact.name,
+            "cas_hash": src_rpm.artifact.cas_hash,
+            "arch": "src",
+            "type": "rpm",
+            "download_url": __get_package_url(repo.url, src_rpm.artifact.name),
+        })
 
     for binary_rpm in build_binary_rpms:
         debug = is_debuginfo_rpm(binary_rpm.artifact.name)
@@ -313,18 +309,16 @@ async def get_available_sign_task(
             platform_id=binary_rpm.artifact.build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
-        packages.append(
-            {
-                "id": binary_rpm.artifact.id,
-                "name": binary_rpm.artifact.name,
-                "cas_hash": binary_rpm.artifact.cas_hash,
-                "arch": binary_rpm.artifact.build_task.arch,
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, binary_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": binary_rpm.artifact.id,
+            "name": binary_rpm.artifact.name,
+            "cas_hash": binary_rpm.artifact.cas_hash,
+            "arch": binary_rpm.artifact.build_task.arch,
+            "type": "rpm",
+            "download_url": __get_package_url(
+                repo.url, binary_rpm.artifact.name
+            ),
+        })
     sign_task_payload["packages"] = packages
     await db.commit()
     return sign_task_payload
