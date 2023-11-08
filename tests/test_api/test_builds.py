@@ -20,8 +20,6 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
 
     async def test_mark_build_as_cancelled(
         self,
-        base_platform,
-        base_product,
         regular_build: Build,
         start_build,
     ):
@@ -87,15 +85,14 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
 
     async def test_build_delete(
         self,
-        session,
-        base_platform,
-        base_product,
         create_errata,
         build_done,
         build_for_release,
+        delete_by_href,
     ):
         response = await self.make_request(
-            "delete", f"/api/v1/builds/{build_for_release.id}/remove"
+            "delete",
+            f"/api/v1/builds/{build_for_release.id}/remove",
         )
         assert response.status_code == self.status_codes.HTTP_204_NO_CONTENT
 
@@ -116,9 +113,6 @@ class TestModularBuilds(BaseAsyncTestCase):
     ):
         index_with_artifacts = IndexWrapper.from_template(
             multilib_virt_with_artifacts,
-        )
-        response = await self.make_request(
-            'get', f'/api/v1/builds/{virt_modular_build.id}/'
         )
 
         module_file = tmp_path / "modules.x86_64.yaml"
@@ -150,9 +144,6 @@ class TestModularBuilds(BaseAsyncTestCase):
         index_with_artifacts = IndexWrapper.from_template(
             multilib_ruby_with_artifacts,
         )
-        response = await self.make_request(
-            'get', f'/api/v1/builds/{ruby_modular_build.id}/'
-        )
         module_file = tmp_path / "modules.x86_64.yaml"
         build_index = IndexWrapper.from_template(module_file.read_text())
         for build_module in build_index.iter_modules():
@@ -181,9 +172,6 @@ class TestModularBuilds(BaseAsyncTestCase):
         index_with_artifacts = IndexWrapper.from_template(
             multilib_subversion_with_artifacts,
         )
-        response = await self.make_request(
-            'get', f'/api/v1/builds/{subversion_modular_build.id}/'
-        )
         module_file = tmp_path / "modules.x86_64.yaml"
         build_index = IndexWrapper.from_template(module_file.read_text())
         for build_module in build_index.iter_modules():
@@ -211,9 +199,6 @@ class TestModularBuilds(BaseAsyncTestCase):
     ):
         index_with_artifacts = IndexWrapper.from_template(
             multilib_llvm_with_artifacts,
-        )
-        response = await self.make_request(
-            'get', f'/api/v1/builds/{llvm_modular_build.id}/'
         )
         module_file = tmp_path / "modules.x86_64.yaml"
         build_index = IndexWrapper.from_template(module_file.read_text())

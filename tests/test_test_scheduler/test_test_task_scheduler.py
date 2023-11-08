@@ -1,10 +1,9 @@
-import pytest
-
-from typing import List
+from typing import List, Optional
 from unittest.mock import Mock
 
-from alws import models
-from alws.test_scheduler import TestTaskScheduler
+import pytest
+
+from alws.crud.test import get_repos_for_test_task
 
 # TODO: Move all this into a separate data file for unit tests
 # when extending testing coverage for TestTaskScheduler
@@ -13,26 +12,26 @@ build_repos = [
         "name": "build_repo_0",
         "type": "rpm",
         "arch": "x86_64",
-        "url": "http://example.com/build_repo_0"
+        "url": "http://example.com/build_repo_0",
     },
     {
         "name": "build_repo_1",
         "type": "rpm",
         "arch": "noarch",
-        "url": "http://example.com/build_repo_1"
+        "url": "http://example.com/build_repo_1",
     },
     {
         "name": "build_repo_2",
         "type": "rpm",
         "arch": "s390x",
-        "url": "http://example.com/build_repo_2"
+        "url": "http://example.com/build_repo_2",
     },
     {
         "name": "build_repo_3",
         "type": "deb",
         "arch": "x86_64",
-        "url": "http://example.com/build_repo_3"
-    }
+        "url": "http://example.com/build_repo_3",
+    },
 ]
 
 linked_builds = [
@@ -42,14 +41,14 @@ linked_builds = [
                 "name": "linked_build_repo_0",
                 "type": "rpm",
                 "arch": "x86_64",
-                "url": "http://example.com/linked_build_repo_0"
+                "url": "http://example.com/linked_build_repo_0",
             },
             {
                 "name": "linked_build_repo_1",
                 "type": "deb",
                 "arch": "x86_64",
-                "url": "http://example.com/linked_build_repo_1"
-            }
+                "url": "http://example.com/linked_build_repo_1",
+            },
         ]
     },
     {
@@ -58,16 +57,16 @@ linked_builds = [
                 "name": "linked_build_repo_2",
                 "type": "rpm",
                 "arch": "x86_64",
-                "url": "http://example.com/linked_build_repo_2"
+                "url": "http://example.com/linked_build_repo_2",
             },
             {
                 "name": "linked_build_repo_3",
                 "type": "deb",
                 "arch": "x86_64",
-                "url": "http://example.com/linked_build_repo_3"
-            }
+                "url": "http://example.com/linked_build_repo_3",
+            },
         ]
-    }
+    },
 ]
 
 platform_flavors = [
@@ -77,14 +76,14 @@ platform_flavors = [
                 "name": "platform_flavor_repo_0",
                 "type": "rpm",
                 "arch": "x86_64",
-                "url": "http://example.com/$releasever/platform_flavor_repo_0"
+                "url": "http://example.com/$releasever/platform_flavor_repo_0",
             },
             {
                 "name": "platform_flavor_repo_1",
                 "type": "deb",
                 "arch": "x86_64",
-                "url": "http://example.com/$releasever/platform_flavor_repo_1"
-            }
+                "url": "http://example.com/$releasever/platform_flavor_repo_1",
+            },
         ]
     },
     {
@@ -93,53 +92,50 @@ platform_flavors = [
                 "name": "platform_flavor_repo_2",
                 "type": "rpm",
                 "arch": "x86_64",
-                "url": "http://example.com/$releasever/platform_flavor_repo_2"
+                "url": "http://example.com/$releasever/platform_flavor_repo_2",
             },
             {
                 "name": "platform_flavor_repo_3",
                 "type": "deb",
                 "arch": "x86_64",
-                "url": "http://example.com/$releasever/platform_flavor_repo_3"
-            }
+                "url": "http://example.com/$releasever/platform_flavor_repo_3",
+            },
         ]
-    }
+    },
 ]
 
 expected_build_repos = [
     {
         "name": "build_repo_0",
-        "baseurl": "http://example.com/build_repo_0"
+        "baseurl": "http://example.com/build_repo_0",
     }
 ]
 
 expected_linked_builds_repos = [
     {
         "name": "linked_build_repo_0",
-        "baseurl": "http://example.com/linked_build_repo_0"
+        "baseurl": "http://example.com/linked_build_repo_0",
     },
     {
         "name": "linked_build_repo_2",
-        "baseurl": "http://example.com/linked_build_repo_2"
-    }
+        "baseurl": "http://example.com/linked_build_repo_2",
+    },
 ]
 
 expected_platform_flavors_repos = [
     {
         "name": "platform_flavor_repo_0",
-        "baseurl": "http://example.com/8/platform_flavor_repo_0"
+        "baseurl": "http://example.com/8/platform_flavor_repo_0",
     },
     {
         "name": "platform_flavor_repo_2",
-        "baseurl": "http://example.com/8/platform_flavor_repo_2"
-    }
+        "baseurl": "http://example.com/8/platform_flavor_repo_2",
+    },
 ]
 
+
 def _create_mock_repo(repo):
-    mock_repo = Mock(
-        type=repo["type"],
-        arch=repo["arch"],
-        url=repo["url"]
-    )
+    mock_repo = Mock(type=repo["type"], arch=repo["arch"], url=repo["url"])
     # We need to do this because "name" has a special meaning
     # for Mock objects
     mock_repo.name = repo["name"]
@@ -148,8 +144,8 @@ def _create_mock_repo(repo):
 
 def create_test_task_with_repos_mock(
     build_repos: dict,
-    linked_builds: List[dict] = None,
-    platform_flavors: List[dict] = None,
+    linked_builds: Optional[List[dict]] = None,
+    platform_flavors: Optional[List[dict]] = None,
 ) -> Mock:
     task = Mock()
 
@@ -164,7 +160,9 @@ def create_test_task_with_repos_mock(
             task.build_task.build.linked_builds.append(Mock(repos=[]))
             for repo in linked_build['repos']:
                 mock_repo = _create_mock_repo(repo)
-                task.build_task.build.linked_builds[idx].repos.append(mock_repo)
+                task.build_task.build.linked_builds[idx].repos.append(
+                    mock_repo
+                )
 
     task.build_task.build.platform_flavors = []
     if platform_flavors:
@@ -172,31 +170,25 @@ def create_test_task_with_repos_mock(
             task.build_task.build.platform_flavors.append(Mock(repos=[]))
             for repo in platform_flavor['repos']:
                 mock_repo = _create_mock_repo(repo)
-                task.build_task.build.platform_flavors[idx].repos.append(mock_repo)
+                task.build_task.build.platform_flavors[idx].repos.append(
+                    mock_repo
+                )
 
     return task
-    
+
 
 def create_test_task_with_build_repos():
-    task = create_test_task_with_repos_mock(
-        build_repos
-    )
+    task = create_test_task_with_repos_mock(build_repos)
     task.env_arch = "x86_64"
 
     return (task, expected_build_repos)
 
 
 def create_test_task_with_build_and_linked_repos():
-    task = create_test_task_with_repos_mock(
-        build_repos,
-        linked_builds
-    )
+    task = create_test_task_with_repos_mock(build_repos, linked_builds)
     task.env_arch = "x86_64"
     expected_repos = []
-    for repos in (
-        expected_build_repos,
-        expected_linked_builds_repos
-    ):
+    for repos in (expected_build_repos, expected_linked_builds_repos):
         expected_repos.extend(repos)
 
     return (task, expected_repos)
@@ -206,7 +198,7 @@ def create_test_task_with_build_linked_and_flavor_repos():
     task = create_test_task_with_repos_mock(
         build_repos,
         linked_builds,
-        platform_flavors
+        platform_flavors,
     )
     task.env_arch = "x86_64"
     # We need to set distr_version because flavor repos might
@@ -217,17 +209,18 @@ def create_test_task_with_build_linked_and_flavor_repos():
     for repos in (
         expected_build_repos,
         expected_linked_builds_repos,
-        expected_platform_flavors_repos
+        expected_platform_flavors_repos,
     ):
         expected_repos.extend(repos)
 
     return (task, expected_repos)
 
+
 def create_test_task_with_build_and_flavor_repos():
     task = create_test_task_with_repos_mock(
         build_repos,
         None,
-        platform_flavors
+        platform_flavors,
     )
     task.env_arch = "x86_64"
     # We need to set distr_version because flavor repos might
@@ -235,14 +228,11 @@ def create_test_task_with_build_and_flavor_repos():
     task.build_task.platform.distr_version = "8"
 
     expected_repos = []
-    for repos in (
-        expected_build_repos,
-        expected_platform_flavors_repos
-    ):
+    for repos in (expected_build_repos, expected_platform_flavors_repos):
         expected_repos.extend(repos)
 
     return (task, expected_repos)
-    
+
 
 @pytest.mark.parametrize(
     "task, expected_repos",
@@ -250,9 +240,9 @@ def create_test_task_with_build_and_flavor_repos():
         create_test_task_with_build_repos(),
         create_test_task_with_build_and_linked_repos(),
         create_test_task_with_build_linked_and_flavor_repos(),
-        create_test_task_with_build_and_flavor_repos()
-    ]
+        create_test_task_with_build_and_flavor_repos(),
+    ],
 )
 def test_get_repos_for_test_task(task, expected_repos):
-    repos = TestTaskScheduler.get_repos_for_test_task(task)
+    repos = get_repos_for_test_task(task)
     assert repos == expected_repos
