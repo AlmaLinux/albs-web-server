@@ -307,7 +307,7 @@ async def get_module_data_from_beholder(
 
 def compare_module_data(
     component_name: str,
-    beholder_data: typing.List[dict],
+    beholder_data: tuple[typing.Any],
     tag_name: str,
 ) -> typing.List[dict]:
     pkgs_to_add = []
@@ -338,12 +338,12 @@ def compare_module_data(
 async def _get_module_ref(
     component_name: str,
     modified_list: list,
-    platform_prefix_list: list,
+    platform_prefix_list: dict,
     module: ModuleWrapper,
     gitea_client: GiteaClient,
     devel_module: typing.Optional[ModuleWrapper],
     platform_packages_git: str,
-    beholder_data: typing.List[dict],
+    beholder_data: tuple[typing.Any],
 ):
     ref_prefix = platform_prefix_list['non_modified']
     if component_name in modified_list:
