@@ -124,10 +124,25 @@ def modular_build_payload() -> typing.Dict[str, typing.Any]:
         ],
         "repos": [
             {
-                'name': 'test-repos-8',
+                'name': 'test-repos-1',
                 'type': 'rpm',
                 'platform_id': 1,
-            }
+            },
+            {
+                'name': 'test-repos-2',
+                'type': 'rpm',
+                'platform_id': 2,
+            },
+            {
+                'name': 'test-repos-3',
+                'type': 'rpm',
+                'platform_id': 3,
+            },
+            {
+                'name': 'test-repos-4',
+                'type': 'rpm',
+                'platform_id': 4,
+            },
         ],
         "tasks": [
             {
