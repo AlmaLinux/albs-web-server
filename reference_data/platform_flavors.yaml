@@ -552,3 +552,90 @@
       production: true
       debug: false
       priority: 11
+
+- name: UBI
+  repositories:
+    - name: baseos-ubi
+      arch: x86_64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/x86_64/baseos/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: baseos-ubi
+      arch: aarch64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/aarch64/baseos/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: baseos-ubi
+      arch: ppc64le
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/ppc64le/baseos/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: baseos-ubi
+      arch: s390x
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/baseos/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: appstream-ubi
+      arch: x86_64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: appstream-ubi
+      arch: aarch64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: appstream-ubi
+      arch: ppc64le
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: appstream-ubi
+      arch: s390x
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/appstream/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: crb-ubi
+      arch: x86_64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: crb-ubi
+      arch: aarch64
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: crb-ubi
+      arch: ppc64le
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      production: true
+      debug: false
+      priority: 11
+    - name: crb-ubi
+      arch: s390x
+      type: rpm
+      url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi$releasever/$releasever/s390x/codeready-builder/os/
+      production: true
+      debug: false
+      priority: 11
