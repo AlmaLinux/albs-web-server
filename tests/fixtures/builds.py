@@ -1091,6 +1091,16 @@ def get_rpm_packages_info(monkeypatch):
     monkeypatch.setattr("alws.crud.build_node.get_rpm_packages_info", func)
 
 
+@pytest.fixture
+def get_packages_info_from_pulp(monkeypatch):
+    async def func(arg, arg2):
+        return
+
+    monkeypatch.setattr(
+        "alws.utils.multilib.MultilibProcessor.add_multilib_packages", func
+    )
+
+
 @pytest.mark.anyio
 @pytest.fixture
 async def build_for_release(

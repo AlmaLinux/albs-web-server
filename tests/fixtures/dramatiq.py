@@ -142,6 +142,7 @@ async def build_done(
     create_entity,
     get_rpm_packages_info,
     mock_get_pulp_packages,
+    get_packages_info_from_pulp,
 ):
     build = await get_builds(db=session, build_id=regular_build.id)
     await session.close()
