@@ -39,6 +39,7 @@ class BuildPlanner:
         platform_flavors: typing.Optional[typing.List[int]],
         is_secure_boot: bool,
         module_build_index: typing.Optional[dict],
+        logger: logging.Logger,
     ):
         self._db = db
         self._gitea_client = GiteaClient(
@@ -47,6 +48,7 @@ class BuildPlanner:
         self._pulp_client = PulpClient(
             settings.pulp_host, settings.pulp_user, settings.pulp_password
         )
+        self.logger = logger
         self._build = build
         self._task_index = 0
         self._request_platforms = {}
@@ -132,13 +134,16 @@ class BuildPlanner:
             pulp_href=pulp_href,
             type=repo_type,
             debug=is_debug,
+            platform=platform,
         )
         if repo_type == 'rpm':
             repo.platform_id = platform.id
         self._build.repos.append(repo)
 
     async def create_log_repo(
-        self, repo_type: str, repo_prefix: str = 'build_logs'
+        self,
+        repo_type: str,
+        repo_prefix: str = 'build_logs',
     ):
         repo_name = f'build-{self._build.id}-{repo_type}'
         repo_url, repo_href = await self._pulp_client.create_log_repo(
@@ -156,7 +161,6 @@ class BuildPlanner:
 
     async def init_build_repos(self):
         tasks = []
-
         # Add build log and test log repositories
         for repo_type, repo_prefix in (
             ('build_log', 'build_logs'),
@@ -167,6 +171,11 @@ class BuildPlanner:
             )
 
         for platform in self._platforms:
+            self.logger.info(
+                'Create repos for platform "%s" with id "%s"',
+                platform.name,
+                platform.id,
+            )
             for arch in self._request_platforms[platform.name]:
                 tasks.append(self.create_build_repo(platform, arch, 'rpm'))
                 tasks.append(
@@ -408,7 +417,13 @@ class BuildPlanner:
                         module.add_rpm_artifact(artifact)
         return index
 
-    async def add_task(self, task: build_schema.BuildTaskRef):
+    async def add_task(
+        self,
+        task: typing.Union[
+            build_schema.BuildTaskRef,
+            build_schema.BuildTaskModuleRef,
+        ],
+    ):
         if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
             await self._add_single_ref(
                 models.BuildTaskRef(
@@ -438,9 +453,13 @@ class BuildPlanner:
             if devel_module:
                 module_templates.append(devel_module.render())
         else:
-            raw_refs, module_templates = await build_schema.get_module_refs(
-                task, self._platforms[0], self._platform_flavors
-            )
+            raw_refs = [
+                ref
+                for platform in self._platforms
+                for ref, *_ in await build_schema.get_module_refs(
+                    task, platform, self._platform_flavors
+                )
+            ]
         refs = [
             models.BuildTaskRef(
                 url=ref.url,
@@ -487,7 +506,8 @@ class BuildPlanner:
             if task.module_version:
                 module_version = int(task.module_version)
             mock_enabled_modules = mock_options.get('module_enable', [])[:]
-            # Take the first task mock_options as all tasks share the same mock_options
+            # Take the first task mock_options
+            # as all tasks share the same mock_options
             if task.refs:
                 mock_enabled_modules.extend(
                     task.refs[0].mock_options.get("module_enable", [])
