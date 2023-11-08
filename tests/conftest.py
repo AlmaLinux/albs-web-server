@@ -13,6 +13,7 @@ pytest_plugins = [
     "tests.fixtures.releases",
     "tests.fixtures.repositories",
     "tests.fixtures.sign_keys",
+    "tests.fixtures.tests",
 ]
 
 
