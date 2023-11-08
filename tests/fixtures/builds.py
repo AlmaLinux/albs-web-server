@@ -122,6 +122,13 @@ def modular_build_payload() -> typing.Dict[str, typing.Any]:
                 "parallel_mode_enabled": True,
             }
         ],
+        "repos": [
+            {
+                'name': 'test-repos-8',
+                'type': 'rpm',
+                'platform_id': 1,
+            }
+        ],
         "tasks": [
             {
                 "refs": [

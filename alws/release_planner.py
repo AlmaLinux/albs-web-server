@@ -19,12 +19,12 @@ from alws.config import settings
 from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
+    BeholderMatchMethod,
     ErrataPackageStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
-    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task

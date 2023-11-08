@@ -1,12 +1,11 @@
 import typing
 
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
 from alws.constants import ErrataPackageStatus, ReleaseStatus
 from alws.crud.release import commit_release, revert_release
-
 from tests.mock_classes import BaseAsyncTestCase
 
 
