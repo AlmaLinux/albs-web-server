@@ -1,3 +1,5 @@
+import typing
+
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 

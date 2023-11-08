@@ -651,7 +651,7 @@ async def complete_sign_task(
                     repo_unique_key = RepoUniqueKey(
                         arch=arch,
                         debug=debug,
-                        platform_id=rpms_per_platforms_mapping[pkg_name]
+                        platform_id=rpms_per_platforms_mapping[pkg_name],
                     )
                     repo = repo_mapping[repo_unique_key]
                     packages_to_add[repo.pulp_href].append(new_href)

@@ -168,7 +168,8 @@ async def set_platform_for_products_repos(
         f"{product.owner.username}-{product.name}-{platform.name.lower()}-"
         f"{repo.arch}-{repo_debug_dict[repo.debug]}": platform
         for repo in product.repositories
-        for platform in product.platforms if repo.type != 'sign_key'
+        for platform in product.platforms
+        if repo.type != 'sign_key'
     }
     # we do nothing if all repos have platform
     if all(repo.platform for repo in product.repositories):

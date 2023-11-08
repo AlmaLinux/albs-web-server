@@ -136,21 +136,26 @@ async def delete_release(
     """
 
     async with db.begin():
-        release = (await db.execute(
-            select(models.Release)
-            .where(
-                models.Release.id == release_id,
-                models.Release.status == ReleaseStatus.SCHEDULED,
+        release = (
+            (
+                await db.execute(
+                    select(models.Release).where(
+                        models.Release.id == release_id,
+                        models.Release.status == ReleaseStatus.SCHEDULED,
+                    )
+                )
             )
-        )).scalars().first()
+            .scalars()
+            .first()
+        )
         if release is None:
             return {
                 'message':
-                f'There is no scheduled release plant with ID "{release_id}"'
+                f'There is no scheduled release plant with ID "{release_id}"',
             }
         else:
             await db.delete(release)
             return {
                 'message':
-                    f'Scheduled release with ID "{release_id}" is removed'
+                f'Scheduled release with ID "{release_id}" is removed',
             }
