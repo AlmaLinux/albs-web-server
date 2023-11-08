@@ -279,6 +279,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 for build_rpm in rpms_list
                 if build_rpm.artifact.build_task.platform_id == platform_id
             ]
+            logging.info('Build RPMs "%s"', build_rpms)
             pulp_artifacts = await self.get_pulp_packages_info(
                 build_rpms,
                 build_tasks,
@@ -324,6 +325,14 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     )
                     if key in modules_to_release:
                         continue
+                    for repo in task.build.repos:
+                        logging.info(
+                            'Repo name "%s", Repo type "%s", '
+                            'Repo platfomr_id "%s"',
+                            repo.name,
+                            repo.type,
+                            repo.platform_id,
+                        )
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
@@ -447,7 +456,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             self.db,
             product_id=payload.product_id,
         )
-
+        logging.info('Platform ID "%s"', platform.id)
         builds = (
             (
                 await self.db.execute(
