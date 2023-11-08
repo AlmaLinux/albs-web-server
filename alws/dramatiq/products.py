@@ -165,10 +165,12 @@ async def set_platform_for_products_repos(
     # name of a product's repo:
     # some-username-some-product-some-platform-x86_64-debug-dr
     repos_per_platform = {
+        # fmt: off
         (
             f"{product.owner.username}-{product.name}-{platform.name.lower()}"
             f"-{repo.arch}-{repo_debug_dict[repo.debug]}"
         ): platform
+        # fmt: on
         for repo in product.repositories
         for platform in product.platforms
         if repo.type != 'sign_key'
@@ -191,10 +193,12 @@ async def set_platform_for_build_repos(
     # name of a build's repo:
     # some-platform-x86_64-some-build-id-debug-br
     repos_per_platform = {
+        # fmt: off
         (
             f"{task.platform.name}-{repo.arch}-{build.id}"
             f"-{repo_debug_dict[repo.debug]}"
         ): task.platform
+        # fmt: on
         for repo in build.repos
         for task in build.tasks
     }
