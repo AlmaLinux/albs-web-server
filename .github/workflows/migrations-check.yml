@@ -14,9 +14,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Rebase
-        uses: cirrus-actions/rebase@1.8
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.email "action@users.noreply.github.com"
+          git config --global user.name "action"
+          git fetch origin master
+          git rebase origin/master
       - name: Create dirs
         run: |
           mkdir -p /home/runner/work/albs-web-server/alts
@@ -31,12 +33,11 @@ jobs:
           echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
           echo POSTGRES_PASSWORD="password" >> ./vars.env
           echo JWT_SECRET="secret" >> ./vars.env
-          echo POSTGRES_DB="test-almalinux-bs" >> ./vars.env
+          echo POSTGRES_DB="almalinux-bs" >> ./vars.env
           echo PACKAGE_BEHOLDER_ENABLED="False" >> ./vars.env
-          echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
+          echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/almalinux-bs" >> ./vars.env
+          echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/almalinux-bs" >> ./vars.env
+          echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/almalinux-bs" >> ./vars.env
       - uses: isbang/compose-action@v1.5.1
         name: Run docker-compose
         with:

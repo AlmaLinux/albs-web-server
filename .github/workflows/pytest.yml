@@ -31,6 +31,7 @@ jobs:
           echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
+          cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
       - uses: isbang/compose-action@v1.4.1
         name: Run docker-compose
         with:
