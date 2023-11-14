@@ -333,6 +333,8 @@ services:
     image: eclipse-mosquitto:2.0
     ports:
       - "11883:1883"
+    volumes:
+      - "./mosquitto-no-auth.conf:/mosquitto/config/mosquitto.conf"
 
   redis:
     image: redis
