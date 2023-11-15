@@ -1,6 +1,6 @@
 name: check-migrations
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - "**"
 jobs:
@@ -41,10 +41,14 @@ jobs:
       - uses: isbang/compose-action@v1.5.1
         name: Run docker-compose
         with:
-          up-flags: "--build --no-deps"
+          # Use this if you change something in Dockerfile
+          # up-flags: --build --no-deps
+          up-flags: "--pull always --no-build --no-deps"
           down-flags: "--volumes"
           services: |
             db
             web_server
       - name: Check migratrions
-        run: docker-compose run --rm --no-deps web_server bash -c 'source env/bin/activate && alembic --config alws/alembic.ini upgrade head'
+        run: docker-compose run --rm --no-deps web_server bash -c 'source
+          env/bin/activate && pip3 install -r requirements.txt &&
+          alembic --config alws/alembic.ini upgrade head'
