@@ -25,7 +25,10 @@ services:
     restart: always
 
   alts-celery:
-    image: quay.io/almalinuxorg/alts-celery:latest
+    image: alts-celery:latest
+    build:
+      dockerfile: Dockerfile.celery
+      context: ../alts
     environment:
       CELERY_CONFIG_PATH: "/celery_config.yaml"
       EXTERNAL_NETWORK: "albs-web-server_default"
@@ -47,7 +50,10 @@ services:
       - rabbitmq
 
   alts-scheduler:
-    image: quay.io/almalinuxorg/alts-scheduler:latest
+    image: alts-scheduler:latest
+    build:
+      dockerfile: Dockerfile.scheduler
+      context: ../alts
     ports:
       - "8082:8000"
     environment:
@@ -72,6 +78,9 @@ services:
       - vars.env
     ports:
       - "8088:8000"
+    build:
+      dockerfile: Dockerfile
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -96,6 +105,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./tests:/code/tests"
@@ -117,6 +129,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -135,6 +150,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -153,6 +171,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -171,6 +192,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -184,6 +208,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -197,6 +224,9 @@ services:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -215,6 +245,9 @@ services:
     image: quay.io/almalinuxorg/albs-frontend:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-frontend
     command: bash -c "npm install && npm run dev"
     volumes:
       - "../albs-frontend:/code"
@@ -226,6 +259,9 @@ services:
   build_node:
     image: quay.io/almalinuxorg/albs-node:latest
     privileged: true
+    build:
+      context: ../albs-node/
+      dockerfile: ./Dockerfile
     env_file:
       - vars.env
     volumes:
@@ -245,6 +281,9 @@ services:
 
   sign_node:
     image: quay.io/almalinuxorg/albs-sign-node:latest
+    build:
+      context: ../albs-sign-node/
+      dockerfile: ./Dockerfile
     env_file:
       - vars.env
     volumes:
@@ -263,6 +302,9 @@ services:
 
   gitea_listener:
     image: quay.io/almalinuxorg/gitea-listener:latest
+    build:
+      dockerfile: Dockerfile.gitea-listener
+      context: .
     env_file:
       - vars.env
     restart: on-failure
@@ -278,6 +320,9 @@ services:
 
   git_cacher:
     image: quay.io/almalinuxorg/git-cacher:latest
+    build:
+      dockerfile: Dockerfile.git-cacher
+      context: .
     env_file:
       - vars.env
     restart: on-failure
