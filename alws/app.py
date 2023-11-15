@@ -2,6 +2,9 @@ import importlib
 import logging
 
 import sentry_sdk
+from fastapi import FastAPI
+from starlette.middleware.exceptions import ExceptionMiddleware
+
 from alws import routers
 from alws.auth import AuthRoutes
 from alws.auth.backend import BearerBackend, CookieBackend
@@ -9,8 +12,6 @@ from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers
-from fastapi import FastAPI
-from starlette.middleware.exceptions import ExceptionMiddleware
 
 logging.basicConfig(level=settings.logging_level)
 

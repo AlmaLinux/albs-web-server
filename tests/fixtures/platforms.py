@@ -2,10 +2,11 @@ from typing import AsyncIterable
 
 import pytest
 import yaml
-from alws import models
-from alws.schemas import platform_schema, repository_schema
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from alws import models
+from alws.schemas import platform_schema, repository_schema
 from tests.test_utils.pulp_utils import get_repo_href
 
 

@@ -6,7 +6,6 @@ __all__ = ['Distribution', 'DistroCreate']
 
 
 class DistroRepository(BaseModel):
-
     id: int
     name: str
     arch: str
@@ -16,7 +15,6 @@ class DistroRepository(BaseModel):
 
 
 class DistroPlatforms(BaseModel):
-
     id: int
     type: typing.Optional[str] = None
     distr_type: typing.Optional[str] = None
@@ -28,13 +26,11 @@ class DistroPlatforms(BaseModel):
 
 
 class DistroCreate(BaseModel):
-
     name: str
     platforms: typing.List[str]
 
 
 class Distribution(BaseModel):
-
     id: int
     name: str
 

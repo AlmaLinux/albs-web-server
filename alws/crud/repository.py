@@ -1,13 +1,14 @@
 import typing
 
 import sqlalchemy
+from sqlalchemy import delete
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
+
 from alws import models
 from alws.config import settings
 from alws.schemas import remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
-from sqlalchemy import delete
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
 
 
 async def get_repositories(

@@ -5,6 +5,9 @@ import logging
 import re
 import typing
 
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
+
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskRefType, BuildTaskStatus
@@ -21,8 +24,6 @@ from alws.utils.modularity import (
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.parsing import get_clean_distr_name, parse_git_ref
 from alws.utils.pulp_client import PulpClient
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
 
 __all__ = ['BuildPlanner']
 
@@ -59,9 +60,9 @@ class BuildPlanner:
         self._is_secure_boot = is_secure_boot
         for platform in platforms:
             self._request_platforms[platform.name] = platform.arch_list
-            self._parallel_modes[
-                platform.name
-            ] = platform.parallel_mode_enabled
+            self._parallel_modes[platform.name] = (
+                platform.parallel_mode_enabled
+            )
         self.load_platforms()
         if platform_flavors:
             self.load_platform_flavors(platform_flavors)
@@ -244,14 +245,14 @@ class BuildPlanner:
 
         for platform in self._platforms:
             platform_name = get_clean_distr_name(platform.name)
-            multilib_artifacts[
-                platform.name
-            ] = await self.get_platform_multilib_artifacts(
-                beholder_client,
-                platform_name,
-                platform.distr_version,
-                task,
-                has_devel=has_devel,
+            multilib_artifacts[platform.name] = (
+                await self.get_platform_multilib_artifacts(
+                    beholder_client,
+                    platform_name,
+                    platform.distr_version,
+                    task,
+                    has_devel=has_devel,
+                )
             )
 
         return multilib_artifacts
@@ -425,9 +426,11 @@ class BuildPlanner:
                     url=task.url,
                     git_ref=task.git_ref,
                     ref_type=task.ref_type,
-                    test_configuration=task.test_configuration.model_dump()
-                    if task.test_configuration
-                    else None,
+                    test_configuration=(
+                        task.test_configuration.model_dump()
+                        if task.test_configuration
+                        else None
+                    ),
                 ),
                 mock_options=task.mock_options,
             )
@@ -460,9 +463,11 @@ class BuildPlanner:
                 url=ref.url,
                 git_ref=ref.git_ref,
                 ref_type=BuildTaskRefType.GIT_BRANCH,
-                test_configuration=ref.test_configuration.model_dump()
-                if ref.test_configuration
-                else None,
+                test_configuration=(
+                    ref.test_configuration.model_dump()
+                    if ref.test_configuration
+                    else None
+                ),
             )
             for ref in raw_refs
         ]

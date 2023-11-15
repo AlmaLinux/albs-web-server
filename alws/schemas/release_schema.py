@@ -1,10 +1,11 @@
 import datetime
 import typing
 
+from pydantic import BaseModel
+
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.schemas.platform_schema import Platform
 from alws.schemas.user_schema import User
-from pydantic import BaseModel
 
 __all__ = [
     'Release',
@@ -42,7 +43,6 @@ class Release(BaseModel):
 
 
 class ReleaseResponse(BaseModel):
-
     releases: typing.List[Release]
     total_releases: typing.Optional[int] = None
     current_page: typing.Optional[int] = None

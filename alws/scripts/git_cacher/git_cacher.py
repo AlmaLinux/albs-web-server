@@ -5,19 +5,19 @@ import typing
 
 import aioredis
 import sentry_sdk
-from alws.utils.gitea import GiteaClient
 from pydantic_settings import BaseSettings
+
+from alws.utils.gitea import GiteaClient
 
 __all__ = ['Config', 'load_redis_cache', 'save_redis_cache']
 
 
 class Config(BaseSettings):
-
     redis_url: str = 'redis://redis:6379'
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
     git_cache_keys: typing.Dict[str, str] = {
         'rpms': 'rpms_gitea_cache',
-        'modules': 'modules_gitea_cache'
+        'modules': 'modules_gitea_cache',
     }
     cacher_sentry_environment: str = "dev"
     cacher_sentry_dsn: str = ""
@@ -41,7 +41,8 @@ def setup_logger():
     handler = logging.StreamHandler()
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
-        '%(asctime)s [%(name)s:%(levelname)s] - %(message)s')
+        '%(asctime)s [%(name)s:%(levelname)s] - %(message)s'
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
@@ -64,7 +65,7 @@ async def run(config, logger, redis_client, gitea_client, organization):
             'name': repo['name'],
             'full_name': repo_name,
             'updated_at': repo['updated_at'],
-            'clone_url': repo['clone_url']
+            'clone_url': repo['clone_url'],
         }
         if repo_name not in cache:
             cache[repo_name] = repo_meta
@@ -81,12 +82,10 @@ async def run(config, logger, redis_client, gitea_client, organization):
         cache_record['branches'] = [
             branch['name'] for branch in result['branches']
         ]
-    for outdated_repo in (cache_names - git_names):
+    for outdated_repo in cache_names - git_names:
         cache.pop(outdated_repo)
     await save_redis_cache(
-        redis_client,
-        config.git_cache_keys[organization],
-        cache
+        redis_client, config.git_cache_keys[organization], cache
     )
 
 
@@ -105,7 +104,7 @@ async def main():
         logger.info('Checking cache for updates')
         await asyncio.gather(
             run(config, logger, redis_client, gitea_client, 'rpms'),
-            run(config, logger, redis_client, gitea_client, 'modules')
+            run(config, logger, redis_client, gitea_client, 'modules'),
         )
         await asyncio.sleep(600)
 

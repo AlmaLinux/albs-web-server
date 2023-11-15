@@ -7,6 +7,12 @@ import urllib.parse
 from io import BytesIO
 from typing import Dict, List, Optional
 
+from sqlalchemy import insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.expression import func
+
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
@@ -15,12 +21,10 @@ from alws.schemas import test_schema
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
-from alws.utils.pulp_utils import get_rpm_packages_by_ids, get_uuid_from_pulp_href
-from sqlalchemy import insert, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.expression import func
+from alws.utils.pulp_utils import (
+    get_rpm_packages_by_ids,
+    get_uuid_from_pulp_href,
+)
 
 
 def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
@@ -116,13 +120,11 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
                 'callback_href': f'/api/v1/tests/{task.id}/result/',
             }
             if module_name and module_stream and module_version:
-                payload.update(
-                    {
-                        'module_name': module_name,
-                        'module_stream': module_stream,
-                        'module_version': module_version,
-                    }
-                )
+                payload.update({
+                    'module_name': module_name,
+                    'module_stream': module_stream,
+                    'module_version': module_version,
+                })
             if repositories:
                 payload['repositories'] = repositories
             if test_configuration:

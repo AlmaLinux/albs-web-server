@@ -6,6 +6,15 @@ import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
+from pydantic import (
+    AfterValidator,
+    AnyHttpUrl,
+    BaseModel,
+    conlist,
+    field_validator,
+)
+from typing_extensions import Annotated
+
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskRefType
@@ -13,10 +22,12 @@ from alws.errors import EmptyBuildError
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.gitea import GiteaClient, download_modules_yaml
-from alws.utils.modularity import ModuleWrapper, RpmArtifact, get_modified_refs_list
+from alws.utils.modularity import (
+    ModuleWrapper,
+    RpmArtifact,
+    get_modified_refs_list,
+)
 from alws.utils.parsing import clean_release, get_clean_distr_name
-from pydantic import AfterValidator, AnyHttpUrl, BaseModel, conlist, field_validator
-from typing_extensions import Annotated
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
@@ -107,7 +118,9 @@ class BuildCreatePlatforms(BaseModel):
 
 class BuildCreate(BaseModel):
     platforms: conlist(BuildCreatePlatforms, min_length=1)
-    tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1)
+    tasks: conlist(
+        typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1
+    )
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     platform_flavors: typing.Optional[typing.List[int]] = None
@@ -322,7 +335,7 @@ def compare_module_data(
             continue
         srpm = beholder_artifact['sourcerpm']
         beholder_tag_name = (
-            f"{srpm['name']}-{srpm['version']}-" f"{srpm['release']}"
+            f"{srpm['name']}-{srpm['version']}-{srpm['release']}"
         )
         beholder_tag_name = clean_release(beholder_tag_name)
         if beholder_tag_name != tag_name:

@@ -1,13 +1,13 @@
 import typing
 
-from alws.utils.debuginfo import is_debuginfo_rpm
 from pydantic import BaseModel
+
+from alws.utils.debuginfo import is_debuginfo_rpm
 
 __all__ = ['Task']
 
 
 class TaskRepo(BaseModel):
-
     name: str
     url: str
     priority: int
@@ -18,7 +18,6 @@ class TaskRepo(BaseModel):
 
 
 class TaskRef(BaseModel):
-
     url: str
     git_ref: typing.Optional[str] = None
     ref_type: int
@@ -29,13 +28,11 @@ class TaskRef(BaseModel):
 
 
 class TaskCreatedBy(BaseModel):
-
     name: str
     email: str
 
 
 class TaskPlatform(BaseModel):
-
     name: str
     type: typing.Literal['rpm', 'deb']
     data: typing.Dict[str, typing.Any]
@@ -55,8 +52,9 @@ class TaskPlatform(BaseModel):
             elif k == 'yum_exclude':
                 old_exclude = self.data['yum'].get('exclude', '')
                 full_exclude = f'{old_exclude} {" ".join(v)}'.strip()
-                self.data['yum']['exclude'] = \
+                self.data['yum']['exclude'] = (
                     full_exclude if full_exclude else None
+                )
             elif k in ('with', 'without'):
                 for i in v:
                     self.data['definitions'][f'_{k}_{i}'] = f'--{k}-{i}'
@@ -69,7 +67,6 @@ class TaskPlatform(BaseModel):
 
 
 class Task(BaseModel):
-
     id: int
     arch: str
     ref: TaskRef
@@ -89,12 +86,10 @@ class Task(BaseModel):
 
 
 class Ping(BaseModel):
-
     active_tasks: typing.List[int]
 
 
 class BuildDoneArtifact(BaseModel):
-
     name: str
     type: typing.Literal['rpm', 'build_log']
     href: str
@@ -115,7 +110,6 @@ class BuildDoneArtifact(BaseModel):
 
 
 class BuildDone(BaseModel):
-
     task_id: int
     status: typing.Literal['done', 'failed', 'excluded']
     artifacts: typing.List[BuildDoneArtifact]
@@ -126,5 +120,4 @@ class BuildDone(BaseModel):
 
 
 class RequestTask(BaseModel):
-
     supported_arches: typing.List[str]

@@ -171,7 +171,9 @@ class TestsCacher:
                     f'/api/v1/test_repositories/{repository_id}/packages/bulk_create/',
                 ),
                 method='post',
-                json=[test_folder.model_dump() for test_folder in test_folders],
+                json=[
+                    test_folder.model_dump() for test_folder in test_folders
+                ],
                 headers=self.albs_headers,
             )
         except Exception:
@@ -224,7 +226,9 @@ class TestsCacher:
                         remote_test_folder,
                     ),
                     url=urllib.parse.urljoin(
-                        urllib.parse.urljoin(str(db_repo.url), db_repo.tests_dir),
+                        urllib.parse.urljoin(
+                            str(db_repo.url), db_repo.tests_dir
+                        ),
                         remote_test_folder,
                     ),
                 )

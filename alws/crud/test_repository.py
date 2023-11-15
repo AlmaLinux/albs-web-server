@@ -1,12 +1,13 @@
 import typing
 
-from alws import models
-from alws.errors import DataNotFoundError, TestRepositoryError
-from alws.schemas import test_repository_schema
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import func
+
+from alws import models
+from alws.errors import DataNotFoundError, TestRepositoryError
+from alws.schemas import test_repository_schema
 
 
 async def get_repositories(
@@ -35,15 +36,17 @@ async def get_repositories(
 
     if page_number:
         return {
-            "test_repositories": (await session.execute(generate_query()))
-            .unique()
-            .scalars()
-            .all(),
+            "test_repositories": (
+                (await session.execute(generate_query()))
+                .unique()
+                .scalars()
+                .all()
+            ),
             "total_test_repositories": (
-                await session.execute(generate_query(count=True))
-            )
-            .unique()
-            .scalar(),
+                (await session.execute(generate_query(count=True)))
+                .unique()
+                .scalar()
+            ),
             "current_page": page_number,
         }
 

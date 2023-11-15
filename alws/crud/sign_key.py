@@ -1,5 +1,9 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+
 from alws import models
 from alws.crud.user import get_user
 from alws.errors import (
@@ -11,9 +15,6 @@ from alws.models import User
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
 
 
 async def get_sign_keys(
@@ -56,7 +57,7 @@ async def create_sign_key(
         if not check_platform.scalars().first():
             raise PlatformMissingError(
                 f"No platform with id '{payload.platform_id}' "
-                f"exists in the system"
+                "exists in the system"
             )
     sign_key = models.SignKey(**payload.model_dump())
     db.add(sign_key)

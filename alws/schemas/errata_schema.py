@@ -1,9 +1,10 @@
 import datetime
 from typing import Any, List, Optional
 
+from pydantic import BaseModel, field_validator
+
 from alws.constants import ErrataReleaseStatus
 from alws.models import ErrataPackageStatus
-from pydantic import BaseModel, field_validator
 
 
 class BaseErrataCVE(BaseModel):

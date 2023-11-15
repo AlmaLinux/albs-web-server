@@ -1,7 +1,8 @@
 from typing import List, Optional, Union
 
-from alws.schemas.perf_stats_schema import PerformanceStats
 from pydantic import BaseModel
+
+from alws.schemas.perf_stats_schema import PerformanceStats
 
 __all__ = ['TestTaskResult']
 

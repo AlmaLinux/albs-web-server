@@ -1,12 +1,13 @@
 from typing import List
 
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from alws import dramatiq
 from alws.auth import get_current_user
 from alws.crud import test
 from alws.dependencies import get_db
 from alws.schemas import test_schema
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(
     prefix='/tests',

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 __all__ = ['FileSystemExporter']
 
+
 class FileSystemExporter(BaseModel):
     pulp_href: typing.Optional[str] = None
     pulp_created: typing.Optional[str] = None

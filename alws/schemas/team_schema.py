@@ -1,8 +1,9 @@
 import typing
 
+from pydantic import BaseModel
+
 from alws.schemas.role_schema import Role
 from alws.schemas.user_schema import User
-from pydantic import BaseModel
 
 __all__ = ['Team', 'TeamCreate']
 

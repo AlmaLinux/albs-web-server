@@ -1,10 +1,11 @@
 import typing
 
+from pydantic import BaseModel
+
 from alws.schemas.platform_schema import Platform
 from alws.schemas.repository_schema import Repository
 from alws.schemas.team_schema import Team
 from alws.schemas.user_schema import User
-from pydantic import BaseModel
 
 __all__ = ['ProductCreate', 'Product', 'ProductOpResult']
 
@@ -48,6 +49,5 @@ class ProductResponse(BaseModel):
 
 
 class ProductOpResult(BaseModel):
-
     success: bool
     message: typing.Optional[str] = None
