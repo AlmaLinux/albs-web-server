@@ -334,23 +334,24 @@ services:
       - "./alws/scripts/git_cacher/requirements.txt:/code/requirements.txt"
 
   tests_cacher:
-    image: albs-tests-cacher:latest
+    image: alma-tests-cacher:latest
     env_file:
-      - vars.env
+      - ../alma-tests-cacher/vars.env
     build:
-      context: .
-      dockerfile: Dockerfile.tests-cacher
+      context: ../alma-tests-cacher/
+      dockerfile: ../alma-tests-cacher/Dockerfile
     restart: on-failure
     depends_on:
       - web_server
     volumes:
-      - "./alws/scripts/tests_cacher/tests_cacher.py:/code/tests_cacher.py"
-      - "./alws/scripts/tests_cacher/requirements.txt:/code/requirements.txt"
+      - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
+      - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
+      - "../alma-tests-cacher/requirements.txt:/code/requirements.txt"
     command: "bash -c '/wait_for_it.sh web_server:8000 &&
               source env/bin/activate &&
               pip3 install --upgrade pip &&
               pip3 install -r /code/requirements.txt --no-cache-dir &&
-              python tests_cacher.py'"
+              python alma_tests_cacher.py'"
 
   pulp:
     # image: pulp/pulp
