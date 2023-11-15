@@ -7,12 +7,6 @@ import urllib.parse
 from io import BytesIO
 from typing import Dict, List, Optional
 
-from sqlalchemy import insert, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.expression import func
-
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
@@ -21,10 +15,12 @@ from alws.schemas import test_schema
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
-from alws.utils.pulp_utils import (
-    get_rpm_packages_by_ids,
-    get_uuid_from_pulp_href,
-)
+from alws.utils.pulp_utils import get_rpm_packages_by_ids, get_uuid_from_pulp_href
+from sqlalchemy import insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.expression import func
 
 
 def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
@@ -328,7 +324,7 @@ async def update_test_task(
             status=status,
             started_at=started_at,
             finished_at=datetime.datetime.utcnow(),
-            alts_response=test_result.dict(),
+            alts_response=test_result.model_dump(),
         )
     )
     await db.execute(

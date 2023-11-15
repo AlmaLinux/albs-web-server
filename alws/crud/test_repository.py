@@ -1,13 +1,12 @@
 import typing
 
+from alws import models
+from alws.errors import DataNotFoundError, TestRepositoryError
+from alws.schemas import test_repository_schema
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import func
-
-from alws import models
-from alws.errors import DataNotFoundError, TestRepositoryError
-from alws.schemas import test_repository_schema
 
 
 async def get_repositories(
@@ -101,7 +100,7 @@ async def create_package_mapping(
         )
 
     new_package = models.PackageTestRepository(
-        **payload.dict(),
+        **payload.model_dump(),
         test_repository_id=test_repository_id,
     )
     new_package.test_repository = test_repository
@@ -130,7 +129,7 @@ async def bulk_create_package_mapping(
     ]
     new_packages = [
         models.PackageTestRepository(
-            **pkg.dict(),
+            **pkg.model_dump(),
             test_repository_id=repository_id,
         )
         for pkg in payload
@@ -163,7 +162,7 @@ async def create_repository(
     if test_repository:
         raise TestRepositoryError("Test Repository already exists")
 
-    repository = models.TestRepository(**payload.dict())
+    repository = models.TestRepository(**payload.model_dump())
     session.add(repository)
     if flush:
         await session.flush()
@@ -185,7 +184,7 @@ async def update_repository(
     if not db_repo:
         raise DataNotFoundError(f"Unknown test repository ID: {repository_id}")
 
-    for field, value in payload.dict().items():
+    for field, value in payload.model_dump().items():
         setattr(db_repo, field, value)
     session.add(db_repo)
     await session.commit()

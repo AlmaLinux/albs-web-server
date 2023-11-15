@@ -1,17 +1,15 @@
 import typing
 
-from sqlalchemy import update, delete, or_
+from alws import models
+from alws.errors import PermissionDenied, UserError
+from alws.perms import actions
+from alws.perms.authorization import can_perform
+from alws.schemas import user_schema
+from sqlalchemy import delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
-
-from alws import models
-
-from alws.errors import UserError, PermissionDenied
-from alws.perms import actions
-from alws.perms.authorization import can_perform
-from alws.schemas import user_schema
 
 
 async def get_user(
@@ -213,7 +211,7 @@ async def update_user(
     user = await get_user(db, user_id=user_id)
     if not user:
         raise UserError(f'User with ID {user_id} does not exist')
-    for k, v in payload.dict().items():
+    for k, v in payload.model_dump().items():
         if v!= None: setattr(user, k, v)
     db.add(user)
     await db.commit()

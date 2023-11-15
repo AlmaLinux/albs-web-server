@@ -1,22 +1,15 @@
-import uuid
+import datetime
 import json
 import typing
-import datetime
+import uuid
 
 import aioredis
-from fastapi import (
-    APIRouter,
-    Depends,
-    WebSocket,
-)
-
-from alws import database
+from alws import database, dramatiq
 from alws.auth import get_current_user
 from alws.crud import sign_task
 from alws.dependencies import get_db, get_redis
-from alws import dramatiq
 from alws.schemas import sign_schema
-
+from fastapi import APIRouter, Depends, WebSocket
 
 router = APIRouter(
     prefix='/sign-tasks',
@@ -64,7 +57,7 @@ async def complete_sign_task(
     task = await sign_task.get_sign_task(db, sign_task_id)
     task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
     await db.commit()
-    dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.dict())
+    dramatiq.sign_task.complete_sign_task.send(sign_task_id, payload.model_dump())
     return {'success': True}
 
 

@@ -1,12 +1,11 @@
 import typing
 
-from sqlalchemy import and_, delete
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
-
 from alws import models
 from alws.errors import DataNotFoundError
 from alws.schemas import platform_schema
+from sqlalchemy import and_, delete
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
 
 
 async def modify_platform(
@@ -43,10 +42,10 @@ async def modify_platform(
             for repo in platform.repos:
                 if repo.name in db_repos:
                     db_repo = db_repos[repo.name]
-                    for key in repo.dict().keys():
+                    for key in repo.model_dump().keys():
                         setattr(db_repo, key, getattr(repo, key))
                 else:
-                    db_platform.repos.append(models.Repository(**repo.dict()))
+                    db_platform.repos.append(models.Repository(**repo.model_dump()))
 
         ref_platform_ids_to_remove = [
             ref_platform.id
@@ -98,7 +97,7 @@ async def create_platform(
     )
     if platform.repos:
         for repo in platform.repos:
-            db_platform.repos.append(models.Repository(**repo.dict()))
+            db_platform.repos.append(models.Repository(**repo.model_dump()))
     db.add(db_platform)
     await db.commit()
     await db.refresh(db_platform)

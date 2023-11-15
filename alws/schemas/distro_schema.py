@@ -2,7 +2,6 @@ import typing
 
 from pydantic import BaseModel
 
-
 __all__ = ['Distribution', 'DistroCreate']
 
 
@@ -19,13 +18,13 @@ class DistroRepository(BaseModel):
 class DistroPlatforms(BaseModel):
 
     id: int
-    type: typing.Optional[str]
-    distr_type: typing.Optional[str]
-    distr_version: typing.Optional[str]
+    type: typing.Optional[str] = None
+    distr_type: typing.Optional[str] = None
+    distr_version: typing.Optional[str] = None
     name: str
     arch_list: typing.List[str]
-    data: typing.Optional[typing.Any]
-    repos: typing.Optional[typing.Any]
+    data: typing.Optional[typing.Any] = None
+    repos: typing.Optional[typing.Any] = None
 
 
 class DistroCreate(BaseModel):
@@ -40,4 +39,4 @@ class Distribution(BaseModel):
     name: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True

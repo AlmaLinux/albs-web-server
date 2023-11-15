@@ -1,9 +1,7 @@
 import typing
 
-from pydantic import BaseModel
-
 from alws.utils.debuginfo import is_debuginfo_rpm
-
+from pydantic import BaseModel
 
 __all__ = ['Task']
 
@@ -16,18 +14,18 @@ class TaskRepo(BaseModel):
     mock_enabled: bool = True
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TaskRef(BaseModel):
 
     url: str
-    git_ref: typing.Optional[str]
+    git_ref: typing.Optional[str] = None
     ref_type: int
-    git_commit_hash: typing.Optional[str]
+    git_commit_hash: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TaskCreatedBy(BaseModel):
@@ -67,7 +65,7 @@ class TaskPlatform(BaseModel):
                     self.data['definitions'][v_k] = v_v
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Task(BaseModel):
@@ -78,16 +76,16 @@ class Task(BaseModel):
     build_id: int
     platform: TaskPlatform
     created_by: TaskCreatedBy
-    alma_commit_cas_hash: typing.Optional[str]
-    srpm_hash: typing.Optional[str]
+    alma_commit_cas_hash: typing.Optional[str] = None
+    srpm_hash: typing.Optional[str] = None
     is_cas_authenticated: bool = False
     is_secure_boot: typing.Optional[bool] = False
     repositories: typing.List[TaskRepo]
     linked_builds: typing.Optional[typing.List[int]] = []
-    built_srpm_url: typing.Optional[str]
+    built_srpm_url: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Ping(BaseModel):
@@ -101,10 +99,10 @@ class BuildDoneArtifact(BaseModel):
     type: typing.Literal['rpm', 'build_log']
     href: str
     sha256: str
-    cas_hash: typing.Optional[str]
+    cas_hash: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @property
     def arch(self):
@@ -123,8 +121,8 @@ class BuildDone(BaseModel):
     artifacts: typing.List[BuildDoneArtifact]
     stats: typing.Dict[str, typing.Dict[str, str]]
     is_cas_authenticated: bool = False
-    alma_commit_cas_hash: typing.Optional[str]
-    git_commit_hash: typing.Optional[str]
+    alma_commit_cas_hash: typing.Optional[str] = None
+    git_commit_hash: typing.Optional[str] = None
 
 
 class RequestTask(BaseModel):

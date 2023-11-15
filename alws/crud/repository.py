@@ -1,14 +1,13 @@
 import typing
 
 import sqlalchemy
-from sqlalchemy import delete
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
-
 from alws import models
 from alws.config import settings
 from alws.schemas import remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
+from sqlalchemy import delete
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
 
 
 async def get_repositories(
@@ -60,7 +59,7 @@ async def create_repositories(
             repos_mapping[repo_key] = repo
 
         for repo_item in payload:
-            repo_item_dict = repo_item.dict()
+            repo_item_dict = repo_item.model_dump()
             repo_key = f'{repo_item.name}-{repo_item.arch}-{repo_item.debug}'
             if repo_key not in repos_mapping:
                 repos_mapping[repo_key] = models.Repository(**repo_item_dict)
@@ -92,7 +91,7 @@ async def create_repository(
         result = await db.execute(query)
         if result.scalars().first():
             raise ValueError('Repository already exists')
-        repository = models.Repository(**payload.dict())
+        repository = models.Repository(**payload.model_dump())
         db.add(repository)
     await db.refresh(repository)
     return repository
@@ -103,7 +102,7 @@ async def search_repository(
     payload: repository_schema.RepositorySearch,
 ) -> models.Repository:
     query = select(models.Repository)
-    for key, value in payload.dict().items():
+    for key, value in payload.model_dump().items():
         if key == 'name':
             query = query.where(models.Repository.name == value)
         elif key == 'arch':
@@ -129,7 +128,7 @@ async def update_repository(
             )
         )
         db_repo = db_repo.scalars().first()
-        for field, value in payload.dict().items():
+        for field, value in payload.model_dump().items():
             setattr(db_repo, field, value)
         db.add(db_repo)
         await db.commit()
@@ -262,7 +261,7 @@ async def update_repository_remote(
             )
         )
         remote = result.scalars().first()
-        for key, value in payload.dict().items():
+        for key, value in payload.model_dump().items():
             setattr(remote, key, value)
         db.add(remote)
         await db.commit()

@@ -1,9 +1,5 @@
 import typing
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-
 from alws import models
 from alws.crud.user import get_user
 from alws.errors import (
@@ -15,6 +11,9 @@ from alws.models import User
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import sign_schema
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 
 async def get_sign_keys(
@@ -59,7 +58,7 @@ async def create_sign_key(
                 f"No platform with id '{payload.platform_id}' "
                 f"exists in the system"
             )
-    sign_key = models.SignKey(**payload.dict())
+    sign_key = models.SignKey(**payload.model_dump())
     db.add(sign_key)
     await db.commit()
     await db.refresh(sign_key)
@@ -72,7 +71,7 @@ async def update_sign_key(
     sign_key = await db.execute(select(models.SignKey).get(key_id))
     if not sign_key:
         raise DataNotFoundError(f"Sign key with ID {key_id} does not exist")
-    for k, v in payload.dict().items():
+    for k, v in payload.model_dump().items():
         setattr(sign_key, k, v)
     db.add(sign_key)
     await db.commit()

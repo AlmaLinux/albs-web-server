@@ -1,12 +1,10 @@
 import datetime
 import typing
 
-from pydantic import BaseModel
-
-from alws.schemas.user_schema import User
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.schemas.platform_schema import Platform
-
+from alws.schemas.user_schema import User
+from pydantic import BaseModel
 
 __all__ = [
     'Release',
@@ -19,12 +17,12 @@ __all__ = [
 class ReleaseProduct(BaseModel):
     id: int
     name: str
-    title: typing.Optional[str]
-    description: typing.Optional[str]
+    title: typing.Optional[str] = None
+    description: typing.Optional[str] = None
     is_community: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Release(BaseModel):
@@ -32,35 +30,35 @@ class Release(BaseModel):
     status: int
     build_ids: typing.List[int]
     build_task_ids: typing.Optional[typing.List[int]] = []
-    plan: typing.Optional[typing.Dict[str, typing.Any]]
+    plan: typing.Optional[typing.Dict[str, typing.Any]] = None
     owner: User
     platform: Platform
     product: ReleaseProduct
     performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
-    created_at: typing.Optional[datetime.datetime]
+    created_at: typing.Optional[datetime.datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ReleaseResponse(BaseModel):
 
     releases: typing.List[Release]
-    total_releases: typing.Optional[int]
-    current_page: typing.Optional[int]
+    total_releases: typing.Optional[int] = None
+    current_page: typing.Optional[int] = None
 
 
 class ReleaseCreate(BaseModel):
     builds: typing.List[int]
-    build_tasks: typing.Optional[typing.List[int]]
+    build_tasks: typing.Optional[typing.List[int]] = None
     platform_id: int
     product_id: int
 
 
 class ReleaseUpdate(BaseModel):
-    builds: typing.Optional[typing.List[int]]
-    build_tasks: typing.Optional[typing.List[int]]
-    plan: typing.Optional[typing.Dict[str, typing.Any]]
+    builds: typing.Optional[typing.List[int]] = None
+    build_tasks: typing.Optional[typing.List[int]] = None
+    plan: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
 class ReleaseCommitResult(BaseModel):

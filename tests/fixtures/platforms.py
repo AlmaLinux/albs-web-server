@@ -2,11 +2,10 @@ from typing import AsyncIterable
 
 import pytest
 import yaml
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from alws import models
 from alws.schemas import platform_schema, repository_schema
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from tests.test_utils.pulp_utils import get_repo_href
 
 
@@ -18,7 +17,7 @@ async def base_platform(
     with open("reference_data/platforms.yaml", "rt") as file:
         loader = yaml.Loader(file)
         platform_data = loader.get_data()[0]
-    schema = platform_schema.PlatformCreate(**platform_data).dict()
+    schema = platform_schema.PlatformCreate(**platform_data).model_dump()
     schema["repos"] = []
     platform = (
         (
@@ -37,7 +36,7 @@ async def base_platform(
             repo["url"] = repo["remote_url"]
             repo["pulp_href"] = get_repo_href()
             repository = models.Repository(
-                **repository_schema.RepositoryCreate(**repo).dict()
+                **repository_schema.RepositoryCreate(**repo).model_dump()
             )
             platform.repos.append(repository)
         session.add(platform)

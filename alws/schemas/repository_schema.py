@@ -17,14 +17,14 @@ class Repository(BaseModel):
     arch: str
     url: str
     type: str
-    debug: typing.Optional[bool]
-    priority: typing.Optional[int]
-    production: typing.Optional[bool]
-    mock_enabled: typing.Optional[bool]
-    pulp_href: typing.Optional[str]
+    debug: typing.Optional[bool] = None
+    priority: typing.Optional[int] = None
+    production: typing.Optional[bool] = None
+    mock_enabled: typing.Optional[bool] = None
+    pulp_href: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RepositoryCreate(BaseModel):
@@ -36,26 +36,26 @@ class RepositoryCreate(BaseModel):
     priority: int = 10
     production: bool = False
     mock_enabled: bool = True
-    export_path: typing.Optional[str]
-    pulp_href: typing.Optional[str]
+    export_path: typing.Optional[str] = None
+    pulp_href: typing.Optional[str] = None
 
 
 class RepositorySearch(BaseModel):
-    name: typing.Optional[str]
-    arch: typing.Optional[str]
-    url: typing.Optional[str]
-    type: typing.Optional[str]
-    debug: typing.Optional[bool]
-    production: typing.Optional[bool]
-    pulp_href: typing.Optional[str]
-    mock_enabled: typing.Optional[bool]
+    name: typing.Optional[str] = None
+    arch: typing.Optional[str] = None
+    url: typing.Optional[str] = None
+    type: typing.Optional[str] = None
+    debug: typing.Optional[bool] = None
+    production: typing.Optional[bool] = None
+    pulp_href: typing.Optional[str] = None
+    mock_enabled: typing.Optional[bool] = None
 
 
 class RepositoryUpdate(BaseModel):
     priority: int = 10
-    production: typing.Optional[bool]
-    export_path: typing.Optional[str]
-    pulp_href: typing.Optional[str]
+    production: typing.Optional[bool] = None
+    export_path: typing.Optional[str] = None
+    pulp_href: typing.Optional[str] = None
     mock_enabled: bool = True
 
 

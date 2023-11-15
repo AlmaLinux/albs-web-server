@@ -1,6 +1,15 @@
 import typing
 
-from pydantic import AnyHttpUrl, BaseModel, validator
+from pydantic import (
+    AfterValidator,
+    AnyHttpUrl,
+    BaseModel,
+    field_serializer,
+    field_validator,
+)
+from typing_extensions import Annotated
+
+AnyHttpUrlString = Annotated[AnyHttpUrl, AfterValidator(lambda v: str(v))]
 
 
 class PackageTestRepository(BaseModel):
@@ -10,7 +19,7 @@ class PackageTestRepository(BaseModel):
     url: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PackageTestRepositoryCreate(BaseModel):
@@ -22,22 +31,22 @@ class PackageTestRepositoryCreate(BaseModel):
 class TestRepository(BaseModel):
     id: int
     name: str
-    url: AnyHttpUrl
+    url: AnyHttpUrlString
     tests_dir: str
-    tests_prefix: typing.Optional[str]
-    packages: typing.Optional[typing.List[PackageTestRepository]]
+    tests_prefix: typing.Optional[str] = None
+    packages: typing.Optional[typing.List[PackageTestRepository]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TestRepositoryCreate(BaseModel):
     name: str
-    url: AnyHttpUrl
+    url: AnyHttpUrlString
     tests_dir: str
-    tests_prefix: typing.Optional[str]
+    tests_prefix: typing.Optional[str] = None
 
-    @validator('tests_dir', pre=True)
+    @field_validator('tests_dir', mode="before")
     def tests_dir_validator(cls, tests_dir: str):
         if not tests_dir.endswith('/'):
             raise ValueError('tests_dir field should ends with "/"')
@@ -45,10 +54,10 @@ class TestRepositoryCreate(BaseModel):
 
 
 class TestRepositoryUpdate(BaseModel):
-    tests_dir: typing.Optional[str]
-    tests_prefix: typing.Optional[str]
+    tests_dir: typing.Optional[str] = None
+    tests_prefix: typing.Optional[str] = None
 
-    @validator('tests_dir', pre=True)
+    @field_validator('tests_dir', mode="before")
     def tests_dir_validator(cls, tests_dir: str):
         if not tests_dir.endswith('/'):
             raise ValueError('tests_dir field should ends with "/"')
@@ -57,5 +66,5 @@ class TestRepositoryUpdate(BaseModel):
 
 class TestRepositoryResponse(BaseModel):
     test_repositories: typing.List[TestRepository]
-    total_test_repositories: typing.Optional[int]
-    current_page: typing.Optional[int]
+    total_test_repositories: typing.Optional[int] = None
+    current_page: typing.Optional[int] = None

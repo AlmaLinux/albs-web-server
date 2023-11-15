@@ -4,16 +4,14 @@ import logging
 import typing
 
 import aioredis
-import pydantic
 import sentry_sdk
-
 from alws.utils.gitea import GiteaClient
-
+from pydantic_settings import BaseSettings
 
 __all__ = ['Config', 'load_redis_cache', 'save_redis_cache']
 
 
-class Config(pydantic.BaseSettings):
+class Config(BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
     gitea_host: str = 'https://git.almalinux.org/api/v1/'

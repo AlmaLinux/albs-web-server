@@ -2,24 +2,19 @@ import logging
 import typing
 
 import sqlalchemy
+from alws import models
+from alws.config import settings
+from alws.dramatiq import start_build
+from alws.errors import BuildError, DataNotFoundError, PermissionDenied
+from alws.perms import actions
+from alws.perms.authorization import can_perform
+from alws.schemas import build_schema
+from alws.utils.pulp_client import PulpClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
-
-from alws import models
-from alws.config import settings
-from alws.errors import (
-    BuildError,
-    DataNotFoundError,
-    PermissionDenied,
-)
-from alws.perms import actions
-from alws.perms.authorization import can_perform
-from alws.schemas import build_schema
-from alws.utils.pulp_client import PulpClient
-from alws.dramatiq import start_build
 
 
 async def create_build(
@@ -67,7 +62,7 @@ async def create_build(
     db.add(db_build)
     await db.commit()
     await db.refresh(db_build)
-    start_build.send(db_build.id, build.dict())
+    start_build.send(db_build.id, build.model_dump())
     return db_build
 
 

@@ -1,11 +1,10 @@
 from typing import List
 
 import sqlalchemy
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-
 from alws import models
 from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
@@ -27,7 +26,7 @@ async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
         )
         db_repo = db_repo.scalars().first()
         if not db_repo:
-            db_repo = models.Repository(**repo.dict())
+            db_repo = models.Repository(**repo.model_dump())
             db.add(db_repo)
         db_flavour.repos.append(db_repo)
     db.add(db_flavour)
@@ -60,7 +59,7 @@ async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
         )
         db_repo = db_repo.scalars().first()
         if not db_repo:
-            db_repo = models.Repository(**repo.dict())
+            db_repo = models.Repository(**repo.model_dump())
             db.add(db_repo)
         db_flavour.repos.append(db_repo)
     db.add(db_flavour)

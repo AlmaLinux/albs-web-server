@@ -5,18 +5,13 @@ import logging
 import re
 import typing
 
-from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
-
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskRefType, BuildTaskStatus
 from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.schemas import build_schema
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.gitea import (
-    GiteaClient,
-)
+from alws.utils.gitea import GiteaClient
 from alws.utils.modularity import (
     IndexWrapper,
     ModuleWrapper,
@@ -26,6 +21,8 @@ from alws.utils.modularity import (
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.parsing import get_clean_distr_name, parse_git_ref
 from alws.utils.pulp_client import PulpClient
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session, selectinload
 
 __all__ = ['BuildPlanner']
 
@@ -428,7 +425,7 @@ class BuildPlanner:
                     url=task.url,
                     git_ref=task.git_ref,
                     ref_type=task.ref_type,
-                    test_configuration=task.test_configuration.dict()
+                    test_configuration=task.test_configuration.model_dump()
                     if task.test_configuration
                     else None,
                 ),
@@ -463,7 +460,7 @@ class BuildPlanner:
                 url=ref.url,
                 git_ref=ref.git_ref,
                 ref_type=BuildTaskRefType.GIT_BRANCH,
-                test_configuration=ref.test_configuration.dict()
+                test_configuration=ref.test_configuration.model_dump()
                 if ref.test_configuration
                 else None,
             )

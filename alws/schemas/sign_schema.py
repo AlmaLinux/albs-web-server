@@ -15,7 +15,7 @@ class SignKey(BaseModel):
     product_id: typing.Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SignKeyCreate(BaseModel):
@@ -28,11 +28,11 @@ class SignKeyCreate(BaseModel):
 
 
 class SignKeyUpdate(BaseModel):
-    name: typing.Optional[str]
-    description: typing.Optional[str]
-    keyid: typing.Optional[str]
-    fingerprint: typing.Optional[str]
-    public_url: typing.Optional[str]
+    name: typing.Optional[str] = None
+    description: typing.Optional[str] = None
+    keyid: typing.Optional[str] = None
+    fingerprint: typing.Optional[str] = None
+    public_url: typing.Optional[str] = None
 
 
 class SignTask(BaseModel):
@@ -40,18 +40,18 @@ class SignTask(BaseModel):
     build_id: int
     sign_key: SignKey
     status: int
-    error_message: typing.Optional[str]
-    log_href: typing.Optional[str]
+    error_message: typing.Optional[str] = None
+    log_href: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class GenKeyTask(BaseModel):
     id: int
-    user_name: typing.Optional[str]
-    user_email: typing.Optional[str]
-    product_name: typing.Optional[str]
+    user_name: typing.Optional[str] = None
+    user_email: typing.Optional[str] = None
+    product_name: typing.Optional[str] = None
 
 
 class SignTaskCreate(BaseModel):
@@ -66,54 +66,54 @@ class SignTaskGet(BaseModel):
 class SignRpmInfo(BaseModel):
     id: int
     name: str
-    arch: typing.Optional[str]
+    arch: typing.Optional[str] = None
     type: str
     download_url: str
-    cas_hash: typing.Optional[str]
+    cas_hash: typing.Optional[str] = None
 
 
 class SignedRpmInfo(BaseModel):
     id: int
     name: str
-    arch: typing.Optional[str]
+    arch: typing.Optional[str] = None
     type: str
     href: str
     fingerprint: str
     sha256: str
-    cas_hash: typing.Optional[str]
+    cas_hash: typing.Optional[str] = None
 
 
 class AvailableSignTask(BaseModel):
-    id: typing.Optional[int]
-    build_id: typing.Optional[int]
-    keyid: typing.Optional[str]
-    packages: typing.Optional[typing.List[SignRpmInfo]]
+    id: typing.Optional[int] = None
+    build_id: typing.Optional[int] = None
+    keyid: typing.Optional[str] = None
+    packages: typing.Optional[typing.List[SignRpmInfo]] = None
 
 
 class AvailableGenKeyTask(BaseModel):
-    id: typing.Optional[int]
-    user_name: typing.Optional[str]
-    user_email: typing.Optional[str]
-    product_name: typing.Optional[str]
+    id: typing.Optional[int] = None
+    user_name: typing.Optional[str] = None
+    user_email: typing.Optional[str] = None
+    product_name: typing.Optional[str] = None
 
 
 class GenKeyTaskComplete(BaseModel):
     success: bool
-    error_message: typing.Optional[str]
-    sign_key_href: typing.Optional[str]
-    key_name: typing.Optional[str]
-    key_id: typing.Optional[str]
-    fingerprint: typing.Optional[str]
-    file_name: typing.Optional[str]
+    error_message: typing.Optional[str] = None
+    sign_key_href: typing.Optional[str] = None
+    key_name: typing.Optional[str] = None
+    key_id: typing.Optional[str] = None
+    fingerprint: typing.Optional[str] = None
+    file_name: typing.Optional[str] = None
 
 
 class SignTaskComplete(BaseModel):
     build_id: int
     success: bool
-    error_message: typing.Optional[str]
-    log_href: typing.Optional[str]
-    packages: typing.Optional[typing.List[SignedRpmInfo]]
-    stats: typing.Optional[dict]
+    error_message: typing.Optional[str] = None
+    log_href: typing.Optional[str] = None
+    packages: typing.Optional[typing.List[SignedRpmInfo]] = None
+    stats: typing.Optional[dict] = None
 
 
 class SignTaskCompleteResponse(BaseModel):

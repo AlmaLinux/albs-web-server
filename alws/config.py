@@ -1,7 +1,7 @@
 import urllib.parse
 from typing import Optional
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     package_beholder_enabled: bool = True
     beholder_host: str = 'http://beholder-web:5000'
-    beholder_token: Optional[str]
+    beholder_token: Optional[str] = None
 
     redis_url: str = 'redis://redis:6379'
 
@@ -39,11 +39,11 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
-    immudb_username: Optional[str]
-    immudb_password: Optional[str]
-    immudb_database: Optional[str]
-    immudb_address: Optional[str]
-    immudb_public_key_file: Optional[str]
+    immudb_username: Optional[str] = None
+    immudb_password: Optional[str] = None
+    immudb_database: Optional[str] = None
+    immudb_address: Optional[str] = None
+    immudb_public_key_file: Optional[str] = None
 
     rabbitmq_default_user: str = 'test-system'
     rabbitmq_default_pass: str = 'test-system'
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     rabbitmq_default_vhost: str = 'test_system'
 
     sign_server_url: Optional[str] = 'http://web_server:8000/api/v1/'
-    sign_server_token: Optional[str]
+    sign_server_token: Optional[str] = None
 
     documentation_path: str = 'alws/documentation/'
 
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
 
     sentry_environment: str = 'dev'
-    sentry_dsn: Optional[str]
+    sentry_dsn: Optional[str] = None
     sentry_traces_sample_rate: float = 0.2
 
     @property

@@ -2,9 +2,6 @@ import datetime
 import itertools
 import typing
 
-from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from alws import dramatiq
 from alws.auth import get_current_user
 from alws.config import settings
@@ -12,6 +9,8 @@ from alws.constants import BuildTaskRefType, BuildTaskStatus
 from alws.crud import build_node
 from alws.dependencies import get_db
 from alws.schemas import build_node_schema
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(
     prefix="/build_node",
@@ -47,7 +46,7 @@ async def build_done(
     # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
     await db.commit()
-    dramatiq.build_done.send(build_done_.dict())
+    dramatiq.build_done.send(build_done_.model_dump())
     return {"ok": True}
 
 

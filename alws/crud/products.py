@@ -2,12 +2,6 @@ import asyncio
 import logging
 import typing
 
-from sqlalchemy import or_
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.expression import func
-
 from alws import models
 from alws.config import settings
 from alws.constants import BuildTaskStatus
@@ -19,11 +13,13 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.copr import (
-    create_product_repo,
-    create_product_sign_key_repo,
-)
+from alws.utils.copr import create_product_repo, create_product_sign_key_repo
 from alws.utils.pulp_client import PulpClient
+from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.expression import func
 
 __all__ = [
     'create_product',
@@ -67,7 +63,7 @@ async def create_product(
         team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
 
-    product_payload = payload.dict()
+    product_payload = payload.model_dump()
     product_payload['team_id'] = team.id
 
     product = models.Product(**product_payload)
