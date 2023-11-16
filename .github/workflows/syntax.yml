@@ -1,12 +1,19 @@
 name: syntax
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - "**"
+# permissions: write-all
+  # pull-requests: write
+  # actions: write
+  # checks: write
+  # id-token: write
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pull-requests: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v3

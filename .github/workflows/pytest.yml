@@ -1,8 +1,13 @@
 name: pytest
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - "**"
+permissions: write-all
+  # pull-requests: write
+  # actions: write
+  # checks: write
+  # id-token: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -50,6 +55,8 @@ jobs:
           tests/ | tee /tmp/pytest-coverage.txt'
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           pytest-coverage-path: /tmp/pytest-coverage.txt
           pytest-xml-coverage-path: /tmp/coverage.xml
