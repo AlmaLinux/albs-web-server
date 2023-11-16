@@ -19,10 +19,7 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
 from alws.schemas.team_schema import TeamCreate
-from alws.utils.copr import (
-    create_product_repo,
-    create_product_sign_key_repo,
-)
+from alws.utils.copr import create_product_repo, create_product_sign_key_repo
 from alws.utils.pulp_client import PulpClient
 
 __all__ = [
@@ -67,7 +64,7 @@ async def create_product(
         team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
 
-    product_payload = payload.dict()
+    product_payload = payload.model_dump()
     product_payload['team_id'] = team.id
 
     product = models.Product(**product_payload)
@@ -75,9 +72,9 @@ async def create_product(
         (
             await db.execute(
                 select(models.Platform).where(
-                    models.Platform.name.in_(
-                        [platform.name for platform in payload.platforms]
-                    ),
+                    models.Platform.name.in_([
+                        platform.name for platform in payload.platforms
+                    ]),
                 ),
             )
         )
@@ -244,12 +241,10 @@ async def remove_product(
                 .join(models.BuildTask)
                 .where(
                     models.Build.team_id == db_product.team_id,
-                    models.BuildTask.status.in_(
-                        [
-                            BuildTaskStatus.IDLE,
-                            BuildTaskStatus.STARTED,
-                        ]
-                    ),
+                    models.BuildTask.status.in_([
+                        BuildTaskStatus.IDLE,
+                        BuildTaskStatus.STARTED,
+                    ]),
                 )
             )
         )
@@ -258,7 +253,7 @@ async def remove_product(
     )
     if active_builds_by_team_id:
         raise ProductError(
-            f'Cannot remove product, please wait until the following '
+            'Cannot remove product, please wait until the following '
             f'builds are finished: {str(active_builds_by_team_id)}'
         )
     pulp_client = PulpClient(
@@ -303,7 +298,7 @@ async def modify_product(
             raise DataNotFoundError(f"User={user_id} doesn't exist")
         if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
             raise PermissionDenied(
-                f'User has no permissions '
+                'User has no permissions '
                 f'to modify the product "{db_product.name}"'
             )
 
@@ -328,7 +323,7 @@ async def modify_product(
             if db_build in db_product.builds:
                 error_msg = (
                     f"Can't add build {build_id} to {product} "
-                    f"as it's already part of the product"
+                    "as it's already part of the product"
                 )
                 raise ProductError(error_msg)
         if modification == 'remove':
@@ -336,7 +331,7 @@ async def modify_product(
                 error_msg = (
                     f"Can't remove build {build_id} "
                     f"from {product} as it's not part "
-                    f"of the product"
+                    "of the product"
                 )
                 raise ProductError(error_msg)
 

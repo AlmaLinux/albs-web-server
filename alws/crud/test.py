@@ -120,13 +120,11 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
                 'callback_href': f'/api/v1/tests/{task.id}/result/',
             }
             if module_name and module_stream and module_version:
-                payload.update(
-                    {
-                        'module_name': module_name,
-                        'module_stream': module_stream,
-                        'module_version': module_version,
-                    }
-                )
+                payload.update({
+                    'module_name': module_name,
+                    'module_stream': module_stream,
+                    'module_version': module_version,
+                })
             if repositories:
                 payload['repositories'] = repositories
             if test_configuration:
@@ -328,7 +326,7 @@ async def update_test_task(
             status=status,
             started_at=started_at,
             finished_at=datetime.datetime.utcnow(),
-            alts_response=test_result.dict(),
+            alts_response=test_result.model_dump(),
         )
     )
     await db.execute(

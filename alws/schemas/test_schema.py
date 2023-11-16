@@ -10,21 +10,21 @@ __all__ = ['TestTaskResult']
 class TestTaskResult(BaseModel):
     api_version: str
     result: dict
-    stats: Optional[dict]
+    stats: Optional[dict] = None
 
 
 class TestTask(BaseModel):
     id: int
     package_name: str
     package_version: str
-    package_release: Optional[str]
+    package_release: Optional[str] = None
     status: int
     revision: int
-    alts_response: Optional[dict]
+    alts_response: Optional[dict] = None
     performance_stats: Optional[List[PerformanceStats]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TestLog(BaseModel):

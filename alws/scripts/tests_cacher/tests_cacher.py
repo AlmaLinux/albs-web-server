@@ -6,12 +6,16 @@ from typing import List, Optional, Union
 
 import aiohttp
 import sentry_sdk
-from pydantic import AnyHttpUrl, BaseModel, BaseSettings
+from pydantic import AfterValidator, AnyHttpUrl, BaseModel
+from pydantic_settings import BaseSettings
+from typing_extensions import Annotated
 
 DEFAULT_REQUESTS_LIMIT = 5
 DEFAULT_SLEEP_TIMEOUT = 600  # 10 minutes
 DEFAULT_ALBS_API_URL = 'http://web_server:8000'
 DEFAULT_LOGGING_LEVEL = 'DEBUG'
+
+AnyHttpUrlString = Annotated[AnyHttpUrl, AfterValidator(lambda v: str(v))]
 
 
 class Config(BaseSettings):
@@ -35,9 +39,9 @@ class PackageTestRepository(BaseModel):
 class TestRepository(BaseModel):
     id: int
     name: str
-    url: AnyHttpUrl
+    url: AnyHttpUrlString
     tests_dir: str
-    tests_prefix: Optional[str]
+    tests_prefix: Optional[str] = None
     packages: List[PackageTestRepository]
 
 
@@ -167,7 +171,9 @@ class TestsCacher:
                     f'/api/v1/test_repositories/{repository_id}/packages/bulk_create/',
                 ),
                 method='post',
-                json=[test_folder.dict() for test_folder in test_folders],
+                json=[
+                    test_folder.model_dump() for test_folder in test_folders
+                ],
                 headers=self.albs_headers,
             )
         except Exception:
@@ -195,7 +201,7 @@ class TestsCacher:
             tests_prefix = db_repo.tests_prefix if db_repo.tests_prefix else ''
             self.logger.info('Start processing "%s" repo', db_repo.name)
             repo_content = await self.get_test_repo_content(
-                urllib.parse.urljoin(db_repo.url, db_repo.tests_dir),
+                urllib.parse.urljoin(str(db_repo.url), db_repo.tests_dir),
             )
             for line in repo_content.splitlines():
                 result = re.search(
@@ -220,7 +226,9 @@ class TestsCacher:
                         remote_test_folder,
                     ),
                     url=urllib.parse.urljoin(
-                        urllib.parse.urljoin(db_repo.url, db_repo.tests_dir),
+                        urllib.parse.urljoin(
+                            str(db_repo.url), db_repo.tests_dir
+                        ),
                         remote_test_folder,
                     ),
                 )

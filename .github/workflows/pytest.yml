@@ -32,17 +32,20 @@ jobs:
           echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
-      - uses: isbang/compose-action@v1.4.1
+      - uses: isbang/compose-action@v1.5.1
         name: Run docker-compose
         with:
-          up-flags: "--build --no-deps"
+          # Use this if you change something in Dockerfile
+          # up-flags: --build --no-deps
+          up-flags: "--pull always --no-build --no-deps"
           down-flags: "--volumes"
           services: |
             db
             web_server
       - name: Run unit tests (pytest)
         run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -o pipefail -c 'source
-          env/bin/activate && pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
+          env/bin/activate && pip3 install -r requirements.txt &&
+          pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
           --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
           tests/ | tee /tmp/pytest-coverage.txt'
       - name: Pytest coverage comment
