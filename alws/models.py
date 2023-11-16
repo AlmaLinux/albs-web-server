@@ -27,7 +27,6 @@ from alws.constants import (
     GenKeyStatus,
 )
 from alws.database import Base, engine
-
 __all__ = [
     "Build",
     "BuildTask",
