@@ -250,8 +250,8 @@ services:
       context: ../albs-frontend
     command: bash -c "npm install && npm run dev"
     volumes:
-      - "../albs-frontend:/code"
-      - "../node_modules:/code/node_modules"
+      - "../albs-frontend:/home/albs/code"
+      - "frontend_node_modules:/code/node_modules"
     restart: on-failure
     depends_on:
       - web_server
@@ -406,3 +406,6 @@ services:
       - "../volumes/immudb/data:/var/lib/immudb:Z"
       - "../volumes/immudb/config:/etc/immudb:Z"
       - "../volumes/immudb/logs:/var/log/immudb:Z"
+
+volumes:
+  frontend_node_modules:
