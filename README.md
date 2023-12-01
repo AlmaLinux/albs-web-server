@@ -102,7 +102,7 @@ Web-server works with multiple parts of the Build System. Web-server works with 
 }
 ```
 
-**`GET /get_task`** endpoint accepts the following payload: 
+**`POST /get_task`** endpoint accepts the following payload: 
 
 ```ruby
 {
