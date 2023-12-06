@@ -390,7 +390,7 @@ services:
   sign_file:
     image: sign-file:latest
     env_file:
-      - vars.env
+      - /home/albs/albs/albs-sign-file/.env
     build:
       dockerfile: Dockerfile
       context: ../albs-sign-file
@@ -400,7 +400,9 @@ services:
     restart: on-failure
     volumes:
       - "~/.gnupg:/home/alt/.gnupg"
-      - "../albs-sign-file/sign:/app/sign"
+      - ../albs-sign-file/sign:/app/sign
+      - ../albs-sign-file/start.py:/app/start.py
+      - ../albs-sign-file/db_manage.py:/app/db_manage.py
     ports:
       - "8083:8000"
 
