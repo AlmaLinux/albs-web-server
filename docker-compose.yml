@@ -59,9 +59,11 @@ services:
     environment:
       CELERY_CONFIG_PATH: "/scheduler_config.yaml"
       SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
-    command: "bash -c 'source env/bin/activate && pip3 install --upgrade pip &&
-        pip3 install -r /tmp/requirements/scheduler.txt --no-cache-dir &&
-        uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+    command: "bash -c 'source env/bin/activate && \
+                       pip3 install --upgrade pip && \
+                       pip3 install -r /tmp/requirements/scheduler.txt --no-cache-dir && \
+                       /wait_for_it.sh web_server:8000 && \
+                       uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
     restart: on-failure
     volumes:
       - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
@@ -70,6 +72,7 @@ services:
       - ../alts/tests:/code/tests
       - ../alts/requirements:/tmp/requirements
     depends_on:
+      - web_server
       - rabbitmq
 
   web_server:
