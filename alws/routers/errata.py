@@ -156,5 +156,17 @@ async def release_errata_record(
 async def bulk_release_errata_records(records_ids: List[str]):
     bulk_errata_release.send(records_ids)
     return {
-        "message": f"Following records scheduled for release: {', '.join(records_ids)}"
+        "message": (
+            "Following records scheduled for release:"
+            f" {', '.join(records_ids)}"
+        )
     }
+
+
+@router.post('/reset-matched-packages')
+async def reset_matched_packages(
+    record_id: str,
+    session: AsyncSession = Depends(get_db),
+):
+    await errata_crud.reset_matched_errata_packages(record_id, session)
+    return {'message': f'Packages for record {record_id} have been matched'}

@@ -5,11 +5,20 @@ import logging
 import re
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Awaitable, DefaultDict, Dict, List, Optional, Tuple
+from typing import (
+    Any,
+    Awaitable,
+    DefaultDict,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import createrepo_c as cr
 import jinja2
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, load_only, selectinload
 from sqlalchemy.sql.expression import func
@@ -229,71 +238,70 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             title = record.title
         else:
             title = record.original_title
-        definition = Definition.from_dict(
-            {
-                "id": debrand_id(record.definition_id),
-                "version": record.definition_version,
-                "class": record.definition_class,
-                "metadata": {
-                    "title": title,
-                    "description": record.description
+        definition = Definition.from_dict({
+            "id": debrand_id(record.definition_id),
+            "version": record.definition_version,
+            "class": record.definition_class,
+            "metadata": {
+                "title": title,
+                "description": (
+                    record.description
                     if record.description
-                    else record.original_description,
-                    "advisory": {
-                        "from": record.contact_mail,
-                        "severity": record.severity,
-                        "rights": record.rights,
-                        "issued_date": record.issued_date,
-                        "updated_date": record.updated_date,
-                        "affected_cpe_list": debrand_affected_cpe_list(
-                            record.affected_cpe, record.platform.distr_version
-                        ),
-                        "bugzilla": [
-                            {
-                                "id": ref.ref_id,
-                                "href": ref.href,
-                                "title": ref.title,
-                            }
-                            for ref in record.references
-                            if ref.ref_type == ErrataReferenceType.bugzilla
-                        ],
-                        "cves": [
-                            {
-                                "name": ref.ref_id,
-                                "public": datetime.datetime.strptime(
-                                    # year-month-day
-                                    ref.cve.public[:10],
-                                    "%Y-%m-%d",
-                                ).date(),
-                                "href": ref.href,
-                                "impact": ref.cve.impact,
-                                "cwe": ref.cve.cwe,
-                                "cvss3": ref.cve.cvss3,
-                            }
-                            for ref in record.references
-                            if ref.ref_type == ErrataReferenceType.cve
-                            and ref.cve
-                        ],
-                    },
-                    "references": [
-                        debrand_reference(
-                            {
-                                "id": ref.ref_id,
-                                "source": ref.ref_type.value.upper(),
-                                "url": ref.href,
-                            },
-                            record.platform.distr_version,
-                        )
+                    else record.original_description
+                ),
+                "advisory": {
+                    "from": record.contact_mail,
+                    "severity": record.severity,
+                    "rights": record.rights,
+                    "issued_date": record.issued_date,
+                    "updated_date": record.updated_date,
+                    "affected_cpe_list": debrand_affected_cpe_list(
+                        record.affected_cpe, record.platform.distr_version
+                    ),
+                    "bugzilla": [
+                        {
+                            "id": ref.ref_id,
+                            "href": ref.href,
+                            "title": ref.title,
+                        }
                         for ref in record.references
-                        if ref.ref_type
-                        not in [
-                            ErrataReferenceType.bugzilla,
-                        ]
+                        if ref.ref_type == ErrataReferenceType.bugzilla
+                    ],
+                    "cves": [
+                        {
+                            "name": ref.ref_id,
+                            "public": datetime.datetime.strptime(
+                                # year-month-day
+                                ref.cve.public[:10],
+                                "%Y-%m-%d",
+                            ).date(),
+                            "href": ref.href,
+                            "impact": ref.cve.impact,
+                            "cwe": ref.cve.cwe,
+                            "cvss3": ref.cve.cvss3,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.cve and ref.cve
                     ],
                 },
-                "criteria": record.original_criteria,
-            }
-        )
+                "references": [
+                    debrand_reference(
+                        {
+                            "id": ref.ref_id,
+                            "source": ref.ref_type.value.upper(),
+                            "url": ref.href,
+                        },
+                        record.platform.distr_version,
+                    )
+                    for ref in record.references
+                    if ref.ref_type
+                    not in [
+                        ErrataReferenceType.bugzilla,
+                    ]
+                ],
+            },
+            "criteria": record.original_criteria,
+        })
         oval.append_object(definition)
         for test in record.original_tests:
             test["id"] = debrand_id(test["id"])
@@ -385,7 +393,7 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
 
 
 def prepare_search_params(
-    errata_record: models.ErrataRecord,
+    errata_record: Union[models.ErrataRecord, BaseErrataRecord],
 ) -> DefaultDict[str, List[str]]:
     search_params = collections.defaultdict(list)
     for package in errata_record.packages:
@@ -695,7 +703,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         html_id = db_errata.id.replace(":", "-")
         self_ref = models.ErrataReference(
             href=(
-                f"https://errata.almalinux.org/"
+                "https://errata.almalinux.org/"
                 f"{platform.distr_version}/{html_id}.html"
             ),
             ref_id=db_errata.id,
@@ -778,17 +786,15 @@ async def list_errata_records(
             load_only(models.ErrataRecord.id, models.ErrataRecord.updated_date)
         )
     else:
-        options.extend(
-            [
-                selectinload(models.ErrataRecord.packages)
-                .selectinload(models.ErrataPackage.albs_packages)
-                .selectinload(models.ErrataToALBSPackage.build_artifact)
-                .selectinload(models.BuildTaskArtifact.build_task),
-                selectinload(models.ErrataRecord.references).selectinload(
-                    models.ErrataReference.cve
-                ),
-            ]
-        )
+        options.extend([
+            selectinload(models.ErrataRecord.packages)
+            .selectinload(models.ErrataPackage.albs_packages)
+            .selectinload(models.ErrataToALBSPackage.build_artifact)
+            .selectinload(models.BuildTaskArtifact.build_task),
+            selectinload(models.ErrataRecord.references).selectinload(
+                models.ErrataReference.cve
+            ),
+        ])
 
     def generate_query(count=False):
         query = select(func.count(models.ErrataRecord.id))
@@ -849,7 +855,7 @@ async def update_package_status(
                 for albs_pkg in errata_pkg.albs_packages:
                     if albs_pkg.status == ErrataPackageStatus.released:
                         raise ValueError(
-                            f"There is already released package "
+                            "There is already released package "
                             f"with same source: {albs_pkg}"
                         )
                     if (
@@ -895,20 +901,18 @@ async def release_errata_packages(
         if pkg_name_arch in released_pkgs:
             continue
         released_pkgs.add(pkg_name_arch)
-        dict_packages.append(
-            {
-                "name": pulp_pkg["name"],
-                "release": pulp_pkg["release"],
-                "version": pulp_pkg["version"],
-                "epoch": pulp_pkg["epoch"],
-                "arch": pulp_pkg["arch"],
-                "filename": pulp_pkg["location_href"],
-                "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
-                "src": pulp_pkg["rpm_sourcerpm"],
-                "sum": pulp_pkg["sha256"],
-                "sum_type": "sha256",
-            }
-        )
+        dict_packages.append({
+            "name": pulp_pkg["name"],
+            "release": pulp_pkg["release"],
+            "version": pulp_pkg["version"],
+            "epoch": pulp_pkg["epoch"],
+            "arch": pulp_pkg["arch"],
+            "filename": pulp_pkg["location_href"],
+            "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
+            "src": pulp_pkg["rpm_sourcerpm"],
+            "sum": pulp_pkg["sha256"],
+            "sum_type": "sha256",
+        })
         if rpm_module or ".module_el" not in pulp_pkg["release"]:
             continue
         query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
@@ -1262,7 +1266,8 @@ async def get_release_logs(
     missing_pkg_names: List[str],
 ) -> str:
     release_log = [
-        f"Record {record_id} successfully released at {datetime.datetime.utcnow()}\n"
+        f"Record {record_id} successfully released at"
+        f" {datetime.datetime.utcnow()}\n"
     ]
     pkg_fields = [
         RpmPackage.name,
@@ -1291,16 +1296,13 @@ async def get_release_logs(
     if db_record.module:
         release_log.append(f"Module: {db_record.module}\n")
 
-    release_log.extend(
-        [
-            "Architecture(s): " + ", ".join(arches),
-            "\nPackages:\n" + "\n".join(pkgs),
-            f"\nForce flag: {force_flag}",
-            "\nMissing packages:\n" + "\n".join(missing_pkg_names),
-            "\nRepositories:\n"
-            + "\n".join([repo.url for repo in repositories]),
-        ]
-    )
+    release_log.extend([
+        "Architecture(s): " + ", ".join(arches),
+        "\nPackages:\n" + "\n".join(pkgs),
+        f"\nForce flag: {force_flag}",
+        "\nMissing packages:\n" + "\n".join(missing_pkg_names),
+        "\nRepositories:\n" + "\n".join([repo.url for repo in repositories]),
+    ])
     return "".join(release_log)
 
 
@@ -1395,7 +1397,8 @@ async def bulk_errata_records_release(records_ids: List[str]):
             return
 
         logging.info(
-            "Starting bulk errata release, the following records are locked: %s",
+            "Starting bulk errata release, the following records are"
+            " locked: %s",
             [rec.id for rec in db_records],
         )
         for db_record in db_records:
@@ -1536,3 +1539,53 @@ async def get_updateinfo_xml_from_pulp(
         cr_rec.append_collection(cr_col)
         cr_upd.append(cr_rec)
     return cr_upd.xml_dump()
+
+
+async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
+    record = (
+        (
+            await session.execute(
+                select(models.ErrataRecord)
+                .where(models.ErrataRecord.id == record_id)
+                .options(
+                    selectinload(models.ErrataRecord.platform).selectinload(
+                        models.Platform.repos
+                    ),
+                    selectinload(models.ErrataRecord.packages).selectinload(
+                        models.ErrataPackage.albs_packages
+                    ),
+                )
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not record:
+        return
+    items_to_insert = []
+    search_params = prepare_search_params(record)
+    prod_repos_cache = await load_platform_packages(
+        platform=record.platform,
+        search_params=search_params,
+        for_release=False,
+        module=record.module,
+    )
+    await session.execute(
+        delete(models.ErrataToALBSPackage).where(
+            models.ErrataToALBSPackage.errata_package_id.in_(
+                (pkg.id for pkg in record.packages)
+            )
+        )
+    )
+    for package in record.packages:
+        items_to_insert.extend(
+            await get_matching_albs_packages(
+                session,
+                package,
+                prod_repos_cache,
+                record.module,
+            )
+        )
+    session.add_all(items_to_insert)
+    await session.commit()
