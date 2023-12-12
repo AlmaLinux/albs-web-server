@@ -1,4 +1,6 @@
-# System overview  
+# System overview
+
+[![badges](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/maccelf/7894f3c3bd830eb5456d45c9dacc0f93/raw/pytest-coverage-comment__web-server__main.json)](https://github.com/AlmaLinux/albs-web-server/blob/master/tests/README.md)
 
 AlmaLinux Build System Web-Server (albs-web-server) is designed to control multiple Build System's processes like build, sign and release packages. Web-Server maintains the following functionality:
 * Creates, restarts and deletes builds;
