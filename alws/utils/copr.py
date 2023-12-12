@@ -22,8 +22,9 @@ def generate_repo_config(
 ) -> str:
     # we should clean "http" protocol from host url
     clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
-    repo_url = re.sub('(x86_64|aarch64|ppc64le|i386|i686|s390x)',
-                      '$basearch', repo.url)
+    repo_url = re.sub(
+        '(x86_64|aarch64|ppc64le|i386|i686|s390x)', '$basearch', repo.url
+    )
     repo_url = re.sub('almalinux-(8|9|10)', 'almalinux-$releasever', repo_url)
     config_template = (
         f"[copr:{clean_host_name}:{ownername}:{product_name}]\n"
@@ -89,16 +90,19 @@ async def create_product_repo(
         f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
     )
     repo_url, repo_href = await pulp_client.create_rpm_repository(
-        repo_name, auto_publish=False, create_publication=True,
+        repo_name,
+        auto_publish=False,
+        create_publication=True,
         base_path_start='copr',
     )
     return repo_name, repo_url, arch, repo_href, is_debug
 
 
 async def create_product_sign_key_repo(
-        pulp_client: PulpClient, owner_name: str, product_name: str
+    pulp_client: PulpClient, owner_name: str, product_name: str
 ) -> typing.Tuple[str, str, str]:
     sign_key_repo_name = f'{owner_name}-{product_name}-sign-key-repo'
     repo_url, repo_href = await pulp_client.create_sign_key_repo(
-        sign_key_repo_name)
+        sign_key_repo_name
+    )
     return sign_key_repo_name, repo_url, repo_href
