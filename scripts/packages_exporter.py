@@ -208,7 +208,7 @@ class Exporter:
         self.pulp_client = pulp_client
         self.createrepo_c = local["createrepo_c"]
         self.web_server_headers = {
-            "Authorization": f"Bearer {settings.web_server_token}",
+            "Authorization": f"Bearer {settings.albs_jwt_token}",
         }
         self.pulp_system_user = pulp_user
         self.common_group = pulp_group
@@ -264,18 +264,18 @@ class Exporter:
         self.logger.debug("OSV data are generated")
 
     async def make_request(self, method: str, endpoint: str,
-                           params: dict = None, data: dict = None,
+                           params: dict = None, body: dict = None,
                            user_headers: dict = None,
-                           files: typing.Optional[list] = None,
+                           data: typing.Optional[list] = None,
                            send_to: typing.Literal['web_server', 'sign_server']\
                               = 'web_server'):
         if send_to == 'web_server':
             headers = {**self.web_server_headers}
-            full_url = urllib.parse.urljoin(settings.web_server_baseurl, 
+            full_url = urllib.parse.urljoin(settings.albs_api_url, 
                                             endpoint)
         elif send_to == 'sing_server':
             headers = {}
-            full_url = urllib.parse.urljoin(settings.sign_server_baseurl, 
+            full_url = urllib.parse.urljoin(settings.sign_server_api_url, 
                                             endpoint)
         else:
             raise ValueError("send_to parameter must be web_server of sign_server")
@@ -286,8 +286,8 @@ class Exporter:
         async with aiohttp.ClientSession(headers=headers,
                                          raise_for_status=True) as session:
             async with session.request(method, full_url,
-                                       json=data, params=params,
-                                       files=files) as response:
+                                       json=body, params=params,
+                                       data=data) as response:
                 if response.headers['Content-Type'] == 'application/json':
                     json_data = await response.read()
                     json_data = json.loads(json_data)
@@ -370,7 +370,7 @@ class Exporter:
                 'POST',
                 endpoint,
                 params=params,
-                files=files,
+                data=files,
                 user_headers=headers,
                 send_to='sign_server'
             )
@@ -753,13 +753,13 @@ class Exporter:
         self.logger.info(stdout)
     
     async def get_sign_server_token(self) -> str:
-        data = {'email': settings.sign_server_email,
+        body = {'email': settings.sign_server_username,
                    'password': settings.sign_server_password}
         endpoint = '/token'
         method = 'POST'
         response = await self.make_request(method=method,
                                            endpoint=endpoint,
-                                           data=data,
+                                           body=body,
                                            send_to='sign_server')
         return response['token']
 
