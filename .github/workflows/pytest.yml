@@ -3,6 +3,9 @@ on:
   pull_request_target:
     branches:
       - "**"
+  push:
+    branches:
+      - master
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -52,6 +55,7 @@ jobs:
           tests/ | tee /tmp/pytest-coverage.txt'
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
+        id: coverageComment
         with:
           pytest-coverage-path: /tmp/pytest-coverage.txt
           pytest-xml-coverage-path: /tmp/coverage.xml
@@ -63,3 +67,14 @@ jobs:
           hide-comment: false
           remove-link-from-badge: false
           junitxml-path: /tmp/pytest.xml
+      - name: Create the Badge
+        if: ${{ github.ref == 'refs/heads/master' && steps.coverageComment.outputs.coverage }}
+        uses: schneegans/dynamic-badges-action@v1.6.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 7894f3c3bd830eb5456d45c9dacc0f93
+          filename: pytest-coverage-comment__web-server__main.json
+          label: Test Coverage
+          message: ${{ steps.coverageComment.outputs.coverage }}
+          color: ${{ steps.coverageComment.outputs.color }}
+          namedLogo: pytest
