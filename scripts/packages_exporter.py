@@ -273,7 +273,7 @@ class Exporter:
             headers = {**self.web_server_headers}
             full_url = urllib.parse.urljoin(settings.albs_api_url, 
                                             endpoint)
-        elif send_to == 'sing_server':
+        elif send_to == 'sign_server':
             headers = {}
             full_url = urllib.parse.urljoin(settings.sign_server_api_url, 
                                             endpoint)
@@ -359,9 +359,9 @@ class Exporter:
         return list(dict(results).values())
 
     async def sign_repomd_xml(self, path_to_file: str, key_id: str):
-        token = self.get_sign_server_token()
+        token = await self.get_sign_server_token()
         headers = {'Authorization': f"Bearer {token}"}
-        endpoint = '/sign'
+        endpoint = 'sign'
         params = {'keyid': key_id}
         files = {'file': open(path_to_file,'rb')}
         result = {'asc_content': None, 'error': None}
@@ -755,7 +755,7 @@ class Exporter:
     async def get_sign_server_token(self) -> str:
         body = {'email': settings.sign_server_username,
                    'password': settings.sign_server_password}
-        endpoint = '/token'
+        endpoint = 'token/'
         method = 'POST'
         response = await self.make_request(method=method,
                                            endpoint=endpoint,
