@@ -118,3 +118,17 @@ class SignTaskComplete(BaseModel):
 
 class SignTaskCompleteResponse(BaseModel):
     success: bool
+
+
+class SyncSignTaskRequest(BaseModel):
+    content: str
+    pgp_keyid: str
+    sig_type: typing.Literal['detach-sign', 'clear-sign'] = 'detach-sign'
+
+
+class SyncSignTaskResponse(BaseModel):
+    asc_content: str
+
+
+class SyncSignTaskError(BaseModel):
+    error: str
