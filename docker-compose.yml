@@ -413,8 +413,6 @@ services:
 
   tests_cacher:
     image: alma-tests-cacher:latest
-    env_file:
-      - ../alma-tests-cacher/vars.env
     build:
       context: ../alma-tests-cacher/
       dockerfile: ../alma-tests-cacher/Dockerfile
@@ -425,11 +423,12 @@ services:
       - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
       - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
       - "../alma-tests-cacher/requirements.txt:/code/requirements.txt"
+      - "../alma-tests-cacher/vars.yaml:/code/vars.yaml"
     command: "bash -c '/wait_for_it.sh web_server:8000 &&
               source env/bin/activate &&
               pip3 install --upgrade pip &&
               pip3 install -r /code/requirements.txt --no-cache-dir &&
-              python tests_cacher.py'"
+              python alma_tests_cacher.py'"
     logging:
       driver: "json-file"
       options:
