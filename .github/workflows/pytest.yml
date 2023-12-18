@@ -24,7 +24,6 @@ jobs:
           mkdir -p /home/runner/work/albs-web-server/albs-sign-node
           mkdir -p /home/runner/work/albs-web-server/alma-tests-cacher
           touch /home/runner/work/albs-web-server/alma-tests-cacher/vars.env
-          mkdir -p /home/runner/work/albs-web-server/albs-sign-file
           touch /home/runner/work/albs-web-server/albs-sign-file/.env
       - name: Add env file
         run: |
