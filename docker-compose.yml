@@ -488,7 +488,7 @@ services:
   sign_file:
     image: sign-file:latest
     env_file:
-      - /home/albs/albs/albs-sign-file/.env
+      - ../albs-sign-file/.env
     build:
       dockerfile: Dockerfile
       context: ../albs-sign-file
