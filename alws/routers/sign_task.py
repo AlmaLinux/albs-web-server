@@ -73,6 +73,7 @@ async def complete_sign_task(
     )
     return {'success': True}
 
+
 @router.post(
     '/sync_sign_task/',
     response_model=typing.Union[

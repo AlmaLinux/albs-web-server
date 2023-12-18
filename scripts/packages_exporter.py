@@ -59,7 +59,10 @@ LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
 def parse_args():
     parser = argparse.ArgumentParser(
         "packages_exporter",
-        description="Packages exporter script. Exports repositories from Pulp and transfer them to the filesystem",
+        description=(
+            "Packages exporter script. Exports repositories from Pulp and"
+            " transfer them to the filesystem"
+        ),
     )
     parser.add_argument(
         "-names",
@@ -263,31 +266,38 @@ class Exporter:
         )
         self.logger.debug("OSV data are generated")
 
-    async def make_request(self, method: str, endpoint: str,
-                           params: dict = None, body: dict = None,
-                           user_headers: dict = None,
-                           data: typing.Optional[list] = None,
-                           send_to: typing.Literal['web_server', 'sign_server']\
-                              = 'web_server'):
+    async def make_request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict = None,
+        body: dict = None,
+        user_headers: dict = None,
+        data: typing.Optional[list] = None,
+        send_to: typing.Literal['web_server', 'sign_server'] = 'web_server',
+    ):
         if send_to == 'web_server':
             headers = {**self.web_server_headers}
-            full_url = urllib.parse.urljoin(settings.albs_api_url, 
-                                            endpoint)
+            full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
         elif send_to == 'sign_server':
             headers = {}
-            full_url = urllib.parse.urljoin(settings.sign_server_api_url, 
-                                            endpoint)
+            full_url = urllib.parse.urljoin(
+                settings.sign_server_api_url, endpoint
+            )
         else:
-            raise ValueError("send_to parameter must be web_server of sign_server")
+            raise ValueError(
+                "send_to parameter must be web_server of sign_server"
+            )
 
         if user_headers:
-                headers.update(user_headers)
+            headers.update(user_headers)
 
-        async with aiohttp.ClientSession(headers=headers,
-                                         raise_for_status=True) as session:
-            async with session.request(method, full_url,
-                                       json=body, params=params,
-                                       data=data) as response:
+        async with aiohttp.ClientSession(
+            headers=headers, raise_for_status=True
+        ) as session:
+            async with session.request(
+                method, full_url, json=body, params=params, data=data
+            ) as response:
                 if response.headers['Content-Type'] == 'application/json':
                     json_data = await response.read()
                     json_data = json.loads(json_data)
@@ -363,16 +373,16 @@ class Exporter:
         headers = {'Authorization': f"Bearer {token}"}
         endpoint = 'sign'
         params = {'keyid': key_id}
-        files = {'file': open(path_to_file,'rb')}
+        files = {'file': open(path_to_file, 'rb')}
         result = {'asc_content': None, 'error': None}
-        try:   
+        try:
             response = await self.make_request(
                 'POST',
                 endpoint,
                 params=params,
                 data=files,
                 user_headers=headers,
-                send_to='sign_server'
+                send_to='sign_server',
             )
             result['asc_content'] = response
         except Exception as err:
@@ -751,16 +761,17 @@ class Exporter:
         shutil.copytree(repodata_path, cache_repodata_dir)
 
         self.logger.info(stdout)
-    
+
     async def get_sign_server_token(self) -> str:
-        body = {'email': settings.sign_server_username,
-                   'password': settings.sign_server_password}
+        body = {
+            'email': settings.sign_server_username,
+            'password': settings.sign_server_password,
+        }
         endpoint = 'token/'
         method = 'POST'
-        response = await self.make_request(method=method,
-                                           endpoint=endpoint,
-                                           body=body,
-                                           send_to='sign_server')
+        response = await self.make_request(
+            method=method, endpoint=endpoint, body=body, send_to='sign_server'
+        )
         return response['token']
 
 
