@@ -1,7 +1,8 @@
 import tempfile
 
-from scripts.packages_exporter import Exporter
 from syncer import sync
+
+from scripts.packages_exporter import Exporter
 
 
 def test_repomd_signer():
