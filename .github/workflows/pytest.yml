@@ -15,7 +15,7 @@ jobs:
         name: Check out repository
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Create dirs
+      - name: Create dirs and files
         run: |
           mkdir -p /home/runner/work/albs-web-server/alts
           mkdir -p /home/runner/work/albs-web-server/albs-frontend
@@ -24,6 +24,8 @@ jobs:
           mkdir -p /home/runner/work/albs-web-server/albs-sign-node
           mkdir -p /home/runner/work/albs-web-server/alma-tests-cacher
           touch /home/runner/work/albs-web-server/alma-tests-cacher/vars.env
+          mkdir -p /home/runner/work/albs-web-server/albs-sign-file
+          touch /home/runner/work/albs-web-server/albs-sign-file/.env
       - name: Add env file
         run: |
           touch ./vars.env
