@@ -1,7 +1,8 @@
 import os
+import tempfile
+
 import pytest
 from syncer import sync
-import tempfile
 
 from scripts.packages_exporter import Exporter
 
