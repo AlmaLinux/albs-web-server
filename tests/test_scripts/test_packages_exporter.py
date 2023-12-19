@@ -5,7 +5,8 @@ import tempfile
 
 from scripts.packages_exporter import Exporter
 
-IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") is not None
+assert IN_GITHUB_ACTIONS, f'GITHUB_ACTIONS is None: {os.environ.items()}'
 
 @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_repomd_signer():
