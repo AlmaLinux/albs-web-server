@@ -11,15 +11,21 @@ from alws.schemas.platform_flavors_schema import CreateFlavour, UpdateFlavour
 
 async def delete_flavour(db, pf_id: int) -> models.PlatformFlavour:
     repos_to_delete = (
+        (
             await db.execute(
-                select(models.FlavourRepo.c.repository_id)
-                .where(models.FlavourRepo.c.flavour_id == pf_id)
+                select(models.FlavourRepo.c.repository_id).where(
+                    models.FlavourRepo.c.flavour_id == pf_id
                 )
-            ).scalars().all()
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     await db.execute(
-        delete(models.FlavourRepo)
-        .where(models.FlavourRepo.c.flavour_id == pf_id)
+        delete(models.FlavourRepo).where(
+            models.FlavourRepo.c.flavour_id == pf_id
+        )
     )
 
     await db.execute(
