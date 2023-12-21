@@ -50,6 +50,14 @@ def parse_args():
         required=False,
         help="Enable verbose output",
     )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        default=False,
+        required=False,
+        help="Anser \"yes\" to confirmation",
+    )
     return parser.parse_args()
 
 
@@ -63,7 +71,9 @@ async def update_flavour(flavour_data: dict, logger: logging.Logger):
             logger.info("Flavor %s update is completed", flavour_data["name"])
 
 
-async def prune_flavours(flavours_data: [], logger: logging.Logger):
+async def prune_flavours(
+    flavours_data: [], logger: logging.Logger, confirmation_yes
+):
     async with database.Session() as db:
         flavour_names_in_config = list(map(lambda x: x["name"], flavours_data))
         flavours_in_db = await pf_crud.list_flavours(db)
@@ -88,13 +98,16 @@ async def prune_flavours(flavours_data: [], logger: logging.Logger):
             logger.info("There's no orphaned flavours, exitting.")
             return
 
-        confirmation = (
-            input(
-                "Are you sure want to delete orphaned flavours?\n"
-                "This operation cannot be undone!! (yes/no): "
+        if confirmation_yes:
+            confirmation = 'yes'
+        else:
+            confirmation = (
+                input(
+                    "Are you sure want to delete orphaned flavours?\n"
+                    "This operation cannot be undone!! (yes/no): "
+                )
+                == 'yes'
             )
-            == 'yes'
-        )
 
         if confirmation:
             for orphaned_flavour in orphaned_flavours:
@@ -129,7 +142,7 @@ def main():
 
     if args.prune:
         logger.info("Start to prune")
-        sync(prune_flavours(flavours_data, logger))
+        sync(prune_flavours(flavours_data, logger, args.yes))
         sys.exit(0)
     for flavor_data in flavours_data:
         if args.only_update:
