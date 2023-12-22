@@ -59,7 +59,10 @@ LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
 def parse_args():
     parser = argparse.ArgumentParser(
         "packages_exporter",
-        description="Packages exporter script. Exports repositories from Pulp and transfer them to the filesystem",
+        description=(
+            "Packages exporter script. Exports repositories from Pulp and"
+            " transfer them to the filesystem"
+        ),
     )
     parser.add_argument(
         "-names",
@@ -365,7 +368,9 @@ class Exporter:
         dist_version = platform.split('-')[-1]
 
         errata_data = modern_cache['data']
-        sorted_errata_data = sorted(erratum_data, key=lambda k: k['updated_date'], reverse=True)
+        sorted_errata_data = sorted(
+            erratum_data, key=lambda k: k['updated_date'], reverse=True
+        )
 
         feed = FeedGenerator()
         feed.title(f'Errata Feed for {dist_name}')
