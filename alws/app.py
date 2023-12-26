@@ -8,8 +8,8 @@ from starlette.middleware.exceptions import ExceptionMiddleware
 from alws import routers
 from alws.auth import AuthRoutes
 from alws.auth.backend import BearerBackend, CookieBackend
-from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.oauth.almalinux import get_almalinux_oauth_client
+from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers

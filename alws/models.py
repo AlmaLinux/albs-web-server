@@ -20,11 +20,11 @@ from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
     ErrataReleaseStatus,
+    GenKeyStatus,
     Permissions,
     PermissionTriad,
     ReleaseStatus,
     SignStatus,
-    GenKeyStatus,
 )
 from alws.database import Base, engine
 
@@ -1009,7 +1009,7 @@ class PackageTestRepository(Base):
             ondelete="CASCADE",
             name="fk_package_test_repository_id",
         ),
-        nullable = False,
+        nullable=False,
     )
     test_repository = relationship("TestRepository", back_populates="packages")
 
@@ -1024,7 +1024,7 @@ class TestRepository(Base):
     packages: List["PackageTestRepository"] = relationship(
         "PackageTestRepository",
         back_populates="test_repository",
-        cascade="all, delete"
+        cascade="all, delete",
     )
 
 
@@ -1105,7 +1105,9 @@ class SignKey(PermissionsMixin, Base):
     name = sqlalchemy.Column(sqlalchemy.Text)
     # FIXME: change nullable to False after population
     is_community = sqlalchemy.Column(
-        sqlalchemy.Boolean, nullable=True, default=False,
+        sqlalchemy.Boolean,
+        nullable=True,
+        default=False,
     )
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
     keyid = sqlalchemy.Column(sqlalchemy.String(16), unique=True)
