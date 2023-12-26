@@ -750,6 +750,11 @@ class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
     __tablename__ = "user_oauth_accounts"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    # Override SQLAlchemyBaseOAuthAccountTable access_token column length
+    access_token = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(length=2048),
+        nullable=False,
+    )
 
     @declared_attr
     def user_id(cls):
@@ -783,6 +788,13 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     username = sqlalchemy.Column(sqlalchemy.TEXT, nullable=True)
     first_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
     last_name = sqlalchemy.Column(sqlalchemy.String(320), nullable=True)
+    # Override SQLAlchemyBaseUserTable email attribute to keep current type
+    email = sqlalchemy.Column(
+        sqlalchemy.TEXT,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
     hashed_password: str = sqlalchemy.Column(
         sqlalchemy.String(length=1024),
         nullable=True,

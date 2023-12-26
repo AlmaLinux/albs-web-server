@@ -1,3 +1,5 @@
+import jwt
+
 from typing import Optional
 
 from fastapi import Depends, Request
@@ -45,8 +47,19 @@ class UserManager(IntegerIDMixin, BaseUserManager):
             ):
                 token = existing_oauth_account.access_token
         try:
-            user_info = await get_github_user_info(token)
-            update_dict = {'username': user_info['login']}
+            if oauth_name == 'github':
+                username = await get_github_user_info(token).get('login')
+            else:  # openid
+               # Don't we trust the token we just got?
+               # If we really don't, then we need to set up a JWKS endpoint on
+               # accounts.almalinux.org in order to properly fetch the public key
+               # and decode the JWT with it.
+                decoded_jwt = jwt.decode(
+                    token,
+                    options={'verify_signature': False},
+                )
+                username = decoded_jwt.get('preferred_username')
+            update_dict = {'username': username}
             await self.user_db.update(user, update_dict)
         except Exception:
             username = user.email.split('@')[0]

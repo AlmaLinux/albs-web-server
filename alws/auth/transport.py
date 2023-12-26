@@ -68,7 +68,7 @@ class JWTransport(Transport):
 
 class RedirectCookieTransport(CookieTransport):
     async def get_login_response(self, token: str, response: Response) -> Any:
-        redirect_url = urljoin(settings.frontend_baseurl, 'auth/login/github')
+        redirect_url = urljoin(settings.frontend_baseurl, 'auth/login/finished')
         await super().get_login_response(token, response)
         response.status_code = status.HTTP_302_FOUND
         response.headers['Location'] = redirect_url
