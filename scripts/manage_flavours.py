@@ -40,7 +40,7 @@ def parse_args():
         action="store_true",
         default=False,
         required=False,
-        help="Prune flavours on database but in config",
+        help="Prune flavours on database but not in config",
     )
     parser.add_argument(
         "-v",
