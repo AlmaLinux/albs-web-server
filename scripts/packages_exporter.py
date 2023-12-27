@@ -369,7 +369,7 @@ class Exporter:
 
         errata_data = modern_cache['data']
         sorted_errata_data = sorted(
-            erratum_data, key=lambda k: k['updated_date'], reverse=True
+            errata_data, key=lambda k: k['updated_date'], reverse=True
         )
 
         feed = FeedGenerator()
