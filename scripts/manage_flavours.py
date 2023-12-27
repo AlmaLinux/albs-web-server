@@ -75,7 +75,7 @@ async def prune_flavours(
     flavours_data: [], logger: logging.Logger, confirmation_yes
 ):
     async with database.Session() as db:
-        flavour_names_in_config = list(map(lambda x: x["name"], flavours_data))
+        flavour_names_in_config = [e.get('name') for e in flavours_data]
         flavours_in_db = await pf_crud.list_flavours(db)
 
         logger.info(
