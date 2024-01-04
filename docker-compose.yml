@@ -424,7 +424,7 @@ services:
       - ../alma-tests-cacher/vars.env
     build:
       context: ../alma-tests-cacher/
-      dockerfile: ../alma-tests-cacher/Dockerfile
+      dockerfile: Dockerfile
     restart: on-failure
     depends_on:
       - web_server
