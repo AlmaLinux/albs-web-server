@@ -25,6 +25,7 @@ Manager = Role(
     actions=[
         actions.ReadTeam.name,
         actions.ReadBuild.name,
+        actions.GenKey.name,
         actions.AssignTeamRole.name,
         actions.RemoveFromTeam.name,
         actions.InviteToTeam.name,
@@ -75,6 +76,7 @@ ProductMaintainer = Role(
     name='product_maintainer',
     actions=[
         actions.ReadTeam.name,
+        actions.GenKey.name,
         actions.ReadBuild.name,
         actions.LeaveTeam.name,
         actions.CreateTeam.name,

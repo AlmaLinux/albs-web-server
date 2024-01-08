@@ -97,6 +97,7 @@ async def create_gen_key_task(
     product: models.Product,
     user: models.User,
 ) -> models.GenKeyTask:
+    user = await get_user(db, user.id)
     if not can_perform(product, user, actions.GenKey.name):
         raise PermissionDenied(
             'User does not have permissions '
