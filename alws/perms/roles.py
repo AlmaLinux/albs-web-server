@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 from alws.perms import actions
 
-
 __all__ = [
     'Contributor',
     'Manager',
@@ -44,7 +43,7 @@ Manager = Role(
         actions.UpdateProduct.name,
         actions.DeleteProduct.name,
         actions.ReadSignKeyInfo.name,
-    ]
+    ],
 )
 
 Contributor = Role(
@@ -58,7 +57,7 @@ Contributor = Role(
         actions.CreateProduct.name,
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
-    ]
+    ],
 )
 
 Observer = Role(
@@ -69,7 +68,7 @@ Observer = Role(
         actions.LeaveTeam.name,
         actions.ReadPlatform.name,
         actions.ReadProduct.name,
-    ]
+    ],
 )
 
 ProductMaintainer = Role(
@@ -87,7 +86,7 @@ ProductMaintainer = Role(
         actions.ReleaseBuild.name,
         actions.ReleaseToProduct.name,
         actions.ReadSignKeyInfo.name,
-    ]
+    ],
 )
 
 Signer = Role(
@@ -104,7 +103,7 @@ Signer = Role(
         actions.SignBuild.name,
         actions.ReadSignKeyInfo.name,
         actions.UseSignKey.name,
-    ]
+    ],
 )
 
 RolesList = [
