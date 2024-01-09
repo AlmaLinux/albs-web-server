@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     github_client: str
     github_client_secret: str
 
-    almalinux_client: str
-    almalinux_client_secret: str
+    almalinux_client: str = 'secret'
+    almalinux_client_secret: str = 'secret'
 
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
