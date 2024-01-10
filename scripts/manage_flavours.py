@@ -92,8 +92,6 @@ async def prune_flavours(
             else:
                 logger.info("\t%s", flavour.name)
 
-        logger.info("")
-
         if not orphaned_flavours:
             logger.info("There's no orphaned flavours, exitting.")
             return
