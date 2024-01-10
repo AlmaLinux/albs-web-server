@@ -17,6 +17,11 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
+public_router = APIRouter(
+    prefix="/errata",
+    tags=["errata"],
+)
+
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
 async def create_errata_record(
@@ -55,7 +60,7 @@ async def get_oval_xml(
     return await errata_crud.get_oval_xml(db, platform_name)
 
 
-@router.get("/query/", response_model=errata_schema.ErrataListResponse)
+@public_router.get("/query/", response_model=errata_schema.ErrataListResponse)
 async def list_errata_records(
     pageNumber: Optional[int] = None,
     id: Optional[str] = None,
@@ -78,7 +83,7 @@ async def list_errata_records(
     )
 
 
-@router.get(
+@public_router.get(
     "/{record_id}/updateinfo/",
     response_class=PlainTextResponse,
 )
