@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import typing
+from typing import Any, Dict, List, Optional, Union
 
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,9 +72,9 @@ async def create_product(
         (
             await db.execute(
                 select(models.Platform).where(
-                    models.Platform.name.in_([
-                        platform.name for platform in payload.platforms
-                    ]),
+                    models.Platform.name.in_(
+                        [platform.name for platform in payload.platforms]
+                    ),
                 ),
             )
         )
@@ -84,20 +84,18 @@ async def create_product(
 
     for platform in product.platforms:
         platform_name = platform.name.lower()
-        repo_tasks.extend(
-            (
-                create_product_repo(
-                    pulp_client,
-                    product.name,
-                    owner.username,
-                    platform_name,
-                    arch,
-                    is_debug,
-                )
-                for arch in platform.arch_list
-                for is_debug in (True, False)
+        repo_tasks.extend((
+            create_product_repo(
+                pulp_client,
+                product.name,
+                owner.username,
+                platform_name,
+                arch,
+                is_debug,
             )
-        )
+            for arch in platform.arch_list
+            for is_debug in (True, False)
+        ))
         repo_tasks.append(
             create_product_repo(
                 pulp_client,
@@ -151,14 +149,14 @@ async def create_product(
 
 async def get_products(
     db: AsyncSession,
-    search_string: str = None,
-    page_number: int = None,
-    product_id: int = None,
-    product_name: str = None,
-) -> typing.Union[
-    typing.List[models.Product],
+    search_string: Optional[str] = None,
+    page_number: Optional[int] = None,
+    product_id: Optional[int] = None,
+    product_name: Optional[str] = None,
+) -> Union[
+    List[models.Product],
     models.Product,
-    typing.Dict[str, typing.Any],
+    Dict[str, Any],
     None,
 ]:
     def generate_query(count=False):
