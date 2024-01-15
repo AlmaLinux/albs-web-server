@@ -8,6 +8,7 @@ from starlette.middleware.exceptions import ExceptionMiddleware
 from alws import routers
 from alws.auth import AuthRoutes
 from alws.auth.backend import BearerBackend, CookieBackend
+from alws.auth.oauth.almalinux import get_almalinux_oauth_client
 from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
@@ -54,7 +55,12 @@ github_client = get_github_oauth_client(
     settings.github_client,
     settings.github_client_secret,
 )
+almalinux_client = get_almalinux_oauth_client(
+    settings.almalinux_client,
+    settings.almalinux_client_secret,
+)
 
+# We need to create endpoints for every auth id providers
 app.include_router(
     AuthRoutes.get_oauth_router(
         github_client,
@@ -74,6 +80,28 @@ app.include_router(
         requires_verification=False,
     ),
     prefix=AUTH_PREFIX + '/associate/github',
+    tags=[AUTH_TAG],
+)
+
+app.include_router(
+    AuthRoutes.get_oauth_router(
+        almalinux_client,
+        CookieBackend,
+        settings.jwt_secret,
+        redirect_url=settings.almalinux_callback_url,
+        associate_by_email=True,
+    ),
+    prefix=AUTH_PREFIX + '/almalinux',
+    tags=[AUTH_TAG],
+)
+app.include_router(
+    AuthRoutes.get_oauth_associate_router(
+        almalinux_client,
+        UserRead,
+        settings.jwt_secret,
+        requires_verification=False,
+    ),
+    prefix=AUTH_PREFIX + '/associate/almalinux',
     tags=[AUTH_TAG],
 )
 app.include_router(
