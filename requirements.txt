@@ -1,7 +1,7 @@
 fastapi==0.104.1
 fastapi-users[all]==10.4.1
 fastapi-users-db-sqlalchemy==4.0.5
-uvicorn==0.21.1
+uvicorn==0.26.0
 asyncpg==0.28.0
 psycopg2-binary==2.9.6
 pydantic==2.4.2
