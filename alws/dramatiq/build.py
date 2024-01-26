@@ -139,14 +139,20 @@ async def _build_done(request: build_node_schema.BuildDone):
 
         if all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
-            try:
-                await test.create_test_tasks_for_build_id(db, build_id)
-            except Exception as e:
-                logger.exception(
-                    'Unable to create test tasks for build "%d". Error: %s',
-                    build_id,
-                    str(e),
+            cancel_testing = (
+                await db.execute(select(models.Build.cancel_testing)
+                    .where(models.Build.id == build_id)
                 )
+            ).scalar()
+            if not cancel_testing:
+                try:
+                    await test.create_test_tasks_for_build_id(db, build_id)
+                except Exception as e:
+                    logger.exception(
+                        'Unable to create test tasks for build "%d". Error: %s',
+                        build_id,
+                        str(e),
+                    )
             build_id = await _get_build_id(db, request.task_id)
             await db.execute(
                 update(models.Build)

@@ -69,3 +69,24 @@ class AltsClient:
                     )
                 response.raise_for_status()
                 return resp_json
+
+    async def cancel_tasks(self, tasks_ids):
+        full_url = urllib.parse.urljoin(self._base_url, '/cancel_tasks')
+        payload = {
+            'albs_task_ids': tasks_ids
+        }
+        async with aiohttp.ClientSession(headers=self._headers) as session:
+            async with session.post(
+                full_url,
+                json=payload,
+                timeout=self.__timeout,
+            ) as response:
+                resp_json = None
+                try:
+                    resp_json = await response.json()
+                except Exception as e:
+                    logging.error(
+                        'Cannot decode response from test system: %s', str(e)
+                    )
+                response.raise_for_status()
+                return resp_json

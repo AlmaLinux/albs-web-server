@@ -105,6 +105,7 @@ class TestTaskStatus(enum.IntEnum):
     STARTED = 2
     COMPLETED = 3
     FAILED = 4
+    CANCELLED = 5
 
 
 class TestCaseStatus(enum.IntEnum):

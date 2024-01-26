@@ -56,6 +56,15 @@ async def restart_build_task_tests(
     return {'ok': True}
 
 
+@router.put('/build/{build_id}/cancel')
+async def cancel_build_tests(
+    build_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    await test.cancel_build_tests(db, build_id)
+    return {'ok': True}
+
+
 @public_router.get(
     '/{build_task_id}/latest',
     response_model=List[test_schema.TestTask],
