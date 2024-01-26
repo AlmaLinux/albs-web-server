@@ -205,11 +205,7 @@ class BeholderMatchMethod(enum.Enum):
     @classmethod
     def yellow(cls):
         # as Andrew mentioned closest\name_version\name_only = yellow in the Web user interface
-        return [
-            cls.CLOSEST.value,
-            cls.NAME_VERSION.value,
-            cls.NAME_ONLY.value
-        ]
+        return [cls.CLOSEST.value, cls.NAME_VERSION.value, cls.NAME_ONLY.value]
 
 
 build_ref_str_mapping: typing.Dict[str, int] = {

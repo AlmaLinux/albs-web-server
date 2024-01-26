@@ -18,9 +18,9 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.pulp_models import RpmPackage
 from alws.schemas import test_schema
+from alws.utils.alts_client import AltsClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
-from alws.utils.alts_client import AltsClient
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
     get_rpm_packages_by_ids,
@@ -269,7 +269,8 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
     # had passed the tests
     async with db.begin():
         # Set cancel_testing to False just in case
-        await db.execute(update(models.Build)
+        await db.execute(
+            update(models.Build)
             .where(models.Build.id == build_id)
             .values(cancel_testing=False)
         )
@@ -315,22 +316,28 @@ async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
 async def cancel_build_tests(db: AsyncSession, build_id: int):
     async with db.begin():
         # Set cancel_testing to True in db
-        await db.execute(update(models.Build)
+        await db.execute(
+            update(models.Build)
             .where(models.Build.id == build_id)
             .values(cancel_testing=True)
         )
 
         build_task_ids = (
-            await db.execute(
-                select(models.BuildTask.id).where(
-                    models.BuildTask.build_id == build_id
+            (
+                await db.execute(
+                    select(models.BuildTask.id).where(
+                        models.BuildTask.build_id == build_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         # Set TestTaskStatus.CANCELLED for those that are still
         # with status TestTaskStatus.CREATED
-        await db.execute(update(models.TestTask)
+        await db.execute(
+            update(models.TestTask)
             .where(
                 models.TestTask.status == TestTaskStatus.CREATED,
                 models.TestTask.build_task_id.in_(build_task_ids),
@@ -339,22 +346,23 @@ async def cancel_build_tests(db: AsyncSession, build_id: int):
         )
 
         started_test_tasks_ids = (
-            await db.execute(
-                select(models.TestTask.id).where(
-                    models.TestTask.status == TestTaskStatus.STARTED,
-                    models.TestTask.build_task_id.in_(build_task_ids),
+            (
+                await db.execute(
+                    select(models.TestTask.id).where(
+                        models.TestTask.status == TestTaskStatus.STARTED,
+                        models.TestTask.build_task_id.in_(build_task_ids),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     # Tell ALTS to cancel those with TestTaskStatus.STARTED. ALTS
     # will notify statuses back when its done cancelling tests
     if started_test_tasks_ids:
         logging.info(f'{started_test_tasks_ids=}')
-        alts_client = AltsClient(
-            settings.alts_host,
-            settings.alts_token
-        )
+        alts_client = AltsClient(settings.alts_host, settings.alts_token)
         response = await alts_client.cancel_tasks(started_test_tasks_ids)
         logging.info(f'## Cancel ALTS tasks {response=}')
 

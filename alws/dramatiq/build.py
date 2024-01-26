@@ -38,12 +38,10 @@ def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
 
 
 async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
-    has_modules = any(
-        (
-            isinstance(t, build_schema.BuildTaskModuleRef)
-            for t in build_request.tasks
-        )
-    )
+    has_modules = any((
+        isinstance(t, build_schema.BuildTaskModuleRef)
+        for t in build_request.tasks
+    ))
     module_build_index = {}
 
     if has_modules:
@@ -63,12 +61,10 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 db.execute(
                     update(models.Platform)
                     .where(models.Platform.id == platform.id)
-                    .values(
-                        {
-                            'module_build_index': models.Platform.module_build_index
-                            + 1
-                        }
-                    )
+                    .values({
+                        'module_build_index': models.Platform.module_build_index
+                        + 1
+                    })
                 )
                 db.add(platform)
             db.flush()
@@ -140,8 +136,10 @@ async def _build_done(request: build_node_schema.BuildDone):
         if all_build_tasks_completed:
             build_id = await _get_build_id(db, request.task_id)
             cancel_testing = (
-                await db.execute(select(models.Build.cancel_testing)
-                    .where(models.Build.id == build_id)
+                await db.execute(
+                    select(models.Build.cancel_testing).where(
+                        models.Build.id == build_id
+                    )
                 )
             ).scalar()
             if not cancel_testing:
@@ -196,12 +194,10 @@ async def _check_build_and_completed_tasks(
                 .select_from(models.BuildTask)
                 .where(
                     models.BuildTask.build_id == build_id,
-                    models.BuildTask.status.notin_(
-                        [
-                            BuildTaskStatus.IDLE,
-                            BuildTaskStatus.STARTED,
-                        ]
-                    ),
+                    models.BuildTask.status.notin_([
+                        BuildTaskStatus.IDLE,
+                        BuildTaskStatus.STARTED,
+                    ]),
                 )
             )
         ).scalar()
