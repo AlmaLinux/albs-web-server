@@ -72,7 +72,7 @@ class AltsClient:
 
     async def cancel_tasks(self, tasks_ids):
         full_url = urllib.parse.urljoin(self._base_url, '/cancel_tasks')
-        payload = {'albs_task_ids': tasks_ids}
+        payload = {'bs_task_ids': tasks_ids}
         async with aiohttp.ClientSession(headers=self._headers) as session:
             async with session.post(
                 full_url,

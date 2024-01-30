@@ -108,7 +108,7 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
             task.scheduled_at = datetime.datetime.utcnow()
             test_configuration = task.build_task.ref.test_configuration
             payload = {
-                'albs_task_id': task.id,
+                'bs_task_id': task.id,
                 'runner_type': 'docker',
                 'dist_name': platform.test_dist_name,
                 'dist_version': platform.distr_version,
