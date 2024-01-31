@@ -11,7 +11,7 @@ class Remote(BaseModel):
     url: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RemoteCreate(BaseModel):
@@ -22,7 +22,7 @@ class RemoteCreate(BaseModel):
 
 
 class RemoteUpdate(BaseModel):
-    name: typing.Optional[str]
-    arch: typing.Optional[str]
-    url: typing.Optional[str]
-    pulp_href: typing.Optional[str]
+    name: typing.Optional[str] = None
+    arch: typing.Optional[str] = None
+    url: typing.Optional[str] = None
+    pulp_href: typing.Optional[str] = None

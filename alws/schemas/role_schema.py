@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
 __all__ = ['Role']
 
 
@@ -9,4 +8,4 @@ class Role(BaseModel):
     name: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True

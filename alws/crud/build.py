@@ -10,45 +10,62 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
-from alws.errors import (
-    BuildError,
-    DataNotFoundError,
-    PermissionDenied,
-)
+from alws.dramatiq import start_build
+from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
-from alws.dramatiq import start_build
 
 
 async def create_build(
-            db: AsyncSession,
-            build: build_schema.BuildCreate,
-            user_id: int,
-        ) -> models.Build:
-
-    product = (await db.execute(select(models.Product).where(
-        models.Product.id == build.product_id).options(
-        selectinload(models.Product.team).selectinload(
-            models.Team.roles).selectinload(models.UserRole.actions),
-        selectinload(
-            models.Product.roles).selectinload(models.UserRole.actions),
-        selectinload(models.Product.owner),
-    ))).scalars().first()
+    db: AsyncSession,
+    build: build_schema.BuildCreate,
+    user_id: int,
+) -> models.Build:
+    product = (
+        (
+            await db.execute(
+                select(models.Product)
+                .where(models.Product.id == build.product_id)
+                .options(
+                    selectinload(models.Product.team)
+                    .selectinload(models.Team.roles)
+                    .selectinload(models.UserRole.actions),
+                    selectinload(models.Product.roles).selectinload(
+                        models.UserRole.actions
+                    ),
+                    selectinload(models.Product.owner),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not product:
         raise ValueError(f'Cannot find product with id {build.product_id}')
 
-    user = (await db.execute(select(models.User).where(
-        models.User.id == user_id).options(
-        selectinload(models.User.roles).selectinload(models.UserRole.actions)
-    ))).scalars().first()
+    user = (
+        (
+            await db.execute(
+                select(models.User)
+                .where(models.User.id == user_id)
+                .options(
+                    selectinload(models.User.roles).selectinload(
+                        models.UserRole.actions
+                    )
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not user:
         raise ValueError(f'Cannot find user with id {user_id}')
 
     if not can_perform(product, user, actions.CreateBuild.name):
         raise PermissionDenied(
-            f'User has no permissions '
+            'User has no permissions '
             f'to create build for the product "{product.name}"'
         )
 
@@ -58,16 +75,18 @@ async def create_build(
         team_id=product.team_id,
     )
     if build.platform_flavors:
-        flavors = await db.execute(select(models.PlatformFlavour).where(
-            models.PlatformFlavour.id.in_(build.platform_flavors)
-        ))
+        flavors = await db.execute(
+            select(models.PlatformFlavour).where(
+                models.PlatformFlavour.id.in_(build.platform_flavors)
+            )
+        )
         flavors = flavors.scalars().all()
         for flavour in flavors:
             db_build.platform_flavors.append(flavour)
     db.add(db_build)
     await db.commit()
     await db.refresh(db_build)
-    start_build.send(db_build.id, build.dict())
+    start_build.send(db_build.id, build.model_dump())
     return db_build
 
 
@@ -89,7 +108,6 @@ async def get_builds(
     signed: typing.Optional[bool] = None,
     is_running: typing.Optional[bool] = None,
 ) -> typing.Union[models.Build, typing.List[models.Build], dict]:
-
     pulp_params = {
         "fields": ["pulp_href"],
     }
@@ -132,11 +150,12 @@ async def get_builds(
                     models.BuildTask.artifacts
                 ),
                 selectinload(models.Build.linked_builds),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.test_tasks
-                ).selectinload(models.TestTask.performance_stats),
                 selectinload(models.Build.tasks)
-                .selectinload(models.BuildTask.performance_stats),
+                .selectinload(models.BuildTask.test_tasks)
+                .selectinload(models.TestTask.performance_stats),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.performance_stats
+                ),
                 selectinload(models.Build.sign_tasks),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.rpm_module
@@ -154,9 +173,7 @@ async def get_builds(
             project_query = query.filter(
                 sqlalchemy.or_(
                     models.BuildTaskRef.url.like(f"%/{project_name}.git"),
-                    models.BuildTaskRef.url.like(
-                        f"%/{project_name}%.src.rpm"
-                    ),
+                    models.BuildTaskRef.url.like(f"%/{project_name}%.src.rpm"),
                     models.BuildTaskRef.url.like(
                         f"%/rpms/{project_name}%.git"
                     ),
@@ -175,27 +192,19 @@ async def get_builds(
             query = query.filter(
                 sqlalchemy.or_(
                     models.BuildTaskRef.url.like(f"%{ref}%"),
-                    models.BuildTaskRef.git_ref.like(
-                        f"%{ref}%"
-                    ),
+                    models.BuildTaskRef.git_ref.like(f"%{ref}%"),
                 )
             )
         if platform_id is not None:
-            query = query.filter(
-                models.BuildTask.platform_id == platform_id
-            )
+            query = query.filter(models.BuildTask.platform_id == platform_id)
         if build_task_arch is not None:
-            query = query.filter(
-                models.BuildTask.arch == build_task_arch
-            )
+            query = query.filter(models.BuildTask.arch == build_task_arch)
         if any(rpm_params.values()):
-            pulp_params.update(
-                {
-                    key: value
-                    for key, value in rpm_params.items()
-                    if value is not None
-                }
-            )
+            pulp_params.update({
+                key: value
+                for key, value in rpm_params.items()
+                if value is not None
+            })
             # TODO: we can get packages from pulp database
             pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
             pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
@@ -206,13 +215,9 @@ async def get_builds(
                 )
             )
         if released is not None:
-            query = query.filter(
-                models.Build.released == released
-            )
+            query = query.filter(models.Build.released == released)
         if signed is not None:
-            query = query.filter(
-                models.Build.signed == signed
-            )
+            query = query.filter(models.Build.signed == signed)
         if is_running is not None:
             query = query.filter(
                 models.Build.finished_at.is_(None)
@@ -231,8 +236,8 @@ async def get_builds(
     if page_number:
         return {
             "builds": (
-                await db.execute(await generate_query())
-            ).scalars().all(),
+                (await db.execute(await generate_query())).scalars().all()
+            ),
             "total_builds": (
                 await db.execute(await generate_query(count=True))
             ).scalar(),
@@ -243,10 +248,10 @@ async def get_builds(
 
 
 async def get_module_preview(
-                platform: models.Platform,
-                flavors: typing.List[models.PlatformFlavour],
-                module_request: build_schema.ModulePreviewRequest
-            ) -> build_schema.ModulePreview:
+    platform: models.Platform,
+    flavors: typing.List[models.PlatformFlavour],
+    module_request: build_schema.ModulePreviewRequest,
+) -> build_schema.ModulePreview:
     refs, modules, enabled_modules = await build_schema.get_module_refs(
         task=module_request.ref,
         platform=platform,
@@ -264,15 +269,19 @@ async def get_module_preview(
 
 
 async def remove_build_job(db: AsyncSession, build_id: int):
-    query_bj = select(models.Build).where(
-        models.Build.id == build_id).options(
-        selectinload(models.Build.tasks).selectinload(
-            models.BuildTask.artifacts),
-        selectinload(models.Build.repos),
-        selectinload(models.Build.products),
-        selectinload(models.Build.tasks).selectinload(
-            models.BuildTask.test_tasks).selectinload(
-            models.TestTask.artifacts)
+    query_bj = (
+        select(models.Build)
+        .where(models.Build.id == build_id)
+        .options(
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.artifacts
+            ),
+            selectinload(models.Build.repos),
+            selectinload(models.Build.products),
+            selectinload(models.Build.tasks)
+            .selectinload(models.BuildTask.test_tasks)
+            .selectinload(models.TestTask.artifacts),
+        )
     )
     repos = []
     repo_ids = []
@@ -287,10 +296,9 @@ async def remove_build_job(db: AsyncSession, build_id: int):
         if build is None:
             raise DataNotFoundError(f'Build with {build_id} not found')
         if build.products:
-            product_names = "\n".join((
-                product.name
-                for product in build.products
-            ))
+            product_names = "\n".join(
+                (product.name for product in build.products)
+            )
             raise BuildError(
                 f"Cannot delete Build={build_id}, "
                 f"build contains in following products:\n{product_names}"
@@ -311,66 +319,87 @@ async def remove_build_job(db: AsyncSession, build_id: int):
             repos.append(br.pulp_href)
             repo_ids.append(br.id)
         pulp_client = PulpClient(
-            settings.pulp_host,
-            settings.pulp_user,
-            settings.pulp_password
+            settings.pulp_host, settings.pulp_user, settings.pulp_password
         )
         await db.execute(
-            delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
+            delete(models.BuildRepo).where(
+                models.BuildRepo.c.build_id == build_id
+            )
         )
-        await db.execute(delete(models.BuildPlatformFlavour).where(
-            models.BuildPlatformFlavour.c.build_id == build_id))
         await db.execute(
-            delete(models.SignTask).where(
-                models.SignTask.build_id == build_id)
+            delete(models.BuildPlatformFlavour).where(
+                models.BuildPlatformFlavour.c.build_id == build_id
+            )
         )
-        await db.execute(delete(models.BinaryRpm).where(
-            models.BinaryRpm.build_id == build_id))
-        await db.execute(delete(models.SourceRpm).where(
-            models.SourceRpm.build_id == build_id))
+        await db.execute(
+            delete(models.SignTask).where(models.SignTask.build_id == build_id)
+        )
+        await db.execute(
+            delete(models.BinaryRpm).where(
+                models.BinaryRpm.build_id == build_id
+            )
+        )
+        await db.execute(
+            delete(models.SourceRpm).where(
+                models.SourceRpm.build_id == build_id
+            )
+        )
         await db.execute(
             delete(models.PerformanceStats).where(
-                models.PerformanceStats.build_task_id.in_(build_task_ids))
+                models.PerformanceStats.build_task_id.in_(build_task_ids)
+            )
         )
         await db.execute(
             delete(models.PerformanceStats).where(
-                models.PerformanceStats.test_task_id.in_(test_task_ids))
+                models.PerformanceStats.test_task_id.in_(test_task_ids)
+            )
         )
         await db.execute(
             delete(models.TestTaskArtifact).where(
-                models.TestTaskArtifact.id.in_(test_task_artifact_ids))
+                models.TestTaskArtifact.id.in_(test_task_artifact_ids)
+            )
         )
         await db.execute(
             delete(models.TestTask).where(
-                models.TestTask.id.in_(test_task_ids))
+                models.TestTask.id.in_(test_task_ids)
+            )
         )
         await db.execute(
             delete(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.id.in_(build_task_artifact_ids))
+                models.BuildTaskArtifact.id.in_(build_task_artifact_ids)
+            )
         )
         await db.execute(
             delete(models.BuildTaskDependency).where(
-                models.BuildTaskDependency.c.build_task_dependency.in_(build_task_ids))
+                models.BuildTaskDependency.c.build_task_dependency.in_(
+                    build_task_ids
+                )
+            )
         )
         await db.execute(
-            delete(models.Repository).where(
-                models.Repository.id.in_(repo_ids))
+            delete(models.Repository).where(models.Repository.id.in_(repo_ids))
         )
         await db.execute(
-            delete(models.BuildTask).where(models.BuildTask.build_id == build_id)
+            delete(models.BuildTask).where(
+                models.BuildTask.build_id == build_id
+            )
         )
         await db.execute(
-            delete(models.BuildDependency).where(sqlalchemy.or_(
-                models.BuildDependency.c.build_dependency == build_id,
-                models.BuildDependency.c.build_id == build_id,
-            ))
+            delete(models.BuildDependency).where(
+                sqlalchemy.or_(
+                    models.BuildDependency.c.build_dependency == build_id,
+                    models.BuildDependency.c.build_id == build_id,
+                )
+            )
         )
         await db.execute(
             delete(models.BuildTaskRef).where(
-                models.BuildTaskRef.id.in_(build_task_ref_ids))
+                models.BuildTaskRef.id.in_(build_task_ref_ids)
+            )
         )
         await db.execute(
-            delete(models.Build).where(models.Build.id == build_id))
+            delete(models.Build).where(models.Build.id == build_id)
+        )
         # FIXME
         # it seems we cannot just delete any files because
         # https://docs.pulpproject.org/pulpcore/restapi.html#tag/Content:-Files

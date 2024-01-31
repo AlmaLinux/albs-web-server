@@ -8,15 +8,20 @@ AlmaLinux Build System Gitea queue validation models.
 
 import typing
 from datetime import datetime
+
 from pydantic import BaseModel
 
-
-__all__ = ['GiteaListenerConfig', 'ShortUser', 'User', 'PushedEvent',
-           'Repository', 'Commit']
+__all__ = [
+    'GiteaListenerConfig',
+    'ShortUser',
+    'User',
+    'PushedEvent',
+    'Repository',
+    'Commit',
+]
 
 
 class GiteaListenerConfig(BaseModel):
-
     """Gitea queue listener configuration validation."""
 
     mqtt_queue_host: str
@@ -25,17 +30,16 @@ class GiteaListenerConfig(BaseModel):
     mqtt_queue_topic_modified: str
     mqtt_queue_qos: int
     mqtt_client_id: str
-    mqtt_queue_username: str
-    mqtt_queue_password: str
+    mqtt_queue_username: typing.Optional[str] = None
+    mqtt_queue_password: typing.Optional[str] = None
     mqtt_queue_clean_session: bool
-    albs_jwt_token: str
+    albs_jwt_token: typing.Optional[str] = None
     albs_address: str
     redis_host: str = 'redis://redis:6379'
     redis_cache_key: str = 'gitea_cache'
 
 
 class ShortUser(BaseModel):
-
     """Shorted Gitea user validation."""
 
     name: str
@@ -44,7 +48,6 @@ class ShortUser(BaseModel):
 
 
 class User(BaseModel):
-
     """Gitea user validation."""
 
     id: int
@@ -56,7 +59,6 @@ class User(BaseModel):
 
 
 class Repository(BaseModel):
-
     """Gitea repository validation."""
 
     id: int
@@ -80,7 +82,6 @@ class Repository(BaseModel):
 
 
 class Commit(BaseModel):
-
     """Gitea commit validation."""
 
     id: str
@@ -92,7 +93,6 @@ class Commit(BaseModel):
 
 
 class PushedEvent(BaseModel):
-
     """Received MQTT event validation."""
 
     secret: typing.Optional[str]

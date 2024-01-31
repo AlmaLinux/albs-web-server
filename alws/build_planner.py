@@ -14,9 +14,7 @@ from alws.constants import BuildTaskRefType, BuildTaskStatus
 from alws.errors import DataNotFoundError, EmptyBuildError
 from alws.schemas import build_schema
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.gitea import (
-    GiteaClient,
-)
+from alws.utils.gitea import GiteaClient
 from alws.utils.modularity import (
     IndexWrapper,
     ModuleWrapper,
@@ -431,7 +429,7 @@ class BuildPlanner:
                     git_ref=task.git_ref,
                     ref_type=task.ref_type,
                     test_configuration=(
-                        task.test_configuration.dict()
+                        task.test_configuration.model_dump()
                         if task.test_configuration
                         else None
                     ),
@@ -468,7 +466,7 @@ class BuildPlanner:
                 git_ref=ref.git_ref,
                 ref_type=BuildTaskRefType.GIT_BRANCH,
                 test_configuration=(
-                    ref.test_configuration.dict()
+                    ref.test_configuration.model_dump()
                     if ref.test_configuration
                     else None
                 ),

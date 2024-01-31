@@ -47,7 +47,7 @@ async def build_done(
     # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
     await db.commit()
-    dramatiq.build_done.send(build_done_.dict())
+    dramatiq.build_done.send(build_done_.model_dump())
     return {"ok": True}
 
 
@@ -140,14 +140,12 @@ async def get_task(
         module_build_options = {
             "definitions": {
                 "_module_build": "1",
-                "modularitylabel": ":".join(
-                    [
-                        module.name,
-                        module.stream,
-                        module.version,
-                        module.context,
-                    ]
-                ),
+                "modularitylabel": ":".join([
+                    module.name,
+                    module.stream,
+                    module.version,
+                    module.context,
+                ]),
             }
         }
         response["platform"].add_mock_options(module_build_options)

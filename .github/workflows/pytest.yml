@@ -3,6 +3,9 @@ on:
   pull_request_target:
     branches:
       - "**"
+  push:
+    branches:
+      - master
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,10 +21,14 @@ jobs:
           mkdir -p /home/runner/work/albs-web-server/albs-frontend
           mkdir -p /home/runner/work/albs-web-server/albs-node
           mkdir -p /home/runner/work/albs-web-server/albs-sign-node
+          mkdir -p /home/runner/work/albs-web-server/alma-tests-cacher
+          touch /home/runner/work/albs-web-server/alma-tests-cacher/vars.env
       - name: Add env file
         run: |
           touch ./vars.env
           echo ALTS_TOKEN="secret" >> ./vars.env
+          echo ALMALINUX_CLIENT="secret" >> ./vars.env
+          echo ALMALINUX_CLIENT_SECRET="secret" >> ./vars.env
           echo GITHUB_CLIENT="secret" >> ./vars.env
           echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
           echo POSTGRES_PASSWORD="password" >> ./vars.env
@@ -31,21 +38,26 @@ jobs:
           echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-      - uses: isbang/compose-action@v1.4.1
+          cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
+      - uses: isbang/compose-action@v1.5.1
         name: Run docker-compose
         with:
-          up-flags: "--build --no-deps"
+          # Use this if you change something in Dockerfile
+          # up-flags: --build --no-deps
+          up-flags: "--pull always --no-build --no-deps"
           down-flags: "--volumes"
           services: |
             db
             web_server
       - name: Run unit tests (pytest)
         run: docker-compose run -v /tmp:/tmp --no-deps web_server bash -o pipefail -c 'source
-          env/bin/activate && pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
+          env/bin/activate && pip3 install -r requirements.txt &&
+          pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
           --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
           tests/ | tee /tmp/pytest-coverage.txt'
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
+        id: coverageComment
         with:
           pytest-coverage-path: /tmp/pytest-coverage.txt
           pytest-xml-coverage-path: /tmp/coverage.xml
@@ -57,3 +69,14 @@ jobs:
           hide-comment: false
           remove-link-from-badge: false
           junitxml-path: /tmp/pytest.xml
+      - name: Create the Badge
+        if: ${{ github.ref == 'refs/heads/master' && steps.coverageComment.outputs.coverage }}
+        uses: schneegans/dynamic-badges-action@v1.6.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 7894f3c3bd830eb5456d45c9dacc0f93
+          filename: pytest-coverage-comment__web-server__main.json
+          label: Test Coverage
+          message: ${{ steps.coverageComment.outputs.coverage }}
+          color: ${{ steps.coverageComment.outputs.color }}
+          namedLogo: pytest

@@ -109,6 +109,7 @@ async def create_gen_key_task(
     product: models.Product,
     user: models.User,
 ) -> models.GenKeyTask:
+    user = await get_user(db, user.id)
     if not can_perform(product, user, actions.GenKey.name):
         raise PermissionDenied(
             'User does not have permissions '
@@ -316,7 +317,8 @@ async def get_available_sign_task(
             "arch": binary_rpm.artifact.build_task.arch,
             "type": "rpm",
             "download_url": __get_package_url(
-                repo.url, binary_rpm.artifact.name
+                repo.url,
+                binary_rpm.artifact.name,
             ),
         })
     sign_task_payload["packages"] = packages
@@ -582,12 +584,10 @@ async def complete_sign_task(
                 [pkg.sha256 for pkg in packages_to_convert.values()],
             )
             logging.info("Start processing packages for task %s", sign_task_id)
-            results = await asyncio.gather(
-                *(
-                    __process_single_package(package, pulp_db_packages)
-                    for package in packages_to_convert.values()
-                )
-            )
+            results = await asyncio.gather(*(
+                __process_single_package(package, pulp_db_packages)
+                for package in packages_to_convert.values()
+            ))
             converted_packages = dict(results)
             logging.info(
                 "Finish processing packages for task %s", sign_task_id
@@ -643,12 +643,10 @@ async def complete_sign_task(
                 sign_task = await __failed_post_processing(sign_task, stats)
                 return sign_task
             logging.info("Start modify repository for task %s", sign_task_id)
-            await asyncio.gather(
-                *(
-                    pulp_client.modify_repository(repo_href, add=packages)
-                    for repo_href, packages in packages_to_add.items()
-                )
-            )
+            await asyncio.gather(*(
+                pulp_client.modify_repository(repo_href, add=packages)
+                for repo_href, packages in packages_to_add.items()
+            ))
             logging.info("Finish modify repository for task %s", sign_task_id)
 
         if payload.success and not sign_failed:

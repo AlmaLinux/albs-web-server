@@ -13,6 +13,11 @@ services:
       - "5432:5432"
     volumes:
       - "../volumes/postgresql/data:/var/lib/postgresql/data"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   rabbitmq:
     image: rabbitmq:3.8-management
@@ -23,9 +28,17 @@ services:
     env_file:
       - vars.env
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   alts-celery:
-    image: quay.io/almalinuxorg/alts-celery:latest
+    image: alts-celery:latest
+    build:
+      dockerfile: Dockerfile.celery
+      context: ../alts
     environment:
       CELERY_CONFIG_PATH: "/celery_config.yaml"
       EXTERNAL_NETWORK: "albs-web-server_default"
@@ -45,9 +58,17 @@ services:
       - ../alts/requirements:/tmp/requirements
     depends_on:
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   alts-scheduler:
-    image: quay.io/almalinuxorg/alts-scheduler:latest
+    image: alts-scheduler:latest
+    build:
+      dockerfile: Dockerfile.scheduler
+      context: ../alts
     ports:
       - "8082:8000"
     environment:
@@ -65,6 +86,11 @@ services:
       - ../alts/requirements:/tmp/requirements
     depends_on:
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   web_server:
     image: quay.io/almalinuxorg/albs:latest
@@ -72,6 +98,9 @@ services:
       - vars.env
     ports:
       - "8088:8000"
+    build:
+      dockerfile: Dockerfile
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -91,11 +120,19 @@ services:
     depends_on:
       - db
       - pulp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./tests:/code/tests"
@@ -112,11 +149,19 @@ services:
       - db
       - pulp
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_builds:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -130,11 +175,19 @@ services:
       - db
       - pulp
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_errata:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -148,11 +201,19 @@ services:
       - db
       - pulp
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_releases:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -166,11 +227,19 @@ services:
       - db
       - pulp
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_sign:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -179,11 +248,19 @@ services:
                       pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_product_modify:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -192,11 +269,19 @@ services:
                       pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_tests:
     image: quay.io/almalinuxorg/task-queue:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
     volumes:
       - "./alws:/code/alws"
       - "./requirements.txt:/code/requirements.txt"
@@ -210,22 +295,38 @@ services:
       - db
       - pulp
       - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   frontend:
     image: quay.io/almalinuxorg/albs-frontend:latest
     env_file:
       - vars.env
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-frontend
     command: bash -c "npm install && npm run dev"
     volumes:
-      - "../albs-frontend:/code"
-      - "../node_modules:/code/node_modules"
+      - "../albs-frontend:/home/albs/code"
+      - "frontend_node_modules:/code/node_modules"
     restart: on-failure
     depends_on:
       - web_server
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   build_node:
     image: quay.io/almalinuxorg/albs-node:latest
     privileged: true
+    build:
+      context: ../albs-node/
+      dockerfile: ./Dockerfile
     env_file:
       - vars.env
     volumes:
@@ -242,9 +343,17 @@ services:
                        python3 almalinux_build_node.py -v -t 2'"
     depends_on:
       - web_server
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   sign_node:
     image: quay.io/almalinuxorg/albs-sign-node:latest
+    build:
+      context: ../albs-sign-node/
+      dockerfile: ./Dockerfile
     env_file:
       - vars.env
     volumes:
@@ -260,9 +369,17 @@ services:
                        pip3 install --upgrade pip &&
                        pip3 install -r requirements.txt --no-cache-dir &&
                        python3 almalinux_sign_node.py -v'"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   gitea_listener:
     image: quay.io/almalinuxorg/gitea-listener:latest
+    build:
+      dockerfile: Dockerfile.gitea-listener
+      context: .
     env_file:
       - vars.env
     restart: on-failure
@@ -275,9 +392,17 @@ services:
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
       - "./alws:/code/alws"
       - "./alws/scripts/albs-gitea-listener/requirements.txt:/code/requirements.txt"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   git_cacher:
     image: quay.io/almalinuxorg/git-cacher:latest
+    build:
+      dockerfile: Dockerfile.git-cacher
+      context: .
     env_file:
       - vars.env
     restart: on-failure
@@ -287,25 +412,35 @@ services:
       - "./alws:/code/alws"
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
       - "./alws/scripts/git_cacher/requirements.txt:/code/requirements.txt"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   tests_cacher:
-    image: albs-tests-cacher:latest
-    env_file:
-      - vars.env
+    image: alma-tests-cacher:latest
     build:
-      context: .
-      dockerfile: Dockerfile.tests-cacher
+      context: ../alma-tests-cacher/
+      dockerfile: Dockerfile
     restart: on-failure
     depends_on:
       - web_server
     volumes:
-      - "./alws/scripts/tests_cacher/tests_cacher.py:/code/tests_cacher.py"
-      - "./alws/scripts/tests_cacher/requirements.txt:/code/requirements.txt"
+      - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
+      - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
+      - "../alma-tests-cacher/requirements.txt:/code/requirements.txt"
+      - "../alma-tests-cacher/vars.yaml:/code/vars.yaml"
     command: "bash -c '/wait_for_it.sh web_server:8000 &&
               source env/bin/activate &&
               pip3 install --upgrade pip &&
               pip3 install -r /code/requirements.txt --no-cache-dir &&
-              python tests_cacher.py'"
+              python alma_tests_cacher.py'"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   pulp:
     # image: pulp/pulp
@@ -324,6 +459,11 @@ services:
     devices:
       - "/dev/fuse"
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
     #  echo "listen_addresses = '*'" >> /var/lib/pgsql/data/postgresql.conf &&
     #  echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
     #  echo "host all all ::/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
@@ -333,12 +473,24 @@ services:
     image: eclipse-mosquitto:2.0
     ports:
       - "11883:1883"
+    volumes:
+      - "./mosquitto-no-auth.conf:/mosquitto/config/mosquitto.conf"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   redis:
     image: redis
     ports:
       - 6379:6379
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   nginx:
     image: nginx
@@ -349,6 +501,11 @@ services:
     depends_on:
       - web_server
       - frontend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   immudb:
     image: codenotary/immudb:1.5
@@ -359,3 +516,12 @@ services:
       - "../volumes/immudb/data:/var/lib/immudb:Z"
       - "../volumes/immudb/config:/etc/immudb:Z"
       - "../volumes/immudb/logs:/var/log/immudb:Z"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+
+volumes:
+  frontend_node_modules:

@@ -6,7 +6,14 @@ import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
-from pydantic import AnyHttpUrl, BaseModel, conlist, validator
+from pydantic import (
+    AfterValidator,
+    AnyHttpUrl,
+    BaseModel,
+    conlist,
+    field_validator,
+)
+from typing_extensions import Annotated
 
 from alws import models
 from alws.config import settings
@@ -24,17 +31,19 @@ from alws.utils.parsing import clean_release, get_clean_distr_name
 
 __all__ = ['BuildTaskRef', 'BuildCreate', 'Build', 'BuildsResponse']
 
+AnyHttpUrlString = Annotated[AnyHttpUrl, AfterValidator(lambda v: str(v))]
+
 
 class BuildTestConfiguration(BaseModel):
     tests: typing.Optional[typing.List[dict]] = []
-    test_env: typing.Optional[dict]
+    test_env: typing.Optional[dict] = None
 
 
 class BuildTaskRef(BaseModel):
-    url: AnyHttpUrl
-    git_ref: typing.Optional[str]
-    ref_type: typing.Optional[int]
-    git_commit_hash: typing.Optional[str]
+    url: AnyHttpUrlString
+    git_ref: typing.Optional[str] = None
+    ref_type: typing.Optional[int] = None
+    git_commit_hash: typing.Optional[str] = None
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_module: typing.Optional[bool] = False
     enabled: bool = True
@@ -54,7 +63,7 @@ class BuildTaskRef(BaseModel):
             return self.git_ref.split('stream-')[-1]
         return self.git_ref
 
-    @validator('ref_type', pre=True)
+    @field_validator('ref_type', mode="before")
     def ref_type_validator(cls, v):
         if isinstance(v, str):
             v = BuildTaskRefType.from_text(v)
@@ -72,7 +81,7 @@ class BuildTaskRef(BaseModel):
         return model_copy
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildTaskModuleRef(BaseModel):
@@ -84,7 +93,7 @@ class BuildTaskModuleRef(BaseModel):
     enabled_modules: dict
     refs: typing.List[BuildTaskRef]
 
-    @validator('refs', pre=True)
+    @field_validator('refs', mode="before")
     def refs_validator(cls, refs):
         if not refs or all((not ref['enabled'] for ref in refs)):
             raise EmptyBuildError(
@@ -108,10 +117,12 @@ class BuildCreatePlatforms(BaseModel):
 
 
 class BuildCreate(BaseModel):
-    platforms: conlist(BuildCreatePlatforms, min_items=1)
-    tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_items=1)
+    platforms: conlist(BuildCreatePlatforms, min_length=1)
+    tasks: conlist(
+        typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1
+    )
     linked_builds: typing.List[int] = []
-    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     platform_flavors: typing.Optional[typing.List[int]] = None
     is_secure_boot: bool = False
     product_id: int
@@ -124,7 +135,7 @@ class BuildPlatform(BaseModel):
     arch_list: typing.List[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildTaskArtifact(BaseModel):
@@ -132,10 +143,10 @@ class BuildTaskArtifact(BaseModel):
     name: str
     type: str
     href: str
-    cas_hash: typing.Optional[str]
+    cas_hash: typing.Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildTaskTestTask(BaseModel):
@@ -145,18 +156,18 @@ class BuildTaskTestTask(BaseModel):
     performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildSignTask(BaseModel):
     id: int
-    started_at: typing.Optional[datetime.datetime]
-    finished_at: typing.Optional[datetime.datetime]
+    started_at: typing.Optional[datetime.datetime] = None
+    finished_at: typing.Optional[datetime.datetime] = None
     status: int
-    stats: typing.Optional[dict]
+    stats: typing.Optional[dict] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RpmModule(BaseModel):
@@ -169,31 +180,31 @@ class RpmModule(BaseModel):
     sha256: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildTask(BaseModel):
     id: int
-    ts: typing.Optional[datetime.datetime]
-    started_at: typing.Optional[datetime.datetime]
-    finished_at: typing.Optional[datetime.datetime]
+    ts: typing.Optional[datetime.datetime] = None
+    started_at: typing.Optional[datetime.datetime] = None
+    finished_at: typing.Optional[datetime.datetime] = None
     status: int
     index: int
     arch: str
     platform: BuildPlatform
     ref: BuildTaskRef
-    rpm_module: typing.Optional[RpmModule]
+    rpm_module: typing.Optional[RpmModule] = None
     artifacts: typing.List[BuildTaskArtifact]
-    is_cas_authenticated: typing.Optional[bool]
-    alma_commit_cas_hash: typing.Optional[str]
+    is_cas_authenticated: typing.Optional[bool] = None
+    alma_commit_cas_hash: typing.Optional[str] = None
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
-    is_secure_boot: typing.Optional[bool]
+    is_secure_boot: typing.Optional[bool] = None
     test_tasks: typing.List[BuildTaskTestTask]
-    error: typing.Optional[str]
+    error: typing.Optional[str] = None
     performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildOwner(BaseModel):
@@ -202,16 +213,16 @@ class BuildOwner(BaseModel):
     email: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildCreateResponse(BaseModel):
     id: int
     created_at: datetime.datetime
-    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PlatformFlavour(BaseModel):
@@ -219,7 +230,7 @@ class PlatformFlavour(BaseModel):
     name: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Product(BaseModel):
@@ -227,35 +238,35 @@ class Product(BaseModel):
     name: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Build(BaseModel):
     id: int
     created_at: datetime.datetime
-    finished_at: typing.Optional[datetime.datetime]
+    finished_at: typing.Optional[datetime.datetime] = None
     tasks: typing.List[BuildTask]
     owner: BuildOwner
     sign_tasks: typing.List[BuildSignTask]
     linked_builds: typing.Optional[typing.List[int]] = []
-    mock_options: typing.Optional[typing.Dict[str, typing.Any]]
+    mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     platform_flavors: typing.List[PlatformFlavour]
-    release_id: typing.Optional[int]
+    release_id: typing.Optional[int] = None
     released: bool
     products: typing.Optional[typing.List[Product]] = []
 
-    @validator('linked_builds', pre=True)
+    @field_validator('linked_builds', mode="before")
     def linked_builds_validator(cls, v):
         return [item if isinstance(item, int) else item.id for item in v]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class BuildsResponse(BaseModel):
     builds: typing.List[Build]
-    total_builds: typing.Optional[int]
-    current_page: typing.Optional[int]
+    total_builds: typing.Optional[int] = None
+    current_page: typing.Optional[int] = None
 
 
 class ModulePreviewRequest(BaseModel):
@@ -281,7 +292,7 @@ class ModulePreview(BaseModel):
     module_name: str
     module_stream: str
     enabled_modules: dict
-    git_ref: typing.Optional[str]
+    git_ref: typing.Optional[str] = None
 
 
 async def get_module_data_from_beholder(
@@ -324,7 +335,7 @@ def compare_module_data(
             continue
         srpm = beholder_artifact['sourcerpm']
         beholder_tag_name = (
-            f"{srpm['name']}-{srpm['version']}-" f"{srpm['release']}"
+            f"{srpm['name']}-{srpm['version']}-{srpm['release']}"
         )
         beholder_tag_name = clean_release(beholder_tag_name)
         if beholder_tag_name != tag_name:
