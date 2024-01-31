@@ -541,15 +541,17 @@ class BuildPlanner:
                     devel_module.add_module_dependency_to_devel_module(
                         module=module
                     )
-                (
-                    module_pulp_href,
-                    sha256,
-                ) = await self._pulp_client.create_module(
+                module_pulp_href = await self._pulp_client.create_module(
                     module_index.render(),
                     module.name,
                     module.stream,
                     module.context,
                     module.arch,
+                    module.description,
+                    artifacts=[],
+                    dependencies=[],
+                    packages=[],
+                    profiles=[],
                 )
                 db_module = models.RpmModule(
                     name=module.name,
@@ -558,7 +560,8 @@ class BuildPlanner:
                     context=module.context,
                     arch=module.arch,
                     pulp_href=module_pulp_href,
-                    sha256=sha256,
+                    # TODO: get a build task by arch and add
+                    #  its ID to a rpm module
                 )
                 self._modules_by_target[(platform.name, arch)].append(
                     db_module
@@ -637,7 +640,6 @@ class BuildPlanner:
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=modules[0] if modules else None,
                     is_secure_boot=self._is_secure_boot,
                     mock_options=mock_options,
                 )

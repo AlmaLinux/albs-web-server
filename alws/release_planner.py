@@ -843,6 +843,15 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                     module_info["stream"],
                     module_info["context"],
                     module_info["arch"],
+                    # TODO: field `data->artifacts->rpms` from modules.yaml
+                    artifacts=module_info['artifacts'],
+                    # TODO: field `data->dependencies->requires` from modules.yaml
+                    # TODO: And a dictionary should be packaged into a list
+                    dependencies=module_info['dependencies'],
+                    # TODO: a list of hrefs to packages of a module like
+                    # TODO: "/pulp/api/v3/content/rpm/packages/401874f5-9838-41f1-bc07-c9f5f5933e62/"
+                    packages=module_info['packages'],
+                    version=module_info['version'],
                 )
                 repository_modification_mapping[db_repo["pulp_href"]].append(
                     module_pulp_href
@@ -1706,6 +1715,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     module_info["stream"],
                     module_info["context"],
                     module_info["arch"],
+                    # TODO: field `data->artifacts->rpms` from modules.yaml
+                    artifacts=module_info['artifacts'],
+                    # TODO: field `data->dependencies->requires` from modules.yaml
+                    # TODO: And a dictionary should be packaged into a list
+                    dependencies=module_info['dependencies'],
+                    # TODO: a list of hrefs to packages of a module like
+                    # TODO: "/pulp/api/v3/content/rpm/packages/401874f5-9838-41f1-bc07-c9f5f5933e62/"
+                    packages=module_info['packages'],
+                    version=module_info['version'],
                 )
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     module_pulp_href

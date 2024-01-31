@@ -141,6 +141,14 @@ class ModuleWrapper:
     def raw_stream(self):
         return self._stream
 
+    @property
+    def profiles(self) -> str:
+        return self._stream.get_profile_names()
+
+    @property
+    def description(self) -> str:
+        return self._stream.get_description()
+
     @classmethod
     def from_template(cls, template: str, name=None, stream=None):
         if all([name, stream]):

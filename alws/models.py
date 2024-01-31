@@ -451,11 +451,7 @@ class BuildTask(TimeMixin, Base):
         nullable=False,
         index=True,
     )
-    rpm_module_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("rpm_module.id"),
-        nullable=True,
-    )
+    rpm_modules = relationship("RpmModule", back_populates="build_task")
     status = sqlalchemy.Column(
         sqlalchemy.Integer,
         nullable=False,
@@ -488,7 +484,6 @@ class BuildTask(TimeMixin, Base):
     test_tasks = relationship(
         "TestTask", back_populates="build_task", order_by="TestTask.revision"
     )
-    rpm_module = relationship("RpmModule")
     performance_stats: "PerformanceStats" = relationship(
         "PerformanceStats",
         back_populates="build_task",
@@ -518,7 +513,15 @@ class RpmModule(Base):
     context = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
-    sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
+    # TODO: should be removed
+    # sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
+    build_task = relationship("BuildTask", back_populates="rpm_modules")
+    build_task_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("build_tasks.id"),
+        nullable=False,
+        index=True,
+    )
 
     @property
     def nvsca(self):

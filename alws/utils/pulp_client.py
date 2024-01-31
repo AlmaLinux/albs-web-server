@@ -267,16 +267,16 @@ class PulpClient:
         stream: str,
         context: str,
         arch: str,
-        version: int,
+        description: str,
         artifacts: list,
         dependencies: list,
         packages: list,
+        profiles: list,
+        version: typing.Optional[int] = None,
     ):
         ENDPOINT = "pulp/api/v3/content/rpm/modulemds/"
-        artifact_href, sha256 = await self.upload_file(content)
         payload = {
-            "relative_path": "modules.yaml",
-            "artifact": artifact_href,
+            "snippet": content,
             "name": name,
             "stream": stream,
             # Instead of real module version, we're inserting
@@ -287,13 +287,15 @@ class PulpClient:
             "version": version or get_random_unique_version(),
             "context": context,
             "arch": arch,
+            "description": description,
             "artifacts": artifacts,
             "dependencies": dependencies,
             "packages": packages,
+            "profiles": profiles,
         }
         task = await self.request("POST", ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task["task"])
-        return task_result["created_resources"][0], sha256
+        return task_result["created_resources"][0]
 
     async def check_if_artifact_exists(self, sha256: str) -> typing.Optional[str]:
         ENDPOINT = "pulp/api/v3/artifacts/"
