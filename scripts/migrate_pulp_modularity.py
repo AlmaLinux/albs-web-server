@@ -242,6 +242,7 @@ async def get_package_pulp_href_by_params(
             'name': name,
             'release': release,
             'version': version,
+            'ordering': '-pulp_created',
         }
     )
     if result:
