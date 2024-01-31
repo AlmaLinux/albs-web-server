@@ -27,7 +27,14 @@ PULP_SEMAPHORE = asyncio.Semaphore(5)
 
 
 class PulpClient:
-    def __init__(self, host: str, username: str, password: str):
+    def __init__(
+        self,
+        host: str,
+        username: str,
+        password: str,
+        semaphore: asyncio.Semaphore = None,
+    ):
+        self.semaphore = semaphore
         self._host = host
         self._username = username
         self._password = password
@@ -198,13 +205,35 @@ class PulpClient:
         return response["results"]
 
     async def get_modules(
-            self, **search_params
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        # only for debug/dev purposes if you don't want to get all list
+        use_next: bool = True,
+        **search_params,
     ) -> typing.List[typing.Dict[str, typing.Any]]:
-        endpoint = "pulp/api/v3/content/rpm/modulemds/"
-        response = await self.request("GET", endpoint, params=search_params)
-        if response["count"] == 0:
+        result = list()
+        endpoint = 'pulp/api/v3/content/rpm/modulemds/'
+        params = {
+            'limit': limit,
+            'offset': offset,
+        }
+        params.update(search_params)
+        response = await self.request(
+            'GET',
+            endpoint,
+            params=params,
+        )
+        if response['count'] == 0:
             return []
-        return response["results"]
+        result.extend(response['results'])
+        if use_next and response['next']:
+            result.extend(await self.get_modules(
+                limit=limit,
+                offset=offset + limit,
+                **search_params,
+            ))
+        return result
 
     async def create_module_by_payload(self, payload: dict) -> str:
         ENDPOINT = "pulp/api/v3/content/rpm/modulemds/"
@@ -212,8 +241,36 @@ class PulpClient:
         task_result = await self.wait_for_task(task["task"])
         return task_result["created_resources"][0]
 
+    async def create_default_module(
+        self,
+        content: str,
+        module: str,
+        stream: str,
+        profiles: list[str],
+    ):
+        ENDPOINT = "pulp/api/v3/content/rpm/modulemd_defaults/"
+        artifact_href, _ = await self.upload_file(content)
+        payload = {
+            'relative_path': 'modules.yaml',
+            'artifact': artifact_href,
+            'module': module,
+            'stream': stream,
+            'profiles': profiles,
+        }
+        task = await self.request('POST', ENDPOINT, json=payload)
+        await self.wait_for_task(task['task'])
+
     async def create_module(
-        self, content: str, name: str, stream: str, context: str, arch: str
+        self,
+        content: str,
+        name: str,
+        stream: str,
+        context: str,
+        arch: str,
+        version: int,
+        artifacts: list,
+        dependencies: list,
+        packages: list,
     ):
         ENDPOINT = "pulp/api/v3/content/rpm/modulemds/"
         artifact_href, sha256 = await self.upload_file(content)
@@ -227,11 +284,12 @@ class PulpClient:
             # since pulp have this global index:
             # unique_together = ("name", "stream", "version", "context",
             #                    "arch")
-            "version": get_random_unique_version(),
+            "version": version or get_random_unique_version(),
             "context": context,
             "arch": arch,
-            "artifacts": [],
-            "dependencies": [],
+            "artifacts": artifacts,
+            "dependencies": dependencies,
+            "packages": packages,
         }
         task = await self.request("POST", ENDPOINT, json=payload)
         task_result = await self.wait_for_task(task["task"])
@@ -869,7 +927,7 @@ class PulpClient:
             full_url = endpoint
         else:
             full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with PULP_SEMAPHORE:
+        async with (self.semaphore or PULP_SEMAPHORE):
             if method.lower() == "get":
                 async with RetryClient(retry_options=self._retry_options) as client:
                     response = await client.get(

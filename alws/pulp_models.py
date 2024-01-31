@@ -422,6 +422,9 @@ class RpmModulemd(PulpBase):
     version = sqlalchemy.Column(sqlalchemy.Text)
     context = sqlalchemy.Column(sqlalchemy.Text)
     arch = sqlalchemy.Column(sqlalchemy.Text)
+    dependencies = sqlalchemy.Column(JSONB)
+    artifacts = sqlalchemy.Column(JSONB)
+    static_context = sqlalchemy.Column(sqlalchemy.Boolean)
 
     @property
     def nsvca(self):
