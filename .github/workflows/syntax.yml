@@ -9,12 +9,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v42
         with:
           files: |
             **/*.py
