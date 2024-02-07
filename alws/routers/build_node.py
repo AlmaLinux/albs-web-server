@@ -135,8 +135,8 @@ async def get_task(
         response["platform"].add_mock_options(task.build.mock_options)
     if task.mock_options:
         response["platform"].add_mock_options(task.mock_options)
-    if task.rpm_module:
-        module = task.rpm_module
+    if task.rpm_modules:
+        module = next((m for m in task.rpm_modules if '-devel' not in m.name))
         module_build_options = {
             "definitions": {
                 "_module_build": "1",

@@ -923,14 +923,17 @@ async def release_errata_packages(
             .where(query)
             .options(
                 selectinload(models.BuildTaskArtifact.build_task).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 )
             )
         )
         db_pkg = db_pkg.scalars().first()
         if not db_pkg:
             continue
-        db_module = db_pkg.build_task.rpm_module
+        db_module = next((
+            i for i in db_pkg.build_task.rpm_modules
+            if '-devel' not in i.name
+        ))
         if db_module is not None:
             rpm_module = {
                 "name": db_module.name,
@@ -1017,7 +1020,7 @@ async def prepare_updateinfo_mapping(
                     .options(
                         selectinload(
                             models.BuildTaskArtifact.build_task
-                        ).selectinload(models.BuildTask.rpm_module)
+                        ).selectinload(models.BuildTask.rpm_modules)
                     )
                 )
             )
@@ -1229,7 +1232,7 @@ async def process_errata_release_for_repos(
             )
         )
         if publish:
-            publish_tasks.append(pulp.create_rpm_publication(repo_href))
+            publish_tasks.append(pulp.create_rpm_publication(repo_href, sleep_time=30.))
     if not publish:
         return release_tasks
     logging.info("Releasing errata packages in async tasks")

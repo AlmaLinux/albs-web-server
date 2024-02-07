@@ -3,7 +3,7 @@ import json
 import logging
 import typing
 
-import aioredis
+from redis import asyncio as aioredis
 import sentry_sdk
 from pydantic_settings import BaseSettings
 

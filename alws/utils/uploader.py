@@ -187,7 +187,6 @@ class MetadataUploader:
                 module_value = str(getattr(module, attr))
                 if module_value != str(getattr(rpm_module, attr)):
                     setattr(rpm_module, attr, module_value)
-            rpm_module.sha256 = sha256
             rpm_module.pulp_href = module_href
         await self.session.commit()
 

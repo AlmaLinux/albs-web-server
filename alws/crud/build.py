@@ -23,6 +23,7 @@ async def create_build(
     build: build_schema.BuildCreate,
     user_id: int,
 ) -> models.Build:
+    logging.error('Build info: %s', build.model_dump())
     product = (
         (
             await db.execute(
@@ -158,7 +159,7 @@ async def get_builds(
                 ),
                 selectinload(models.Build.sign_tasks),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 ),
                 selectinload(models.Build.platform_flavors),
                 selectinload(models.Build.products),

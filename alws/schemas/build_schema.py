@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import os.path
 import re
 import typing
 import urllib.parse
@@ -21,7 +22,11 @@ from alws.constants import BuildTaskRefType
 from alws.errors import EmptyBuildError
 from alws.schemas.perf_stats_schema import PerformanceStats
 from alws.utils.beholder_client import BeholderClient
-from alws.utils.gitea import GiteaClient, download_modules_yaml
+from alws.utils.gitea import (
+    GiteaClient,
+    ModulesYamlNotFoundError,
+    download_modules_yaml,
+)
 from alws.utils.modularity import (
     ModuleWrapper,
     RpmArtifact,
@@ -73,7 +78,7 @@ class BuildTaskRef(BaseModel):
         return BuildTaskRefType.to_text(self.ref_type)
 
     def get_dev_module(self) -> 'BuildTaskRef':
-        model_copy = self.copy(deep=True)
+        model_copy = self.model_copy(deep=True)
         model_copy.url = self.url.replace(
             self.git_repo_name,
             self.git_repo_name + '-devel',
@@ -177,7 +182,6 @@ class RpmModule(BaseModel):
     stream: str
     context: str
     arch: str
-    sha256: str
 
     class Config:
         from_attributes = True
@@ -193,7 +197,7 @@ class BuildTask(BaseModel):
     arch: str
     platform: BuildPlatform
     ref: BuildTaskRef
-    rpm_module: typing.Optional[RpmModule] = None
+    rpm_modules: typing.Optional[typing.List[RpmModule]] = None
     artifacts: typing.List[BuildTaskArtifact]
     is_cas_authenticated: typing.Optional[bool] = None
     alma_commit_cas_hash: typing.Optional[str] = None
@@ -438,10 +442,6 @@ async def get_module_refs(
         logging.getLogger(__name__),
     )
 
-    beholder_client = BeholderClient(
-        host=settings.beholder_host,
-        token=settings.beholder_token,
-    )
     clean_dist_name = get_clean_distr_name(platform.name)
     distr_ver = platform.distr_version
     modified_list = await get_modified_refs_list(
@@ -450,6 +450,8 @@ async def get_module_refs(
     template = await download_modules_yaml(
         task.url, task.git_ref, BuildTaskRefType.to_text(task.ref_type)
     )
+    logging.debug('Git URL: %s', task.url)
+    logging.debug('Module template:\n%s', template)
     devel_module = None
     module = ModuleWrapper.from_template(
         template,
@@ -457,8 +459,21 @@ async def get_module_refs(
         stream=task.module_stream_from_ref(),
     )
     if not module.is_devel:
+        repo_name = os.path.basename(task.url)
+        devel_repo_name = f'{repo_name.replace(".git", "")}-devel.git'
+        devel_repo_url = task.url.replace(repo_name, devel_repo_name)
+        logging.debug('Devel repo URL: %s', devel_repo_url)
+        try:
+            devel_template = await download_modules_yaml(
+                devel_repo_url,
+                task.git_ref,
+                BuildTaskRefType.to_text(task.ref_type)
+            )
+            logging.debug('Devel template:\n%s', devel_template)
+        except ModulesYamlNotFoundError:
+            devel_template = template
         devel_module = ModuleWrapper.from_template(
-            template,
+            devel_template,
             name=f'{task.git_repo_name}-devel',
             stream=task.module_stream_from_ref(),
         )
@@ -469,36 +484,29 @@ async def get_module_refs(
             has_beta_flafor = True
             break
 
-    checking_tasks = []
-    if platform_arches is None:
-        platform_arches = []
-    for arch in platform_arches:
-        request_arch = arch
-        if arch == 'i686':
-            request_arch = 'x86_64'
-        for _module in (module, devel_module):
-            if _module is None:
-                continue
-            # if module is devel and devel_module is None
-            # we shouldn't mark module as devel, because it will broke logic
-            # for partially updating modules
-            module_is_devel = _module.is_devel and devel_module is not None
-            endpoint = (
-                f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
-                f'/module/{_module.name}/{_module.stream}/{request_arch}/'
-            )
-            checking_tasks.append(
-                get_module_data_from_beholder(
-                    beholder_client,
-                    endpoint,
-                    arch,
-                    devel=module_is_devel,
-                )
-            )
-
-            if has_beta_flafor:
+    if not settings.package_beholder_enabled:
+        beholder_results = ()
+    else:
+        beholder_client = BeholderClient(
+            host=settings.beholder_host,
+            token=settings.beholder_token,
+        )
+        checking_tasks = []
+        if platform_arches is None:
+            platform_arches = []
+        for arch in platform_arches:
+            request_arch = arch
+            if arch == 'i686':
+                request_arch = 'x86_64'
+            for _module in (module, devel_module):
+                if _module is None:
+                    continue
+                # if module is devel and devel_module is None
+                # we shouldn't mark module as devel, because it will broke logic
+                # for partially updating modules
+                module_is_devel = _module.is_devel and devel_module is not None
                 endpoint = (
-                    f'/api/v1/distros/{clean_dist_name}-beta/{distr_ver}'
+                    f'/api/v1/distros/{clean_dist_name}/{distr_ver}'
                     f'/module/{_module.name}/{_module.stream}/{request_arch}/'
                 )
                 checking_tasks.append(
@@ -509,7 +517,21 @@ async def get_module_refs(
                         devel=module_is_devel,
                     )
                 )
-    beholder_results = await asyncio.gather(*checking_tasks)
+
+                if has_beta_flafor:
+                    endpoint = (
+                        f'/api/v1/distros/{clean_dist_name}-beta/{distr_ver}'
+                        f'/module/{_module.name}/{_module.stream}/{request_arch}/'
+                    )
+                    checking_tasks.append(
+                        get_module_data_from_beholder(
+                            beholder_client,
+                            endpoint,
+                            arch,
+                            devel=module_is_devel,
+                        )
+                    )
+        beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
     for flavor in flavors:

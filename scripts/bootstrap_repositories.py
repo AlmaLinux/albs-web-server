@@ -16,6 +16,8 @@ from alws.crud import repository as repo_crud
 from alws.schemas import platform_schema, remote_schema, repository_schema
 from alws.utils.pulp_client import PulpClient
 
+REPO_CACHE = {}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -76,19 +78,23 @@ async def get_repository(
         if production:
             repo_payload = repo_info.copy()
             repo_payload.pop("remote_url")
-            repo = await pulp_client.get_rpm_repository(repo_name)
-            if repo:
-                distro = await pulp_client.get_rpm_distro(repo_name)
-                if not distro:
-                    distro = await pulp_client.create_rpm_distro(
-                        repo_name, repo["pulp_href"], base_path_start="prod"
-                    )
-                repo_url = distro["base_url"]
-                repo_href = repo["pulp_href"]
+            if repo_name in REPO_CACHE:
+                repo_url, repo_href = REPO_CACHE[repo_name]
             else:
-                repo_url, repo_href = await pulp_client.create_rpm_repository(
-                    repo_name, create_publication=True, base_path_start="prod"
-                )
+                repo = await pulp_client.get_rpm_repository(repo_name)
+                if repo:
+                    distro = await pulp_client.get_rpm_distro(repo_name)
+                    if not distro:
+                        distro = await pulp_client.create_rpm_distro(
+                            repo_name, repo["pulp_href"], base_path_start="prod"
+                        )
+                    repo_url = distro["base_url"]
+                    repo_href = repo["pulp_href"]
+                else:
+                    repo_url, repo_href = await pulp_client.create_rpm_repository(
+                        repo_name, create_publication=True, base_path_start="prod"
+                    )
+                REPO_CACHE[repo_name] = (repo_url, repo_href)
             logger.debug("Base URL: %s, Pulp href: %s", repo_url, repo_href)
             payload_dict = repo_payload.copy()
             payload_dict["url"] = repo_url
@@ -249,6 +255,17 @@ def main():
 
         repository_ids = []
         repositories_data = platform_data.pop("repositories", [])
+
+        # populate repos cache
+        logger.info('Making repository data cache')
+        for repo_info in repositories_data:
+            repo_name = f'{repo_info["name"]}-{repo_info["arch"]}'
+            distro = None
+            repo = sync(pulp_client.get_rpm_repository(repo_name))
+            if repo:
+                distro = sync(pulp_client.get_rpm_distro(repo_name))
+            if repo and distro:
+                REPO_CACHE[repo_name] = (distro["base_url"], repo["pulp_href"])
 
         for repo_info in repositories_data:
             logger.info(

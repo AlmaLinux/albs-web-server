@@ -261,7 +261,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 ),
                 selectinload(models.Build.repos),
             )
@@ -306,15 +306,16 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 pkg_info["source"] = source_name
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
-                if task.rpm_module and task.id in build_tasks:
-                    key = (
-                        task.rpm_module.name,
-                        task.rpm_module.stream,
-                        task.rpm_module.version,
-                        task.rpm_module.arch,
-                    )
-                    if key in modules_to_release:
-                        continue
+                if task.rpm_modules and task.id in build_tasks:
+                    for module in task.rpm_modules:
+                        key = (
+                            module.name,
+                            module.stream,
+                            module.version,
+                            module.arch,
+                        )
+                        if key in modules_to_release:
+                            continue
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
@@ -331,6 +332,12 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
+                        key = (
+                            module.name,
+                            module.stream,
+                            module.version,
+                            module.arch,
+                        )
                         modules_to_release[key].append(
                             {
                                 "build_id": build.id,
@@ -541,7 +548,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release_id: int,
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
-        logging.info("Commiing release %d", release_id)
+        logging.info("Committing release %d", release_id)
 
         user = await user_crud.get_user(self.db, user_id=user_id)
         release = await self.get_release_for_update(release_id)
@@ -1185,7 +1192,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_devel: bool,
         is_debug: bool,
         beholder_cache: typing.Dict[BeholderKey, typing.Any],
-    ) -> typing.Set[typing.Tuple[RepoType, int]]:
+    ) -> typing.Set[typing.Tuple[RepoType, int, str]]:
         def generate_key(beta: bool) -> BeholderKey:
             return BeholderKey(
                 pkg_name,
@@ -1233,8 +1240,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             )
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
-            trustness = predicted_package["priority"]
-            matched = predicted_package["matched"]
+            trustness: int = predicted_package["priority"]
+            matched: str = predicted_package["matched"]
             repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
                 "name"
             ]

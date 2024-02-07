@@ -423,6 +423,30 @@ BuildTaskDependency = sqlalchemy.Table(
 )
 
 
+BuildTaskRpmModuleMapping = sqlalchemy.Table(
+    "build_tasks_rpm_modules_mapping",
+    Base.metadata,
+    sqlalchemy.Column(
+        "build_task_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "build_tasks.id",
+            name="build_tasks_rpm_modules_mapping_build_task_id_fkey",
+        ),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "rpm_module_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "rpm_module.id",
+            name="build_tasks_rpm_modules_mapping_rpm_module_id_fkey",
+        ),
+        primary_key=True,
+    ),
+)
+
+
 class BuildTask(TimeMixin, Base):
     __tablename__ = "build_tasks"
 
@@ -451,7 +475,10 @@ class BuildTask(TimeMixin, Base):
         nullable=False,
         index=True,
     )
-    rpm_modules = relationship("RpmModule", back_populates="build_task")
+    rpm_modules = relationship(
+        "RpmModule",
+        secondary=BuildTaskRpmModuleMapping,
+    )
     status = sqlalchemy.Column(
         sqlalchemy.Integer,
         nullable=False,
@@ -513,15 +540,6 @@ class RpmModule(Base):
     context = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
-    # TODO: should be removed
-    # sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
-    build_task = relationship("BuildTask", back_populates="rpm_modules")
-    build_task_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("build_tasks.id"),
-        nullable=False,
-        index=True,
-    )
 
     @property
     def nvsca(self):

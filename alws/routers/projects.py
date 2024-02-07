@@ -1,7 +1,7 @@
 import typing
 
 from fastapi import APIRouter, Depends
-import aioredis
+from redis import asyncio as aioredis
 
 from alws.auth import get_current_user
 from alws.dependencies import get_redis

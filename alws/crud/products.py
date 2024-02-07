@@ -308,7 +308,7 @@ async def modify_product(
             .options(
                 selectinload(models.Build.repos),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 ),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.platform

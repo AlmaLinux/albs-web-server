@@ -3,7 +3,7 @@ import json
 import typing
 import uuid
 
-import aioredis
+from redis import asyncio as aioredis
 from fastapi import APIRouter, Depends, WebSocket
 
 from alws import database, dramatiq

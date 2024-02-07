@@ -13,7 +13,7 @@ import os
 import logging
 import requests
 import re
-import aioredis
+from redis import asyncio as aioredis
 import asyncio
 import traceback
 from ruamel.yaml import YAML
