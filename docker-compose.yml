@@ -486,7 +486,7 @@ services:
     ports:
       - 6379:6379
     volumes:
-      - "../volumes/redis/data:/data"
+      - "redis:/data"
     restart: on-failure
     logging:
       driver: "json-file"
@@ -527,3 +527,4 @@ services:
 
 volumes:
   frontend_node_modules:
+  redis:
