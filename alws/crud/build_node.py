@@ -710,11 +710,7 @@ async def __process_build_task_artifacts(
     logging.info("Starting modules update in Pulp")
     logging.info(f"Task rpm modules: %s", build_task.rpm_modules)
     logging.info(f"Module index: %s", module_index)
-    if (
-        build_task.rpm_modules
-        and module_index
-        and build_task.status == BuildTaskStatus.COMPLETED
-    ):
+    if build_task.rpm_modules and module_index:
         # If the task is the last for its architecture, we need to add
         # correct version for it in Pulp
         arch_task_statuses = (await db.execute(

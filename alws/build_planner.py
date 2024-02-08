@@ -642,14 +642,17 @@ class BuildPlanner:
             first_arch = 'i686'
             first_arch_tasks = platform_task_cache.get('i686')
             if not first_arch_tasks:
-                first_arch_tasks = next(iter(platform_task_cache))
-                first_arch = first_arch_tasks[0].arch
+                first_arch = next(iter(platform_task_cache))
+                first_arch_tasks = platform_task_cache.get(first_arch)
             for index in range(1, len(first_arch_tasks)):
                 previous_task_index = index - 1
                 current_task = first_arch_tasks[index]
                 previous_task = first_arch_tasks[previous_task_index]
                 current_task.dependencies.append(previous_task)
             all_tasks.extend(first_arch_tasks)
+            # If it's the only arch, do not need to go additional cycle
+            if len(platform_task_cache.keys()) == 1:
+                continue
             for arch, tasks in platform_task_cache.items():
                 if arch == first_arch:
                     continue
