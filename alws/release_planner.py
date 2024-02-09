@@ -763,9 +763,9 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             for module in pulp_rpm_modules:
                 # Modules go only in non-debug repos
                 repository = db_repos_mapping[(module["arch"], False)]
-                plan_modules.append({
-                    "module": module, "repositories": [repository]
-                })
+                plan_modules.append(
+                    {"module": module, "repositories": [repository]}
+                )
             release_plan["modules"] = plan_modules
 
         return release_plan
@@ -841,13 +841,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any(
-                    (
-                        prod_module
-                        for prod_module in repo_module_index.iter_modules()
-                        if prod_module.nsvca == release_module_nvsca
-                    )
-                )
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
                 if module_already_in_repo:
                     additional_messages.append(
                         f'Module {release_module_nvsca} skipped, '
@@ -866,18 +864,14 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 )
                 added_modules[full_repo_name].append(release_module_nvsca)
 
-        await asyncio.gather(
-            *(
-                self.pulp_client.modify_repository(href, add=packages)
-                for href, packages in repository_modification_mapping.items()
-            )
-        )
-        await asyncio.gather(
-            *(
-                self.pulp_client.create_rpm_publication(href)
-                for href in repository_modification_mapping.keys()
-            )
-        )
+        await asyncio.gather(*(
+            self.pulp_client.modify_repository(href, add=packages)
+            for href, packages in repository_modification_mapping.items()
+        ))
+        await asyncio.gather(*(
+            self.pulp_client.create_rpm_publication(href)
+            for href in repository_modification_mapping.keys()
+        ))
         builds = await self.db.execute(
             select(models.Build).where(
                 models.Build.id.in_(release.build_ids),
@@ -1055,13 +1049,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         task_arch: str = "",
         is_module: bool = False,
     ):
-        repo_name = "-".join(
-            (
-                self.clean_base_dist_name_lower,
-                self.base_platform.distr_version,
-                "devel-debuginfo" if is_debug else "devel",
-            )
-        )
+        repo_name = "-".join((
+            self.clean_base_dist_name_lower,
+            self.base_platform.distr_version,
+            "devel-debuginfo" if is_debug else "devel",
+        ))
         repo_arch = arch if arch == "src" else task_arch
         if is_module:
             repo_arch = arch
@@ -1247,13 +1239,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             # in cases if we try to find debug repos by non debug name
             if is_debug and not repo_name.endswith("debuginfo"):
                 repo_name += "-debuginfo"
-            release_repo_name = "-".join(
-                (
-                    self.clean_base_dist_name_lower,
-                    self.base_platform.distr_version,
-                    repo_name,
-                )
-            )
+            release_repo_name = "-".join((
+                self.clean_base_dist_name_lower,
+                self.base_platform.distr_version,
+                repo_name,
+            ))
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
             release_repositories.add((release_repo, trustness, matched))
         return release_repositories
@@ -1385,13 +1375,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 repo_name = self.repo_name_regex.search(
                     module_repo["name"]
                 ).groupdict()["name"]
-                release_repo_name = "-".join(
-                    (
-                        self.clean_base_dist_name_lower,
-                        base_platform.distr_version,
-                        repo_name,
-                    )
-                )
+                release_repo_name = "-".join((
+                    self.clean_base_dist_name_lower,
+                    base_platform.distr_version,
+                    repo_name,
+                ))
                 repo_key = RepoType(release_repo_name, module["arch"], False)
                 prod_repo = repos_mapping.get(repo_key)
                 if prod_repo is None:
@@ -1715,13 +1703,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any(
-                    (
-                        prod_module
-                        for prod_module in repo_module_index.iter_modules()
-                        if prod_module.nsvca == release_module_nvsca
-                    )
-                )
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
                 if module_already_in_repo:
                     additional_messages.append(
                         f'Module {release_module_nvsca} skipped, '

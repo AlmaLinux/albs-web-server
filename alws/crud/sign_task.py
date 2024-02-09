@@ -318,8 +318,7 @@ async def get_available_sign_task(
             "arch": binary_rpm.artifact.build_task.arch,
             "type": "rpm",
             "download_url": __get_package_url(
-                repo.url,
-                binary_rpm.artifact.name
+                repo.url, binary_rpm.artifact.name
             ),
         })
     sign_task_payload["packages"] = packages
@@ -424,7 +423,7 @@ async def complete_gen_key_task(
 
 
 def _get_mapping_rpm_per_platform(
-    rpms: list[typing.Union[models.SourceRpm, models.BinaryRpm]]
+    rpms: list[typing.Union[models.SourceRpm, models.BinaryRpm]],
 ) -> dict[str, int]:
     return {
         rpm.artifact.name: rpm.artifact.build_task.platform_id for rpm in rpms
