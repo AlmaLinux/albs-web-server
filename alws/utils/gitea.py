@@ -6,7 +6,6 @@ import logging
 import aiohttp
 
 
-
 class ModulesYamlNotFoundError(Exception):
     pass
 
@@ -20,8 +19,10 @@ def modules_yaml_path_from_url(url: str, ref: str, ref_type: str) -> str:
     elif ref_type == 'git_branch':
         ref_type = 'branch'
     # TODO: use config hostname, instead of https://git.almalinux.org
-    return (f'https://git.almalinux.org/modules/{repo_name}'
-            f'/raw/{ref_type}/{ref}/SOURCES/modulemd.src.txt')
+    return (
+        f'https://git.almalinux.org/modules/{repo_name}'
+        f'/raw/{ref_type}/{ref}/SOURCES/modulemd.src.txt'
+    )
 
 
 async def download_modules_yaml(url: str, ref: str, ref_type: str) -> str:
@@ -39,7 +40,6 @@ async def download_modules_yaml(url: str, ref: str, ref_type: str) -> str:
 
 
 class GiteaClient:
-
     def __init__(self, host: str, log: logging.Logger):
         self.host = host
         self.log = log
@@ -83,10 +83,7 @@ class GiteaClient:
         # This is max gitea limit, default is 30
         items_per_page = 50
         while True:
-            payload = {
-                'limit': items_per_page,
-                'page': page
-            }
+            payload = {'limit': items_per_page, 'page': page}
             response = await self.make_request(endpoint, payload)
             items.extend(response)
             if len(response) < items_per_page:
