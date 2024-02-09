@@ -215,6 +215,23 @@
       debug: false
       priority: 10
 
+- name: EPEL-7
+  repositories:
+    - name: epel
+      arch: x86_64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/x86_64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel
+      arch: aarch64
+      type: rpm
+      url: https://download.fedoraproject.org/pub/epel/$releasever/aarch64/
+      production: false
+      debug: false
+      priority: 10
+
 - name: dotnet-build
   data:
     mock:
