@@ -1,7 +1,7 @@
 import asyncio
+import logging
 import typing
 import urllib.parse
-import logging
 
 import aiohttp
 
