@@ -6,6 +6,7 @@ import logging
 import aiohttp
 
 
+
 class ModulesYamlNotFoundError(Exception):
     pass
 
@@ -46,12 +47,35 @@ class GiteaClient:
 
     async def make_request(self, endpoint: str, params: dict = None):
         full_url = urllib.parse.urljoin(self.host, endpoint)
-        self.log.debug(f'Making new request {full_url}, with params: {params}')
-        async with self.requests_lock:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(full_url, params=params) as response:
-                    response.raise_for_status()
-                    return await response.json()
+
+        max_retries = 5
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.log.debug(
+                    f'Attempt to request [#{attempt}/{max_retries}]'
+                    f' {full_url}, with params: {params}'
+                )
+                async with self.requests_lock:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            full_url, params=params
+                        ) as response:
+                            response.raise_for_status()
+                            return await response.json()
+            except (
+                aiohttp.client_exceptions.ClientConnectorError,
+                aiohttp.client_exceptions.ServerDisconnectedError,
+            ) as e:
+                wait = attempt * 2
+                self.log.error(
+                    f'Error during making request: {e}, {full_url}, {params}'
+                )
+                self.log.debug(
+                    f'Retrying attempt [#{attempt}/{max_retries}] in'
+                    f' {wait} seconds: {full_url}, with params: {params}'
+                )
+                await asyncio.sleep(wait)
+                continue
 
     async def _list_all_pages(self, endpoint: str) -> typing.List:
         items = []
