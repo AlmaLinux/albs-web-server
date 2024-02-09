@@ -298,6 +298,7 @@ class PulpClient:
         }
         if packages:
             payload["packages"] = packages
+        logging.info('create_module payload: %s', payload)
         task = await self.request("POST", endpoint, json=payload)
         task_result = await self.wait_for_task(task["task"])
         return task_result["created_resources"][0]

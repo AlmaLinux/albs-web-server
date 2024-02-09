@@ -1716,20 +1716,23 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href, _ = await self.pulp_client.create_module(
+
+                logging.info("module_info: %s", str(module_info))
+                logging.info("release_module: %s", str(release_module))
+
+                module_pulp_href = await self.pulp_client.create_module(
                     module_info["template"],
                     module_info["name"],
                     module_info["stream"],
                     module_info["context"],
                     module_info["arch"],
-                    # TODO: field `data->artifacts->rpms` from modules.yaml
-                    artifacts=module_info['artifacts'],
-                    # TODO: field `data->dependencies->requires` from modules.yaml
-                    # TODO: And a dictionary should be packaged into a list
-                    dependencies=module_info['dependencies'],
-                    # TODO: a list of hrefs to packages of a module like
-                    # TODO: "/pulp/api/v3/content/rpm/packages/401874f5-9838-41f1-bc07-c9f5f5933e62/"
-                    packages=module_info['packages'],
+                    release_module.description,
+                    artifacts=release_module.get_rpm_artifacts(),
+                    dependencies=list(release_module.get_runtime_deps().values()),
+                    # TODO: Provide list of pkg hrefs when this issue is fixed
+                    # https://github.com/pulp/pulp_rpm/issues/3427
+                    packages=[],
+                    profiles=release_module.get_profiles(),
                     version=module_info['version'],
                 )
                 packages_to_repo_layout[repo_name][repo_arch].append(

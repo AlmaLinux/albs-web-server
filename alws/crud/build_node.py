@@ -521,6 +521,9 @@ async def __process_logs(
     return logs
 
 
+# TODO: Improve readability
+#  * Split into smaller pieces
+#  * Maybe use decorators for stats
 async def __process_build_task_artifacts(
     db: AsyncSession,
     pulp_client: PulpClient,
@@ -739,6 +742,24 @@ async def __process_build_task_artifacts(
                     rpm_module.stream,
                 )
                 module_for_pulp.version = int(module_version)
+
+                # TODO: Pass module_pkgs_hrefs in packages field when
+                # https://github.com/pulp/pulp_rpm/issues/3427 is fixed
+                ## Shall we consider multilib pkgs here?
+                #module_for_pulp_rpms = []
+                #for rpm in module_for_pulp.get_rpm_artifacts():
+                #    nevra = parse_rpm_nevra(rpm)
+                #    module_for_pulp_rpms.append(
+                #        f'{nevra.name}-{nevra.version}-{nevra.release}.{nevra.arch}'
+                #    )
+                #logging.info(f'{module_for_pulp_rpms=}')
+                #module_pkgs_hrefs = [
+                #    rpm_entry.href
+                #    for rpm_entry in rpm_entries
+                #    if rpm_entry.name.replace('.rpm', '') in module_for_pulp_rpms
+                #]
+                #logging.info(f'{module_pkgs_hrefs=}')
+
                 module_pulp_href = await pulp_client.create_module(
                     module_for_pulp.render(),
                     rpm_module.name,
@@ -749,8 +770,9 @@ async def __process_build_task_artifacts(
                     version=module_version,
                     artifacts=module_for_pulp.get_rpm_artifacts(),
                     dependencies=list(module_for_pulp.get_runtime_deps().values()),
+                    #packages=module_pkgs_hrefs,
                     packages=[],
-                    profiles=module_for_pulp.get_profiles()
+                    profiles=module_for_pulp.get_profiles(),
                 )
                 new_modules.append(module_pulp_href)
                 old_modules.append(rpm_module.pulp_href)
