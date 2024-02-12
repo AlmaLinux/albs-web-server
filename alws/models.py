@@ -1224,7 +1224,10 @@ class NewErrataRecord(Base):
     id = sqlalchemy.Column(sqlalchemy.Text, primary_key=True)
     platform_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("platforms.id", name="new_errata_records_platform_id_fkey"),
+        sqlalchemy.ForeignKey(
+            "platforms.id",
+            name="new_errata_records_platform_id_fkey",
+        ),
         nullable=False,
         primary_key=True,
     )
@@ -1319,7 +1322,7 @@ class NewErrataPackage(Base):
         foreign_keys=[errata_record_id, platform_id],
         cascade="all, delete",
         primaryjoin="and_(NewErrataPackage.errata_record_id == NewErrataRecord.id,"
-                    "NewErrataPackage.platform_id == NewErrataRecord.platform_id)",
+        "NewErrataPackage.platform_id == NewErrataRecord.platform_id)",
         back_populates="packages",
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1360,7 +1363,7 @@ class NewErrataReference(Base):
         foreign_keys=[errata_record_id, platform_id],
         cascade="all, delete",
         primaryjoin="and_(NewErrataReference.errata_record_id == NewErrataRecord.id,"
-                    "NewErrataReference.platform_id == NewErrataRecord.platform_id)",
+        "NewErrataReference.platform_id == NewErrataRecord.platform_id)",
         back_populates="references",
     )
     cve = relationship("ErrataCVE", cascade="all, delete")
@@ -1754,15 +1757,18 @@ idx_new_errata_packages_name_version_arch = sqlalchemy.Index(
 )
 new_errata_records_id_platform_id_index = sqlalchemy.Index(
     "new_errata_records_id_platform_id_index",
-    NewErrataRecord.id, NewErrataRecord.platform_id,
+    NewErrataRecord.id,
+    NewErrataRecord.platform_id,
 )
 new_errata_packages_errata_record_id_platform_id_index = sqlalchemy.Index(
     "new_errata_packages_errata_record_id_platform_id_index",
-    NewErrataPackage.errata_record_id, NewErrataPackage.platform_id,
+    NewErrataPackage.errata_record_id,
+    NewErrataPackage.platform_id,
 )
 new_errata_references_errata_record_id_platform_id_index = sqlalchemy.Index(
     "new_errata_references_errata_record_id_platform_id_index",
-    NewErrataReference.errata_record_id, NewErrataReference.platform_id,
+    NewErrataReference.errata_record_id,
+    NewErrataReference.platform_id,
 )
 
 

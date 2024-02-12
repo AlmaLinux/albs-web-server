@@ -131,9 +131,9 @@ async def get_oval_xml(db: AsyncSession, platform_name: str):
                     .selectinload(models.NewErrataPackage.albs_packages)
                     .selectinload(models.NewErrataToALBSPackage.build_artifact)
                     .selectinload(models.BuildTaskArtifact.build_task),
-                    selectinload(models.NewErrataRecord.references).selectinload(
-                        models.NewErrataReference.cve
-                    ),
+                    selectinload(
+                        models.NewErrataRecord.references
+                    ).selectinload(models.NewErrataReference.cve),
                 )
             )
         )
@@ -443,13 +443,11 @@ async def load_platform_packages(
                     cache[key] = []
                 cache[key].append(repo.pulp_href)
                 continue
-            short_pkg_name = "-".join(
-                (
-                    pkg.name,
-                    pkg.version,
-                    clean_release(pkg.release),
-                )
-            )
+            short_pkg_name = "-".join((
+                pkg.name,
+                pkg.version,
+                clean_release(pkg.release),
+            ))
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg.arch]
@@ -500,13 +498,11 @@ async def get_matching_albs_packages(
     #   - my-pkg-2.0-2
     #   - my-pkg-2.0-20191233git
     #   - etc
-    clean_package_name = "-".join(
-        (
-            errata_package.name,
-            errata_package.version,
-            clean_release(errata_package.release),
-        )
-    )
+    clean_package_name = "-".join((
+        errata_package.name,
+        errata_package.version,
+        clean_release(errata_package.release),
+    ))
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
@@ -568,13 +564,11 @@ async def get_matching_albs_packages(
         pulp_rpm_package = pulp_pkgs.get(package.href)
         if not pulp_rpm_package:
             continue
-        clean_pulp_package_name = "-".join(
-            (
-                pulp_rpm_package.name,
-                pulp_rpm_package.version,
-                clean_release(pulp_rpm_package.release),
-            )
-        )
+        clean_pulp_package_name = "-".join((
+            pulp_rpm_package.name,
+            pulp_rpm_package.version,
+            clean_release(pulp_rpm_package.release),
+        ))
         if (
             pulp_rpm_package.arch not in (errata_package.arch, "noarch")
             or clean_pulp_package_name != clean_package_name
@@ -783,7 +777,9 @@ async def list_errata_records(
     options = []
     if compact:
         options.append(
-            load_only(models.NewErrataRecord.id, models.NewErrataRecord.updated_date)
+            load_only(
+                models.NewErrataRecord.id, models.NewErrataRecord.updated_date
+            )
         )
     else:
         options.extend([
@@ -802,7 +798,9 @@ async def list_errata_records(
             query = select(models.NewErrataRecord).options(*options)
             query = query.order_by(models.NewErrataRecord.id.desc())
         if errata_id:
-            query = query.filter(models.NewErrataRecord.id.like(f"%{errata_id}%"))
+            query = query.filter(
+                models.NewErrataRecord.id.like(f"%{errata_id}%")
+            )
         if errata_ids:
             query = query.filter(models.NewErrataRecord.id.in_(errata_ids))
         if title:
@@ -813,11 +811,17 @@ async def list_errata_records(
                 )
             )
         if platform:
-            query = query.filter(models.NewErrataRecord.platform_id == platform)
+            query = query.filter(
+                models.NewErrataRecord.platform_id == platform
+            )
         if cve_id:
-            query = query.filter(models.NewErrataRecord.cves.like(f"%{cve_id}%"))
+            query = query.filter(
+                models.NewErrataRecord.cves.like(f"%{cve_id}%")
+            )
         if status:
-            query = query.filter(models.NewErrataRecord.release_status == status)
+            query = query.filter(
+                models.NewErrataRecord.release_status == status
+            )
         if page and not count:
             query = query.slice(10 * page - 10, 10 * page)
         return query
@@ -967,16 +971,13 @@ async def release_errata_packages(
         "release": "0",
         "rights": record.rights,
         "pushcount": "1",
-        "pkglist": [
-            {
-                "name": collection_name,
-                "short": collection_name,
-                "module": rpm_module,
-                "packages": dict_packages,
-            }
-        ],
-        "references": [
-            {
+        "pkglist": [{
+            "name": collection_name,
+            "short": collection_name,
+            "module": rpm_module,
+            "packages": dict_packages,
+        }],
+        "references": [{
                 "href": ref.href,
                 "id": ref.ref_id,
                 "title": ref.title,
@@ -1003,7 +1004,11 @@ async def prepare_updateinfo_mapping(
     blacklist_updateinfo: List[str],
 ) -> DefaultDict[
     str,
-    List[Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]],
+    List[
+        Tuple[
+            models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage
+        ]
+    ],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
     for pkg_href in set(package_hrefs):
@@ -1317,7 +1322,9 @@ async def release_errata_record(record_id: str, force: bool):
         db_record = await session.execute(
             generate_query_for_release([record_id]),
         )
-        db_record: Optional[models.NewErrataRecord] = db_record.scalars().first()
+        db_record: Optional[models.NewErrataRecord] = (
+            db_record.scalars().first()
+        )
         if not db_record:
             logging.info("Record with %s id doesn't exists", record_id)
             return

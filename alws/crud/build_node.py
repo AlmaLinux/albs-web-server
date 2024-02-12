@@ -293,7 +293,7 @@ async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
 def __verify_checksums(
     processed_entities: typing.List[
         typing.Tuple[str, str, build_node_schema.BuildDoneArtifact]
-    ]
+    ],
 ):
     checksum_errors = []
     for _, sha256, artifact in processed_entities:

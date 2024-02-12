@@ -647,7 +647,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE
+                re.IGNORECASE,
             ):
                 continue
             main_info = {
@@ -731,13 +731,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 repo_arch_location.append("x86_64")
             if arch == "noarch":
                 repo_arch_location = base_platform.arch_list
-            plan_packages.append(
-                {
-                    "package": pkg,
-                    "repositories": repositories,
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            plan_packages.append({
+                "package": pkg,
+                "repositories": repositories,
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
@@ -1358,7 +1356,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
-                        matched
+                        matched,
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
@@ -1394,7 +1392,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
-                    "matched": matched
+                    "matched": matched,
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
@@ -1403,7 +1401,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
             platforms_list,
-            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
+            data={
+                "source_rpms": src_rpm_names,
+                "match": BeholderMatchMethod.all()
+            },
         )
 
         for beholder_response in beholder_responses:
@@ -1414,12 +1415,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # we should apply matches in reversed order to overwrite less accurate results by more accurate
                 # name_only -> name_version -> closest -> exact
                 ordered_keys = [
-                    method for method in BeholderMatchMethod.all()[::-1]
+                    method
+                    for method in BeholderMatchMethod.all()[::-1]
                     if method in pkg_list["packages"].keys()
                 ]
 
                 for matched in ordered_keys:
-                    response_priority = self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(
+                        matched
+                    )
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
@@ -1427,7 +1431,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         response_priority,
-                        matched
+                        matched,
                     )
         if not beholder_cache:
             return await self.get_pulp_based_response(
@@ -1498,7 +1502,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness, matched in release_repository_keys:
+            for (
+                release_repo_key,
+                trustness,
+                matched,
+            ) in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1539,13 +1547,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for repo_key, repo_arches in release_repositories.items():
                 repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
-                copy_pkg_info.update(
-                    {
-                        # TODO: need to send only one repo instead of list
-                        "repositories": [repo],
-                        "repo_arch_location": list(repo_arches),
-                    }
-                )
+                copy_pkg_info.update({
+                    # TODO: need to send only one repo instead of list
+                    "repositories": [repo],
+                    "repo_arch_location": list(repo_arches),
+                })
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
@@ -1687,13 +1693,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any(
-                    (
-                        prod_module
-                        for prod_module in repo_module_index.iter_modules()
-                        if prod_module.nsvca == release_module_nvsca
-                    )
-                )
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
                 if module_already_in_repo:
                     additional_messages.append(
                         f"Module {release_module_nvsca} skipped,"
@@ -1752,8 +1756,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         if release.status != ReleaseStatus.COMPLETED:
             return
         package_hrefs = [
-            package["package"]["artifact_href"]
-            for package in release.plan["packages"]
+            package["package"]["artifact_href"] for package in release.plan["packages"]
         ]
         subquery = (
             select(models.BuildTaskArtifact.id)

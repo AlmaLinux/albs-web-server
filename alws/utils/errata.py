@@ -20,7 +20,12 @@ SCHEMA_VERSION = "1.0"
 
 
 def get_nevra(
-    pkg: Union[ErrataPackage, ErrataToALBSPackage, NewErrataPackage, NewErrataToALBSPackage],
+    pkg: Union[
+        ErrataPackage,
+        ErrataToALBSPackage,
+        NewErrataPackage,
+        NewErrataToALBSPackage,
+    ],
     arch: str = None,
     clean: bool = True,
 ) -> str:
@@ -140,7 +145,7 @@ def debrand_description_and_title(string: str) -> str:
         ('rhel-8', 'almalinux-8'),
         ('rhel9.2', 'almalinux9.2'),
         ('rhel-8.5', 'almalinux-8.5'),
-        ('rhel 8.4', 'almalinux 8.4')
+        ('rhel 8.4', 'almalinux 8.4'),
     )
     for pattern, repl in regex_patterns:
         string = re.sub(pattern, repl, string)
@@ -180,30 +185,26 @@ def extract_errata_metadata(update: cr.UpdateInfo) -> dict:
                 "context": item.module.context,
             }
         for collection in item.packages:
-            pkglist["packages"].append(
-                {
-                    "src": collection.src,
-                    "name": collection.name,
-                    "epoch": collection.epoch,
-                    "version": collection.version,
-                    "release": collection.release,
-                    "arch": collection.arch,
-                    "filename": collection.filename,
-                    "sum": collection.sum,
-                    "sum_type": collection.sum_type,
-                    "reboot_suggested": collection.reboot_suggested,
-                }
-            )
+            pkglist["packages"].append({
+                "src": collection.src,
+                "name": collection.name,
+                "epoch": collection.epoch,
+                "version": collection.version,
+                "release": collection.release,
+                "arch": collection.arch,
+                "filename": collection.filename,
+                "sum": collection.sum,
+                "sum_type": collection.sum_type,
+                "reboot_suggested": collection.reboot_suggested,
+            })
     refs = []
     for item in update.references:
-        refs.append(
-            {
-                "href": item.href,
-                "type": item.type,
-                "id": item.id,
-                "title": item.title,
-            }
-        )
+        refs.append({
+            "href": item.href,
+            "type": item.type,
+            "id": item.id,
+            "title": item.title,
+        })
     return {
         "updateinfo_id": update.id,
         "issued_date": update.issued_date,
@@ -226,15 +227,13 @@ def extract_errata_metadata(update: cr.UpdateInfo) -> dict:
 
 
 def _get_module_nsvca(module):
-    return ":".join(
-        [
-            module["name"],
-            module["stream"],
-            module["version"],
-            module["context"],
-            module["arch"],
-        ]
-    )
+    return ":".join([
+        module["name"],
+        module["stream"],
+        module["version"],
+        module["context"],
+        module["arch"],
+    ])
 
 
 def extract_errata_metadata_modern(update):
@@ -253,31 +252,27 @@ def extract_errata_metadata_modern(update):
     module_nsvca = None
     for item in update.collections:
         if item.module:
-            record["modules"].append(
-                {
-                    "name": item.module.name,
-                    "arch": item.module.arch,
-                    "stream": item.module.stream,
-                    "version": str(item.module.version),
-                    "context": item.module.context,
-                }
-            )
+            record["modules"].append({
+                "name": item.module.name,
+                "arch": item.module.arch,
+                "stream": item.module.stream,
+                "version": str(item.module.version),
+                "context": item.module.context,
+            })
             module_nsvca = _get_module_nsvca(record["modules"][-1])
         for pkg in item.packages:
-            record["packages"].append(
-                {
-                    "name": pkg.name,
-                    "epoch": pkg.epoch,
-                    "version": pkg.version,
-                    "release": pkg.release,
-                    "arch": pkg.arch,
-                    "src": pkg.src,
-                    "filename": pkg.filename,
-                    "checksum": pkg.sum,
-                    "checksum_type": cr.checksum_name_str(pkg.sum_type),
-                    "reboot_suggested": pkg.reboot_suggested,
-                }
-            )
+            record["packages"].append({
+                "name": pkg.name,
+                "epoch": pkg.epoch,
+                "version": pkg.version,
+                "release": pkg.release,
+                "arch": pkg.arch,
+                "src": pkg.src,
+                "filename": pkg.filename,
+                "checksum": pkg.sum,
+                "checksum_type": cr.checksum_name_str(pkg.sum_type),
+                "reboot_suggested": pkg.reboot_suggested,
+            })
             if module_nsvca:
                 record["packages"][-1]["module"] = module_nsvca
         for ref in update.references:
