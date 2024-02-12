@@ -977,7 +977,8 @@ async def release_errata_packages(
             "module": rpm_module,
             "packages": dict_packages,
         }],
-        "references": [{
+        "references": [
+            {
                 "href": ref.href,
                 "id": ref.ref_id,
                 "title": ref.title,
@@ -1004,11 +1005,7 @@ async def prepare_updateinfo_mapping(
     blacklist_updateinfo: List[str],
 ) -> DefaultDict[
     str,
-    List[
-        Tuple[
-            models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage
-        ]
-    ],
+    List[Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
     for pkg_href in set(package_hrefs):
@@ -1073,7 +1070,9 @@ def append_update_packages_in_update_records(
     updateinfo_mapping: DefaultDict[
         str,
         List[
-            Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]
+            Tuple[
+                models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage
+            ]
         ],
     ],
 ):
