@@ -1268,8 +1268,14 @@ class NewErrataRecord(Base):
     variables = sqlalchemy.Column(JSONB, nullable=True)
     original_variables = sqlalchemy.Column(JSONB, nullable=True)
 
-    references = relationship("NewErrataReference", cascade="all, delete")
-    packages = relationship("NewErrataPackage", cascade="all, delete")
+    references = relationship(
+        "NewErrataReference",
+        back_populates="platform_specific_errata_record",
+    )
+    packages = relationship(
+        "NewErrataPackage",
+        back_populates="platform_specific_errata_record",
+    )
 
     cves = association_proxy("references", "cve_id")
 
@@ -1300,7 +1306,8 @@ class NewErrataPackage(Base):
     __table_args__ = (
         sqlalchemy.ForeignKeyConstraint(
             ("errata_record_id", "platform_id"),
-            [NewErrataRecord.id, NewErrataRecord.platform_id]
+            [NewErrataRecord.id, NewErrataRecord.platform_id],
+            name="new_errata_package_errata_record_platform_id_fkey",
         ),
     )
 
@@ -1311,6 +1318,9 @@ class NewErrataPackage(Base):
         "NewErrataRecord",
         foreign_keys=[errata_record_id, platform_id],
         cascade="all, delete",
+        primaryjoin="and_(NewErrataPackage.errata_record_id == NewErrataRecord.id,"
+                    "NewErrataPackage.platform_id == NewErrataRecord.platform_id)",
+        back_populates="packages",
     )
     name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
     version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1328,6 +1338,13 @@ class NewErrataPackage(Base):
 
 class NewErrataReference(Base):
     __tablename__ = "new_errata_references"
+    __table_args__ = (
+        sqlalchemy.ForeignKeyConstraint(
+            ("errata_record_id", "platform_id"),
+            [NewErrataRecord.id, NewErrataRecord.platform_id],
+            name="new_errata_references_errata_record_platform_id_fkey",
+        ),
+    )
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
     href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
@@ -1342,6 +1359,9 @@ class NewErrataReference(Base):
         "NewErrataRecord",
         foreign_keys=[errata_record_id, platform_id],
         cascade="all, delete",
+        primaryjoin="and_(NewErrataReference.errata_record_id == NewErrataRecord.id,"
+                    "NewErrataReference.platform_id == NewErrataRecord.platform_id)",
+        back_populates="references",
     )
     cve = relationship("ErrataCVE", cascade="all, delete")
     cve_id = sqlalchemy.Column(
