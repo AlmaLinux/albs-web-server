@@ -343,7 +343,13 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                                 "build_id": build.id,
                                 "name": module.name,
                                 "stream": module.stream,
-                                "version": module.version,
+                                # Module version needs to be converted into
+                                # string because it's going to be involved later
+                                # in release plan. When interacting with API
+                                # via Swagger or albs-frontend, we'll loose
+                                # precision as described here:
+                                # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
+                                "version": str(module.version),
                                 "context": module.context,
                                 "arch": module.arch,
                                 "template": module.render(),
@@ -844,7 +850,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href, _ = await self.pulp_client.create_module(
+                module_pulp_href = await self.pulp_client.create_module(
                     module_info["template"],
                     module_info["name"],
                     module_info["stream"],
