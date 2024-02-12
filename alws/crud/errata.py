@@ -129,7 +129,7 @@ async def get_oval_xml(db: AsyncSession, platform_name: str):
                 .options(
                     selectinload(models.NewErrataRecord.packages)
                     .selectinload(models.NewErrataPackage.albs_packages)
-                    .selectinload(models.ErrataToALBSPackage.build_artifact)
+                    .selectinload(models.NewErrataToALBSPackage.build_artifact)
                     .selectinload(models.BuildTaskArtifact.build_task),
                     selectinload(models.NewErrataRecord.references).selectinload(
                         models.NewErrataReference.cve
@@ -493,7 +493,7 @@ async def get_matching_albs_packages(
     errata_package: models.NewErrataPackage,
     prod_repos_cache,
     module,
-) -> List[models.ErrataToALBSPackage]:
+) -> List[models.NewErrataToALBSPackage]:
     items_to_insert = []
     # We're going to check packages that match name-version-clean_release
     # Note that clean_release doesn't include the .module... str, we match:
@@ -512,7 +512,7 @@ async def get_matching_albs_packages(
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
         errata_package.arch, []
     ):
-        mapping = models.ErrataToALBSPackage(
+        mapping = models.NewErrataToALBSPackage(
             pulp_href=prod_package.pulp_href,
             status=ErrataPackageStatus.released,
             name=prod_package.name,
@@ -580,7 +580,7 @@ async def get_matching_albs_packages(
             or clean_pulp_package_name != clean_package_name
         ):
             continue
-        mapping = models.ErrataToALBSPackage(
+        mapping = models.NewErrataToALBSPackage(
             albs_artifact_id=package.id,
             status=ErrataPackageStatus.proposal,
             name=pulp_rpm_package.name,
@@ -754,7 +754,7 @@ async def get_errata_record(
     options = [
         selectinload(models.NewErrataRecord.packages)
         .selectinload(models.NewErrataPackage.albs_packages)
-        .selectinload(models.ErrataToALBSPackage.build_artifact)
+        .selectinload(models.NewErrataToALBSPackage.build_artifact)
         .selectinload(models.BuildTaskArtifact.build_task),
         selectinload(models.NewErrataRecord.references).selectinload(
             models.NewErrataReference.cve
@@ -789,7 +789,7 @@ async def list_errata_records(
         options.extend([
             selectinload(models.NewErrataRecord.packages)
             .selectinload(models.NewErrataPackage.albs_packages)
-            .selectinload(models.ErrataToALBSPackage.build_artifact)
+            .selectinload(models.NewErrataToALBSPackage.build_artifact)
             .selectinload(models.BuildTaskArtifact.build_task),
             selectinload(models.NewErrataRecord.references).selectinload(
                 models.NewErrataReference.cve
@@ -843,7 +843,7 @@ async def update_package_status(
                 .options(
                     selectinload(models.NewErrataRecord.packages)
                     .selectinload(models.NewErrataPackage.albs_packages)
-                    .selectinload(models.ErrataToALBSPackage.build_artifact)
+                    .selectinload(models.NewErrataToALBSPackage.build_artifact)
                     .selectinload(models.BuildTaskArtifact.build_task)
                 )
             )
@@ -872,7 +872,7 @@ async def release_errata_packages(
     session: AsyncSession,
     pulp_client: PulpClient,
     record: models.NewErrataRecord,
-    packages: List[models.ErrataToALBSPackage],
+    packages: List[models.NewErrataToALBSPackage],
     platform: models.Platform,
     repo_href: str,
     publish: bool = True,
@@ -1003,7 +1003,7 @@ async def prepare_updateinfo_mapping(
     blacklist_updateinfo: List[str],
 ) -> DefaultDict[
     str,
-    List[Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]],
+    List[Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
     for pkg_href in set(package_hrefs):
@@ -1026,17 +1026,17 @@ async def prepare_updateinfo_mapping(
         )
         for db_pkg in db_pkg_list:
             errata_pkgs = await db.execute(
-                select(models.ErrataToALBSPackage)
+                select(models.NewErrataToALBSPackage)
                 .where(
                     or_(
-                        models.ErrataToALBSPackage.albs_artifact_id
+                        models.NewErrataToALBSPackage.albs_artifact_id
                         == db_pkg.id,
-                        models.ErrataToALBSPackage.pulp_href == pkg_href,
+                        models.NewErrataToALBSPackage.pulp_href == pkg_href,
                     )
                 )
                 .options(
-                    selectinload(models.ErrataToALBSPackage.errata_package),
-                    selectinload(models.ErrataToALBSPackage.build_artifact),
+                    selectinload(models.NewErrataToALBSPackage.errata_package),
+                    selectinload(models.NewErrataToALBSPackage.build_artifact),
                 )
             )
             pulp_pkg = await pulp.get_rpm_package(
@@ -1068,7 +1068,7 @@ def append_update_packages_in_update_records(
     updateinfo_mapping: DefaultDict[
         str,
         List[
-            Tuple[models.BuildTaskArtifact, dict, models.ErrataToALBSPackage]
+            Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]
         ],
     ],
 ):
@@ -1130,7 +1130,7 @@ def get_albs_packages_from_record(
     record: models.NewErrataRecord,
     pulp_packages: Dict[str, Any],
     force: bool = False,
-) -> Tuple[DefaultDict[str, List[models.ErrataToALBSPackage]], List[str]]:
+) -> Tuple[DefaultDict[str, List[models.NewErrataToALBSPackage]], List[str]]:
     repo_mapping = collections.defaultdict(list)
     errata_packages = set()
     albs_packages = set()
@@ -1181,7 +1181,7 @@ def get_albs_packages_from_record(
 
 async def process_errata_release_for_repos(
     db_record: models.NewErrataRecord,
-    repo_mapping: DefaultDict[str, List[models.ErrataToALBSPackage]],
+    repo_mapping: DefaultDict[str, List[models.NewErrataToALBSPackage]],
     session: AsyncSession,
     pulp: PulpClient,
     publish: bool = True,
@@ -1246,7 +1246,7 @@ def generate_query_for_release(records_ids: List[str]):
             selectinload(models.NewErrataRecord.references),
             selectinload(models.NewErrataRecord.packages)
             .selectinload(models.NewErrataPackage.albs_packages)
-            .selectinload(models.ErrataToALBSPackage.build_artifact),
+            .selectinload(models.NewErrataToALBSPackage.build_artifact),
             selectinload(models.NewErrataRecord.platform).selectinload(
                 models.Platform.repos
             ),
@@ -1572,8 +1572,8 @@ async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
         module=record.module,
     )
     await session.execute(
-        delete(models.ErrataToALBSPackage).where(
-            models.ErrataToALBSPackage.errata_package_id.in_(
+        delete(models.NewErrataToALBSPackage).where(
+            models.NewErrataToALBSPackage.errata_package_id.in_(
                 (pkg.id for pkg in record.packages)
             )
         )

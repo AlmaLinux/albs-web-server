@@ -8,14 +8,19 @@ from typing import List, Union
 import createrepo_c as cr
 import jinja2
 
-from alws.models import ErrataPackage, ErrataToALBSPackage
+from alws.models import (
+    ErrataPackage,
+    ErrataToALBSPackage,
+    NewErrataPackage,
+    NewErrataToALBSPackage,
+)
 from alws.utils.parsing import clean_release
 
 SCHEMA_VERSION = "1.0"
 
 
 def get_nevra(
-    pkg: Union[ErrataPackage, ErrataToALBSPackage],
+    pkg: Union[ErrataPackage, ErrataToALBSPackage, NewErrataPackage, NewErrataToALBSPackage],
     arch: str = None,
     clean: bool = True,
 ) -> str:

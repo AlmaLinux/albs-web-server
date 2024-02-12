@@ -387,7 +387,7 @@ async def __process_rpms(
             )
 
     def append_errata_package(_, errata_package, artifact, rpm_info):
-        model = models.ErrataToALBSPackage(
+        model = models.NewErrataToALBSPackage(
             status=ErrataPackageStatus.proposal,
             name=rpm_info["name"],
             version=rpm_info["version"],

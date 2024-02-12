@@ -912,10 +912,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             .scalar_subquery()
         )
         errata_pkgs = await self.db.execute(
-            select(models.ErrataToALBSPackage).where(
+            select(models.NewErrataToALBSPackage).where(
                 or_(
-                    models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
-                    models.ErrataToALBSPackage.pulp_href.in_(pkgs_to_remove),
+                    models.NewErrataToALBSPackage.albs_artifact_id.in_(subquery),
+                    models.NewErrataToALBSPackage.pulp_href.in_(pkgs_to_remove),
                 )
             )
         )
@@ -1761,10 +1761,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             .scalar_subquery()
         )
         albs_pkgs = await self.db.execute(
-            select(models.ErrataToALBSPackage).where(
+            select(models.NewErrataToALBSPackage).where(
                 or_(
-                    models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
-                    models.ErrataToALBSPackage.pulp_href.in_(package_hrefs),
+                    models.NewErrataToALBSPackage.albs_artifact_id.in_(subquery),
+                    models.NewErrataToALBSPackage.pulp_href.in_(package_hrefs),
                 )
             )
         )
