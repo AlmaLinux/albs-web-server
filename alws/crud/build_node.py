@@ -418,13 +418,13 @@ async def __process_rpms(
             src_name = rpm_info["name"]
         clean_rpm_release = clean_release(rpm_info["release"])
         conditions = [
-            models.ErrataPackage.name == rpm_info["name"],
-            models.ErrataPackage.version == rpm_info["version"],
+            models.NewErrataPackage.name == rpm_info["name"],
+            models.NewErrataPackage.version == rpm_info["version"],
         ]
         if rpm_info["arch"] != "noarch":
-            conditions.append(models.ErrataPackage.arch == rpm_info["arch"])
+            conditions.append(models.NewErrataPackage.arch == rpm_info["arch"])
 
-        query = select(models.ErrataPackage).where(
+        query = select(models.NewErrataPackage).where(
             sqlalchemy.and_(*conditions)
         )
 
@@ -435,8 +435,8 @@ async def __process_rpms(
                     continue
                 module = mod
             build_task_module = f"{module.name}:{module.stream}"
-            query = query.join(models.ErrataRecord).filter(
-                models.ErrataRecord.module == build_task_module
+            query = query.join(models.NewErrataRecord).filter(
+                models.NewErrataRecord.module == build_task_module
             )
 
         errata_packages = (await db.execute(query)).scalars().all()
