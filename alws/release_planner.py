@@ -1725,21 +1725,29 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 logging.info("module_info: %s", str(module_info))
                 logging.info("release_module: %s", str(release_module))
 
-                module_pulp_href = await self.pulp_client.create_module(
-                    module_info["template"],
-                    module_info["name"],
-                    module_info["stream"],
-                    module_info["context"],
-                    module_info["arch"],
-                    release_module.description,
-                    artifacts=release_module.get_rpm_artifacts(),
-                    dependencies=list(release_module.get_runtime_deps().values()),
-                    # TODO: Provide list of pkg hrefs when this issue is fixed
-                    # https://github.com/pulp/pulp_rpm/issues/3427
-                    packages=[],
-                    profiles=release_module.get_profiles(),
+                # I think that here we were having the "right behavior
+                # by accident" after pulp migration.
+                # Modules in release_plan might be getting a wrong final
+                # module version. Not fake module one, but wrong due to
+                # precision loss during their transit between back and front,
+                # see: https://github.com/AlmaLinux/albs-web-server/commit/8ffea9a3ab41d93011e01f8464e1b767b1461bb4
+                # Given that the module (with the right final version) already
+                # exists in Pulp, all we need to do is to add such module to
+                # the release repo at the end. This is, there's no need to
+                # create a new module.
+                module_pulp_hrefs = await self.pulp_client.get_modules(
+                    name=module_info["name"],
+                    stream=module_info["stream"],
                     version=module_info['version'],
+                    context=module_info["context"],
+                    arch=module_info["arch"],
+                    fields="pulp_href",
+                    use_next=False,
                 )
+                # We assume there's only one module with the same module
+                # nsvca in pulp.
+                module_pulp_href = module_pulp_hrefs[0]['pulp_href']
+
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     module_pulp_href
                 )

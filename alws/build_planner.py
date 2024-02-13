@@ -575,6 +575,10 @@ class BuildPlanner:
                 for module in (module, devel_module):
                     if not module:
                         continue
+                    # Create fake module in pulp without final version.
+                    # Final module in pulp will be created after all tasks are
+                    # done.
+                    # See: alws.crud.build_node.__process_build_task_artifacts
                     module_pulp_href = await self._pulp_client.create_module(
                         module.render(),
                         module.name,
@@ -587,6 +591,9 @@ class BuildPlanner:
                         packages=[],
                         profiles=module.get_profiles()
                     )
+                    # Create module in db.
+                    # It has the final version and pulp_href is pointing
+                    # to the fake module in pulp created above.
                     db_module = models.RpmModule(
                         name=module.name,
                         version=str(module.version),

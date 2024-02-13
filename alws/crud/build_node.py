@@ -732,6 +732,10 @@ async def __process_build_task_artifacts(
         for rpm_module in build_task.rpm_modules:
             logging.info("Processing module template for %s", rpm_module.name)
             start_time = datetime.datetime.utcnow()
+            # If all build tasks are finished, module_version will be
+            # the final (or real) one.
+            # If there are unfinished build tasks, module_version will be
+            # a randomly generated version.
             if all((i in finished_states for i in arch_task_statuses)):
                 module_version = rpm_module.version
             else:
@@ -744,8 +748,12 @@ async def __process_build_task_artifacts(
                 module_for_pulp.version = int(module_version)
 
                 # TODO: Pass module_pkgs_hrefs in packages field when
-                # https://github.com/pulp/pulp_rpm/issues/3427 is fixed
-                ## Shall we consider multilib pkgs here?
+                # https://github.com/pulp/pulp_rpm/issues/3427 is fixed.
+                # Then, the following commented code should work as is.
+                # Shall we consider multilib pkgs here?
+                # In any case, and as a temporary solution, we can manually
+                # create the corresponding rpm_module_packages in pulp and link
+                # them to the modules.
                 #module_for_pulp_rpms = []
                 #for rpm in module_for_pulp.get_rpm_artifacts():
                 #    nevra = parse_rpm_nevra(rpm)
@@ -774,6 +782,9 @@ async def __process_build_task_artifacts(
                     packages=[],
                     profiles=module_for_pulp.get_profiles(),
                 )
+                # Here we ensure that we add the recently created module
+                # and remove the old module (if any) from the build repo
+                # later on at modify_repository.
                 new_modules.append(module_pulp_href)
                 old_modules.append(rpm_module.pulp_href)
                 rpm_module.pulp_href = module_pulp_href
