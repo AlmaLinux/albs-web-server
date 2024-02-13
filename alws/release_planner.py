@@ -850,21 +850,19 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href = await self.pulp_client.create_module(
-                    module_info["template"],
-                    module_info["name"],
-                    module_info["stream"],
-                    module_info["context"],
-                    module_info["arch"],
-                    release_module.description,
-                    artifacts=release_module.get_rpm_artifacts(),
-                    dependencies=list(release_module.get_runtime_deps().values()),
-                    # TODO: Provide list of pkg hrefs when this issue is fixed
-                    # https://github.com/pulp/pulp_rpm/issues/3427
-                    packages=[],
-                    profiles=release_module.get_profiles(),
+
+                module_pulp_hrefs = await self.pulp_client.get_modules(
+                    name=module_info["name"],
+                    stream=module_info["stream"],
                     version=module_info['version'],
+                    context=module_info["context"],
+                    arch=module_info["arch"],
+                    fields="pulp_href",
+                    use_next=False,
                 )
+                # We assume there's only one module with the same module
+                # nsvca in pulp.
+                module_pulp_href = module_pulp_hrefs[0]['pulp_href']
                 repository_modification_mapping[db_repo["pulp_href"]].append(
                     module_pulp_href
                 )
