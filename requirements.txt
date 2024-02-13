@@ -6,7 +6,7 @@ asyncpg==0.28.0
 psycopg2-binary==2.9.6
 pydantic==2.4.2
 pydantic-settings==2.0.3
-SQLAlchemy==1.4.46
+SQLAlchemy==2.0.26
 aiohttp==3.8.6
 aiohttp-retry==2.8.3
 aiofiles==23.1.0
