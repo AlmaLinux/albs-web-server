@@ -403,6 +403,9 @@ class Build(PermissionsMixin, TeamMixin, Base):
     signed = sqlalchemy.Column(
         sqlalchemy.Boolean, default=False, nullable=True
     )
+    cancel_testing = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False, nullable=False
+    )
 
 
 BuildTaskDependency = sqlalchemy.Table(

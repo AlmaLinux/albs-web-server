@@ -18,6 +18,7 @@ from alws.config import settings
 from alws.constants import BuildTaskStatus, TestTaskStatus
 from alws.pulp_models import RpmPackage
 from alws.schemas import test_schema
+from alws.utils.alts_client import AltsClient
 from alws.utils.file_utils import download_file
 from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
@@ -107,6 +108,7 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
             task.scheduled_at = datetime.datetime.utcnow()
             test_configuration = task.build_task.ref.test_configuration
             payload = {
+                'bs_task_id': task.id,
                 'runner_type': 'docker',
                 'dist_name': platform.test_dist_name,
                 'dist_version': platform.distr_version,
@@ -120,11 +122,13 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
                 'callback_href': f'/api/v1/tests/{task.id}/result/',
             }
             if module_name and module_stream and module_version:
-                payload.update({
-                    'module_name': module_name,
-                    'module_stream': module_stream,
-                    'module_version': module_version,
-                })
+                payload.update(
+                    {
+                        'module_name': module_name,
+                        'module_stream': module_stream,
+                        'module_version': module_version,
+                    }
+                )
             if repositories:
                 payload['repositories'] = repositories
             if test_configuration:
@@ -266,6 +270,12 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
     # which only restarts tests for those builds that already
     # had passed the tests
     async with db.begin():
+        # Set cancel_testing to False just in case
+        await db.execute(
+            update(models.Build)
+            .where(models.Build.id == build_id)
+            .values(cancel_testing=False)
+        )
         query = (
             select(models.BuildTask)
             .options(joinedload(models.BuildTask.test_tasks))
@@ -323,6 +333,60 @@ async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
                 'Cannot create test tasks: the log repository is not found'
             )
     await create_test_tasks(db, build_task_id, test_log_repository.id)
+
+
+async def cancel_build_tests(db: AsyncSession, build_id: int):
+    async with db.begin():
+        # Set cancel_testing to True in db
+        await db.execute(
+            update(models.Build)
+            .where(models.Build.id == build_id)
+            .values(cancel_testing=True)
+        )
+
+        build_task_ids = (
+            (
+                await db.execute(
+                    select(models.BuildTask.id).where(
+                        models.BuildTask.build_id == build_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        # Set TestTaskStatus.CANCELLED for those that are still
+        # with status TestTaskStatus.CREATED
+        await db.execute(
+            update(models.TestTask)
+            .where(
+                models.TestTask.status == TestTaskStatus.CREATED,
+                models.TestTask.build_task_id.in_(build_task_ids),
+            )
+            .values(status=TestTaskStatus.CANCELLED)
+        )
+
+        started_test_tasks_ids = (
+            (
+                await db.execute(
+                    select(models.TestTask.id).where(
+                        models.TestTask.status == TestTaskStatus.STARTED,
+                        models.TestTask.build_task_id.in_(build_task_ids),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    # Tell ALTS to cancel those with TestTaskStatus.STARTED. ALTS
+    # will notify statuses back when its done cancelling tests
+    if started_test_tasks_ids:
+        logging.info(f'{started_test_tasks_ids=}')
+        alts_client = AltsClient(settings.alts_host, settings.alts_token)
+        response = await alts_client.cancel_tasks(started_test_tasks_ids)
+        logging.info(f'## Cancel ALTS tasks {response=}')
 
 
 async def __convert_to_file(pulp_client: PulpClient, artifact: dict):
@@ -415,18 +479,21 @@ async def complete_test_task(
         logging.exception('Cannot convert test logs to proper files')
         status = TestTaskStatus.FAILED
     else:
-        for key, item in test_result.result.items():
-            if key == 'tests':
-                for test_item in item.values():
-                    if not test_item.get('success', False):
-                        status = TestTaskStatus.FAILED
-                        break
-            # Skip logs from processing
-            elif key == 'logs':
-                continue
-            elif not item.get('success', False):
-                status = TestTaskStatus.FAILED
-                break
+        if test_result.result.get('revoked'):
+            status = TestTaskStatus.CANCELLED
+        else:
+            for key, item in test_result.result.items():
+                if key == 'tests':
+                    for test_item in item.values():
+                        if not test_item.get('success', False):
+                            status = TestTaskStatus.FAILED
+                            break
+                # Skip logs from processing
+                elif key == 'logs':
+                    continue
+                elif not item.get('success', False):
+                    status = TestTaskStatus.FAILED
+                    break
     finally:
         await update_test_task(db, task_id, test_result, status=status)
         if logs:
