@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -274,15 +274,35 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
             .where(models.Build.id == build_id)
             .values(cancel_testing=False)
         )
-        build_task_ids = await db.execute(
-            select(models.BuildTask.id).where(
-                models.BuildTask.build_id == build_id
-            )
+        query = (
+            select(models.BuildTask)
+            .options(joinedload(models.BuildTask.test_tasks))
+            .where(models.BuildTask.build_id == build_id)
         )
-        build_task_ids = build_task_ids.scalars().all()
+
+        build_tasks = await db.execute(query)
+        build_tasks = build_tasks.scalars().unique().all()
         test_log_repository = await __get_log_repository(db, build_id)
-    for build_task_id in build_task_ids:
-        await create_test_tasks(db, build_task_id, test_log_repository.id)
+    for build_task in build_tasks:
+        if not build_task.test_tasks:
+            continue
+
+        last_revision = build_task.test_tasks[-1].revision
+        failed = False
+        for test_task in build_task.test_tasks:
+            if test_task.revision != last_revision:
+                continue
+
+            if test_task.status == TestTaskStatus.FAILED:
+                failed = True
+                break
+
+        if failed:
+            await create_test_tasks(
+                db,
+                build_task.id,
+                test_log_repository.id,
+            )
 
 
 async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
@@ -310,7 +330,7 @@ async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
             raise ValueError(
                 'Cannot create test tasks: the log repository is not found'
             )
-        await create_test_tasks(db, build_task_id, test_log_repository.id)
+    await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def cancel_build_tests(db: AsyncSession, build_id: int):
