@@ -1,7 +1,7 @@
 """Migrate Pulp modules
 
 Revision ID: 07dad1dc5105
-Revises: 4d128cf0914b
+Revises: 79b5458320de
 Create Date: 2024-02-02 16:17:33.965562
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '07dad1dc5105'
-down_revision = '4d128cf0914b'
+down_revision = '79b5458320de'
 branch_labels = None
 depends_on = None
 
