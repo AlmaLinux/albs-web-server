@@ -100,13 +100,17 @@ async def main():
     logger = setup_logger()
     redis_client = aioredis.from_url(config.redis_url)
     gitea_client = GiteaClient(config.gitea_host, logger)
+    wait = 600
     while True:
         logger.info('Checking cache for updates')
         await asyncio.gather(
             run(config, logger, redis_client, gitea_client, 'rpms'),
             run(config, logger, redis_client, gitea_client, 'modules'),
         )
-        await asyncio.sleep(600)
+        logger.info(
+            f'Cache has been updated, waiting for {wait} sec for next update'
+        )
+        await asyncio.sleep(wait)
 
 
 if __name__ == '__main__':

@@ -54,7 +54,7 @@ class UserManager(IntegerIDMixin, BaseUserManager):
                 token = existing_oauth_account.access_token
         try:
             if oauth_name == 'github':
-                username = await get_github_user_info(token).get('login')
+                username = (await get_github_user_info(token)).get('login')
             else:  # openid
                 # Don't we trust the token we just got?
                 # If we really don't, then we need to set up a JWKS endpoint on

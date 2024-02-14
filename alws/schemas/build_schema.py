@@ -257,6 +257,7 @@ class Build(BaseModel):
     platform_flavors: typing.List[PlatformFlavour]
     release_id: typing.Optional[int] = None
     released: bool
+    cancel_testing: typing.Optional[bool]
     products: typing.Optional[typing.List[Product]] = []
 
     @field_validator('linked_builds', mode="before")
