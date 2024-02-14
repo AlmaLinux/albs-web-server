@@ -13,12 +13,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Rebase
+      - name: Merge
         run: |
           git config --global user.email "action@users.noreply.github.com"
           git config --global user.name "action"
           git fetch origin master
-          git rebase origin/master
+          git merge --no-ff --no-log origin/master
       - name: Create dirs
         run: |
           mkdir -p /home/runner/work/albs-web-server/alts
