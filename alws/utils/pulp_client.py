@@ -239,6 +239,8 @@ class PulpClient:
             ))
         return result
 
+    # TODO: Get rid of this after uploader is updated to work
+    # with new version of Pulp
     async def create_module_by_payload(self, payload: dict) -> str:
         endpoint = "pulp/api/v3/content/rpm/modulemds/"
         task = await self.request("POST", endpoint, json=payload)

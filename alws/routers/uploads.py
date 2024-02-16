@@ -22,9 +22,17 @@ async def upload_repometada(
     repository: str = Form(...),
     session: AsyncSession = Depends(get_db),
 ):
+    # Temporary disable modules.yaml upload
+    msg = ""
+    if modules:
+        msg = (
+            'Modules metadata upload is disabled, see '
+            'https://github.com/AlmaLinux/build-system/issues/192\n'
+        )
+        modules = None
     uploader = MetadataUploader(session, repository)
     if modules is None and comps is None:
         return {"error": "there is nothing to upload"}
     updated_metadata = await uploader.process_uploaded_files(modules, comps)
-    msg = f'{", ".join(updated_metadata)} in "{repository}" has been updated'
+    msg += f'{", ".join(updated_metadata)} in "{repository}" has been updated'
     return {"message": msg}

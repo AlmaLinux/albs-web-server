@@ -51,6 +51,8 @@ class MetadataUploader:
         await self.pulp.upload_comps(data)
         await self.pulp.create_rpm_publication(repo_href)
 
+    # TODO: Update this to work with new modularity workflow, see
+    # https://github.com/AlmaLinux/build-system/issues/192
     async def upload_modules(
         self,
         repo_href: str,

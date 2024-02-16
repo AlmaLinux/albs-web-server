@@ -7,6 +7,13 @@ from alws.utils.modularity import IndexWrapper
 from tests.mock_classes import BaseAsyncTestCase
 
 
+@pytest.mark.skip(
+    reason=(
+        "This test needs to be refactored because "
+        "upload_repometadata is disabled, see "
+        "https://github.com/AlmaLinux/build-system/issues/192"
+    )
+)
 @pytest.mark.usefixtures(
     "create_repo",
     "create_module_by_payload",

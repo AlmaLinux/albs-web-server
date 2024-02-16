@@ -111,6 +111,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         create_rpm_publication,
         get_repo_modules_yaml,
         create_module,
+        get_modules,
     ):
         response = await self.make_request(
             "get",
