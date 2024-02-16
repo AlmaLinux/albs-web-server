@@ -140,12 +140,14 @@ async def get_task(
         module_build_options = {
             "definitions": {
                 "_module_build": "1",
-                "modularitylabel": ":".join([
-                    module.name,
-                    module.stream,
-                    module.version,
-                    module.context,
-                ]),
+                "modularitylabel": ":".join(
+                    [
+                        module.name,
+                        module.stream,
+                        module.version,
+                        module.context,
+                    ]
+                ),
             }
         }
         response["platform"].add_mock_options(module_build_options)

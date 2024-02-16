@@ -468,7 +468,7 @@ async def get_module_refs(
             devel_template = await download_modules_yaml(
                 devel_repo_url,
                 task.git_ref,
-                BuildTaskRefType.to_text(task.ref_type)
+                BuildTaskRefType.to_text(task.ref_type),
             )
             logging.debug('Devel template:\n%s', devel_template)
         except ModulesYamlNotFoundError:

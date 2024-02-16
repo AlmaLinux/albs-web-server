@@ -51,13 +51,15 @@ class BuildPlanner:
         self._platform_flavors = []
         self._modules_by_platform_arch = collections.defaultdict(list)
         self._module_build_index = module_build_index or {}
-        self._tasks_cache = collections.defaultdict(lambda: collections.defaultdict(list))
+        self._tasks_cache = collections.defaultdict(
+            lambda: collections.defaultdict(list)
+        )
         self._is_secure_boot = is_secure_boot
 
     async def init(
         self,
         platforms: typing.List[build_schema.BuildCreatePlatforms],
-        platform_flavors: typing.Optional[typing.List[int]]
+        platform_flavors: typing.Optional[typing.List[int]],
     ):
         if self.__initialized:
             return
@@ -101,11 +103,16 @@ class BuildPlanner:
 
     async def load_platform_flavors(self, flavors):
         db_flavors = (
-            await self._db.execute(
-                select(models.PlatformFlavour)
-                .where(models.PlatformFlavour.id.in_(flavors))
-                .options(joinedload(models.PlatformFlavour.repos))
-            )).scalars().all()
+            (
+                await self._db.execute(
+                    select(models.PlatformFlavour)
+                    .where(models.PlatformFlavour.id.in_(flavors))
+                    .options(joinedload(models.PlatformFlavour.repos))
+                )
+            )
+            .scalars()
+            .all()
+        )
         if db_flavors:
             self._platform_flavors = db_flavors
 
@@ -119,7 +126,7 @@ class BuildPlanner:
             ):
                 break
         return found
-    
+
     async def create_build_repo(
         self,
         platform: models.Platform,
@@ -202,11 +209,11 @@ class BuildPlanner:
 
     @staticmethod
     async def get_platform_multilib_artifacts(
-            beholder_client: BeholderClient,
-            platform_name: str,
-            platform_version: str,
-            task: build_schema.BuildTaskModuleRef,
-            has_devel: bool = False,
+        beholder_client: BeholderClient,
+        platform_name: str,
+        platform_version: str,
+        task: build_schema.BuildTaskModuleRef,
+        has_devel: bool = False,
     ) -> typing.Dict[str, typing.List[dict]]:
         multilib_artifacts = {}
 
@@ -235,8 +242,8 @@ class BuildPlanner:
             for artifact in ref.added_artifacts:
                 parsed_artifact = RpmArtifact.from_str(artifact)
                 if (
-                        parsed_artifact.arch == 'i686'
-                        and parsed_artifact.name in multilib_set
+                    parsed_artifact.arch == 'i686'
+                    and parsed_artifact.name in multilib_set
                 ):
                     multilib_artifacts[project_name].append(
                         parsed_artifact.as_dict()
@@ -245,7 +252,7 @@ class BuildPlanner:
         return multilib_artifacts
 
     async def get_multilib_artifacts(
-            self, task: build_schema.BuildTaskModuleRef, has_devel: bool = False
+        self, task: build_schema.BuildTaskModuleRef, has_devel: bool = False
     ) -> typing.Dict[str, dict]:
         if not settings.package_beholder_enabled:
             return {}
@@ -303,8 +310,8 @@ class BuildPlanner:
                     stable_pkg_arch = stable_pkg['arch']
                     for beta_pkg in beta_projects[proj_name]:
                         if (
-                                stable_pkg_name == beta_pkg['name']
-                                and stable_pkg_arch == beta_pkg['arch']
+                            stable_pkg_name == beta_pkg['name']
+                            and stable_pkg_arch == beta_pkg['arch']
                         ):
                             update_found = True
                             new_packages.append(beta_pkg)
@@ -319,11 +326,11 @@ class BuildPlanner:
         return merged
 
     async def get_prebuilt_module_artifacts(
-            self,
-            task: build_schema.BuildTaskModuleRef,
-            platform_name: str,
-            platform_version: str,
-            task_arch: str,
+        self,
+        task: build_schema.BuildTaskModuleRef,
+        platform_name: str,
+        platform_version: str,
+        task_arch: str,
     ) -> dict:
         if not settings.package_beholder_enabled:
             return {}
@@ -519,7 +526,8 @@ class BuildPlanner:
                 flavour_versions = [
                     flavour.modularity['versions']
                     for flavour in self._platform_flavors
-                    if flavour.modularity and flavour.modularity.get('versions')
+                    if flavour.modularity
+                    and flavour.modularity.get('versions')
                 ]
                 modularity_version = next(
                     item
@@ -555,7 +563,9 @@ class BuildPlanner:
                 module.version = module_version
                 module.context = module.generate_new_context()
                 module.arch = arch
-                module.set_arch_list(self._request_platforms_arch_list[platform.name])
+                module.set_arch_list(
+                    self._request_platforms_arch_list[platform.name]
+                )
                 module_index.add_module(module)
                 devel_module = None
                 if module_index.has_devel_module() and not module.is_devel:
@@ -589,7 +599,7 @@ class BuildPlanner:
                         artifacts=module.get_rpm_artifacts(),
                         dependencies=list(module.get_runtime_deps().values()),
                         packages=[],
-                        profiles=module.get_profiles()
+                        profiles=module.get_profiles(),
                     )
                     # Create module in db.
                     # It has the final version and pulp_href is pointing
@@ -602,9 +612,9 @@ class BuildPlanner:
                         arch=module.arch,
                         pulp_href=module_pulp_href,
                     )
-                    self._modules_by_platform_arch[(platform.name, arch)].append(
-                        db_module
-                    )
+                    self._modules_by_platform_arch[
+                        (platform.name, arch)
+                    ].append(db_module)
                 all_modules = []
                 for modules in self._modules_by_platform_arch.values():
                     all_modules.extend(modules)
@@ -618,10 +628,13 @@ class BuildPlanner:
                     modularity_version=modularity_version,
                 )
 
-    async def add_git_project(self, ref: typing.Union[
-        build_schema.BuildTaskRef,
-        build_schema.BuildTaskModuleRef,
-    ]):
+    async def add_git_project(
+        self,
+        ref: typing.Union[
+            build_schema.BuildTaskRef,
+            build_schema.BuildTaskModuleRef,
+        ],
+    ):
         if isinstance(ref, build_schema.BuildTaskRef):
             db_ref = models.BuildTaskRef(
                 url=ref.url,

@@ -201,11 +201,13 @@ async def get_builds(
         if build_task_arch is not None:
             query = query.filter(models.BuildTask.arch == build_task_arch)
         if any(rpm_params.values()):
-            pulp_params.update({
-                key: value
-                for key, value in rpm_params.items()
-                if value is not None
-            })
+            pulp_params.update(
+                {
+                    key: value
+                    for key, value in rpm_params.items()
+                    if value is not None
+                }
+            )
             # TODO: we can get packages from pulp database
             pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
             pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]

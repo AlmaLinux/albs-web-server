@@ -472,8 +472,6 @@ def delete_by_href(monkeypatch):
 @pytest.fixture
 def get_modules(monkeypatch):
     async def func(*args, **kwargs):
-        return [
-            { "pulp_href": get_module_href() }
-        ]
+        return [{"pulp_href": get_module_href()}]
 
     monkeypatch.setattr(PulpClient, "get_modules", func)

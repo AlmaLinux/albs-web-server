@@ -183,10 +183,9 @@ class MultilibProcessor:
 
         ref_name = get_clean_distr_name(platform.name)
         ref_ver = platform.distr_version
-        module = next((
-            i for i in self._build_task.rpm_modules
-            if '-devel' not in i.name
-        ))
+        module = next(
+            (i for i in self._build_task.rpm_modules if '-devel' not in i.name)
+        )
         module_name = module.name
         module_stream = module.stream
         result = await self.get_module_multilib_data(
@@ -368,10 +367,13 @@ class MultilibProcessor:
                     packages_to_process.values()
                 ).values()
             ]
-            module = next((
-                i for i in self._build_task.rpm_modules
-                if '-devel' not in i.name
-            ))
+            module = next(
+                (
+                    i
+                    for i in self._build_task.rpm_modules
+                    if '-devel' not in i.name
+                )
+            )
             module_name = module.name
             module_stream = module.stream
             await self.update_module_index(

@@ -19,12 +19,12 @@ from alws.config import settings
 from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
+    BeholderMatchMethod,
     ErrataPackageStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
-    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -660,7 +660,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE
+                re.IGNORECASE,
             ):
                 continue
             main_info = {
@@ -1341,7 +1341,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            platforms_list = base_platform.reference_platforms + [base_platform]
+            platforms_list = base_platform.reference_platforms + [
+                base_platform
+            ]
             module_responses = await self._beholder_client.retrieve_responses(
                 platforms_list,
                 module_name=module_name,
@@ -1377,7 +1379,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
-                        matched
+                        matched,
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
@@ -1413,7 +1415,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
-                    "matched": matched
+                    "matched": matched,
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
@@ -1422,7 +1424,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
             platforms_list,
-            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
+            data={
+                "source_rpms": src_rpm_names,
+                "match": BeholderMatchMethod.all(),
+            },
         )
 
         for beholder_response in beholder_responses:
@@ -1433,12 +1438,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # we should apply matches in reversed order to overwrite less accurate results by more accurate
                 # name_only -> name_version -> closest -> exact
                 ordered_keys = [
-                    method for method in BeholderMatchMethod.all()[::-1]
+                    method
+                    for method in BeholderMatchMethod.all()[::-1]
                     if method in pkg_list["packages"].keys()
                 ]
 
                 for matched in ordered_keys:
-                    response_priority = self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(
+                        matched
+                    )
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
@@ -1446,7 +1454,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         response_priority,
-                        matched
+                        matched,
                     )
         if not beholder_cache:
             return await self.get_pulp_based_response(
@@ -1517,7 +1525,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness, matched in release_repository_keys:
+            for (
+                release_repo_key,
+                trustness,
+                matched,
+            ) in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:

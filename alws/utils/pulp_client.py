@@ -3,8 +3,8 @@ import io
 import json
 import logging
 import math
-import re
 import os
+import re
 import typing
 import urllib.parse
 from typing import (
@@ -15,13 +15,12 @@ from typing import (
 
 import aiohttp
 from aiohttp.client_exceptions import ClientResponseError
+from aiohttp_retry import ExponentialRetry, RetryClient
 from fastapi import status
-from aiohttp_retry import RetryClient, ExponentialRetry
 
 from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
-
 
 PULP_SEMAPHORE = asyncio.Semaphore(5)
 
@@ -45,20 +44,24 @@ class PulpClient:
         )
 
     async def create_file_repository(
-            self, name: str, distro_path_start: str) -> typing.Tuple[str, str]:
+        self, name: str, distro_path_start: str
+    ) -> typing.Tuple[str, str]:
         endpoint = 'pulp/api/v3/repositories/file/file/'
         payload = {'name': name, 'autopublish': True}
         response = await self.request('POST', endpoint, json=payload)
         repo_href = response['pulp_href']
         await self.create_file_publication(repo_href)
         distro = await self.create_file_distro(
-            name, repo_href, base_path_start=distro_path_start)
+            name, repo_href, base_path_start=distro_path_start
+        )
         return distro, repo_href
 
     async def create_log_repo(
-            self, name: str, distro_path_start: str = 'build_logs'
+        self, name: str, distro_path_start: str = 'build_logs'
     ) -> typing.Tuple[str, str]:
-        distro, repo_href = await self.create_file_repository(name, distro_path_start)
+        distro, repo_href = await self.create_file_repository(
+            name, distro_path_start
+        )
         return distro, repo_href
 
     async def create_sign_key_repo(self, name) -> typing.Tuple[str, str]:
@@ -128,7 +131,7 @@ class PulpClient:
         return repositories[0]
 
     async def get_log_repository(
-            self, name: str
+        self, name: str
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         endpoint = "pulp/api/v3/repositories/file/file/"
         params = {"name": name}
@@ -156,7 +159,7 @@ class PulpClient:
             endpoint,
             include_fields=include_fields,
             exclude_fields=exclude_fields,
-            **params
+            **params,
         )
 
     async def get_rpm_repository(self, name: str) -> typing.Union[dict, None]:
@@ -185,7 +188,7 @@ class PulpClient:
             "pulp/api/v3/distributions/rpm/rpm/",
             include_fields=include_fields,
             exclude_fields=exclude_fields,
-            **search_params
+            **search_params,
         )
 
     async def get_rpm_remote(self, name: str) -> typing.Optional[dict]:
@@ -232,11 +235,13 @@ class PulpClient:
             return []
         result.extend(response['results'])
         if use_next and response['next']:
-            result.extend(await self.get_modules(
-                limit=limit,
-                offset=offset + limit,
-                **search_params,
-            ))
+            result.extend(
+                await self.get_modules(
+                    limit=limit,
+                    offset=offset + limit,
+                    **search_params,
+                )
+            )
         return result
 
     # TODO: Get rid of this after uploader is updated to work
@@ -305,7 +310,9 @@ class PulpClient:
         task_result = await self.wait_for_task(task["task"])
         return task_result["created_resources"][0]
 
-    async def check_if_artifact_exists(self, sha256: str) -> typing.Optional[str]:
+    async def check_if_artifact_exists(
+        self, sha256: str
+    ) -> typing.Optional[str]:
         endpoint = "pulp/api/v3/artifacts/"
         payload = {"sha256": sha256}
         response = await self.request("GET", endpoint, params=payload)
@@ -323,19 +330,26 @@ class PulpClient:
         return task_result["created_resources"]
 
     async def _upload_local_file(
-        self, file_path: str, sha256: str, chunk_size: int = UPLOAD_FILE_CHUNK_SIZE
+        self,
+        file_path: str,
+        sha256: str,
+        chunk_size: int = UPLOAD_FILE_CHUNK_SIZE,
     ):
         file_size = os.path.getsize(file_path)
         chunks = math.ceil(file_size / chunk_size)
         start = 0
         upload_href = (
-            await self.request("POST", "pulp/api/v3/uploads/", json={"size": file_size})
+            await self.request(
+                "POST", "pulp/api/v3/uploads/", json={"size": file_size}
+            )
         )["pulp_href"]
         try:
             with open(file_path, "rb") as f:
                 for i in range(chunks):
                     chunk = io.BytesIO(f.read(chunk_size))
-                    chunk.name = f'{file_path.strip("/").replace("/", "_")}_{i}'
+                    chunk.name = (
+                        f'{file_path.strip("/").replace("/", "_")}_{i}'
+                    )
                     payload = {"file": chunk}
                     if chunk_size >= file_size:
                         stop = file_size - 1
@@ -343,13 +357,17 @@ class PulpClient:
                         stop = start + chunk_size - 1
                         if stop >= file_size:
                             stop = file_size - 1
-                    headers = {"Content-Range": f"bytes {start}-{stop}/{file_size}"}
+                    headers = {
+                        "Content-Range": f"bytes {start}-{stop}/{file_size}"
+                    }
                     await self.request(
                         "PUT", upload_href, data=payload, headers=headers
                     )
                     start += chunk_size
         except Exception:
-            logging.exception("Exception during the file upload", exc_info=True)
+            logging.exception(
+                "Exception during the file upload", exc_info=True
+            )
             await self.request("DELETE", upload_href, raw=True)
         else:
             task = await self.request(
@@ -368,7 +386,9 @@ class PulpClient:
         else:
             content_fd = io.BytesIO(content)
         payload = {"file": content_fd}
-        headers = {"Content-Range": f"bytes 0-{len(content) - 1}/{len(content)}"}
+        headers = {
+            "Content-Range": f"bytes 0-{len(content) - 1}/{len(content)}"
+        }
         await self.request("PUT", upload_href, data=payload, headers=headers)
         task = await self.request(
             "POST", f"{upload_href}commit/", json={"sha256": sha256}
@@ -487,7 +507,9 @@ class PulpClient:
         task = await self.request("POST", endpoint, json=payload)
         await self.wait_for_task(task["task"])
 
-    async def create_rpm_publication(self, repository: str, sleep_time: float = 10.):
+    async def create_rpm_publication(
+        self, repository: str, sleep_time: float = 10.0
+    ):
         # Creates repodata for repositories in some way
         endpoint = "pulp/api/v3/publications/rpm/rpm/"
         payload = {"repository": repository}
@@ -510,7 +532,9 @@ class PulpClient:
         task = await self.request("POST", endpoint, json=payload)
         task_result = await self.wait_for_task(task["task"])
         hrefs = [
-            item for item in task_result["created_resources"] if "file/files" in item
+            item
+            for item in task_result["created_resources"]
+            if "file/files" in item
         ]
         return hrefs[0] if hrefs else None
 
@@ -613,7 +637,9 @@ class PulpClient:
         if search_params:
             params.update(**search_params)
 
-        return await self.request("GET", endpoint, pure_url=pure_url, params=params)
+        return await self.request(
+            "GET", endpoint, pure_url=pure_url, params=params
+        )
 
     async def get_rpm_package(
         self,
@@ -622,7 +648,9 @@ class PulpClient:
         exclude_fields: typing.List[str] = None,
     ):
         return await self.__get_content_info(
-            package_href, include_fields=include_fields, exclude_fields=exclude_fields
+            package_href,
+            include_fields=include_fields,
+            exclude_fields=exclude_fields,
         )
 
     async def __get_entities(
@@ -630,7 +658,7 @@ class PulpClient:
         endpoint,
         include_fields: typing.Optional[typing.List[str]] = None,
         exclude_fields: typing.Optional[typing.List[str]] = None,
-        **search_params
+        **search_params,
     ) -> typing.List[typing.Dict[str, typing.Any]]:
         all_entities = []
 
@@ -670,7 +698,7 @@ class PulpClient:
             endpoint,
             include_fields=include_fields,
             exclude_fields=exclude_fields,
-            **search_params
+            **search_params,
         )
 
     async def get_rpm_repository_packages(
@@ -684,7 +712,9 @@ class PulpClient:
         params = {"repository_version": latest_version, "limit": 10000}
         params.update(**search_params)
         return await self.get_rpm_packages(
-            include_fields=include_fields, exclude_fields=exclude_fields, **params
+            include_fields=include_fields,
+            exclude_fields=exclude_fields,
+            **params,
         )
 
     async def get_artifact(
@@ -694,7 +724,9 @@ class PulpClient:
         exclude_fields: typing.Optional[typing.List[str]] = None,
     ) -> typing.Optional[typing.Dict[str, Any]]:
         return await self.__get_content_info(
-            package_href, include_fields=include_fields, exclude_fields=exclude_fields
+            package_href,
+            include_fields=include_fields,
+            exclude_fields=exclude_fields,
         )
 
     async def delete_by_href(self, href: str, wait_for_result: bool = False):
@@ -705,7 +737,10 @@ class PulpClient:
         return task
 
     async def create_rpm_remote(
-        self, remote_name: str, remote_url: str, remote_policy: str = "on_demand"
+        self,
+        remote_name: str,
+        remote_url: str,
+        remote_policy: str = "on_demand",
     ) -> str:
         """
         Policy variants: 'on_demand', 'immediate', 'streamed'
@@ -759,7 +794,10 @@ class PulpClient:
         return result["results"][0]
 
     async def create_filesystem_exporter(
-        self, exporter_name: str, export_path: str, export_method: str = "hardlink"
+        self,
+        exporter_name: str,
+        export_path: str,
+        export_method: str = "hardlink",
     ):
         endpoint = "pulp/api/v3/exporters/core/filesystem/"
 
@@ -873,13 +911,15 @@ class PulpClient:
 
     async def create_entity(self, artifact):
         if artifact.type == "rpm":
-            entity_href = await self.create_rpm_package(artifact.name, artifact.href)
+            entity_href = await self.create_rpm_package(
+                artifact.name, artifact.href
+            )
         else:
             entity_href = await self.create_file(artifact.name, artifact.href)
         info = await self.get_artifact(entity_href, include_fields=["sha256"])
         return entity_href, info["sha256"], artifact
 
-    async def wait_for_task(self, task_href: str, sleep_time: float = 5.):
+    async def wait_for_task(self, task_href: str, sleep_time: float = 5.0):
         task = await self.request("GET", task_href)
         while task["state"] not in ("failed", "completed"):
             await asyncio.sleep(sleep_time)
@@ -898,7 +938,9 @@ class PulpClient:
         return task
 
     async def list_updateinfo_records(
-        self, id__in: List[str], repository_version: typing.Optional[str] = None
+        self,
+        id__in: List[str],
+        repository_version: typing.Optional[str] = None,
     ):
         endpoint = "pulp/api/v3/content/rpm/advisories/"
         payload = {"id__in": id__in}
@@ -937,9 +979,11 @@ class PulpClient:
             full_url = endpoint
         else:
             full_url = urllib.parse.urljoin(self._host, endpoint)
-        async with (self.semaphore or PULP_SEMAPHORE):
+        async with self.semaphore or PULP_SEMAPHORE:
             if method.lower() == "get":
-                async with RetryClient(retry_options=self._retry_options) as client:
+                async with RetryClient(
+                    retry_options=self._retry_options
+                ) as client:
                     response = await client.get(
                         full_url,
                         params=params,

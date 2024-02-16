@@ -7,8 +7,8 @@ import dramatiq
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.sql.expression import func
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.build_planner import BuildPlanner
@@ -40,9 +40,15 @@ def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
 
 
 async def fetch_build(db: AsyncSession, build_id: int) -> models.Build:
-    query = select(models.Build).where(models.Build.id == build_id).options(
-        joinedload(models.Build.tasks).selectinload(models.BuildTask.rpm_modules),
-        joinedload(models.Build.repos),
+    query = (
+        select(models.Build)
+        .where(models.Build.id == build_id)
+        .options(
+            joinedload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            joinedload(models.Build.repos),
+        )
     )
     result = await db.execute(query)
     return result.scalars().first()

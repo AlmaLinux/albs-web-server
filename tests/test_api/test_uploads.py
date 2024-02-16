@@ -1,9 +1,9 @@
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from alws.models import BuildTask, RpmModule
 from alws.utils.modularity import IndexWrapper
-
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -92,4 +92,6 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
                 module_value = str(getattr(module, attr))
                 db_module_value = str(getattr(rpm_module, attr))
                 if module_value != db_module_value:
-                    assert False, f"{module_value=} not equal to {db_module_value=}"
+                    assert (
+                        False
+                    ), f"{module_value=} not equal to {db_module_value=}"

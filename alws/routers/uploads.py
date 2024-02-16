@@ -1,12 +1,11 @@
 import typing
 
-from fastapi import APIRouter, Depends, UploadFile, Form
+from fastapi import APIRouter, Depends, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.auth import get_current_user
 from alws.dependencies import get_db
 from alws.utils.uploader import MetadataUploader
-
 
 router = APIRouter(
     prefix="/uploads",

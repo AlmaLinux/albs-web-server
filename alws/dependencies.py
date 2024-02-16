@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from alws import database
 from alws.config import settings
 
-
 __all__ = [
     'get_async_session',
     'get_db',

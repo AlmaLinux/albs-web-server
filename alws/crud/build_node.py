@@ -294,7 +294,7 @@ async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
 def __verify_checksums(
     processed_entities: typing.List[
         typing.Tuple[str, str, build_node_schema.BuildDoneArtifact]
-    ]
+    ],
 ):
     checksum_errors = []
     for _, sha256, artifact in processed_entities:
@@ -716,12 +716,19 @@ async def __process_build_task_artifacts(
     if build_task.rpm_modules and module_index:
         # If the task is the last for its architecture, we need to add
         # correct version for it in Pulp
-        arch_task_statuses = (await db.execute(
-            select(models.BuildTask.status).where(
-                models.BuildTask.arch == build_task.arch,
-                models.BuildTask.build_id == build_task.build_id,
-                models.BuildTask.id != build_task.id,
-            ))).scalars().all()
+        arch_task_statuses = (
+            (
+                await db.execute(
+                    select(models.BuildTask.status).where(
+                        models.BuildTask.arch == build_task.arch,
+                        models.BuildTask.build_id == build_task.build_id,
+                        models.BuildTask.id != build_task.id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         finished_states = (
             BuildTaskStatus.CANCELLED,
             BuildTaskStatus.COMPLETED,
@@ -754,19 +761,19 @@ async def __process_build_task_artifacts(
                 # In any case, and as a temporary solution, we can manually
                 # create the corresponding rpm_module_packages in pulp and link
                 # them to the modules.
-                #module_for_pulp_rpms = []
-                #for rpm in module_for_pulp.get_rpm_artifacts():
+                # module_for_pulp_rpms = []
+                # for rpm in module_for_pulp.get_rpm_artifacts():
                 #    nevra = parse_rpm_nevra(rpm)
                 #    module_for_pulp_rpms.append(
                 #        f'{nevra.name}-{nevra.version}-{nevra.release}.{nevra.arch}'
                 #    )
-                #logging.info(f'{module_for_pulp_rpms=}')
-                #module_pkgs_hrefs = [
+                # logging.info(f'{module_for_pulp_rpms=}')
+                # module_pkgs_hrefs = [
                 #    rpm_entry.href
                 #    for rpm_entry in rpm_entries
                 #    if rpm_entry.name.replace('.rpm', '') in module_for_pulp_rpms
-                #]
-                #logging.info(f'{module_pkgs_hrefs=}')
+                # ]
+                # logging.info(f'{module_pkgs_hrefs=}')
 
                 module_pulp_href = await pulp_client.create_module(
                     module_for_pulp.render(),
@@ -777,8 +784,10 @@ async def __process_build_task_artifacts(
                     module_for_pulp.description,
                     version=module_version,
                     artifacts=module_for_pulp.get_rpm_artifacts(),
-                    dependencies=list(module_for_pulp.get_runtime_deps().values()),
-                    #packages=module_pkgs_hrefs,
+                    dependencies=list(
+                        module_for_pulp.get_runtime_deps().values()
+                    ),
+                    # packages=module_pkgs_hrefs,
                     packages=[],
                     profiles=module_for_pulp.get_profiles(),
                 )
@@ -795,7 +804,9 @@ async def __process_build_task_artifacts(
                     "delta": str(end_time - start_time),
                 }
             except Exception as e:
-                message = f"Cannot update module information inside Pulp: {str(e)}"
+                message = (
+                    f"Cannot update module information inside Pulp: {str(e)}"
+                )
                 logging.exception(message)
                 raise ModuleUpdateError(message) from e
             logging.info("Module template processing is finished")

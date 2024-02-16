@@ -238,70 +238,73 @@ def errata_records_to_oval(records: List[models.ErrataRecord]):
             title = record.title
         else:
             title = record.original_title
-        definition = Definition.from_dict({
-            "id": debrand_id(record.definition_id),
-            "version": record.definition_version,
-            "class": record.definition_class,
-            "metadata": {
-                "title": title,
-                "description": (
-                    record.description
-                    if record.description
-                    else record.original_description
-                ),
-                "advisory": {
-                    "from": record.contact_mail,
-                    "severity": record.severity,
-                    "rights": record.rights,
-                    "issued_date": record.issued_date,
-                    "updated_date": record.updated_date,
-                    "affected_cpe_list": debrand_affected_cpe_list(
-                        record.affected_cpe, record.platform.distr_version
+        definition = Definition.from_dict(
+            {
+                "id": debrand_id(record.definition_id),
+                "version": record.definition_version,
+                "class": record.definition_class,
+                "metadata": {
+                    "title": title,
+                    "description": (
+                        record.description
+                        if record.description
+                        else record.original_description
                     ),
-                    "bugzilla": [
-                        {
-                            "id": ref.ref_id,
-                            "href": ref.href,
-                            "title": ref.title,
-                        }
+                    "advisory": {
+                        "from": record.contact_mail,
+                        "severity": record.severity,
+                        "rights": record.rights,
+                        "issued_date": record.issued_date,
+                        "updated_date": record.updated_date,
+                        "affected_cpe_list": debrand_affected_cpe_list(
+                            record.affected_cpe, record.platform.distr_version
+                        ),
+                        "bugzilla": [
+                            {
+                                "id": ref.ref_id,
+                                "href": ref.href,
+                                "title": ref.title,
+                            }
+                            for ref in record.references
+                            if ref.ref_type == ErrataReferenceType.bugzilla
+                        ],
+                        "cves": [
+                            {
+                                "name": ref.ref_id,
+                                "public": datetime.datetime.strptime(
+                                    # year-month-day
+                                    ref.cve.public[:10],
+                                    "%Y-%m-%d",
+                                ).date(),
+                                "href": ref.href,
+                                "impact": ref.cve.impact,
+                                "cwe": ref.cve.cwe,
+                                "cvss3": ref.cve.cvss3,
+                            }
+                            for ref in record.references
+                            if ref.ref_type == ErrataReferenceType.cve
+                            and ref.cve
+                        ],
+                    },
+                    "references": [
+                        debrand_reference(
+                            {
+                                "id": ref.ref_id,
+                                "source": ref.ref_type.value.upper(),
+                                "url": ref.href,
+                            },
+                            record.platform.distr_version,
+                        )
                         for ref in record.references
-                        if ref.ref_type == ErrataReferenceType.bugzilla
-                    ],
-                    "cves": [
-                        {
-                            "name": ref.ref_id,
-                            "public": datetime.datetime.strptime(
-                                # year-month-day
-                                ref.cve.public[:10],
-                                "%Y-%m-%d",
-                            ).date(),
-                            "href": ref.href,
-                            "impact": ref.cve.impact,
-                            "cwe": ref.cve.cwe,
-                            "cvss3": ref.cve.cvss3,
-                        }
-                        for ref in record.references
-                        if ref.ref_type == ErrataReferenceType.cve and ref.cve
+                        if ref.ref_type
+                        not in [
+                            ErrataReferenceType.bugzilla,
+                        ]
                     ],
                 },
-                "references": [
-                    debrand_reference(
-                        {
-                            "id": ref.ref_id,
-                            "source": ref.ref_type.value.upper(),
-                            "url": ref.href,
-                        },
-                        record.platform.distr_version,
-                    )
-                    for ref in record.references
-                    if ref.ref_type
-                    not in [
-                        ErrataReferenceType.bugzilla,
-                    ]
-                ],
-            },
-            "criteria": record.original_criteria,
-        })
+                "criteria": record.original_criteria,
+            }
+        )
         oval.append_object(definition)
         for test in record.original_tests:
             test["id"] = debrand_id(test["id"])
@@ -786,15 +789,17 @@ async def list_errata_records(
             load_only(models.ErrataRecord.id, models.ErrataRecord.updated_date)
         )
     else:
-        options.extend([
-            selectinload(models.ErrataRecord.packages)
-            .selectinload(models.ErrataPackage.albs_packages)
-            .selectinload(models.ErrataToALBSPackage.build_artifact)
-            .selectinload(models.BuildTaskArtifact.build_task),
-            selectinload(models.ErrataRecord.references).selectinload(
-                models.ErrataReference.cve
-            ),
-        ])
+        options.extend(
+            [
+                selectinload(models.ErrataRecord.packages)
+                .selectinload(models.ErrataPackage.albs_packages)
+                .selectinload(models.ErrataToALBSPackage.build_artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
+                selectinload(models.ErrataRecord.references).selectinload(
+                    models.ErrataReference.cve
+                ),
+            ]
+        )
 
     def generate_query(count=False):
         query = select(func.count(models.ErrataRecord.id))
@@ -901,18 +906,20 @@ async def release_errata_packages(
         if pkg_name_arch in released_pkgs:
             continue
         released_pkgs.add(pkg_name_arch)
-        dict_packages.append({
-            "name": pulp_pkg["name"],
-            "release": pulp_pkg["release"],
-            "version": pulp_pkg["version"],
-            "epoch": pulp_pkg["epoch"],
-            "arch": pulp_pkg["arch"],
-            "filename": pulp_pkg["location_href"],
-            "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
-            "src": pulp_pkg["rpm_sourcerpm"],
-            "sum": pulp_pkg["sha256"],
-            "sum_type": "sha256",
-        })
+        dict_packages.append(
+            {
+                "name": pulp_pkg["name"],
+                "release": pulp_pkg["release"],
+                "version": pulp_pkg["version"],
+                "epoch": pulp_pkg["epoch"],
+                "arch": pulp_pkg["arch"],
+                "filename": pulp_pkg["location_href"],
+                "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
+                "src": pulp_pkg["rpm_sourcerpm"],
+                "sum": pulp_pkg["sha256"],
+                "sum_type": "sha256",
+            }
+        )
         if rpm_module or ".module_el" not in pulp_pkg["release"]:
             continue
         query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
@@ -930,10 +937,13 @@ async def release_errata_packages(
         db_pkg = db_pkg.scalars().first()
         if not db_pkg:
             continue
-        db_module = next((
-            i for i in db_pkg.build_task.rpm_modules
-            if '-devel' not in i.name
-        ))
+        db_module = next(
+            (
+                i
+                for i in db_pkg.build_task.rpm_modules
+                if '-devel' not in i.name
+            )
+        )
         if db_module is not None:
             rpm_module = {
                 "name": db_module.name,
@@ -1232,7 +1242,9 @@ async def process_errata_release_for_repos(
             )
         )
         if publish:
-            publish_tasks.append(pulp.create_rpm_publication(repo_href, sleep_time=30.))
+            publish_tasks.append(
+                pulp.create_rpm_publication(repo_href, sleep_time=30.0)
+            )
     if not publish:
         return release_tasks
     logging.info("Releasing errata packages in async tasks")
@@ -1299,13 +1311,16 @@ async def get_release_logs(
     if db_record.module:
         release_log.append(f"Module: {db_record.module}\n")
 
-    release_log.extend([
-        "Architecture(s): " + ", ".join(arches),
-        "\nPackages:\n" + "\n".join(pkgs),
-        f"\nForce flag: {force_flag}",
-        "\nMissing packages:\n" + "\n".join(missing_pkg_names),
-        "\nRepositories:\n" + "\n".join([repo.url for repo in repositories]),
-    ])
+    release_log.extend(
+        [
+            "Architecture(s): " + ", ".join(arches),
+            "\nPackages:\n" + "\n".join(pkgs),
+            f"\nForce flag: {force_flag}",
+            "\nMissing packages:\n" + "\n".join(missing_pkg_names),
+            "\nRepositories:\n"
+            + "\n".join([repo.url for repo in repositories]),
+        ]
+    )
     return "".join(release_log)
 
 

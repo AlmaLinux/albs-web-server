@@ -86,13 +86,19 @@ async def get_repository(
                     distro = await pulp_client.get_rpm_distro(repo_name)
                     if not distro:
                         distro = await pulp_client.create_rpm_distro(
-                            repo_name, repo["pulp_href"], base_path_start="prod"
+                            repo_name,
+                            repo["pulp_href"],
+                            base_path_start="prod",
                         )
                     repo_url = distro["base_url"]
                     repo_href = repo["pulp_href"]
                 else:
-                    repo_url, repo_href = await pulp_client.create_rpm_repository(
-                        repo_name, create_publication=True, base_path_start="prod"
+                    repo_url, repo_href = (
+                        await pulp_client.create_rpm_repository(
+                            repo_name,
+                            create_publication=True,
+                            base_path_start="prod",
+                        )
                     )
                 REPO_CACHE[repo_name] = (repo_url, repo_href)
             logger.debug("Base URL: %s, Pulp href: %s", repo_url, repo_href)
