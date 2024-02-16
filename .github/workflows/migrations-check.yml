@@ -13,11 +13,20 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Merge
+      - name: Configure git and fetch origin/master
         run: |
           git config --global user.email "action@users.noreply.github.com"
           git config --global user.name "action"
           git fetch origin master
+      - name: Rebase
+        id: rebase
+        run: |
+          git rebase origin/master
+        continue-on-error: true
+      - name: Merge
+        if: steps.rebase.outcome != 'success'
+        run: |
+          git rebase --abort
           git merge --no-ff --no-log origin/master
       - name: Create dirs
         run: |
