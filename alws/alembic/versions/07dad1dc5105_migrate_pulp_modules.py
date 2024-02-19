@@ -1,7 +1,7 @@
 """Migrate Pulp modules
 
 Revision ID: 07dad1dc5105
-Revises: 79b5458320de
+Revises: 6a7bbafb88c5
 Create Date: 2024-02-02 16:17:33.965562
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '07dad1dc5105'
-down_revision = '79b5458320de'
+down_revision = '6a7bbafb88c5'
 branch_labels = None
 depends_on = None
 
