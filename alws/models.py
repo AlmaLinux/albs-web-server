@@ -31,6 +31,8 @@ from alws.database import Base, engine
 __all__ = [
     "Build",
     "BuildTask",
+    "ErrataRecord",
+    "NewErrataRecord",
     "Platform",
     "SignKey",
     "SignTask",
@@ -521,7 +523,7 @@ class RpmModule(Base):
     context = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     arch = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
     pulp_href = sqlalchemy.Column(sqlalchemy.TEXT, nullable=False)
-    sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=False)
+    sha256 = sqlalchemy.Column(sqlalchemy.VARCHAR(64), nullable=True)
 
     @property
     def nvsca(self):
@@ -1217,6 +1219,227 @@ class PlatformFlavour(PermissionsMixin, Base):
     data = sqlalchemy.Column(JSONB, nullable=True)
 
 
+class NewErrataRecord(Base):
+    __tablename__ = "new_errata_records"
+    id = sqlalchemy.Column(sqlalchemy.Text, primary_key=True)
+    platform_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "platforms.id",
+            name="new_errata_records_platform_id_fkey",
+        ),
+        nullable=False,
+        primary_key=True,
+    )
+    platform = relationship("Platform")
+    module = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    release_status = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataReleaseStatus, name='erratareleasestatus'),
+        nullable=False,
+    )
+    last_release_log = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    summary = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    solution = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+
+    freezed = sqlalchemy.Column(sqlalchemy.Boolean, nullable=True)
+
+    issued_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
+    updated_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    original_description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    oval_title = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    original_title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    contact_mail = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    severity = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    rights = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    # OVAL-only fields
+    definition_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    definition_version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    definition_class = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    affected_cpe = sqlalchemy.Column(JSONB, nullable=False, default=[])
+    criteria = sqlalchemy.Column(JSONB, nullable=True)
+    original_criteria = sqlalchemy.Column(JSONB, nullable=True)
+    tests = sqlalchemy.Column(JSONB, nullable=True)
+    original_tests = sqlalchemy.Column(JSONB, nullable=True)
+    objects = sqlalchemy.Column(JSONB, nullable=True)
+    original_objects = sqlalchemy.Column(JSONB, nullable=True)
+    states = sqlalchemy.Column(JSONB, nullable=True)
+    original_states = sqlalchemy.Column(JSONB, nullable=True)
+    variables = sqlalchemy.Column(JSONB, nullable=True)
+    original_variables = sqlalchemy.Column(JSONB, nullable=True)
+
+    references = relationship(
+        "NewErrataReference",
+        back_populates="platform_specific_errata_record",
+    )
+    packages = relationship(
+        "NewErrataPackage",
+        back_populates="platform_specific_errata_record",
+    )
+
+    cves = association_proxy("references", "cve_id")
+
+    def get_description(self):
+        if self.description:
+            return self.description
+        return self.original_description
+
+    def get_title(self):
+        if self.title:
+            return self.title
+        return self.original_title
+
+    def get_type(self):
+        # Gets errata type from last part of errata id
+        # For example, ALBS -> (BA) -> bugfix
+        #              ALSA -> (SA) -> security
+        #              ALEA -> (EA) -> enhancement
+        return {
+            "BA": "bugfix",
+            "SA": "security",
+            "EA": "enhancement",
+        }[self.id[2:4]]
+
+
+class NewErrataPackage(Base):
+    __tablename__ = "new_errata_packages"
+    __table_args__ = (
+        sqlalchemy.ForeignKeyConstraint(
+            ("errata_record_id", "platform_id"),
+            [NewErrataRecord.id, NewErrataRecord.platform_id],
+            name="new_errata_package_errata_record_platform_id_fkey",
+        ),
+    )
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    errata_record_id = sqlalchemy.Column(sqlalchemy.Text)
+    platform_id = sqlalchemy.Column(sqlalchemy.Integer)
+    platform_specific_errata_record = relationship(
+        "NewErrataRecord",
+        foreign_keys=[errata_record_id, platform_id],
+        cascade="all, delete",
+        primaryjoin="and_(NewErrataPackage.errata_record_id == NewErrataRecord.id,"
+        "NewErrataPackage.platform_id == NewErrataRecord.platform_id)",
+        back_populates="packages",
+    )
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    release = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    epoch = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    source_srpm = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    reboot_suggested = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False)
+    albs_packages = relationship(
+        "NewErrataToALBSPackage",
+        back_populates="errata_package",
+        cascade="all, delete",
+    )
+
+
+class NewErrataReference(Base):
+    __tablename__ = "new_errata_references"
+    __table_args__ = (
+        sqlalchemy.ForeignKeyConstraint(
+            ("errata_record_id", "platform_id"),
+            [NewErrataRecord.id, NewErrataRecord.platform_id],
+            name="new_errata_references_errata_record_platform_id_fkey",
+        ),
+    )
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    href = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    ref_id = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    title = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    ref_type = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataReferenceType), nullable=False
+    )
+    errata_record_id = sqlalchemy.Column(sqlalchemy.Text)
+    platform_id = sqlalchemy.Column(sqlalchemy.Integer)
+    platform_specific_errata_record = relationship(
+        "NewErrataRecord",
+        foreign_keys=[errata_record_id, platform_id],
+        cascade="all, delete",
+        primaryjoin="and_(NewErrataReference.errata_record_id == NewErrataRecord.id,"
+        "NewErrataReference.platform_id == NewErrataRecord.platform_id)",
+        back_populates="references",
+    )
+    cve = relationship("ErrataCVE", cascade="all, delete")
+    cve_id = sqlalchemy.Column(
+        sqlalchemy.Text,
+        sqlalchemy.ForeignKey(
+            "errata_cves.id",
+            name="new_errata_reference_cve_id_fk",
+            ondelete="CASCADE",
+        ),
+        nullable=True,
+    )
+
+
+class NewErrataToALBSPackage(Base):
+    __tablename__ = "new_errata_to_albs_packages"
+    __table_args___ = (
+        sqlalchemy.CheckConstraint(
+            "albs_artifact_id IS NOT NULL OR pulp_href IS NOT NULL",
+            name="new_errata_to_albs_package_integrity_check",
+        ),
+    )
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    errata_package_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "new_errata_packages.id",
+            name="new_errata_to_albs_package_errata_package_id_fk",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    errata_package = relationship(
+        "NewErrataPackage",
+        back_populates="albs_packages",
+    )
+    albs_artifact_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "build_artifacts.id",
+            name="new_errata_to_albs_packages_albs_artifact_id_fkey",
+            ondelete="CASCADE",
+        ),
+        nullable=True,
+    )
+    build_artifact: BuildTaskArtifact = relationship("BuildTaskArtifact")
+    pulp_href = sqlalchemy.Column(sqlalchemy.Text, nullable=True)
+    status = sqlalchemy.Column(
+        sqlalchemy.Enum(ErrataPackageStatus),
+        nullable=False,
+    )
+
+    name = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    arch = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    version = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    release = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    epoch = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+
+    @property
+    def build_id(self):
+        if self.build_artifact:
+            return self.build_artifact.build_task.build_id
+
+    @property
+    def task_id(self):
+        if self.build_artifact:
+            return self.build_artifact.build_task.id
+
+    def get_pulp_href(self):
+        if self.pulp_href:
+            return self.pulp_href
+        return self.build_artifact.href
+
+
 # Errata/OVAL related tables
 class ErrataRecord(Base):
     __tablename__ = "errata_records"
@@ -1453,7 +1676,7 @@ class PerformanceStats(Base):
         nullable=True,
         index=True,
     )
-    test_task: BuildTask = relationship(
+    test_task: TestTask = relationship(
         "TestTask",
         back_populates="performance_stats",
     )
@@ -1520,6 +1743,32 @@ idx_errata_packages_name_version_arch = sqlalchemy.Index(
     ErrataPackage.name,
     ErrataPackage.version,
     ErrataPackage.arch,
+)
+idx_new_errata_packages_name_version = sqlalchemy.Index(
+    "idx_new_errata_packages_name_version",
+    ErrataPackage.name,
+    ErrataPackage.version,
+)
+idx_new_errata_packages_name_version_arch = sqlalchemy.Index(
+    "idx_new_errata_packages_name_version_arch",
+    ErrataPackage.name,
+    ErrataPackage.version,
+    ErrataPackage.arch,
+)
+new_errata_records_id_platform_id_index = sqlalchemy.Index(
+    "new_errata_records_id_platform_id_index",
+    NewErrataRecord.id,
+    NewErrataRecord.platform_id,
+)
+new_errata_packages_errata_record_id_platform_id_index = sqlalchemy.Index(
+    "new_errata_packages_errata_record_id_platform_id_index",
+    NewErrataPackage.errata_record_id,
+    NewErrataPackage.platform_id,
+)
+new_errata_references_errata_record_id_platform_id_index = sqlalchemy.Index(
+    "new_errata_references_errata_record_id_platform_id_index",
+    NewErrataReference.errata_record_id,
+    NewErrataReference.platform_id,
 )
 
 

@@ -197,12 +197,12 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             for pkg_dict in release["plan"].get("packages", [])
         ]
         errata_pkgs = await session.execute(
-            select(models.ErrataToALBSPackage).where(
-                models.ErrataToALBSPackage.status
+            select(models.NewErrataToALBSPackage).where(
+                models.NewErrataToALBSPackage.status
                 == ErrataPackageStatus.released,
                 or_(
-                    models.ErrataToALBSPackage.pulp_href.in_(pulp_hrefs),
-                    models.ErrataToALBSPackage.albs_artifact_id.in_(
+                    models.NewErrataToALBSPackage.pulp_href.in_(pulp_hrefs),
+                    models.NewErrataToALBSPackage.albs_artifact_id.in_(
                         select(models.BuildTaskArtifact.id)
                         .where(
                             models.BuildTaskArtifact.href.in_(

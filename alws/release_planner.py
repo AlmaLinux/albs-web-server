@@ -331,17 +331,15 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append(
-                            {
-                                "build_id": build.id,
-                                "name": module.name,
-                                "stream": module.stream,
-                                "version": module.version,
-                                "context": module.context,
-                                "arch": module.arch,
-                                "template": module.render(),
-                            }
-                        )
+                        modules_to_release[key].append({
+                            "build_id": build.id,
+                            "name": module.name,
+                            "stream": module.stream,
+                            "version": module.version,
+                            "context": module.context,
+                            "arch": module.arch,
+                            "template": module.render(),
+                        })
         pulp_rpm_modules = [
             module_dict
             for module_list in modules_to_release.values()
@@ -647,7 +645,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 pretty_name,
                 # We get lowered platform_name and some old repos
                 # contain camel case platform in repo names
-                re.IGNORECASE
+                re.IGNORECASE,
             ):
                 continue
             main_info = {
@@ -731,13 +729,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 repo_arch_location.append("x86_64")
             if arch == "noarch":
                 repo_arch_location = base_platform.arch_list
-            plan_packages.append(
-                {
-                    "package": pkg,
-                    "repositories": repositories,
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            plan_packages.append({
+                "package": pkg,
+                "repositories": repositories,
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
@@ -824,13 +820,11 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any(
-                    (
-                        prod_module
-                        for prod_module in repo_module_index.iter_modules()
-                        if prod_module.nsvca == release_module_nvsca
-                    )
-                )
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
                 if module_already_in_repo:
                     additional_messages.append(
                         f"Module {release_module_nvsca} skipped,"
@@ -849,18 +843,14 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 )
                 added_modules[full_repo_name].append(release_module_nvsca)
 
-        await asyncio.gather(
-            *(
-                self.pulp_client.modify_repository(href, add=packages)
-                for href, packages in repository_modification_mapping.items()
-            )
-        )
-        await asyncio.gather(
-            *(
-                self.pulp_client.create_rpm_publication(href)
-                for href in repository_modification_mapping.keys()
-            )
-        )
+        await asyncio.gather(*(
+            self.pulp_client.modify_repository(href, add=packages)
+            for href, packages in repository_modification_mapping.items()
+        ))
+        await asyncio.gather(*(
+            self.pulp_client.create_rpm_publication(href)
+            for href in repository_modification_mapping.keys()
+        ))
         builds = await self.db.execute(
             select(models.Build).where(
                 models.Build.id.in_(release.build_ids),
@@ -912,10 +902,14 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             .scalar_subquery()
         )
         errata_pkgs = await self.db.execute(
-            select(models.ErrataToALBSPackage).where(
+            select(models.NewErrataToALBSPackage).where(
                 or_(
-                    models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
-                    models.ErrataToALBSPackage.pulp_href.in_(pkgs_to_remove),
+                    models.NewErrataToALBSPackage.albs_artifact_id.in_(
+                        subquery
+                    ),
+                    models.NewErrataToALBSPackage.pulp_href.in_(
+                        pkgs_to_remove
+                    ),
                 )
             )
         )
@@ -1038,13 +1032,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         task_arch: str = "",
         is_module: bool = False,
     ):
-        repo_name = "-".join(
-            (
-                self.clean_base_dist_name_lower,
-                self.base_platform.distr_version,
-                "devel-debuginfo" if is_debug else "devel",
-            )
-        )
+        repo_name = "-".join((
+            self.clean_base_dist_name_lower,
+            self.base_platform.distr_version,
+            "devel-debuginfo" if is_debug else "devel",
+        ))
         repo_arch = arch if arch == "src" else task_arch
         if is_module:
             repo_arch = arch
@@ -1104,13 +1096,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             repo_arch_location = [package_arch]
             if package_arch == "noarch":
                 repo_arch_location = self.base_platform.arch_list
-            packages.append(
-                {
-                    "package": package,
-                    "repositories": [devel_repo],
-                    "repo_arch_location": repo_arch_location,
-                }
-            )
+            packages.append({
+                "package": package,
+                "repositories": [devel_repo],
+                "repo_arch_location": repo_arch_location,
+            })
             added_packages.add(full_name)
         (
             pkgs_from_repos,
@@ -1232,13 +1222,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             # in cases if we try to find debug repos by non debug name
             if is_debug and not repo_name.endswith("debuginfo"):
                 repo_name += "-debuginfo"
-            release_repo_name = "-".join(
-                (
-                    self.clean_base_dist_name_lower,
-                    self.base_platform.distr_version,
-                    repo_name,
-                )
-            )
+            release_repo_name = "-".join((
+                self.clean_base_dist_name_lower,
+                self.base_platform.distr_version,
+                repo_name,
+            ))
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
             release_repositories.add((release_repo, trustness, matched))
         return release_repositories
@@ -1322,7 +1310,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            platforms_list = base_platform.reference_platforms + [base_platform]
+            platforms_list = base_platform.reference_platforms + [
+                base_platform
+            ]
             module_responses = await self._beholder_client.retrieve_responses(
                 platforms_list,
                 module_name=module_name,
@@ -1358,20 +1348,18 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         module_response["priority"],
-                        matched
+                        matched,
                     )
                 trustness = module_response["priority"]
                 module_repo = module_response["repository"]
                 repo_name = self.repo_name_regex.search(
                     module_repo["name"]
                 ).groupdict()["name"]
-                release_repo_name = "-".join(
-                    (
-                        self.clean_base_dist_name_lower,
-                        base_platform.distr_version,
-                        repo_name,
-                    )
-                )
+                release_repo_name = "-".join((
+                    self.clean_base_dist_name_lower,
+                    base_platform.distr_version,
+                    repo_name,
+                ))
                 repo_key = RepoType(release_repo_name, module["arch"], False)
                 prod_repo = repos_mapping.get(repo_key)
                 if prod_repo is None:
@@ -1394,7 +1382,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     "debug": repo_key.debug,
                     "url": prod_repo["url"],
                     "trustness": trustness,
-                    "matched": matched
+                    "matched": matched,
                 }
                 if module_repo_dict in module_info["repositories"]:
                     continue
@@ -1403,7 +1391,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
             platforms_list,
-            data={"source_rpms": src_rpm_names, "match": BeholderMatchMethod.all()},
+            data={
+                "source_rpms": src_rpm_names,
+                "match": BeholderMatchMethod.all(),
+            },
         )
 
         for beholder_response in beholder_responses:
@@ -1414,12 +1405,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # we should apply matches in reversed order to overwrite less accurate results by more accurate
                 # name_only -> name_version -> closest -> exact
                 ordered_keys = [
-                    method for method in BeholderMatchMethod.all()[::-1]
+                    method
+                    for method in BeholderMatchMethod.all()[::-1]
                     if method in pkg_list["packages"].keys()
                 ]
 
                 for matched in ordered_keys:
-                    response_priority = self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(
+                        matched
+                    )
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
@@ -1427,7 +1421,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         is_beta,
                         is_devel,
                         response_priority,
-                        matched
+                        matched,
                     )
         if not beholder_cache:
             return await self.get_pulp_based_response(
@@ -1498,7 +1492,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
-            for release_repo_key, trustness, matched in release_repository_keys:
+            for (
+                release_repo_key,
+                trustness,
+                matched,
+            ) in release_repository_keys:
                 release_repo = repos_mapping.get(release_repo_key)
                 # in some cases we get repos that we can't match
                 if release_repo is None:
@@ -1539,13 +1537,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for repo_key, repo_arches in release_repositories.items():
                 repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
-                copy_pkg_info.update(
-                    {
-                        # TODO: need to send only one repo instead of list
-                        "repositories": [repo],
-                        "repo_arch_location": list(repo_arches),
-                    }
-                )
+                copy_pkg_info.update({
+                    # TODO: need to send only one repo instead of list
+                    "repositories": [repo],
+                    "repo_arch_location": list(repo_arches),
+                })
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
@@ -1687,13 +1683,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any(
-                    (
-                        prod_module
-                        for prod_module in repo_module_index.iter_modules()
-                        if prod_module.nsvca == release_module_nvsca
-                    )
-                )
+                module_already_in_repo = any((
+                    prod_module
+                    for prod_module in repo_module_index.iter_modules()
+                    if prod_module.nsvca == release_module_nvsca
+                ))
                 if module_already_in_repo:
                     additional_messages.append(
                         f"Module {release_module_nvsca} skipped,"
@@ -1761,10 +1755,12 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             .scalar_subquery()
         )
         albs_pkgs = await self.db.execute(
-            select(models.ErrataToALBSPackage).where(
+            select(models.NewErrataToALBSPackage).where(
                 or_(
-                    models.ErrataToALBSPackage.albs_artifact_id.in_(subquery),
-                    models.ErrataToALBSPackage.pulp_href.in_(package_hrefs),
+                    models.NewErrataToALBSPackage.albs_artifact_id.in_(
+                        subquery
+                    ),
+                    models.NewErrataToALBSPackage.pulp_href.in_(package_hrefs),
                 )
             )
         )

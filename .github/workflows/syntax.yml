@@ -49,7 +49,7 @@ jobs:
           message-id: pylint-report
       - name: Run black
         if: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alembic --check --diff --color --target-version py39
+        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alws/alembic --check --diff --color --target-version py39
       - name: Run isort
         if: ${{ steps.changed-files.outputs.all_changed_files }}
         run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39
