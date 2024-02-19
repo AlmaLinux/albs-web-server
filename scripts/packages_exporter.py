@@ -35,7 +35,6 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from alws import database, models
 from alws.config import settings
 from alws.constants import SignStatusEnum
-from alws.crud.errata import
 from alws.utils.errata import (
     extract_errata_metadata,
     extract_errata_metadata_modern,
@@ -363,10 +362,12 @@ class Exporter:
     ):
         endpoint = "errata/get_oval_xml/"
         return await self.make_request(
-            "GET", endpoint, params={
+            "GET",
+            endpoint,
+            params={
                 "platform_name": platform_name,
                 "only_released": only_released,
-            }
+            },
         )
 
     async def generate_rss(self, platform, modern_cache):
@@ -991,7 +992,9 @@ def main():
                     )
                 exporter.logger.debug("JSON dump is done")
                 exporter.logger.debug("Generating OVAL data")
-                oval = sync(exporter.get_oval_xml(platform, only_released=True))
+                oval = sync(
+                    exporter.get_oval_xml(platform, only_released=True)
+                )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
                 exporter.logger.debug("OVAL is generated")
