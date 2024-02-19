@@ -446,11 +446,13 @@ async def load_platform_packages(
                     cache[key] = []
                 cache[key].append(repo.pulp_href)
                 continue
-            short_pkg_name = "-".join((
-                pkg.name,
-                pkg.version,
-                clean_release(pkg.release),
-            ))
+            short_pkg_name = "-".join(
+                (
+                    pkg.name,
+                    pkg.version,
+                    clean_release(pkg.release),
+                )
+            )
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg.arch]
@@ -501,11 +503,13 @@ async def get_matching_albs_packages(
     #   - my-pkg-2.0-2
     #   - my-pkg-2.0-20191233git
     #   - etc
-    clean_package_name = "-".join((
-        errata_package.name,
-        errata_package.version,
-        clean_release(errata_package.release),
-    ))
+    clean_package_name = "-".join(
+        (
+            errata_package.name,
+            errata_package.version,
+            clean_release(errata_package.release),
+        )
+    )
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
@@ -567,11 +571,13 @@ async def get_matching_albs_packages(
         pulp_rpm_package = pulp_pkgs.get(package.href)
         if not pulp_rpm_package:
             continue
-        clean_pulp_package_name = "-".join((
-            pulp_rpm_package.name,
-            pulp_rpm_package.version,
-            clean_release(pulp_rpm_package.release),
-        ))
+        clean_pulp_package_name = "-".join(
+            (
+                pulp_rpm_package.name,
+                pulp_rpm_package.version,
+                clean_release(pulp_rpm_package.release),
+            )
+        )
         if (
             pulp_rpm_package.arch not in (errata_package.arch, "noarch")
             or clean_pulp_package_name != clean_package_name
@@ -785,15 +791,17 @@ async def list_errata_records(
             )
         )
     else:
-        options.extend([
-            selectinload(models.NewErrataRecord.packages)
-            .selectinload(models.NewErrataPackage.albs_packages)
-            .selectinload(models.NewErrataToALBSPackage.build_artifact)
-            .selectinload(models.BuildTaskArtifact.build_task),
-            selectinload(models.NewErrataRecord.references).selectinload(
-                models.NewErrataReference.cve
-            ),
-        ])
+        options.extend(
+            [
+                selectinload(models.NewErrataRecord.packages)
+                .selectinload(models.NewErrataPackage.albs_packages)
+                .selectinload(models.NewErrataToALBSPackage.build_artifact)
+                .selectinload(models.BuildTaskArtifact.build_task),
+                selectinload(models.NewErrataRecord.references).selectinload(
+                    models.NewErrataReference.cve
+                ),
+            ]
+        )
 
     def generate_query(count=False):
         query = select(func.count(models.NewErrataRecord.id))
@@ -982,12 +990,14 @@ async def release_errata_packages(
         "release": "0",
         "rights": record.rights,
         "pushcount": "1",
-        "pkglist": [{
-            "name": collection_name,
-            "short": collection_name,
-            "module": rpm_module,
-            "packages": dict_packages,
-        }],
+        "pkglist": [
+            {
+                "name": collection_name,
+                "short": collection_name,
+                "module": rpm_module,
+                "packages": dict_packages,
+            }
+        ],
         "references": [
             {
                 "href": ref.href,
