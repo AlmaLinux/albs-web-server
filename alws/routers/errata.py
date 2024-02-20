@@ -5,11 +5,17 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.auth import get_current_user
+from alws.config import settings
 from alws.constants import ErrataReleaseStatus
 from alws.crud import errata as errata_crud
 from alws.dependencies import get_db
 from alws.dramatiq import bulk_errata_release, release_errata
 from alws.schemas import errata_schema
+from alws.utils.github_integration_helper import (
+    find_issues_by_record_id,
+    get_github_client,
+    move_issues,
+)
 
 router = APIRouter(
     prefix="/errata",
@@ -173,6 +179,18 @@ async def release_errata_record(
     db_record.last_release_log = None
     await session.commit()
     release_errata.send(record_id, platform_id, force)
+    if settings.github_integration_enabled:
+        github_client = await get_github_client()
+        issues = await find_issues_by_record_id(
+            github_client,
+            [record_id],
+        )
+        if issues:
+            await move_issues(
+                github_client=github_client,
+                issues=issues,
+                status="Released",
+            )
     return {
         "message": f"Release updateinfo record {record_id} has been started"
     }
