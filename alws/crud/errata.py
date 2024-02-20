@@ -50,6 +50,12 @@ from alws.utils.errata import (
     get_oval_title,
     get_verbose_errata_title,
 )
+from alws.utils.github_integration_helper import (
+    create_github_issue,
+    find_issues_by_record_id,
+    get_github_client,
+    move_issues,
+)
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
@@ -617,6 +623,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
+    original_id = errata.id
 
     # Rebranding RHEL -> AlmaLinux
     for key in ("description", "title"):
@@ -673,6 +680,19 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
+
+    if settings.github_integration_enabled:
+        github_client = await get_github_client()
+        await create_github_issue(
+            client=github_client,
+            title=errata.title,
+            description=errata.description,
+            advisory_id=alma_errata_id,
+            original_id=original_id,
+            platform_name=platform.name,
+            severity=errata.severity,
+            packages=errata.packages,
+        )
 
     # References
     self_ref_exists = False

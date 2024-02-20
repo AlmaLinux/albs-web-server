@@ -1,4 +1,5 @@
 import typing
+from urllib.parse import urljoin
 
 from albs_github.graphql.client import IntegrationsGHGraphQLClient
 
@@ -7,7 +8,9 @@ from alws.config import settings
 __all__ = [
     'get_github_client',
     'find_issues_by_record_id',
-    'move_issues_to_testing_section'
+    'move_issues',
+    'create_github_issue',
+    'set_build_id_to_issues',
 ]
 
 
@@ -29,9 +32,34 @@ async def get_github_client() -> IntegrationsGHGraphQLClient:
     return github_client
 
 
+async def find_issues_by_pkg_name(
+    github_client: IntegrationsGHGraphQLClient,
+    pkg_names: list,
+    platforms: list,
+) -> typing.List[dict]:
+    issue_ids = []
+    for name in pkg_names:
+        query = f"{name} in:body"
+        issue_ids.extend(
+            await get_github_issue_content_ids(github_client, query)
+        )
+    issue_ids = set(issue_ids)
+    project_issues = await github_client.get_project_content_issues()
+    filtered_issues = []
+    valid_statuses = ["Todo", "In Development"]
+    for issue_id in list(issue_ids):
+        project_issue = project_issues[issue_id]
+        if (
+            project_issue.fields["Platform"]["value"] in platforms
+            and project_issue.fields["Status"]["value"] in valid_statuses
+        ):
+            filtered_issues.append(project_issue.model_dump())
+    return filtered_issues
+
+
 async def find_issues_by_record_id(
     github_client: IntegrationsGHGraphQLClient,
-    record_ids: str,
+    record_ids: typing.List[str],
 ) -> typing.List[dict]:
     issue_ids = []
     for record_id in record_ids:
@@ -47,14 +75,31 @@ async def find_issues_by_record_id(
     return issues
 
 
-async def move_issues_to_testing_section(
+async def set_build_id_to_issues(
     github_client: IntegrationsGHGraphQLClient,
     issues: list,
+    build_id: str,
+):
+    for issue in issues:
+        issue_id = issue["id"]
+        url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
+        await github_client.set_text_field(
+            issue_id=issue_id,
+            field_name="Build URL",
+            field_value=url,
+        )
+
+
+async def move_issues(
+    github_client: IntegrationsGHGraphQLClient,
+    issues: list,
+    status: str,
 ):
     for issue in issues:
         issue_id = issue["id"]
         await github_client.set_issue_status(
-            issue_id=issue_id, status="Testing"
+            issue_id=issue_id,
+            status=status,
         )
 
 
@@ -69,3 +114,31 @@ async def get_github_issue_content_ids(
         issue = edge["node"]
         issues.append(issue["id"])
     return issues
+
+
+async def create_github_issue(
+    client: IntegrationsGHGraphQLClient,
+    title: str,
+    description: str,
+    advisory_id: str,
+    original_id: str,
+    platform_name: str,
+    severity: str,
+    packages: list,
+):
+    packages_section = "\n".join((
+        f"{p['name']}-{p['version']}-{p['release']}.{p['arch']}"
+        for p in packages
+    ))
+    issue_title = f'Release {advisory_id}'
+    issue_body = (
+        f'{title}\nSeverity: {severity}\n'
+        f'Description\n{description}\n\n'
+        f'Affected packages:\n{packages_section}'
+    )
+    issue_id, project_item_id = await client.create_issue(
+        issue_title, issue_body
+    )
+    await client.set_issue_platform(project_item_id, platform_name)
+    await client.set_text_field(project_item_id, 'Upstream ID', original_id)
+    await client.set_text_field(project_item_id, 'AlmaLinux ID', advisory_id)
