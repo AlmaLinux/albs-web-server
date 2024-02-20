@@ -15,6 +15,13 @@ from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
+from alws.utils.github_integration_helper import (
+    find_issues_by_pkg_name,
+    get_github_client,
+    move_issues,
+    set_build_id_to_issues,
+)
+from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 
 
@@ -87,6 +94,38 @@ async def create_build(
     await db.commit()
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
+    if settings.github_integration_enabled:
+        github_client = await get_github_client()
+        names = set()
+        for task in build.tasks:
+            if isinstance(task, build_schema.BuildTaskModuleRef):
+                names.add(f"{task.module_name}:{task.module_stream}")
+                continue
+
+            pkg_name = task.git_repo_name
+            if "src.rpm" in pkg_name:
+                pkg_nevra = parse_rpm_nevra(pkg_name)
+                pkg_name = f"{pkg_nevra.name}-{pkg_nevra.version}"
+            names.add(pkg_name)
+        platforms = []
+        for platform in build.platforms:
+            platforms.append(platform.name)
+        issues = await find_issues_by_pkg_name(
+            github_client=github_client,
+            pkg_names=list(names),
+            platforms=platforms
+        )
+        if issues:
+            await set_build_id_to_issues(
+                github_client=github_client,
+                issues=issues,
+                build_id=db_build.id,
+            )
+            await move_issues(
+                github_client=github_client,
+                issues=issues,
+                status="Building",
+            )
     return db_build
 
 
