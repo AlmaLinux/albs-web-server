@@ -23,6 +23,12 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
+from alws.utils.github_integration_helper import (
+    find_issues_by_record_id,
+    get_github_client,
+    move_issues,
+)
+from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
@@ -410,6 +416,7 @@ async def __process_rpms(
         for href, _, artifact in processed_packages
     ]
     rpms_info = get_rpm_packages_info(rpms)
+    errata_record_ids = set()
     for build_task_artifact in rpms:
         rpm_info = rpms_info[build_task_artifact.href]
         if rpm_info["arch"] != "src":
@@ -453,6 +460,19 @@ async def __process_rpms(
                 errata_package,
                 build_task_artifact,
                 rpm_info,
+            )
+            errata_record_ids.add(errata_package.errata_record_id)
+    if settings.github_integration_enabled:
+        github_client = await get_github_client()
+        issues = await find_issues_by_record_id(
+            github_client=github_client,
+            record_ids=list(errata_record_ids)
+        )
+        if issues:
+            await move_issues(
+                github_client=github_client,
+                issues=issues,
+                status="Testing"
             )
 
     # we need to put source RPM in module as well, but it can be skipped
