@@ -8,6 +8,7 @@ from alws.config import settings
 __all__ = [
     'get_github_client',
     'find_issues_by_record_id',
+    'find_issues_by_repo_name',
     'move_issues',
     'create_github_issue',
     'set_build_id_to_issues',
@@ -32,14 +33,13 @@ async def get_github_client() -> IntegrationsGHGraphQLClient:
     return github_client
 
 
-async def find_issues_by_pkg_name(
+async def find_issues_by_repo_name(
     github_client: IntegrationsGHGraphQLClient,
-    pkg_names: list,
-    platforms: list,
+    repo_names: list,
 ) -> typing.List[dict]:
     issue_ids = []
-    for name in pkg_names:
-        query = f"{name} in:body"
+    for name in repo_names:
+        query = f"{name} in:title,body"
         issue_ids.extend(
             await get_github_issue_content_ids(github_client, query)
         )
@@ -49,10 +49,7 @@ async def find_issues_by_pkg_name(
     valid_statuses = ["Todo", "In Development"]
     for issue_id in list(issue_ids):
         project_issue = project_issues[issue_id]
-        if (
-            project_issue.fields["Platform"]["value"] in platforms
-            and project_issue.fields["Status"]["value"] in valid_statuses
-        ):
+        if project_issue.fields["Status"]["value"] in valid_statuses:
             filtered_issues.append(project_issue.model_dump())
     return filtered_issues
 
@@ -72,6 +69,23 @@ async def find_issues_by_record_id(
     for issue_id in list(issue_ids):
         project_issue = project_issues[issue_id]
         issues.append(project_issue.model_dump())
+    return issues
+
+
+async def find_issues_by_build_id(
+    github_client: IntegrationsGHGraphQLClient,
+    build_ids: typing.List[str],
+) -> typing.List[dict]:
+    project_issues = await github_client.get_project_issues()
+    issues = []
+    for project_issue_id in project_issues:
+        project_issue = project_issues[project_issue_id]
+        build_id = project_issue.fields.get("Build URL", {}).get("value")
+        if not build_id:
+            continue
+        build_id = build_id.split('/')[-1]
+        if build_id in build_ids:
+            issues.append(project_issue.model_dump())
     return issues
 
 

@@ -16,7 +16,7 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.github_integration_helper import (
-    find_issues_by_pkg_name,
+    find_issues_by_repo_name,
     get_github_client,
     move_issues,
     set_build_id_to_issues,
@@ -96,24 +96,16 @@ async def create_build(
     start_build.send(db_build.id, build.model_dump())
     if settings.github_integration_enabled:
         github_client = await get_github_client()
-        names = set()
+        repos = set()
         for task in build.tasks:
             if isinstance(task, build_schema.BuildTaskModuleRef):
-                names.add(f"{task.module_name}:{task.module_stream}")
+                repos.add(f"module {task.module_name}")
                 continue
 
-            pkg_name = task.git_repo_name
-            if "src.rpm" in pkg_name:
-                pkg_nevra = parse_rpm_nevra(pkg_name)
-                pkg_name = f"{pkg_nevra.name}-{pkg_nevra.version}"
-            names.add(pkg_name)
-        platforms = []
-        for platform in build.platforms:
-            platforms.append(platform.name)
-        issues = await find_issues_by_pkg_name(
+            repos.add(f"{task.url} {task.git_ref}")
+        issues = await find_issues_by_repo_name(
             github_client=github_client,
-            pkg_names=list(names),
-            platforms=platforms
+            repo_names=list(repos)
         )
         if issues:
             await set_build_id_to_issues(

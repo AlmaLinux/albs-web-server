@@ -11,11 +11,6 @@ from alws.crud import errata as errata_crud
 from alws.dependencies import get_db
 from alws.dramatiq import bulk_errata_release, release_errata
 from alws.schemas import errata_schema
-from alws.utils.github_integration_helper import (
-    find_issues_by_record_id,
-    get_github_client,
-    move_issues,
-)
 
 router = APIRouter(
     prefix="/errata",

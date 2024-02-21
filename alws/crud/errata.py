@@ -557,7 +557,6 @@ async def get_matching_albs_packages(
                     issues=issues,
                     status="Released",
                 )
-
         return items_to_insert
 
     # If we couldn't find any pkg in production repos
@@ -1514,6 +1513,18 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 missing_pkg_names=missing_pkg_names,
                 force_flag=False,
             )
+            if settings.github_integration_enabled:
+                github_client = await get_github_client()
+                issues = await find_issues_by_record_id(
+                    github_client,
+                    [db_record.id],
+                )
+                if issues:
+                    await move_issues(
+                        github_client=github_client,
+                        issues=issues,
+                        status="Released",
+                    )
             if not tasks:
                 continue
             repos_to_publish.extend(repo_mapping.keys())

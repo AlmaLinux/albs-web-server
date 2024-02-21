@@ -44,6 +44,11 @@ from alws.pulp_models import RpmPackage
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import clean_debug_name, is_debuginfo_rpm
+from alws.utils.github_integration_helper import (
+    find_issues_by_build_id,
+    get_github_client,
+    move_issues,
+)
 from alws.utils.measurements import class_measure_work_time_async
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name
@@ -576,6 +581,18 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 message += "\n".join(release_messages)
             release.status = ReleaseStatus.COMPLETED
             builds_released = True
+            if settings.github_integration_enabled:
+                github_client = await get_github_client()
+                issues = await find_issues_by_build_id(
+                    github_client=github_client,
+                    build_ids=release.build_ids,
+                )
+                if issues:
+                    await move_issues(
+                        github_client=github_client,
+                        issues=issues,
+                        status="Released",
+                    )
 
         await self.db.execute(
             update(models.Build)
