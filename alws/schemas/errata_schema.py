@@ -137,6 +137,7 @@ class ChangeErrataPackageStatusResponse(BaseModel):
 
 class ChangeErrataPackageStatusRequest(BaseModel):
     errata_record_id: str
+    errata_platform_id: int
     build_id: int
     source: str
     status: ErrataPackageStatus
@@ -144,6 +145,7 @@ class ChangeErrataPackageStatusRequest(BaseModel):
 
 class UpdateErrataRequest(BaseModel):
     errata_record_id: str
+    errata_platform_id: int
     title: Optional[str] = None
     description: Optional[str] = None
 

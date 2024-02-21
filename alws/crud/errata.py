@@ -152,7 +152,11 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
         timestamp=datetime.datetime.utcnow(),
     )
     oval.generator = generator
-    # TODO: add this info to platform
+    # TODO: 
+    # * add gpg_keys info platform
+    # * OVAL data has the same problem as in 
+    #   https://github.com/AlmaLinux/build-system/issues/198
+    #   We need to figure out a way to put the right gpg key in every package
     gpg_keys = {
         "8": "51D6647EC21AD6EA",
         "9": "D36CB86CB86B3716",
@@ -466,7 +470,11 @@ async def update_errata_record(
     db: AsyncSession,
     update_record: errata_schema.UpdateErrataRequest,
 ) -> models.NewErrataRecord:
-    record = await get_errata_record(db, update_record.errata_record_id)
+    record = await get_errata_record(
+        db,
+        update_record.errata_record_id,
+        update_record.errata_platform_id,
+    )
     if update_record.title is not None:
         if update_record.title == record.original_title:
             record.title = None
@@ -744,6 +752,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
 async def get_errata_record(
     db: AsyncSession,
     errata_record_id: str,
+    errata_platform_id: int,
 ) -> Optional[models.NewErrataRecord]:
     options = [
         selectinload(models.NewErrataRecord.packages)
@@ -758,7 +767,10 @@ async def get_errata_record(
         select(models.NewErrataRecord)
         .options(*options)
         .order_by(models.NewErrataRecord.updated_date.desc())
-        .where(models.NewErrataRecord.id == errata_record_id)
+        .where(
+            models.NewErrataRecord.id == errata_record_id,
+            models.NewErrataRecord.platform_id == errata_platform_id,
+        )
     )
     return (await db.execute(query)).scalars().first()
 
@@ -843,7 +855,11 @@ async def update_package_status(
         for record in request:
             errata_record = await db.execute(
                 select(models.NewErrataRecord)
-                .where(models.NewErrataRecord.id == record.errata_record_id)
+                .where(
+                    models.NewErrataRecord.id == record.errata_record_id,
+                    models.NewErrataRecord.platform_id
+                    == record.errata_platform_id,
+                )
                 .options(
                     selectinload(models.NewErrataRecord.packages)
                     .selectinload(models.NewErrataPackage.albs_packages)
@@ -1260,6 +1276,7 @@ def generate_query_for_release(records_ids: List[str]):
     return query
 
 
+# TODO: Check db_record
 async def get_release_logs(
     record_id: str,
     pulp_packages: dict,
@@ -1310,7 +1327,7 @@ async def get_release_logs(
     return "".join(release_log)
 
 
-async def release_errata_record(record_id: str, force: bool):
+async def release_errata_record(record_id: str, platform_id: int, force: bool):
     pulp = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -1318,9 +1335,9 @@ async def release_errata_record(record_id: str, force: bool):
     )
     async with asynccontextmanager(get_db)() as session:
         session: AsyncSession
-        db_record = await session.execute(
-            generate_query_for_release([record_id]),
-        )
+        query = generate_query_for_release([record_id])
+        query = query.filter(models.NewErrataRecord.platform_id == platform_id)
+        db_record = await session.execute(query)
         db_record: Optional[models.NewErrataRecord] = (
             db_record.scalars().first()
         )
