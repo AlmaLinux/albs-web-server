@@ -140,10 +140,12 @@ async def create_github_issue(
     severity: str,
     packages: list,
 ):
-    packages_section = "\n".join((
-        f"{p['name']}-{p['version']}-{p['release']}.{p['arch']}"
-        for p in packages
-    ))
+    packages_section = "\n".join(
+        (
+            f"{p['name']}-{p['version']}-{p['release']}.{p['arch']}"
+            for p in packages
+        )
+    )
     issue_title = f'Release {advisory_id}'
     issue_body = (
         f'{title}\nSeverity: {severity}\n'

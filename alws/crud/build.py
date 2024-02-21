@@ -105,7 +105,7 @@ async def create_build(
             repos.add(f"{task.url} {task.git_ref}")
         issues = await find_issues_by_repo_name(
             github_client=github_client,
-            repo_names=list(repos)
+            repo_names=list(repos),
         )
         if issues:
             await set_build_id_to_issues(

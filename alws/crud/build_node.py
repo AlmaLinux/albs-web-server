@@ -24,8 +24,8 @@ from alws.errors import (
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.github_integration_helper import (
-    find_issues_by_record_id,
     find_issues_by_build_id,
+    find_issues_by_record_id,
     get_github_client,
     move_issues,
 )
