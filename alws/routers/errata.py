@@ -35,7 +35,7 @@ async def create_errata_record(
     return {"ok": bool(record)}
 
 
-@router.get("/", response_model=errata_schema.ErrataRecord)
+@public_router.get("/", response_model=errata_schema.ErrataRecord)
 async def get_errata_record(
     errata_id: str,
     db: AsyncSession = Depends(get_db),
