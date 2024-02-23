@@ -3,9 +3,9 @@ import json
 import logging
 import typing
 
-import aioredis
 import sentry_sdk
 from pydantic_settings import BaseSettings
+from redis import asyncio as aioredis
 
 from alws.utils.gitea import GiteaClient
 

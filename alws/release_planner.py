@@ -19,12 +19,12 @@ from alws.config import settings
 from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
+    BeholderMatchMethod,
     ErrataPackageStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
-    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -261,7 +261,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 ),
                 selectinload(models.Build.repos),
             )
@@ -306,15 +306,16 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 pkg_info["source"] = source_name
                 pulp_packages.append(pkg_info)
             for task in build.tasks:
-                if task.rpm_module and task.id in build_tasks:
-                    key = (
-                        task.rpm_module.name,
-                        task.rpm_module.stream,
-                        task.rpm_module.version,
-                        task.rpm_module.arch,
-                    )
-                    if key in modules_to_release:
-                        continue
+                if task.rpm_modules and task.id in build_tasks:
+                    for module in task.rpm_modules:
+                        key = (
+                            module.name,
+                            module.stream,
+                            module.version,
+                            module.arch,
+                        )
+                        if key in modules_to_release:
+                            continue
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
@@ -331,15 +332,23 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append({
-                            "build_id": build.id,
-                            "name": module.name,
-                            "stream": module.stream,
-                            "version": module.version,
-                            "context": module.context,
-                            "arch": module.arch,
-                            "template": module.render(),
-                        })
+                        modules_to_release[key].append(
+                            {
+                                "build_id": build.id,
+                                "name": module.name,
+                                "stream": module.stream,
+                                # Module version needs to be converted into
+                                # string because it's going to be involved later
+                                # in release plan. When interacting with API
+                                # via Swagger or albs-frontend, we'll loose
+                                # precision as described here:
+                                # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
+                                "version": str(module.version),
+                                "context": module.context,
+                                "arch": module.arch,
+                                "template": module.render(),
+                            }
+                        )
         pulp_rpm_modules = [
             module_dict
             for module_list in modules_to_release.values()
@@ -539,7 +548,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release_id: int,
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
-        logging.info("Commiing release %d", release_id)
+        logging.info("Committing release %d", release_id)
 
         user = await user_crud.get_user(self.db, user_id=user_id)
         release = await self.get_release_for_update(release_id)
@@ -729,11 +738,13 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 repo_arch_location.append("x86_64")
             if arch == "noarch":
                 repo_arch_location = base_platform.arch_list
-            plan_packages.append({
-                "package": pkg,
-                "repositories": repositories,
-                "repo_arch_location": repo_arch_location,
-            })
+            plan_packages.append(
+                {
+                    "package": pkg,
+                    "repositories": repositories,
+                    "repo_arch_location": repo_arch_location,
+                }
+            )
             added_packages.add(pkg["full_name"])
         release_plan["packages"] = plan_packages
 
@@ -820,37 +831,49 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any((
-                    prod_module
-                    for prod_module in repo_module_index.iter_modules()
-                    if prod_module.nsvca == release_module_nvsca
-                ))
+                module_already_in_repo = any(
+                    (
+                        prod_module
+                        for prod_module in repo_module_index.iter_modules()
+                        if prod_module.nsvca == release_module_nvsca
+                    )
+                )
                 if module_already_in_repo:
                     additional_messages.append(
                         f"Module {release_module_nvsca} skipped,"
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href, _ = await self.pulp_client.create_module(
-                    module_info["template"],
-                    module_info["name"],
-                    module_info["stream"],
-                    module_info["context"],
-                    module_info["arch"],
+
+                module_pulp_hrefs = await self.pulp_client.get_modules(
+                    name=module_info["name"],
+                    stream=module_info["stream"],
+                    version=module_info['version'],
+                    context=module_info["context"],
+                    arch=module_info["arch"],
+                    fields="pulp_href",
+                    use_next=False,
                 )
+                # We assume there's only one module with the same module
+                # nsvca in pulp.
+                module_pulp_href = module_pulp_hrefs[0]['pulp_href']
                 repository_modification_mapping[db_repo["pulp_href"]].append(
                     module_pulp_href
                 )
                 added_modules[full_repo_name].append(release_module_nvsca)
 
-        await asyncio.gather(*(
-            self.pulp_client.modify_repository(href, add=packages)
-            for href, packages in repository_modification_mapping.items()
-        ))
-        await asyncio.gather(*(
-            self.pulp_client.create_rpm_publication(href)
-            for href in repository_modification_mapping.keys()
-        ))
+        await asyncio.gather(
+            *(
+                self.pulp_client.modify_repository(href, add=packages)
+                for href, packages in repository_modification_mapping.items()
+            )
+        )
+        await asyncio.gather(
+            *(
+                self.pulp_client.create_rpm_publication(href)
+                for href in repository_modification_mapping.keys()
+            )
+        )
         builds = await self.db.execute(
             select(models.Build).where(
                 models.Build.id.in_(release.build_ids),
@@ -1032,11 +1055,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         task_arch: str = "",
         is_module: bool = False,
     ):
-        repo_name = "-".join((
-            self.clean_base_dist_name_lower,
-            self.base_platform.distr_version,
-            "devel-debuginfo" if is_debug else "devel",
-        ))
+        repo_name = "-".join(
+            (
+                self.clean_base_dist_name_lower,
+                self.base_platform.distr_version,
+                "devel-debuginfo" if is_debug else "devel",
+            )
+        )
         repo_arch = arch if arch == "src" else task_arch
         if is_module:
             repo_arch = arch
@@ -1096,11 +1121,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             repo_arch_location = [package_arch]
             if package_arch == "noarch":
                 repo_arch_location = self.base_platform.arch_list
-            packages.append({
-                "package": package,
-                "repositories": [devel_repo],
-                "repo_arch_location": repo_arch_location,
-            })
+            packages.append(
+                {
+                    "package": package,
+                    "repositories": [devel_repo],
+                    "repo_arch_location": repo_arch_location,
+                }
+            )
             added_packages.add(full_name)
         (
             pkgs_from_repos,
@@ -1166,7 +1193,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         is_devel: bool,
         is_debug: bool,
         beholder_cache: typing.Dict[BeholderKey, typing.Any],
-    ) -> typing.Set[typing.Tuple[RepoType, int]]:
+    ) -> typing.Set[typing.Tuple[RepoType, int, str]]:
         def generate_key(beta: bool) -> BeholderKey:
             return BeholderKey(
                 pkg_name,
@@ -1214,19 +1241,21 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             )
         for repo in predicted_package.get("repositories", []):
             ref_repo_name = repo["name"]
-            trustness = predicted_package["priority"]
-            matched = predicted_package["matched"]
+            trustness: int = predicted_package["priority"]
+            matched: str = predicted_package["matched"]
             repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
                 "name"
             ]
             # in cases if we try to find debug repos by non debug name
             if is_debug and not repo_name.endswith("debuginfo"):
                 repo_name += "-debuginfo"
-            release_repo_name = "-".join((
-                self.clean_base_dist_name_lower,
-                self.base_platform.distr_version,
-                repo_name,
-            ))
+            release_repo_name = "-".join(
+                (
+                    self.clean_base_dist_name_lower,
+                    self.base_platform.distr_version,
+                    repo_name,
+                )
+            )
             release_repo = RepoType(release_repo_name, repo["arch"], is_debug)
             release_repositories.add((release_repo, trustness, matched))
         return release_repositories
@@ -1355,11 +1384,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 repo_name = self.repo_name_regex.search(
                     module_repo["name"]
                 ).groupdict()["name"]
-                release_repo_name = "-".join((
-                    self.clean_base_dist_name_lower,
-                    base_platform.distr_version,
-                    repo_name,
-                ))
+                release_repo_name = "-".join(
+                    (
+                        self.clean_base_dist_name_lower,
+                        base_platform.distr_version,
+                        repo_name,
+                    )
+                )
                 repo_key = RepoType(release_repo_name, module["arch"], False)
                 prod_repo = repos_mapping.get(repo_key)
                 if prod_repo is None:
@@ -1537,11 +1568,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             for repo_key, repo_arches in release_repositories.items():
                 repo = repos_mapping[repo_key]
                 copy_pkg_info = copy.deepcopy(pkg_info)
-                copy_pkg_info.update({
-                    # TODO: need to send only one repo instead of list
-                    "repositories": [repo],
-                    "repo_arch_location": list(repo_arches),
-                })
+                copy_pkg_info.update(
+                    {
+                        # TODO: need to send only one repo instead of list
+                        "repositories": [repo],
+                        "repo_arch_location": list(repo_arches),
+                    }
+                )
                 packages.append(copy_pkg_info)
             added_packages.add(full_name)
 
@@ -1683,24 +1716,46 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 # for old module releases that have duplicated repos
                 if release_module_nvsca in added_modules[full_repo_name]:
                     continue
-                module_already_in_repo = any((
-                    prod_module
-                    for prod_module in repo_module_index.iter_modules()
-                    if prod_module.nsvca == release_module_nvsca
-                ))
+                module_already_in_repo = any(
+                    (
+                        prod_module
+                        for prod_module in repo_module_index.iter_modules()
+                        if prod_module.nsvca == release_module_nvsca
+                    )
+                )
                 if module_already_in_repo:
                     additional_messages.append(
                         f"Module {release_module_nvsca} skipped,"
                         f'module already in "{full_repo_name}" modules.yaml'
                     )
                     continue
-                module_pulp_href, _ = await self.pulp_client.create_module(
-                    module_info["template"],
-                    module_info["name"],
-                    module_info["stream"],
-                    module_info["context"],
-                    module_info["arch"],
+
+                logging.info("module_info: %s", str(module_info))
+                logging.info("release_module: %s", str(release_module))
+
+                # I think that here we were having the "right behavior
+                # by accident" after pulp migration.
+                # Modules in release_plan might be getting a wrong final
+                # module version. Not fake module one, but wrong due to
+                # precision loss during their transit between back and front,
+                # see: https://github.com/AlmaLinux/albs-web-server/commit/8ffea9a3ab41d93011e01f8464e1b767b1461bb4
+                # Given that the module (with the right final version) already
+                # exists in Pulp, all we need to do is to add such module to
+                # the release repo at the end. This is, there's no need to
+                # create a new module.
+                module_pulp_hrefs = await self.pulp_client.get_modules(
+                    name=module_info["name"],
+                    stream=module_info["stream"],
+                    version=module_info['version'],
+                    context=module_info["context"],
+                    arch=module_info["arch"],
+                    fields="pulp_href",
+                    use_next=False,
                 )
+                # We assume there's only one module with the same module
+                # nsvca in pulp.
+                module_pulp_href = module_pulp_hrefs[0]['pulp_href']
+
                 packages_to_repo_layout[repo_name][repo_arch].append(
                     module_pulp_href
                 )

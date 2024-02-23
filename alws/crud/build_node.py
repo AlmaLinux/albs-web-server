@@ -23,6 +23,7 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
+from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
@@ -72,7 +73,7 @@ async def get_available_build_task(
                 .selectinload(models.Build.platform_flavors)
                 .selectinload(models.PlatformFlavour.repos),
                 selectinload(models.BuildTask.artifacts),
-                selectinload(models.BuildTask.rpm_module),
+                selectinload(models.BuildTask.rpm_modules),
             )
             .order_by(models.BuildTask.id.asc())
         )
@@ -340,7 +341,6 @@ async def __process_rpms(
             and build_repo.debug == is_debug
         )
 
-    rpms = []
     arch_repo = get_repo(task_arch, False)
     debug_repo = get_repo(task_arch, True)
     src_repo = get_repo("src", False)
@@ -521,6 +521,9 @@ async def __process_logs(
     return logs
 
 
+# TODO: Improve readability
+#  * Split into smaller pieces
+#  * Maybe use decorators for stats
 async def __process_build_task_artifacts(
     db: AsyncSession,
     pulp_client: PulpClient,
@@ -559,7 +562,7 @@ async def __process_build_task_artifacts(
                     selectinload(models.BuildTask.platform).selectinload(
                         models.Platform.reference_platforms
                     ),
-                    selectinload(models.BuildTask.rpm_module),
+                    selectinload(models.BuildTask.rpm_modules),
                     selectinload(models.BuildTask.ref),
                     selectinload(models.BuildTask.build).selectinload(
                         models.Build.repos
@@ -604,7 +607,7 @@ async def __process_build_task_artifacts(
     )
     if git_commit_hash:
         build_task.ref.git_commit_hash = git_commit_hash
-    if build_task.rpm_module:
+    if build_task.rpm_modules:
         module_repo = next(
             build_repo
             for build_repo in rpm_repositories
@@ -705,38 +708,113 @@ async def __process_build_task_artifacts(
             "delta": str(end_time - start_time),
         }
         logging.info("Multilib packages processing is finished")
-    if build_task.rpm_module and module_index:
-        logging.info("Processing module template")
-        start_time = datetime.datetime.utcnow()
-        try:
-            module_pulp_href, sha256 = await pulp_client.create_module(
-                module_index.render(),
-                build_task.rpm_module.name,
-                build_task.rpm_module.stream,
-                build_task.rpm_module.context,
-                build_task.rpm_module.arch,
+    old_modules = []
+    new_modules = []
+    logging.info("Starting modules update in Pulp")
+    logging.info(f"Task rpm modules: %s", build_task.rpm_modules)
+    logging.info(f"Module index: %s", module_index)
+    if build_task.rpm_modules and module_index:
+        # If the task is the last for its architecture, we need to add
+        # correct version for it in Pulp
+        arch_task_statuses = (
+            (
+                await db.execute(
+                    select(models.BuildTask.status).where(
+                        models.BuildTask.arch == build_task.arch,
+                        models.BuildTask.build_id == build_task.build_id,
+                        models.BuildTask.id != build_task.id,
+                    )
+                )
             )
-            old_modules = await pulp_client.get_repo_modules(
-                module_repo.pulp_href,
-            )
-            await pulp_client.modify_repository(
-                module_repo.pulp_href,
-                add=[module_pulp_href],
-                remove=old_modules,
-            )
-            build_task.rpm_module.sha256 = sha256
-            build_task.rpm_module.pulp_href = module_pulp_href
-            end_time = datetime.datetime.utcnow()
-            processing_stats["module_processing"] = {
-                "start_ts": str(start_time),
-                "end_ts": str(end_time),
-                "delta": str(end_time - start_time),
-            }
-        except Exception as e:
-            message = f"Cannot update module information inside Pulp: {str(e)}"
-            logging.exception(message)
-            raise ModuleUpdateError(message) from e
-        logging.info("Module template processing is finished")
+            .scalars()
+            .all()
+        )
+        finished_states = (
+            BuildTaskStatus.CANCELLED,
+            BuildTaskStatus.COMPLETED,
+            BuildTaskStatus.EXCLUDED,
+            BuildTaskStatus.FAILED,
+        )
+
+        for rpm_module in build_task.rpm_modules:
+            logging.info("Processing module template for %s", rpm_module.name)
+            start_time = datetime.datetime.utcnow()
+            # If all build tasks are finished, module_version will be
+            # the final (or real) one.
+            # If there are unfinished build tasks, module_version will be
+            # a randomly generated version.
+            if all((i in finished_states for i in arch_task_statuses)):
+                module_version = rpm_module.version
+            else:
+                module_version = get_random_unique_version()
+            try:
+                module_for_pulp = module_index.get_module(
+                    rpm_module.name,
+                    rpm_module.stream,
+                )
+                module_for_pulp.version = int(module_version)
+
+                # TODO: Pass module_pkgs_hrefs in packages field when
+                # https://github.com/pulp/pulp_rpm/issues/3427 is fixed.
+                # Then, the following commented code should work as is.
+                # Shall we consider multilib pkgs here?
+                # In any case, and as a temporary solution, we can manually
+                # create the corresponding rpm_module_packages in pulp and link
+                # them to the modules.
+                # module_for_pulp_rpms = []
+                # for rpm in module_for_pulp.get_rpm_artifacts():
+                #    nevra = parse_rpm_nevra(rpm)
+                #    module_for_pulp_rpms.append(
+                #        f'{nevra.name}-{nevra.version}-{nevra.release}.{nevra.arch}'
+                #    )
+                # logging.info(f'{module_for_pulp_rpms=}')
+                # module_pkgs_hrefs = [
+                #    rpm_entry.href
+                #    for rpm_entry in rpm_entries
+                #    if rpm_entry.name.replace('.rpm', '') in module_for_pulp_rpms
+                # ]
+                # logging.info(f'{module_pkgs_hrefs=}')
+
+                module_pulp_href = await pulp_client.create_module(
+                    module_for_pulp.render(),
+                    rpm_module.name,
+                    rpm_module.stream,
+                    rpm_module.context,
+                    rpm_module.arch,
+                    module_for_pulp.description,
+                    version=module_version,
+                    artifacts=module_for_pulp.get_rpm_artifacts(),
+                    dependencies=list(
+                        module_for_pulp.get_runtime_deps().values()
+                    ),
+                    # packages=module_pkgs_hrefs,
+                    packages=[],
+                    profiles=module_for_pulp.get_profiles(),
+                )
+                # Here we ensure that we add the recently created module
+                # and remove the old module (if any) from the build repo
+                # later on at modify_repository.
+                new_modules.append(module_pulp_href)
+                old_modules.append(rpm_module.pulp_href)
+                rpm_module.pulp_href = module_pulp_href
+                end_time = datetime.datetime.utcnow()
+                processing_stats["module_processing"] = {
+                    "start_ts": str(start_time),
+                    "end_ts": str(end_time),
+                    "delta": str(end_time - start_time),
+                }
+            except Exception as e:
+                message = (
+                    f"Cannot update module information inside Pulp: {str(e)}"
+                )
+                logging.exception(message)
+                raise ModuleUpdateError(message) from e
+            logging.info("Module template processing is finished")
+        await pulp_client.modify_repository(
+            module_repo.pulp_href,
+            add=new_modules,
+            remove=old_modules,
+        )
 
     if rpm_entries:
         db.add_all(rpm_entries)

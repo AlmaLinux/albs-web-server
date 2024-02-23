@@ -51,6 +51,8 @@ class MetadataUploader:
         await self.pulp.upload_comps(data)
         await self.pulp.create_rpm_publication(repo_href)
 
+    # TODO: Update this to work with new modularity workflow, see
+    # https://github.com/AlmaLinux/build-system/issues/192
     async def upload_modules(
         self,
         repo_href: str,
@@ -187,7 +189,6 @@ class MetadataUploader:
                 module_value = str(getattr(module, attr))
                 if module_value != str(getattr(rpm_module, attr)):
                     setattr(rpm_module, attr, module_value)
-            rpm_module.sha256 = sha256
             rpm_module.pulp_href = module_href
         await self.session.commit()
 
