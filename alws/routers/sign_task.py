@@ -3,8 +3,8 @@ import json
 import typing
 import uuid
 
-import aioredis
 from fastapi import APIRouter, Depends, WebSocket
+from redis import asyncio as aioredis
 
 from alws import database, dramatiq
 from alws.auth import get_current_user
@@ -48,10 +48,12 @@ async def get_available_sign_task(
     payload: sign_schema.SignTaskGet, db: database.Session = Depends(get_db)
 ):
     result = await sign_task.get_available_sign_task(db, payload.key_ids)
-    if any([
-        not result.get(item)
-        for item in ['build_id', 'id', 'keyid', 'packages']
-    ]):
+    if any(
+        [
+            not result.get(item)
+            for item in ['build_id', 'id', 'keyid', 'packages']
+        ]
+    ):
         return {}
     return result
 

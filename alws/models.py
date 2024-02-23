@@ -428,6 +428,30 @@ BuildTaskDependency = sqlalchemy.Table(
 )
 
 
+BuildTaskRpmModuleMapping = sqlalchemy.Table(
+    "build_tasks_rpm_modules_mapping",
+    Base.metadata,
+    sqlalchemy.Column(
+        "build_task_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "build_tasks.id",
+            name="build_tasks_rpm_modules_mapping_build_task_id_fkey",
+        ),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "rpm_module_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "rpm_module.id",
+            name="build_tasks_rpm_modules_mapping_rpm_module_id_fkey",
+        ),
+        primary_key=True,
+    ),
+)
+
+
 class BuildTask(TimeMixin, Base):
     __tablename__ = "build_tasks"
 
@@ -456,10 +480,9 @@ class BuildTask(TimeMixin, Base):
         nullable=False,
         index=True,
     )
-    rpm_module_id = sqlalchemy.Column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("rpm_module.id"),
-        nullable=True,
+    rpm_modules = relationship(
+        "RpmModule",
+        secondary=BuildTaskRpmModuleMapping,
     )
     status = sqlalchemy.Column(
         sqlalchemy.Integer,
@@ -493,7 +516,6 @@ class BuildTask(TimeMixin, Base):
     test_tasks = relationship(
         "TestTask", back_populates="build_task", order_by="TestTask.revision"
     )
-    rpm_module = relationship("RpmModule")
     performance_stats: "PerformanceStats" = relationship(
         "PerformanceStats",
         back_populates="build_task",

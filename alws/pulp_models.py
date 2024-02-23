@@ -422,6 +422,12 @@ class RpmModulemd(PulpBase):
     version = sqlalchemy.Column(sqlalchemy.Text)
     context = sqlalchemy.Column(sqlalchemy.Text)
     arch = sqlalchemy.Column(sqlalchemy.Text)
+    dependencies = sqlalchemy.Column(JSONB)
+    artifacts = sqlalchemy.Column(JSONB)
+    static_context = sqlalchemy.Column(sqlalchemy.Boolean)
+    snippet = sqlalchemy.Column(sqlalchemy.Text)
+    description = sqlalchemy.Column(sqlalchemy.Text)
+    profiles = sqlalchemy.Column(JSONB)
 
     @property
     def nsvca(self):
@@ -440,3 +446,18 @@ class RpmModulemdPackages(PulpBase):
         UUID(as_uuid=True),
         sqlalchemy.ForeignKey(RpmPackage.content_ptr_id),
     )
+
+
+class RpmModulemdDefaults(PulpBase):
+    __tablename__ = "rpm_modulemddefaults"
+
+    content_ptr_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(CoreContent.pulp_id),
+        primary_key=True,
+    )
+    module = sqlalchemy.Column(sqlalchemy.Text)
+    stream = sqlalchemy.Column(sqlalchemy.Text)
+    profiles = sqlalchemy.Column(JSONB)
+    digest = sqlalchemy.Column(sqlalchemy.Text)
+    snippet = sqlalchemy.Column(sqlalchemy.Text)

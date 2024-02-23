@@ -140,16 +140,23 @@ async def prepare_repo_modify_dict(
     results = await asyncio.gather(*tasks)
     modify.update(**dict(results))
 
+    module_cache = defaultdict(set)
+
     for task in db_build.tasks:
         if task.status != BuildTaskStatus.COMPLETED:
             continue
-        if task.rpm_module:
+        if task.rpm_modules:
             product_repo = product_repo_mapping.get(
                 (task.arch, False, task.platform.name)
             )
             if product_repo is None:
                 continue
-            modify[product_repo.pulp_href].append(task.rpm_module.pulp_href)
+            for module in task.rpm_modules:
+                if module.package not in module_cache[product_repo.pulp_href]:
+                    module_cache[product_repo.pulp_href].add(module.pulp_href)
+
+    for repo_href, modules in module_cache.items():
+        modify[repo_href].extend(modules)
 
     return modify
 
@@ -294,7 +301,7 @@ async def _perform_product_modification(
                     models.Repository.platform
                 ),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_module
+                    models.BuildTask.rpm_modules
                 ),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.platform
