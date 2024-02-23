@@ -582,16 +582,22 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             release.status = ReleaseStatus.COMPLETED
             builds_released = True
             if settings.github_integration_enabled:
-                github_client = await get_github_client()
-                issues = await find_issues_by_build_id(
-                    github_client=github_client,
-                    build_ids=release.build_ids,
-                )
-                if issues:
-                    await move_issues(
+                try:
+                    github_client = await get_github_client()
+                    issues = await find_issues_by_build_id(
                         github_client=github_client,
-                        issues=issues,
-                        status="Released",
+                        build_ids=release.build_ids,
+                    )
+                    if issues:
+                        await move_issues(
+                            github_client=github_client,
+                            issues=issues,
+                            status="Released",
+                        )
+                except Exception as err:
+                    logging.exception(
+                        "Cannot move issue to the Released section: %s",
+                        err,
                     )
 
         await self.db.execute(

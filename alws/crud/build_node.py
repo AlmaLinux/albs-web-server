@@ -465,22 +465,28 @@ async def __process_rpms(
             )
             errata_record_ids.add(errata_package.errata_record_id)
     if settings.github_integration_enabled:
-        github_client = await get_github_client()
-        issues = await find_issues_by_record_id(
-            github_client=github_client,
-            record_ids=list(errata_record_ids),
-        )
-        issues.extend(
-            await find_issues_by_build_id(
+        try:
+            github_client = await get_github_client()
+            issues = await find_issues_by_record_id(
                 github_client=github_client,
-                build_ids=[build_id],
+                record_ids=list(errata_record_ids),
             )
-        )
-        if issues:
-            await move_issues(
-                github_client=github_client,
-                issues=issues,
-                status="Testing",
+            issues.extend(
+                await find_issues_by_build_id(
+                    github_client=github_client,
+                    build_ids=[build_id],
+                )
+            )
+            if issues:
+                await move_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    status="Testing",
+                )
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Testing section: %s",
+                err,
             )
 
     # we need to put source RPM in module as well, but it can be skipped

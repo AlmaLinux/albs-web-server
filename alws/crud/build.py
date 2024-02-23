@@ -95,28 +95,34 @@ async def create_build(
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
     if settings.github_integration_enabled:
-        github_client = await get_github_client()
-        repos = set()
-        for task in build.tasks:
-            if isinstance(task, build_schema.BuildTaskModuleRef):
-                repos.add(f"module {task.module_name}")
-                continue
+        try:
+            github_client = await get_github_client()
+            repos = set()
+            for task in build.tasks:
+                if isinstance(task, build_schema.BuildTaskModuleRef):
+                    repos.add(f"module {task.module_name}")
+                    continue
 
-            repos.add(f"{task.url} {task.git_ref}")
-        issues = await find_issues_by_repo_name(
-            github_client=github_client,
-            repo_names=list(repos),
-        )
-        if issues:
-            await set_build_id_to_issues(
+                repos.add(f"{task.url} {task.git_ref}")
+            issues = await find_issues_by_repo_name(
                 github_client=github_client,
-                issues=issues,
-                build_id=db_build.id,
+                repo_names=list(repos),
             )
-            await move_issues(
-                github_client=github_client,
-                issues=issues,
-                status="Building",
+            if issues:
+                await set_build_id_to_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    build_id=db_build.id,
+                )
+                await move_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    status="Building",
+                )
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Building section: %s",
+                err,
             )
     return db_build
 

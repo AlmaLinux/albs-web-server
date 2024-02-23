@@ -512,9 +512,6 @@ async def get_matching_albs_packages(
     prod_repos_cache,
     module,
 ) -> List[models.ErrataToALBSPackage]:
-    github_client = {}
-    if settings.github_integration_enabled:
-        github_client = await get_github_client()
     items_to_insert = []
     # We're going to check packages that match name-version-clean_release
     # Note that clean_release doesn't include the .module... str, we match:
@@ -696,17 +693,23 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     items_to_insert.append(db_errata)
 
     if settings.github_integration_enabled:
-        github_client = await get_github_client()
-        await create_github_issue(
-            client=github_client,
-            title=errata.title,
-            description=errata.description,
-            advisory_id=alma_errata_id,
-            original_id=original_id,
-            platform_name=platform.name,
-            severity=errata.severity,
-            packages=errata.packages,
-        )
+        try:
+            github_client = await get_github_client()
+            await create_github_issue(
+                client=github_client,
+                title=errata.title,
+                description=errata.description,
+                advisory_id=alma_errata_id,
+                original_id=original_id,
+                platform_name=platform.name,
+                severity=errata.severity,
+                packages=errata.packages,
+            )
+        except Exception as err:
+            logging.exception(
+                "Cannot create GitHub issue: %s",
+                err,
+            )
 
     # References
     self_ref_exists = False
@@ -1514,16 +1517,22 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 force_flag=False,
             )
             if settings.github_integration_enabled:
-                github_client = await get_github_client()
-                issues = await find_issues_by_record_id(
-                    github_client,
-                    [db_record.id],
-                )
-                if issues:
-                    await move_issues(
-                        github_client=github_client,
-                        issues=issues,
-                        status="Released",
+                try:
+                    github_client = await get_github_client()
+                    issues = await find_issues_by_record_id(
+                        github_client,
+                        [db_record.id],
+                    )
+                    if issues:
+                        await move_issues(
+                            github_client=github_client,
+                            issues=issues,
+                            status="Released",
+                        )
+                except Exception as err:
+                    logging.exception(
+                        "Cannot move issue to the Released section: %s",
+                        err,
                     )
             if not tasks:
                 continue
