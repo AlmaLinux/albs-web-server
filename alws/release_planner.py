@@ -19,13 +19,13 @@ from alws.config import settings
 from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
+    BeholderMatchMethod,
     ErrataPackageStatus,
     ErrataReleaseStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
     RepoType,
-    BeholderMatchMethod,
 )
 from alws.crud import products as product_crud
 from alws.crud import sign_task
@@ -1813,8 +1813,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         if errata_record_status != ErrataReleaseStatus.RELEASED:
             for albs_pkg in albs_pkgs:
                 albs_pkg.status = ErrataPackageStatus.released
-
-        await self.db.commit()
+            await self.db.commit()
 
     @class_measure_work_time_async("update_release_plan")
     async def update_release_plan(
