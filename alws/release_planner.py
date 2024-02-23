@@ -20,6 +20,7 @@ from alws.constants import (
     LOWEST_PRIORITY,
     BeholderKey,
     ErrataPackageStatus,
+    ErrataReleaseStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
@@ -539,7 +540,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release_id: int,
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
-        logging.info("Commiing release %d", release_id)
+        logging.info("Commiting release %d", release_id)
 
         user = await user_crud.get_user(self.db, user_id=user_id)
         release = await self.get_release_for_update(release_id)
@@ -1755,7 +1756,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             .scalar_subquery()
         )
         albs_pkgs = await self.db.execute(
-            select(models.NewErrataToALBSPackage).where(
+            select(models.NewErrataToALBSPackage)
+            .where(
                 or_(
                     models.NewErrataToALBSPackage.albs_artifact_id.in_(
                         subquery
@@ -1763,9 +1765,34 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     models.NewErrataToALBSPackage.pulp_href.in_(package_hrefs),
                 )
             )
+            .options(
+                selectinload(models.NewErrataToALBSPackage.errata_package)
+            )
         )
-        for albs_pkg in albs_pkgs.scalars().all():
-            albs_pkg.status = ErrataPackageStatus.released
+        albs_pkgs = albs_pkgs.scalars().all()
+
+        # We assume that a release involves only one errata.
+        # If it is not the case, we need to check the errata record status
+        # of every errata_to_albs_packages and taking them into account when
+        # iterating them below.
+        any_errata_package = albs_pkgs[0].errata_package
+        errata_record_status = (
+            await self.db.execute(
+                select(models.NewErrataRecord.release_status)
+                .where(
+                    models.NewErrataRecord.id
+                    == any_errata_package.errata_record_id,
+                    models.NewErrataRecord.platform_id
+                    == any_errata_package.platform_id,
+                )
+            )
+        ).scalar()
+
+        # Only set their status to 'released' if errata_record is not released
+        if errata_record_status != ErrataReleaseStatus.RELEASED:
+            for albs_pkg in albs_pkgs:
+                albs_pkg.status = ErrataPackageStatus.released
+
         await self.db.commit()
 
     @class_measure_work_time_async("update_release_plan")
