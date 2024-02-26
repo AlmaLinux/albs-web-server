@@ -105,6 +105,8 @@ class ErrataRecord(BaseErrataRecord):
     title: Optional[str] = None
     original_title: str
     description: Optional[str] = None
+    issued_date: datetime.datetime
+    updated_date: datetime.datetime
     original_description: str
     release_status: Optional[ErrataReleaseStatus] = None
     last_release_log: Optional[str] = None
@@ -121,7 +123,7 @@ class ErrataListResponse(BaseModel):
 
 class CompactErrataRecord(BaseModel):
     id: str
-    updated_date: datetime.date
+    updated_date: datetime.datetime
 
 
 class CreateErrataResponse(BaseModel):

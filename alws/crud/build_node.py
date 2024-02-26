@@ -293,7 +293,7 @@ async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
 def __verify_checksums(
     processed_entities: typing.List[
         typing.Tuple[str, str, build_node_schema.BuildDoneArtifact]
-    ]
+    ],
 ):
     checksum_errors = []
     for _, sha256, artifact in processed_entities:
@@ -387,7 +387,7 @@ async def __process_rpms(
             )
 
     def append_errata_package(_, errata_package, artifact, rpm_info):
-        model = models.ErrataToALBSPackage(
+        model = models.NewErrataToALBSPackage(
             status=ErrataPackageStatus.proposal,
             name=rpm_info["name"],
             version=rpm_info["version"],
@@ -418,13 +418,13 @@ async def __process_rpms(
             src_name = rpm_info["name"]
         clean_rpm_release = clean_release(rpm_info["release"])
         conditions = [
-            models.ErrataPackage.name == rpm_info["name"],
-            models.ErrataPackage.version == rpm_info["version"],
+            models.NewErrataPackage.name == rpm_info["name"],
+            models.NewErrataPackage.version == rpm_info["version"],
         ]
         if rpm_info["arch"] != "noarch":
-            conditions.append(models.ErrataPackage.arch == rpm_info["arch"])
+            conditions.append(models.NewErrataPackage.arch == rpm_info["arch"])
 
-        query = select(models.ErrataPackage).where(
+        query = select(models.NewErrataPackage).where(
             sqlalchemy.and_(*conditions)
         )
 
@@ -435,8 +435,8 @@ async def __process_rpms(
                     continue
                 module = mod
             build_task_module = f"{module.name}:{module.stream}"
-            query = query.join(models.ErrataRecord).filter(
-                models.ErrataRecord.module == build_task_module
+            query = query.join(models.NewErrataRecord).filter(
+                models.NewErrataRecord.module == build_task_module
             )
 
         errata_packages = (await db.execute(query)).scalars().all()

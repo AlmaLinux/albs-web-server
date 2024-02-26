@@ -37,6 +37,7 @@ class TestLog(BaseModel):
 
 
 class TestTaskPayload(BaseModel):
+    bs_task_id: int
     runner_type: str
     dist_name: str
     dist_version: Union[str, int]

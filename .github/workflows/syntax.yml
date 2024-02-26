@@ -9,12 +9,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v42
         with:
           files: |
             **/*.py
@@ -49,7 +49,7 @@ jobs:
           message-id: pylint-report
       - name: Run black
         if: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alembic --check --diff --color --target-version py39
+        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alws/alembic --check --diff --color --target-version py39
       - name: Run isort
         if: ${{ steps.changed-files.outputs.all_changed_files }}
         run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39

@@ -393,10 +393,18 @@ class Exporter:
         endpoint = "sign-keys/"
         return await self.make_request("GET", endpoint)
 
-    async def get_oval_xml(self, platform_name: str):
+    # TODO: Use direct function call to alws.crud.errata_get_oval_xml
+    async def get_oval_xml(
+        self, platform_name: str, only_released: bool = False
+    ):
         endpoint = "errata/get_oval_xml/"
         return await self.make_request(
-            "GET", endpoint, params={"platform_name": platform_name}
+            "GET",
+            endpoint,
+            params={
+                "platform_name": platform_name,
+                "only_released": only_released,
+            },
         )
 
     async def generate_rss(self, platform, modern_cache):
@@ -405,14 +413,17 @@ class Exporter:
         dist_version = platform.split('-')[-1]
 
         errata_data = modern_cache['data']
+        sorted_errata_data = sorted(
+            errata_data, key=lambda k: k['updated_date'], reverse=True
+        )
 
         feed = FeedGenerator()
         feed.title(f'Errata Feed for {dist_name}')
         feed.link(href='https://errata.almalinux.org', rel='alternate')
-        feed.description(f'Errata Feed for AlmaLinux')
+        feed.description(f'Errata Feed for {dist_name}')
         feed.author(name='AlmaLinux Team', email='packager@almalinux.org')
 
-        for erratum in errata_data:
+        for erratum in sorted_errata_data[:500]:
             html_erratum_id = erratum['id'].replace(':', '-')
             title = f"[{erratum['id']}] {erratum['title']}"
             link = f"https://errata.almalinux.org/{dist_version}/{html_erratum_id}.html"
@@ -1025,7 +1036,9 @@ def main():
                     )
                 exporter.logger.debug("JSON dump is done")
                 exporter.logger.debug("Generating OVAL data")
-                oval = sync(exporter.get_oval_xml(platform))
+                oval = sync(
+                    exporter.get_oval_xml(platform, only_released=True)
+                )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
                 exporter.logger.debug("OVAL is generated")

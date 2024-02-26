@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     github_client: str
     github_client_secret: str
 
+    almalinux_client: str = 'secret'
+    almalinux_client_secret: str = 'secret'
+
     jwt_secret: str
     jwt_algorithm: str = 'HS256'
 
@@ -63,6 +66,7 @@ class Settings(BaseSettings):
 
     frontend_baseurl: str = 'http://localhost:8080'
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
+    almalinux_callback_endpoint: str = 'api/v1/auth/almalinux/callback'
 
     sentry_environment: str = 'dev'
     sentry_dsn: Optional[str] = None
@@ -77,6 +81,13 @@ class Settings(BaseSettings):
         return urllib.parse.urljoin(
             settings.frontend_baseurl,
             settings.github_callback_endpoint,
+        )
+
+    @property
+    def almalinux_callback_url(self) -> str:
+        return urllib.parse.urljoin(
+            settings.frontend_baseurl,
+            settings.almalinux_callback_endpoint,
         )
 
 

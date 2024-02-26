@@ -1,24 +1,23 @@
-from urllib.parse import urljoin, urlparse
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 from fastapi import Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
-from fastapi_users.authentication import (
-    CookieTransport,
-    Transport,
+from fastapi_users.authentication import CookieTransport, Transport
+from fastapi_users.authentication.transport import (
+    TransportLogoutNotSupportedError,
 )
-from fastapi_users.authentication.transport import TransportLogoutNotSupportedError
-from fastapi_users.authentication.transport.bearer import BearerResponse, BearerTransport
+from fastapi_users.authentication.transport.bearer import (
+    BearerResponse,
+    BearerTransport,
+)
 from fastapi_users.openapi import OpenAPIResponseType
+from fastapi_users.schemas import model_dump
 
 from alws.config import settings
 
-
-__all__ = [
-    'get_cookie_transport',
-    'get_jwt_transport',
-    'get_bearer_transport'
-]
+__all__ = ['get_cookie_transport', 'get_jwt_transport', 'get_bearer_transport']
 
 
 class JWTBearer(HTTPBearer):
@@ -35,10 +34,11 @@ class JWTransport(Transport):
     def __init__(self):
         self.scheme = JWTBearer()
 
-    def get_login_response(self, token: str, response: Response) -> Any:
-        return BearerResponse(access_token=token, token_type='bearer')
+    def get_login_response(self, token: str) -> Any:
+        response = BearerResponse(access_token=token, token_type='bearer')
+        return JSONResponse(model_dump(response))
 
-    async def get_logout_response(self, response: Response) -> Any:
+    async def get_logout_response(self) -> Any:
         raise TransportLogoutNotSupportedError()
 
     @staticmethod
@@ -49,11 +49,13 @@ class JWTransport(Transport):
                 "content": {
                     "application/json": {
                         "example": {
-                            "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1"
-                            "c2VyX2lkIjoiOTIyMWZmYzktNjQwZi00MzcyLTg2Z"
-                            "DMtY2U2NDJjYmE1NjAzIiwiYXVkIjoiZmFzdGFwaS"
-                            "11c2VyczphdXRoIiwiZXhwIjoxNTcxNTA0MTkzfQ."
-                            "M10bjOe45I5Ncu_uXvOmVV8QxnL-nZfcH96U90JaocI",
+                            "access_token": (
+                                "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1"
+                                "c2VyX2lkIjoiOTIyMWZmYzktNjQwZi00MzcyLTg2Z"
+                                "DMtY2U2NDJjYmE1NjAzIiwiYXVkIjoiZmFzdGFwaS"
+                                "11c2VyczphdXRoIiwiZXhwIjoxNTcxNTA0MTkzfQ."
+                                "M10bjOe45I5Ncu_uXvOmVV8QxnL-nZfcH96U90JaocI"
+                            ),
                             "token_type": "bearer",
                         }
                     }
@@ -67,15 +69,19 @@ class JWTransport(Transport):
 
 
 class RedirectCookieTransport(CookieTransport):
-    async def get_login_response(self, token: str, response: Response) -> Any:
-        redirect_url = urljoin(settings.frontend_baseurl, 'auth/login/github')
-        await super().get_login_response(token, response)
+    async def get_login_response(self, token: str) -> Response:
+        redirect_url = urljoin(
+            settings.frontend_baseurl, 'auth/login/finished'
+        )
+        response = await super().get_login_response(token)
         response.status_code = status.HTTP_302_FOUND
         response.headers['Location'] = redirect_url
+        return response
 
 
 def get_cookie_transport(
-        cookie_max_age: int = 86400, cookie_name: str = 'albs'):
+    cookie_max_age: int = 86400, cookie_name: str = 'albs'
+):
     cookie_secure = True
     parsed_url = urlparse(settings.frontend_baseurl)
     if parsed_url.scheme == 'http':

@@ -251,6 +251,11 @@ services:
                       pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_product_modify:
     image: quay.io/almalinuxorg/task-queue:latest
@@ -267,6 +272,11 @@ services:
                       pip3 install -r requirements.txt --no-cache-dir &&
                       dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   task_queue_tests:
     image: quay.io/almalinuxorg/task-queue:latest
@@ -415,7 +425,7 @@ services:
     image: alma-tests-cacher:latest
     build:
       context: ../alma-tests-cacher/
-      dockerfile: ../alma-tests-cacher/Dockerfile
+      dockerfile: Dockerfile
     restart: on-failure
     depends_on:
       - web_server
@@ -478,31 +488,9 @@ services:
     image: redis
     ports:
       - 6379:6379
-    restart: on-failure
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100Mb"
-        max-file: "3"
-
-  sign_file:
-    image: sign-file:latest
-    env_file:
-      - ../albs-sign-file/.env
-    build:
-      dockerfile: Dockerfile
-      context: ../albs-sign-file
-    command: >
-      bash -c "/app/env/bin/python /app/db_manage.py dev_init
-      && /app/env/bin/python /app/start.py"
-    restart: on-failure
     volumes:
-      - "~/.gnupg:/home/alt/.gnupg"
-      - ../albs-sign-file/sign:/app/sign
-      - ../albs-sign-file/start.py:/app/start.py
-      - ../albs-sign-file/db_manage.py:/app/db_manage.py
-    ports:
-      - "8083:8000"
+      - "redis:/data"
+    restart: on-failure
     logging:
       driver: "json-file"
       options:
@@ -540,5 +528,30 @@ services:
         max-size: "100Mb"
         max-file: "3"
 
+  sign_file:
+    image: sign-file:latest
+    env_file:
+      - ../albs-sign-file/.env
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-sign-file
+    command: >
+      bash -c "/app/env/bin/python /app/db_manage.py dev_init
+      && /app/env/bin/python /app/start.py"
+    restart: on-failure
+    volumes:
+      - "~/.gnupg:/home/alt/.gnupg"
+      - ../albs-sign-file/sign:/app/sign
+      - ../albs-sign-file/start.py:/app/start.py
+      - ../albs-sign-file/db_manage.py:/app/db_manage.py
+    ports:
+      - "8083:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
 volumes:
   frontend_node_modules:
+  redis:

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Check out repository
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -29,6 +29,8 @@ jobs:
         run: |
           touch ./vars.env
           echo ALTS_TOKEN="secret" >> ./vars.env
+          echo ALMALINUX_CLIENT="secret" >> ./vars.env
+          echo ALMALINUX_CLIENT_SECRET="secret" >> ./vars.env
           echo GITHUB_CLIENT="secret" >> ./vars.env
           echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
           echo POSTGRES_PASSWORD="password" >> ./vars.env
@@ -71,7 +73,7 @@ jobs:
           junitxml-path: /tmp/pytest.xml
       - name: Create the Badge
         if: ${{ github.ref == 'refs/heads/master' && steps.coverageComment.outputs.coverage }}
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: 7894f3c3bd830eb5456d45c9dacc0f93

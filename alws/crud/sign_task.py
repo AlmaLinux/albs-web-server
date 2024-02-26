@@ -97,6 +97,7 @@ async def create_gen_key_task(
     product: models.Product,
     user: models.User,
 ) -> models.GenKeyTask:
+    user = await get_user(db, user.id)
     if not can_perform(product, user, actions.GenKey.name):
         raise PermissionDenied(
             'User does not have permissions '
@@ -271,34 +272,29 @@ async def get_available_sign_task(
     repo_mapping = await __get_build_repos(db, sign_task.build_id)
     repo = repo_mapping.get(("src", False))
     for src_rpm in build_src_rpms:
-        packages.append(
-            {
-                "id": src_rpm.artifact.id,
-                "name": src_rpm.artifact.name,
-                "cas_hash": src_rpm.artifact.cas_hash,
-                "arch": "src",
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, src_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": src_rpm.artifact.id,
+            "name": src_rpm.artifact.name,
+            "cas_hash": src_rpm.artifact.cas_hash,
+            "arch": "src",
+            "type": "rpm",
+            "download_url": __get_package_url(repo.url, src_rpm.artifact.name),
+        })
 
     for binary_rpm in build_binary_rpms:
         debug = is_debuginfo_rpm(binary_rpm.artifact.name)
         repo = repo_mapping.get((binary_rpm.artifact.build_task.arch, debug))
-        packages.append(
-            {
-                "id": binary_rpm.artifact.id,
-                "name": binary_rpm.artifact.name,
-                "cas_hash": binary_rpm.artifact.cas_hash,
-                "arch": binary_rpm.artifact.build_task.arch,
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, binary_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": binary_rpm.artifact.id,
+            "name": binary_rpm.artifact.name,
+            "cas_hash": binary_rpm.artifact.cas_hash,
+            "arch": binary_rpm.artifact.build_task.arch,
+            "type": "rpm",
+            "download_url": __get_package_url(
+                repo.url,
+                binary_rpm.artifact.name,
+            ),
+        })
     sign_task_payload["packages"] = packages
     await db.commit()
     return sign_task_payload
@@ -545,12 +541,10 @@ async def complete_sign_task(
                 [pkg.sha256 for pkg in packages_to_convert.values()],
             )
             logging.info("Start processing packages for task %s", sign_task_id)
-            results = await asyncio.gather(
-                *(
-                    __process_single_package(package, pulp_db_packages)
-                    for package in packages_to_convert.values()
-                )
-            )
+            results = await asyncio.gather(*(
+                __process_single_package(package, pulp_db_packages)
+                for package in packages_to_convert.values()
+            ))
             converted_packages = dict(results)
             logging.info(
                 "Finish processing packages for task %s", sign_task_id
@@ -601,12 +595,10 @@ async def complete_sign_task(
                 sign_task = await __failed_post_processing(sign_task, stats)
                 return sign_task
             logging.info("Start modify repository for task %s", sign_task_id)
-            await asyncio.gather(
-                *(
-                    pulp_client.modify_repository(repo_href, add=packages)
-                    for repo_href, packages in packages_to_add.items()
-                )
-            )
+            await asyncio.gather(*(
+                pulp_client.modify_repository(repo_href, add=packages)
+                for repo_href, packages in packages_to_add.items()
+            ))
             logging.info("Finish modify repository for task %s", sign_task_id)
 
         if payload.success and not sign_failed:
