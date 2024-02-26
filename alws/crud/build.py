@@ -23,7 +23,6 @@ async def create_build(
     build: build_schema.BuildCreate,
     user_id: int,
 ) -> models.Build:
-    logging.error('Build info: %s', build.model_dump())
     product = (
         (
             await db.execute(
@@ -159,7 +158,7 @@ async def get_builds(
                 ),
                 selectinload(models.Build.sign_tasks),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
+                    models.BuildTask.rpm_module
                 ),
                 selectinload(models.Build.platform_flavors),
                 selectinload(models.Build.products),
@@ -201,13 +200,11 @@ async def get_builds(
         if build_task_arch is not None:
             query = query.filter(models.BuildTask.arch == build_task_arch)
         if any(rpm_params.values()):
-            pulp_params.update(
-                {
-                    key: value
-                    for key, value in rpm_params.items()
-                    if value is not None
-                }
-            )
+            pulp_params.update({
+                key: value
+                for key, value in rpm_params.items()
+                if value is not None
+            })
             # TODO: we can get packages from pulp database
             pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
             pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
