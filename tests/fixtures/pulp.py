@@ -174,7 +174,7 @@ def create_module_by_payload(monkeypatch):
 @pytest.fixture
 def create_module(monkeypatch):
     async def func(*args, **kwargs):
-        return get_module_href()
+        return get_module_href(), hashlib.sha256().hexdigest()
 
     monkeypatch.setattr(PulpClient, "create_module", func)
 
@@ -182,14 +182,12 @@ def create_module(monkeypatch):
 @pytest.fixture
 def create_multilib_module(monkeypatch, tmp_path: Path):
     async def func(*args, **kwargs):
-        _, template, name, _, _, arch, _ = args
-        template_file = tmp_path / f'modules.{name}-{arch}.yaml'
-        result = get_module_href()
-
+        _, template, *_, arch = args
+        template_file = tmp_path / f'modules.{arch}.yaml'
+        result = get_module_href(), hashlib.sha256().hexdigest()
         if not template_file.exists():
             template_file.write_text(template)
             return result
-
         source_index = IndexWrapper.from_template(
             template_file.read_text(),
         )
@@ -467,11 +465,3 @@ def delete_by_href(monkeypatch):
         return {"pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"}
 
     monkeypatch.setattr(PulpClient, "delete_by_href", func)
-
-
-@pytest.fixture
-def get_modules(monkeypatch):
-    async def func(*args, **kwargs):
-        return [{"pulp_href": get_module_href()}]
-
-    monkeypatch.setattr(PulpClient, "get_modules", func)

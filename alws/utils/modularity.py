@@ -141,14 +141,6 @@ class ModuleWrapper:
     def raw_stream(self):
         return self._stream
 
-    @property
-    def profiles(self) -> str:
-        return self._stream.get_profile_names()
-
-    @property
-    def description(self) -> str:
-        return self._stream.get_description()
-
     @classmethod
     def from_template(cls, template: str, name=None, stream=None):
         if all([name, stream]):
@@ -187,8 +179,7 @@ class ModuleWrapper:
         hashes = "{0}:{1}".format(build_context, runtime_context)
         return hashlib.sha1(hashes.encode("utf-8")).hexdigest()[:8]
 
-    @staticmethod
-    def get_name_and_stream(module) -> typing.Optional[typing.Tuple[str, str]]:
+    def get_name_and_stream(self, module) -> typing.Tuple[str, str]:
         if ":" not in module:
             return module, ""
         module_dep = module.split(":")
@@ -284,12 +275,6 @@ class ModuleWrapper:
         return {
             name: sorted(list(streams)) for name, streams in requires.items()
         }
-
-    def get_profiles(self):
-        return [
-            {'name': i.get_name(), 'rpms': i.get_rpms()}
-            for i in self._stream.search_profiles(None)
-        ]
 
     def calc_build_context(self):
         build_deps = self.get_build_deps()

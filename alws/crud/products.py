@@ -84,20 +84,18 @@ async def create_product(
 
     for platform in product.platforms:
         platform_name = platform.name.lower()
-        repo_tasks.extend(
-            (
-                create_product_repo(
-                    pulp_client,
-                    product.name,
-                    owner.username,
-                    platform_name,
-                    arch,
-                    is_debug,
-                )
-                for arch in platform.arch_list
-                for is_debug in (True, False)
+        repo_tasks.extend((
+            create_product_repo(
+                pulp_client,
+                product.name,
+                owner.username,
+                platform_name,
+                arch,
+                is_debug,
             )
-        )
+            for arch in platform.arch_list
+            for is_debug in (True, False)
+        ))
         repo_tasks.append(
             create_product_repo(
                 pulp_client,
@@ -241,12 +239,10 @@ async def remove_product(
                 .join(models.BuildTask)
                 .where(
                     models.Build.team_id == db_product.team_id,
-                    models.BuildTask.status.in_(
-                        [
-                            BuildTaskStatus.IDLE,
-                            BuildTaskStatus.STARTED,
-                        ]
-                    ),
+                    models.BuildTask.status.in_([
+                        BuildTaskStatus.IDLE,
+                        BuildTaskStatus.STARTED,
+                    ]),
                 )
             )
         )
@@ -312,7 +308,7 @@ async def modify_product(
             .options(
                 selectinload(models.Build.repos),
                 selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
+                    models.BuildTask.rpm_module
                 ),
                 selectinload(models.Build.tasks).selectinload(
                     models.BuildTask.platform

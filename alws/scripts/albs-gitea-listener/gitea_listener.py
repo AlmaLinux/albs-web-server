@@ -7,20 +7,20 @@
 AlmaLinux Build System Gitea queue listener.
 """
 
-import asyncio
-import json
-import logging
-import os
-import re
-import traceback
 import urllib
-
+import json
+import os
+import logging
 import requests
-from git_cacher import load_redis_cache, save_redis_cache
-from gitea_models import GiteaListenerConfig, PushedEvent
-from paho.mqtt import client as mqtt_client
-from redis import asyncio as aioredis
+import re
+import aioredis
+import asyncio
+import traceback
 from ruamel.yaml import YAML
+
+from paho.mqtt import client as mqtt_client
+from gitea_models import GiteaListenerConfig, PushedEvent
+from git_cacher import load_redis_cache, save_redis_cache
 
 LOGGER: logging.Logger
 
@@ -36,6 +36,7 @@ async def save_gitea_cache(redis_client, redis_key, new_cache):
 
 
 def connect_mqtt(config: GiteaListenerConfig) -> mqtt_client:
+
     """
     Connection to MQTT Gitea Listener queue.
 
@@ -52,6 +53,7 @@ def connect_mqtt(config: GiteaListenerConfig) -> mqtt_client:
     LOGGER.info('Connecting to the MQTT Queue...')
 
     def on_connect(client, userdata, flags, rc):
+
         """
         The broker response to new connection request.
 
@@ -72,22 +74,18 @@ def connect_mqtt(config: GiteaListenerConfig) -> mqtt_client:
         else:
             LOGGER.info(f'Bad connection. Returned code={rc}')
 
-    client = mqtt_client.Client(
-        client_id=config.mqtt_client_id,
-        clean_session=config.mqtt_queue_clean_session,
-    )
-    client.username_pw_set(
-        username=config.mqtt_queue_username,
-        password=config.mqtt_queue_password,
-    )
+    client = mqtt_client.Client(client_id=config.mqtt_client_id,
+                                clean_session=config.mqtt_queue_clean_session)
+    client.username_pw_set(username=config.mqtt_queue_username,
+                           password=config.mqtt_queue_password)
     client.on_connect = on_connect
     client.connect(config.mqtt_queue_host, config.mqtt_queue_port)
     return client
 
 
-def create_build(
-    received_data: PushedEvent, config: GiteaListenerConfig
-) -> str:
+def create_build(received_data: PushedEvent,
+                 config: GiteaListenerConfig) -> str:
+
     """
     Create a new build in AlmaLinux Build System from received new
     event in Gitea.
@@ -115,11 +113,12 @@ def create_build(
                 # this is only for local dev testing
                 # 'url': git_url.replace('localhost', '192.168.1.118'),
                 'url': git_url,
-                'git_ref': git_ref,
+                'git_ref': git_ref
             }
-        ],
+        ]
     }
-    url = urllib.parse.urljoin(config.albs_address, '/api/v1/builds/')
+    url = urllib.parse.urljoin(config.albs_address,
+                               '/api/v1/builds/')
     headers = {'authorization': f'Bearer {config.albs_jwt_token}'}
     response = getattr(requests, 'post')(
         url, json=build_query, headers=headers
@@ -129,6 +128,7 @@ def create_build(
 
 
 def subscribe(client: mqtt_client, config: GiteaListenerConfig):
+
     """
     Listener for new events in MQTT Gitea queue.
 
@@ -139,6 +139,7 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
     """
 
     def on_message(client, userdata, msg):
+
         """
         Receives a new message from MQTT queue and
         creates a new build out of its data.
@@ -156,18 +157,15 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
         try:
             received = json.loads(msg.payload.decode())
             received = PushedEvent(**received)
-            LOGGER.info(
-                f'Received new event from {msg.topic} topic: '
-                f'ref {received.ref} commit {received.after} '
-                f'from repository {received.repository.name}'
-            )
+            LOGGER.info(f'Received new event from {msg.topic} topic: '
+                        f'ref {received.ref} commit {received.after} '
+                        f'from repository {received.repository.name}')
             LOGGER.info('Checking gitea cache')
             redis_client = aioredis.from_url(config.redis_host)
             redis_key = config.redis_cache_key
             loop = asyncio.get_event_loop()
-            gitea_cache = loop.run_until_complete(
-                get_gitea_cache(redis_client, redis_key)
-            )
+            gitea_cache = loop.run_until_complete(get_gitea_cache(
+                redis_client, redis_key))
             try:
                 repo = received.repository.full_name
                 if 'tags' in received.ref:
@@ -184,9 +182,9 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
                             gitea_cache[repo]['branches'].append(git_ref)
                     LOGGER.info('Skipping new commit')
 
-                loop.run_until_complete(
-                    save_gitea_cache(redis_client, redis_key, gitea_cache)
-                )
+                loop.run_until_complete(save_gitea_cache(redis_client,
+                                                         redis_key,
+                                                         gitea_cache))
 
             except Exception as error:
                 LOGGER.error(f'Failed to create a build. Traceback: {error}')
@@ -194,32 +192,26 @@ def subscribe(client: mqtt_client, config: GiteaListenerConfig):
                 client.reconnect()
 
         except Exception as error:
-            LOGGER.error(
-                f'Failed to receive new event from {msg.topic} topic.'
-                f'\nTraceback: {error}'
-            )
+            LOGGER.error(f'Failed to receive new event from {msg.topic} topic.'
+                         f'\nTraceback: {error}')
             LOGGER.error(traceback.format_exc())
             client.reconnect()
 
-    client.subscribe(
-        [
-            (config.mqtt_queue_topic_unmodified, config.mqtt_queue_qos),
-            (config.mqtt_queue_topic_modified, config.mqtt_queue_qos),
-        ]
-    )
+    client.subscribe([(config.mqtt_queue_topic_unmodified,
+                       config.mqtt_queue_qos),
+                      (config.mqtt_queue_topic_modified,
+                       config.mqtt_queue_qos)])
     client.on_message = on_message
 
 
 def run():
+
     """
     Launches AlmaLinux gitea listener for builds creation.
     """
 
-    config_path = os.path.abspath(
-        os.path.expanduser(
-            os.path.expandvars('albs-gitea-listener-config.yaml')
-        )
-    )
+    config_path = os.path.abspath(os.path.expanduser(
+        os.path.expandvars('albs-gitea-listener-config.yaml')))
     loader = YAML(typ='safe')
     with open(config_path, 'rt') as config_file:
         gitea_config = GiteaListenerConfig.parse_obj(loader.load(config_file))

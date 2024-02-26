@@ -91,7 +91,7 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
                     models.BuildTask.platform
                 ),
                 selectinload(models.TestTask.build_task).selectinload(
-                    models.BuildTask.rpm_modules
+                    models.BuildTask.rpm_module
                 ),
             )
             .order_by(models.TestTask.id.asc())
@@ -99,14 +99,7 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
         )
         for task in test_tasks.scalars().all():
             platform = task.build_task.platform
-            module_info = next(
-                (
-                    i
-                    for i in task.build_task.rpm_modules
-                    if '-devel' not in i.name
-                ),
-                None,
-            )
+            module_info = task.build_task.rpm_module
             module_name = module_info.name if module_info else None
             module_stream = module_info.stream if module_info else None
             module_version = module_info.version if module_info else None
