@@ -286,7 +286,7 @@ class Exporter:
             )
         else:
             raise ValueError(
-                "send_to parameter must be web_server of sign_server"
+                "send_to parameter must be either web_server or sign_server"
             )
 
         if user_headers:
@@ -299,9 +299,7 @@ class Exporter:
                 method, full_url, json=body, params=params, data=data
             ) as response:
                 if response.headers['Content-Type'] == 'application/json':
-                    json_data = await response.read()
-                    json_data = json.loads(json_data)
-                    return json_data
+                    return await response.json()
                 return await response.text()
 
     async def create_filesystem_exporters(
@@ -370,21 +368,18 @@ class Exporter:
 
     async def sign_repomd_xml(self, path_to_file: str, key_id: str):
         token = await self.get_sign_server_token()
-        headers = {'Authorization': f"Bearer {token}"}
-        endpoint = 'sign'
-        params = {'keyid': key_id}
-        files = {'file': open(path_to_file, 'rb')}
-        result = {'asc_content': None, 'error': None}
+        endpoint = "sign"
+        result = {"asc_content": None, "error": None}
         try:
             response = await self.make_request(
-                'POST',
+                "POST",
                 endpoint,
-                params=params,
-                data=files,
-                user_headers=headers,
-                send_to='sign_server',
+                params={"keyid": key_id},
+                data={"file": Path(path_to_file).read_bytes()},
+                user_headers={"Authorization": f"Bearer {token}"},
+                send_to="sign_server",
             )
-            result['asc_content'] = response
+            result["asc_content"] = response
         except Exception as err:
             result['error'] = err
         return result
