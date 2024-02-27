@@ -87,7 +87,6 @@ services:
       - ../alts/tests:/code/tests
       - ../alts/requirements:/tmp/requirements
     depends_on:
-      - web_server
       - rabbitmq
     logging:
       driver: "json-file"
@@ -506,7 +505,6 @@ services:
     depends_on:
       - web_server
       - frontend
-      - sign_file
     logging:
       driver: "json-file"
       options:
