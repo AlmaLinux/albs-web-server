@@ -31,7 +31,7 @@ httpx-oauth==0.13.2
 feedgen==1.0.0
 websockets==12.0
 email-validator>=2.0
-sentry-sdk[fastapi]==1.40.4  # requires FastAPI>=0.79.0
+sentry-sdk[fastapi]==1.40.6  # requires FastAPI>=0.79.0
 git+https://github.com/AlmaLinux/immudb-wrapper.git@0.1.2#egg=immudb_wrapper
 git+https://github.com/AlmaLinux/errata2osv.git@0.0.3#egg=errata2osv
 git+https://github.com/AlmaLinux/albs-github-integration.git@0.1.1#egg=albs_github
