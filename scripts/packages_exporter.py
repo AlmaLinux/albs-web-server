@@ -356,10 +356,18 @@ class Exporter:
         endpoint = "sign-keys/"
         return await self.make_request("GET", endpoint)
 
-    async def get_oval_xml(self, platform_name: str):
+    # TODO: Use direct function call to alws.crud.errata_get_oval_xml
+    async def get_oval_xml(
+        self, platform_name: str, only_released: bool = False
+    ):
         endpoint = "errata/get_oval_xml/"
         return await self.make_request(
-            "GET", endpoint, params={"platform_name": platform_name}
+            "GET",
+            endpoint,
+            params={
+                "platform_name": platform_name,
+                "only_released": only_released,
+            },
         )
 
     async def generate_rss(self, platform, modern_cache):
@@ -984,7 +992,9 @@ def main():
                     )
                 exporter.logger.debug("JSON dump is done")
                 exporter.logger.debug("Generating OVAL data")
-                oval = sync(exporter.get_oval_xml(platform))
+                oval = sync(
+                    exporter.get_oval_xml(platform, only_released=True)
+                )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
                 exporter.logger.debug("OVAL is generated")

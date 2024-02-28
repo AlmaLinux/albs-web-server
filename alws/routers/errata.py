@@ -35,7 +35,7 @@ async def create_errata_record(
     return {"ok": bool(record)}
 
 
-@router.get("/", response_model=errata_schema.ErrataRecord)
+@public_router.get("/", response_model=errata_schema.ErrataRecord)
 async def get_errata_record(
     errata_id: str,
     errata_platform_id: int,
@@ -57,9 +57,10 @@ async def get_errata_record(
 @router.get("/get_oval_xml/", response_model=str)
 async def get_oval_xml(
     platform_name: str,
+    only_released: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    return await errata_crud.get_oval_xml(db, platform_name)
+    return await errata_crud.get_oval_xml(db, platform_name, only_released)
 
 
 @public_router.get("/query/", response_model=errata_schema.ErrataListResponse)

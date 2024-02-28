@@ -116,30 +116,32 @@ class CriteriaNode:
         return False
 
 
-async def get_oval_xml(db: AsyncSession, platform_name: str):
+async def get_oval_xml(
+    db: AsyncSession, platform_name: str, only_released: bool = False
+):
+    query = select(models.NewErrataRecord).options(
+        selectinload(models.NewErrataRecord.packages)
+        .selectinload(models.NewErrataPackage.albs_packages)
+        .selectinload(models.NewErrataToALBSPackage.build_artifact)
+        .selectinload(models.BuildTaskArtifact.build_task),
+        selectinload(models.NewErrataRecord.references).selectinload(
+            models.NewErrataReference.cve
+        ),
+    )
+
     platform = await db.execute(
         select(models.Platform).where(models.Platform.name == platform_name)
     )
     platform: models.Platform = platform.scalars().first()
-    records = (
-        (
-            await db.execute(
-                select(models.NewErrataRecord)
-                .where(models.NewErrataRecord.platform_id == platform.id)
-                .options(
-                    selectinload(models.NewErrataRecord.packages)
-                    .selectinload(models.NewErrataPackage.albs_packages)
-                    .selectinload(models.NewErrataToALBSPackage.build_artifact)
-                    .selectinload(models.BuildTaskArtifact.build_task),
-                    selectinload(
-                        models.NewErrataRecord.references
-                    ).selectinload(models.NewErrataReference.cve),
-                )
-            )
+    query = query.filter(models.NewErrataRecord.platform_id == platform.id)
+
+    if only_released:
+        query = query.filter(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.RELEASED
         )
-        .scalars()
-        .all()
-    )
+
+    records = (await db.execute(query)).scalars().all()
     return errata_records_to_oval(records)
 
 
