@@ -1,13 +1,11 @@
 import datetime
 import logging
-from contextlib import asynccontextmanager
 from typing import Any, Dict
 
 import dramatiq
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -36,21 +34,6 @@ logger = logging.getLogger(__name__)
 def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
     result = db.execute(query)
-    return result.scalars().first()
-
-
-async def fetch_build(db: AsyncSession, build_id: int) -> models.Build:
-    query = (
-        select(models.Build)
-        .where(models.Build.id == build_id)
-        .options(
-            joinedload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_modules
-            ),
-            joinedload(models.Build.repos),
-        )
-    )
-    result = await db.execute(query)
     return result.scalars().first()
 
 
@@ -94,30 +77,28 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
             db.commit()
             db.close()
 
-    async with asynccontextmanager(get_db)() as db:
-        async with db.begin():
-            build = await fetch_build(db, build_id)
+    with SyncSession() as db:
+        with db.begin():
+            build = _sync_fetch_build(db, build_id)
             planner = BuildPlanner(
                 db,
                 build,
+                platforms=build_request.platforms,
+                platform_flavors=build_request.platform_flavors,
                 is_secure_boot=build_request.is_secure_boot,
                 module_build_index=module_build_index,
                 logger=logger,
             )
-            await planner.init(
-                platforms=build_request.platforms,
-                platform_flavors=build_request.platform_flavors,
-            )
-            for ref in build_request.tasks:
-                await planner.add_git_project(ref)
+            for task in build_request.tasks:
+                await planner.add_task(task)
             for linked_id in build_request.linked_builds:
-                linked_build = await fetch_build(db, linked_id)
+                linked_build = _sync_fetch_build(db, linked_id)
                 if linked_build:
                     await planner.add_linked_builds(linked_build)
-            await db.flush()
+            db.flush()
             await planner.init_build_repos()
-            await db.commit()
-        await db.close()
+            db.commit()
+        db.close()
 
 
 async def _build_done(request: build_node_schema.BuildDone):

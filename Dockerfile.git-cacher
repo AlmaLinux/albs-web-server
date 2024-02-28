@@ -2,7 +2,7 @@ FROM almalinux:8
 
 RUN mkdir -p /code && \
     yum update -y && \
-    yum install python3-virtualenv python38 git -y && \
+    yum install python3-virtualenv python38 -y && \
     yum clean all
 RUN curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o wait_for_it.sh && chmod +x wait_for_it.sh
 COPY ./alws/scripts/git_cacher/requirements.txt /code/requirements.txt
