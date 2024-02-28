@@ -99,7 +99,7 @@ async def get_updateinfo_xml(
     # Also, this is only "problematic" when there is a errata with the
     # same id in more than one platform.
     # In any case, it would be great if we address this as soon as possible.
-    # TODO: Create ticket for this TODO
+    # See https://github.com/AlmaLinux/build-system/issues/206
     updateinfo_xml = await errata_crud.get_updateinfo_xml_from_pulp(record_id)
     if updateinfo_xml is None:
         raise HTTPException(
@@ -119,6 +119,7 @@ async def update_errata_record(
 
 # TODO: Update this endpoint to include platform_id.
 # albs-oval-cacher would need to be updated according to it.
+# See https://github.com/AlmaLinux/build-system/issues/207
 @router.get("/all/", response_model=List[errata_schema.CompactErrataRecord])
 async def list_all_errata_records(
     db: AsyncSession = Depends(get_db),
@@ -177,10 +178,8 @@ async def release_errata_record(
     }
 
 
-# TODO: Update to get a list of tuples (record_id, platform_id)
-# or, maybe the easiest path for now, ensure that errata records
-# are platform-specific, and when calling this endpoint, indicate the
-# platform the records need to be released into.
+# TODO: Update endpoint to take into account platform_id, see
+# https://github.com/AlmaLinux/build-system/issues/208
 @router.post("/bulk_release_records/")
 async def bulk_release_errata_records(records_ids: List[str]):
     bulk_errata_release.send(records_ids)

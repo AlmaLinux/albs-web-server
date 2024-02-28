@@ -156,9 +156,8 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
     oval.generator = generator
     # TODO:
     # * add gpg_keys info platform
-    # * OVAL data has the same problem as in
-    #   https://github.com/AlmaLinux/build-system/issues/198
-    #   We need to figure out a way to put the right gpg key in every package
+    # * Ensure that packages in OVAL data refer to the right sign key, see
+    #   https://github.com/AlmaLinux/build-system/issues/205
     gpg_keys = {
         "8": "51D6647EC21AD6EA",
         "9": "D36CB86CB86B3716",
