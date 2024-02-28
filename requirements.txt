@@ -6,7 +6,7 @@ uvicorn==0.27.1
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
 pydantic==2.6.1
-pydantic-settings==2.1.0
+pydantic-settings==2.2.1
 SQLAlchemy==1.4.51
 aiohttp==3.9.3
 aiohttp-retry==2.8.3
