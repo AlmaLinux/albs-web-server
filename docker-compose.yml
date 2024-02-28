@@ -528,8 +528,6 @@ services:
 
   sign_file:
     image: sign-file:latest
-    env_file:
-      - ../albs-sign-file/.env
     build:
       dockerfile: Dockerfile
       context: ../albs-sign-file
