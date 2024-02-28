@@ -13,7 +13,7 @@ aiohttp-retry==2.8.3
 aiofiles==23.2.1
 aioredis==2.0.1
 alembic==1.13.1
-alembic-postgresql-enum==1.1.1
+alembic-postgresql-enum==1.1.2
 pytest==8.0.0
 pytest-cov==4.1.0
 jmespath==1.0.1
