@@ -366,8 +366,9 @@ class Exporter:
 
         return list(dict(results).values())
 
-    async def sign_repomd_xml(self, path_to_file: str, key_id: str):
-        token = await self.get_sign_server_token()
+    async def sign_repomd_xml(
+        self, path_to_file: str, key_id: str, token: str
+    ):
         endpoint = "sign"
         result = {"asc_content": None, "error": None}
         try:
@@ -501,7 +502,7 @@ class Exporter:
         exported_paths = [i for i in results if i]
         return exported_paths
 
-    async def repomd_signer(self, repodata_path, key_id):
+    async def repomd_signer(self, repodata_path, key_id, token):
         string_repodata_path = str(repodata_path)
         if key_id is None:
             self.logger.info(
@@ -511,7 +512,8 @@ class Exporter:
             return
 
         file_path = os.path.join(repodata_path, "repomd.xml")
-        result = await self.sign_repomd_xml(file_path, key_id)
+        result = await self.sign_repomd_xml(file_path, key_id, token)
+        self.logger.info('PGP key id: %s', key_id)
         result_data = result.get("asc_content")
         if result_data is None:
             self.logger.error(
@@ -773,7 +775,7 @@ class Exporter:
             'email': settings.sign_server_username,
             'password': settings.sign_server_password,
         }
-        endpoint = 'token/'
+        endpoint = 'token'
         method = 'POST'
         response = await self.make_request(
             method=method, endpoint=endpoint, body=body, send_to='sign_server'
@@ -791,6 +793,7 @@ async def sign_repodata(
     repodata_paths = []
 
     tasks = []
+    token = await exporter.get_sign_server_token()
 
     for repo_path in exported_paths:
         path = Path(repo_path)
@@ -814,8 +817,8 @@ async def sign_repodata(
                         None,
                     )
                     break
-
-        tasks.append(exporter.repomd_signer(repodata, key_id))
+        exporter.logger.info('Key ID: %s', str(key_id))
+        tasks.append(exporter.repomd_signer(repodata, key_id, token))
 
     await asyncio.gather(*tasks)
 
@@ -1032,7 +1035,11 @@ def main():
                 exporter.logger.debug("JSON dump is done")
                 exporter.logger.debug("Generating OVAL data")
                 oval = sync(
-                    exporter.get_oval_xml(platform, only_released=True)
+                    # aiohttp is not able to send booleans in params.
+                    # For this reason, we're passing only_released as a string,
+                    # which in turn will be converted into boolean on backend
+                    # side by fastapi/pydantic.
+                    exporter.get_oval_xml(platform, only_released="true")
                 )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
