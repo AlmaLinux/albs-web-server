@@ -22,9 +22,18 @@ def generate_repo_config(
 ) -> str:
     # we should clean "http" protocol from host url
     clean_host_name = re.sub(r'^(http|https)://', '', settings.pulp_host)
-    repo_url = re.sub(
-        '(x86_64|aarch64|ppc64le|i386|i686|s390x)', '$basearch', repo.url
-    )
+    if 'debug-dr' in repo.url:
+        repo_url = re.sub(
+            '(x86_64|aarch64|ppc64le|i386|i686|s390x)-debug-dr',
+            '$basearch-debug-dr',
+            repo.url,
+        )
+    else:
+        repo_url = re.sub(
+            '(x86_64|aarch64|ppc64le|i386|i686|s390x)-dr',
+            '$basearch-dr',
+            repo.url,
+        )
     repo_url = re.sub('almalinux-(8|9|10)', 'almalinux-$releasever', repo_url)
     config_template = (
         f"[copr:{clean_host_name}:{ownername}:{product_name}]\n"
