@@ -328,7 +328,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for repo in task.build.repos:
                         logging.info(
                             'Repo name "%s", Repo type "%s", '
-                            'Repo platfomr_id "%s"',
+                            'Repo platform_id "%s"',
                             repo.name,
                             repo.type,
                             repo.platform_id,
