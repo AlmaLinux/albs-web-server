@@ -129,7 +129,9 @@ async def update_repository(
             )
         )
         db_repo = db_repo.scalars().first()
-        for field, value in payload.model_dump().items():
+        for field, value in payload.model_dump(
+            exclude_none=True, exclude_unset=True
+        ).items():
             setattr(db_repo, field, value)
         db.add(db_repo)
         await db.commit()
