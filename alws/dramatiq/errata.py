@@ -3,7 +3,7 @@ import typing
 import dramatiq
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
-from alws.crud.errata import release_errata_record, bulk_errata_records_release
+from alws.crud.errata import bulk_errata_records_release, release_errata_record
 from alws.dramatiq import event_loop
 
 __all__ = ["release_errata"]
@@ -15,8 +15,14 @@ __all__ = ["release_errata"]
     queue_name="errata",
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
-def release_errata(record_id: str, force: bool):
-    event_loop.run_until_complete(release_errata_record(record_id, force))
+def release_errata(record_id: str, platform_id: int, force: bool):
+    event_loop.run_until_complete(
+        release_errata_record(
+            record_id,
+            platform_id,
+            force,
+        )
+    )
 
 
 @dramatiq.actor(

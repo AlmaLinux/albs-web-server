@@ -38,11 +38,13 @@ async def create_errata_record(
 @public_router.get("/", response_model=errata_schema.ErrataRecord)
 async def get_errata_record(
     errata_id: str,
+    errata_platform_id: int,
     db: AsyncSession = Depends(get_db),
 ):
     errata_record = await errata_crud.get_errata_record(
         db,
         errata_id,
+        errata_platform_id,
     )
     if errata_record is None:
         raise HTTPException(
@@ -91,6 +93,13 @@ async def list_errata_records(
 async def get_updateinfo_xml(
     record_id: str,
 ):
+    # TODO: Retrieve updateinfo based on record_id AND platform_id
+    # Treating updateinfos as a whole shouldn't be a problem since
+    # updateinfo that ends up in repos is based on the repo itself.
+    # Also, this is only "problematic" when there is a errata with the
+    # same id in more than one platform.
+    # In any case, it would be great if we address this as soon as possible.
+    # See https://github.com/AlmaLinux/build-system/issues/206
     updateinfo_xml = await errata_crud.get_updateinfo_xml_from_pulp(record_id)
     if updateinfo_xml is None:
         raise HTTPException(
@@ -108,13 +117,19 @@ async def update_errata_record(
     return await errata_crud.update_errata_record(db, errata)
 
 
+# TODO: Update this endpoint to include platform_id.
+# albs-oval-cacher would need to be updated according to it.
+# See https://github.com/AlmaLinux/build-system/issues/207
 @router.get("/all/", response_model=List[errata_schema.CompactErrataRecord])
 async def list_all_errata_records(
     db: AsyncSession = Depends(get_db),
 ):
     records = await errata_crud.list_errata_records(db, compact=True)
     return [
-        {"id": record.id, "updated_date": record.updated_date}
+        {
+            "id": record.id,
+            "updated_date": record.updated_date,
+        }
         for record in records["records"]
     ]
 
@@ -141,10 +156,15 @@ async def update_package_status(
 )
 async def release_errata_record(
     record_id: str,
-    session: AsyncSession = Depends(get_db),
+    platform_id: int,
     force: bool = False,
+    session: AsyncSession = Depends(get_db),
 ):
-    db_record = await errata_crud.get_errata_record(session, record_id)
+    db_record = await errata_crud.get_errata_record(
+        session,
+        record_id,
+        platform_id,
+    )
     if not db_record:
         return {"message": f"Record {record_id} doesn't exists"}
     if db_record.release_status == ErrataReleaseStatus.IN_PROGRESS:
@@ -152,12 +172,14 @@ async def release_errata_record(
     db_record.release_status = ErrataReleaseStatus.IN_PROGRESS
     db_record.last_release_log = None
     await session.commit()
-    release_errata.send(record_id, force)
+    release_errata.send(record_id, platform_id, force)
     return {
         "message": f"Release updateinfo record {record_id} has been started"
     }
 
 
+# TODO: Update endpoint to take into account platform_id, see
+# https://github.com/AlmaLinux/build-system/issues/208
 @router.post("/bulk_release_records/")
 async def bulk_release_errata_records(records_ids: List[str]):
     bulk_errata_release.send(records_ids)
