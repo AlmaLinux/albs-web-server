@@ -18,12 +18,18 @@ engine = create_async_engine(DATABASE_URL, poolclass=NullPool, echo_pool=True)
 sync_engine = create_engine(
     settings.sync_database_url, pool_pre_ping=True, pool_recycle=3600
 )
-Base = declarative_base()
+
+
+class Base:
+    __allow_unmapped__ = True
+
+
+Base = declarative_base(cls=Base)
 sync_session_factory = sessionmaker(sync_engine, expire_on_commit=False)
 Session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 SyncSession = scoped_session(sync_session_factory)
 
-PulpBase = declarative_base()
+PulpBase = declarative_base(cls=Base)
 pulp_engine = create_engine(
     settings.pulp_database_url, pool_pre_ping=True, pool_recycle=3600
 )

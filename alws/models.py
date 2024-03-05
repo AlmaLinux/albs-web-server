@@ -258,6 +258,11 @@ class Platform(PermissionsMixin, Base):
 class CustomRepoRepr(Base):
     __abstract__ = True
 
+    def __init__(self):
+        self.url = None
+        self.arch = None
+        self.name = None
+
     def __repr__(self):
         return f"{self.__class__.__name__}: {self.name} {self.arch} {self.url}"
 
@@ -1319,7 +1324,7 @@ class NewErrataPackage(Base):
     platform_id = sqlalchemy.Column(sqlalchemy.Integer)
     platform_specific_errata_record = relationship(
         "NewErrataRecord",
-        foreign_keys=[errata_record_id, platform_id],
+        foreign_keys=str([errata_record_id, platform_id]),
         cascade="all, delete",
         primaryjoin="and_(NewErrataPackage.errata_record_id == NewErrataRecord.id,"
         "NewErrataPackage.platform_id == NewErrataRecord.platform_id)",
@@ -1360,7 +1365,7 @@ class NewErrataReference(Base):
     platform_id = sqlalchemy.Column(sqlalchemy.Integer)
     platform_specific_errata_record = relationship(
         "NewErrataRecord",
-        foreign_keys=[errata_record_id, platform_id],
+        foreign_keys=str([errata_record_id, platform_id]),
         cascade="all, delete",
         primaryjoin="and_(NewErrataReference.errata_record_id == NewErrataRecord.id,"
         "NewErrataReference.platform_id == NewErrataRecord.platform_id)",
