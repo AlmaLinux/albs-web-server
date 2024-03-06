@@ -15,13 +15,6 @@ from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
-from alws.utils.github_integration_helper import (
-    find_issues_by_repo_name,
-    get_github_client,
-    move_issues,
-    set_build_id_to_issues,
-)
-from alws.utils.parsing import parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 
 
@@ -94,36 +87,6 @@ async def create_build(
     await db.commit()
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
-    if settings.github_integration_enabled:
-        try:
-            github_client = await get_github_client()
-            repos = set()
-            for task in build.tasks:
-                if isinstance(task, build_schema.BuildTaskModuleRef):
-                    repos.add(f"module {task.module_name}")
-                    continue
-
-                repos.add(f"{task.url} {task.git_ref}")
-            issues = await find_issues_by_repo_name(
-                github_client=github_client,
-                repo_names=list(repos),
-            )
-            if issues:
-                await set_build_id_to_issues(
-                    github_client=github_client,
-                    issues=issues,
-                    build_id=db_build.id,
-                )
-                await move_issues(
-                    github_client=github_client,
-                    issues=issues,
-                    status="Building",
-                )
-        except Exception as err:
-            logging.exception(
-                "Cannot move issue to the Building section: %s",
-                err,
-            )
     return db_build
 
 
