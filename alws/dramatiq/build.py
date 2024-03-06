@@ -11,7 +11,11 @@ from sqlalchemy.sql.expression import func
 from alws import models
 from alws.build_planner import BuildPlanner
 from alws.config import settings
-from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus, GitHubIssueStatus
+from alws.constants import (
+    DRAMATIQ_TASK_TIMEOUT,
+    BuildTaskStatus,
+    GitHubIssueStatus,
+)
 from alws.crud import build_node as build_node_crud
 from alws.crud import test
 from alws.database import SyncSession

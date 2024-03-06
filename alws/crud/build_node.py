@@ -13,7 +13,11 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus, ErrataPackageStatus, GitHubIssueStatus
+from alws.constants import (
+    BuildTaskStatus,
+    ErrataPackageStatus,
+    GitHubIssueStatus,
+)
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
