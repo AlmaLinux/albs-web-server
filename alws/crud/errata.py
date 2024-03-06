@@ -29,6 +29,7 @@ from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
     ErrataReleaseStatus,
+    GitHubIssueStatus,
 )
 from alws.dependencies import get_db, get_pulp_db
 from alws.pulp_models import (
@@ -552,7 +553,7 @@ async def get_matching_albs_packages(
                 await move_issues(
                     github_client=github_client,
                     issues=issues,
-                    status="Released",
+                    status=GitHubIssueStatus.RELEASED,
                 )
         return items_to_insert
 
@@ -1527,7 +1528,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
                         await move_issues(
                             github_client=github_client,
                             issues=issues,
-                            status="Released",
+                            status=GitHubIssueStatus.RELEASED,
                         )
                 except Exception as err:
                     logging.exception(

@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus, ErrataPackageStatus
+from alws.constants import BuildTaskStatus, ErrataPackageStatus, GitHubIssueStatus
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -481,7 +481,7 @@ async def __process_rpms(
                 await move_issues(
                     github_client=github_client,
                     issues=issues,
-                    status="Testing",
+                    status=GitHubIssueStatus.TESTING,
                 )
         except Exception as err:
             logging.exception(

@@ -22,6 +22,7 @@ from alws.constants import (
     BeholderMatchMethod,
     ErrataPackageStatus,
     ErrataReleaseStatus,
+    GitHubIssueStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
@@ -592,7 +593,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         await move_issues(
                             github_client=github_client,
                             issues=issues,
-                            status="Released",
+                            status=GitHubIssueStatus.RELEASED,
                         )
                 except Exception as err:
                     logging.exception(

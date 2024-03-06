@@ -187,6 +187,14 @@ class SignStatusEnum(enum.IntEnum):
     WRONG_SIGNATURE = 4
 
 
+class GitHubIssueStatus(enum.Enum):
+    TODO = "Todo"
+    DEVELOPMENT = "In Development"
+    BUILDING = "Building"
+    TESTING = "Testing"
+    RELEASED = "Released"
+
+
 class BeholderMatchMethod(enum.Enum):
     EXACT = "exact"
     CLOSEST = "closest"
