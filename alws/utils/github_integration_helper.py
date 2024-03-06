@@ -146,7 +146,9 @@ async def create_github_issue(
             for p in packages
         )
     )
-    issue_title = f'Release {advisory_id}'
+    main_package = packages[0]
+    name = f"{main_package['name']}-{main_package['version']}-{main_package['release']}"
+    issue_title = f'Release {name} {advisory_id}'
     issue_body = (
         f'{title}\nSeverity: {severity}\n'
         f'Description\n{description}\n\n'
