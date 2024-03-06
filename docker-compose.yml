@@ -2,6 +2,19 @@ version: "3.9"
 
 services:
 
+  web_server_tests:
+    image: quay.io/almalinuxorg/albs:latest
+    env_file:
+      - test_vars.env
+    volumes:
+      - "./alws:/code/alws"
+      - "./scripts:/code/scripts"
+      - "./reference_data:/code/reference_data"
+      - "./tests:/code/tests"
+      - "./requirements.txt:/code/requirements.txt"
+    command:
+      bash -c 'source env/bin/activate && pytest -v --ignore alws/'
+
   db:
     image: postgres:13
     env_file:
