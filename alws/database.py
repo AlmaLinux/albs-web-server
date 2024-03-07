@@ -1,10 +1,9 @@
 # -*- mode:python; coding:utf-8; -*-
 # author: Vyacheslav Potoropin <vpotoropin@almalinux.org>
 # created: 2021-06-22
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from alws.config import settings
@@ -20,16 +19,20 @@ sync_engine = create_engine(
 )
 
 
-class Base:
+class Base(DeclarativeBase):
     __allow_unmapped__ = True
+    metadata = MetaData()
 
 
-Base = declarative_base(cls=Base)
 sync_session_factory = sessionmaker(sync_engine, expire_on_commit=False)
 Session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 SyncSession = scoped_session(sync_session_factory)
 
-PulpBase = declarative_base(cls=Base)
+
+class PulpBase(DeclarativeBase):
+    __allow_unmapped__ = True
+
+
 pulp_engine = create_engine(
     settings.pulp_database_url, pool_pre_ping=True, pool_recycle=3600
 )
