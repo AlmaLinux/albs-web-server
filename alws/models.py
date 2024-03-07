@@ -230,9 +230,7 @@ PlatformRoleMapping = sqlalchemy.Table(
 class Platform(PermissionsMixin, Base):
     __tablename__ = "platforms"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     contact_mail: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
@@ -318,7 +316,7 @@ class Repository(CustomRepoRepr, PermissionsMixin):
     production: Mapped[Optional[bool]] = mapped_column(
         sqlalchemy.Boolean, default=False, nullable=True
     )
-    pulp_href: Mapped[str] = mapped_column(sqlalchemy.Text)
+    pulp_href: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text)
     export_path: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
@@ -344,9 +342,7 @@ class RepositoryRemote(CustomRepoRepr):
         ),
     ]
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     arch: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     url: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
@@ -391,9 +387,7 @@ BuildDependency = sqlalchemy.Table(
 class Build(PermissionsMixin, TeamMixin, Base):
     __tablename__ = "builds"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     created_at: Mapped[date_time] = mapped_column(
         sqlalchemy.DateTime,
         nullable=False,
@@ -476,9 +470,7 @@ BuildTaskDependency = sqlalchemy.Table(
 class BuildTask(TimeMixin, Base):
     __tablename__ = "build_tasks"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     ts: Mapped[Optional[date_time]] = mapped_column(
         sqlalchemy.DateTime,
         nullable=True,
@@ -535,7 +527,7 @@ class BuildTask(TimeMixin, Base):
     )
     platform: Mapped["Platform"] = relationship("Platform")
     build: Mapped["Build"] = relationship("Build", back_populates="tasks")
-    dependencies: Mapped["BuildTask"] = relationship(
+    dependencies: Mapped[List["BuildTask"]] = relationship(
         "BuildTask",
         secondary=BuildTaskDependency,
         primaryjoin=(BuildTaskDependency.c.build_task_id == id),
@@ -560,12 +552,10 @@ class BuildTask(TimeMixin, Base):
 class BuildTaskRef(Base):
     __tablename__ = "build_task_refs"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     url: Mapped[str] = mapped_column(sqlalchemy.TEXT, nullable=False)
-    git_ref: Mapped[str] = mapped_column(sqlalchemy.TEXT)
-    ref_type: Mapped[int] = mapped_column(sqlalchemy.Integer)
+    git_ref: Mapped[Optional[str]] = mapped_column(sqlalchemy.TEXT)
+    ref_type: Mapped[Optional[int]] = mapped_column(sqlalchemy.Integer)
     git_commit_hash: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.TEXT, nullable=True
     )
@@ -599,9 +589,7 @@ class RpmModule(Base):
 class BuildTaskArtifact(Base):
     __tablename__ = "build_artifacts"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     build_task_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("build_tasks.id"),
@@ -645,9 +633,7 @@ class BuildTaskArtifact(Base):
 class SourceRpm(Base):
     __tablename__ = "source_rpms"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     build_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("builds.id"),
@@ -671,9 +657,7 @@ class SourceRpm(Base):
 class BinaryRpm(Base):
     __tablename__ = "binary_rpms"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     build_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer, sqlalchemy.ForeignKey("builds.id"), nullable=False
     )
@@ -841,9 +825,7 @@ TeamUserMapping = sqlalchemy.Table(
 class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
     __tablename__ = "user_oauth_accounts"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     # Override SQLAlchemyBaseOAuthAccountTable access_token column length
     access_token: Mapped[str] = mapped_column(
         sqlalchemy.VARCHAR(length=2048),
@@ -862,7 +844,7 @@ class UserOauthAccount(SQLAlchemyBaseOAuthAccountTable[int], Base):
 class UserAccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     __tablename__ = "user_access_tokens"
 
-    id: Mapped[Optional[int]] = mapped_column(
+    id: Mapped[int] = mapped_column(
         sqlalchemy.Integer, primary_key=True, autoincrement=True
     )
 
@@ -878,9 +860,7 @@ class UserAccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
 class User(SQLAlchemyBaseUserTable[int], Base):
     __tablename__ = "users"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     username: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.TEXT, nullable=True
     )
@@ -915,9 +895,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 class Team(PermissionsMixin, Base):
     __tablename__ = "teams"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True
     )
@@ -1007,9 +985,7 @@ ProductPlatforms = sqlalchemy.Table(
 class Product(PermissionsMixin, TeamMixin, Base):
     __tablename__ = "products"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True
     )
@@ -1059,9 +1035,7 @@ class Product(PermissionsMixin, TeamMixin, Base):
 class TestTask(TimeMixin, Base):
     __tablename__ = "test_tasks"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     package_name: Mapped[str] = mapped_column(sqlalchemy.TEXT, nullable=False)
     package_version: Mapped[str] = mapped_column(
         sqlalchemy.TEXT, nullable=False
@@ -1112,9 +1086,7 @@ class TestTask(TimeMixin, Base):
 
 class TestTaskArtifact(Base):
     __tablename__ = "test_task_artifacts"
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     test_task_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("test_tasks.id"),
@@ -1156,9 +1128,7 @@ class PackageTestRepository(Base):
 
 class TestRepository(Base):
     __tablename__ = "test_repositories"
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True
     )
@@ -1179,9 +1149,7 @@ class TestRepository(Base):
 class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):
     __tablename__ = "build_releases"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     build_ids: Mapped[List[int]] = mapped_column(
         sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False
     )
@@ -1253,9 +1221,7 @@ SignKeyRoleMapping = sqlalchemy.Table(
 class SignKey(PermissionsMixin, Base):
     __tablename__ = "sign_keys"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(sqlalchemy.Text)
     # FIXME: change nullable to False after population
     is_community: Mapped[Optional[bool]] = mapped_column(
@@ -1308,9 +1274,7 @@ class SignKey(PermissionsMixin, Base):
 class GenKeyTask(Base):
     __tablename__ = "gen_key_tasks"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     status: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=GenKeyStatus.IDLE
     )
@@ -1328,9 +1292,7 @@ class GenKeyTask(Base):
 class SignTask(TimeMixin, Base):
     __tablename__ = "sign_tasks"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     build_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer, sqlalchemy.ForeignKey("builds.id"), nullable=False
     )
@@ -1361,9 +1323,7 @@ class SignTask(TimeMixin, Base):
 class ExportTask(Base):
     __tablename__ = "export_tasks"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     status: Mapped[int] = mapped_column(sqlalchemy.Integer, nullable=False)
     exported_at: Mapped[Optional[date_time]] = mapped_column(
@@ -1374,9 +1334,7 @@ class ExportTask(Base):
 class RepoExporter(Base):
     __tablename__ = "repo_exporters"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     path: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     exported_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
@@ -1397,9 +1355,7 @@ class RepoExporter(Base):
 class PlatformFlavour(PermissionsMixin, Base):
     __tablename__ = "platform_flavours"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True
     )
@@ -1416,10 +1372,8 @@ class PlatformFlavour(PermissionsMixin, Base):
 
 class NewErrataRecord(Base):
     __tablename__ = "new_errata_records"
-    id: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, primary_key=True
-    )
-    platform_id: Mapped[Optional[int]] = mapped_column(
+    id: Mapped[str] = mapped_column(sqlalchemy.Text, primary_key=True)
+    platform_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
             "platforms.id",
@@ -1654,9 +1608,7 @@ class NewErrataToALBSPackage(Base):
         ),
     )
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     errata_package_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
@@ -1724,9 +1676,7 @@ class NewErrataToALBSPackage(Base):
 class ErrataRecord(Base):
     __tablename__ = "errata_records"
 
-    id: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, primary_key=True
-    )
+    id: Mapped[str] = mapped_column(sqlalchemy.Text, primary_key=True)
     platform_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("platforms.id"),
@@ -1867,9 +1817,7 @@ class ErrataRecord(Base):
 class ErrataReference(Base):
     __tablename__ = "errata_references"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     href: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     ref_id: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     title: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
@@ -1906,9 +1854,7 @@ class ErrataReference(Base):
 class ErrataCVE(Base):
     __tablename__ = "errata_cves"
 
-    id: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, primary_key=True
-    )
+    id: Mapped[str] = mapped_column(sqlalchemy.Text, primary_key=True)
     cvss3: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     cwe: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     impact: Mapped[Optional[str]] = mapped_column(
@@ -1920,9 +1866,7 @@ class ErrataCVE(Base):
 class ErrataPackage(Base):
     __tablename__ = "errata_packages"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     errata_record_id: Mapped[str] = mapped_column(
         sqlalchemy.Text,
         sqlalchemy.ForeignKey(
@@ -1960,9 +1904,7 @@ class ErrataToALBSPackage(Base):
         ),
     )
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     errata_package_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(
@@ -2029,9 +1971,7 @@ class ErrataToALBSPackage(Base):
 class PerformanceStats(Base):
     __tablename__ = "performance_stats"
 
-    id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer, primary_key=True
-    )
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     statistics: Mapped[Optional[Dict[str, Any]]] = mapped_column(
         JSONB,
         nullable=True,
