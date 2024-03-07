@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import re
-from datetime import datetime as date_time
 from typing import Any, Dict, List, Literal, Optional
 
 import sqlalchemy
@@ -127,11 +126,11 @@ class PermissionsMixin:
 @declarative_mixin
 class TimeMixin:
     @declared_attr
-    def started_at(cls) -> Mapped[Optional[date_time]]:
+    def started_at(cls) -> Mapped[Optional[datetime.datetime]]:
         return mapped_column(sqlalchemy.DateTime, nullable=True)
 
     @declared_attr
-    def finished_at(cls) -> Mapped[Optional[date_time]]:
+    def finished_at(cls) -> Mapped[Optional[datetime.datetime]]:
         return mapped_column(sqlalchemy.DateTime, nullable=True)
 
 
@@ -388,12 +387,12 @@ class Build(PermissionsMixin, TeamMixin, Base):
     __tablename__ = "builds"
 
     id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
-    created_at: Mapped[date_time] = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime,
         nullable=False,
         default=func.current_timestamp(),
     )
-    finished_at: Mapped[Optional[date_time]] = mapped_column(
+    finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime, nullable=True
     )
     tasks: Mapped[List["BuildTask"]] = relationship(
@@ -471,7 +470,7 @@ class BuildTask(TimeMixin, Base):
     __tablename__ = "build_tasks"
 
     id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
-    ts: Mapped[Optional[date_time]] = mapped_column(
+    ts: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime,
         nullable=True,
         index=True,
@@ -1075,7 +1074,7 @@ class TestTask(TimeMixin, Base):
         nullable=True,
     )
     repository: Mapped["Repository"] = relationship("Repository")
-    scheduled_at: Mapped[Optional[date_time]] = mapped_column(
+    scheduled_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime, nullable=True
     )
     performance_stats: Mapped["PerformanceStats"] = relationship(
@@ -1153,7 +1152,7 @@ class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):
     build_ids: Mapped[List[int]] = mapped_column(
         sqlalchemy.ARRAY(sqlalchemy.Integer, dimensions=1), nullable=False
     )
-    created_at: Mapped[Optional[date_time]] = mapped_column(
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime,
         nullable=True,
         default=func.current_timestamp(),
@@ -1237,7 +1236,7 @@ class SignKey(PermissionsMixin, Base):
         sqlalchemy.String(40), unique=True
     )
     public_url: Mapped[str] = mapped_column(sqlalchemy.Text)
-    inserted: Mapped[date_time] = mapped_column(
+    inserted: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
     )
     product_id: Mapped[Optional[int]] = mapped_column(
@@ -1306,7 +1305,7 @@ class SignTask(TimeMixin, Base):
     status: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=SignStatus.IDLE
     )
-    ts: Mapped[Optional[date_time]] = mapped_column(
+    ts: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime, nullable=True
     )
     error_message: Mapped[Optional[str]] = mapped_column(
@@ -1326,7 +1325,7 @@ class ExportTask(Base):
     id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     status: Mapped[int] = mapped_column(sqlalchemy.Integer, nullable=False)
-    exported_at: Mapped[Optional[date_time]] = mapped_column(
+    exported_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime, nullable=True
     )
 
@@ -1413,10 +1412,10 @@ class NewErrataRecord(Base):
         sqlalchemy.Boolean, nullable=True
     )
 
-    issued_date: Mapped[date_time] = mapped_column(
+    issued_date: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, nullable=False
     )
-    updated_date: Mapped[date_time] = mapped_column(
+    updated_date: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, nullable=False
     )
     description: Mapped[Optional[str]] = mapped_column(
@@ -1713,10 +1712,10 @@ class ErrataRecord(Base):
         sqlalchemy.Boolean, nullable=True
     )
 
-    issued_date: Mapped[date_time] = mapped_column(
+    issued_date: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, nullable=False
     )
-    updated_date: Mapped[date_time] = mapped_column(
+    updated_date: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, nullable=False
     )
     description: Mapped[Optional[str]] = mapped_column(
