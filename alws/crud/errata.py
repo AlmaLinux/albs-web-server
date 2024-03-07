@@ -544,16 +544,23 @@ async def get_matching_albs_packages(
         errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
-        if github_client:
-            issues = await find_issues_by_record_id(
-                github_client,
-                [errata_package.errata_record_id],
-            )
-            if issues:
-                await move_issues(
-                    github_client=github_client,
-                    issues=issues,
-                    status=GitHubIssueStatus.RELEASED,
+        if settings.github_integration_enabled:
+            try:
+                github_client = await get_github_client()
+                issues = await find_issues_by_record_id(
+                    github_client,
+                    [errata_package.errata_record_id],
+                )
+                if issues:
+                    await move_issues(
+                        github_client=github_client,
+                        issues=issues,
+                        status=GitHubIssueStatus.RELEASED,
+                    )
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
                 )
         return items_to_insert
 

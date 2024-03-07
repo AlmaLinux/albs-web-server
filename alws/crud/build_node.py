@@ -33,7 +33,6 @@ from alws.utils.github_integration_helper import (
     get_github_client,
     move_issues,
 )
-from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
