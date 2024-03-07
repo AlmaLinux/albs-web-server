@@ -29,6 +29,7 @@ from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
     ErrataReleaseStatus,
+    GitHubIssueStatus,
 )
 from alws.dependencies import get_db, get_pulp_db
 from alws.pulp_models import (
@@ -49,6 +50,12 @@ from alws.utils.errata import (
     get_nevra,
     get_oval_title,
     get_verbose_errata_title,
+)
+from alws.utils.github_integration_helper import (
+    create_github_issue,
+    find_issues_by_record_id,
+    get_github_client,
+    move_issues,
 )
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
@@ -505,7 +512,7 @@ async def get_matching_albs_packages(
     errata_package: models.NewErrataPackage,
     prod_repos_cache,
     module,
-) -> List[models.NewErrataToALBSPackage]:
+) -> List[models.ErrataToALBSPackage]:
     items_to_insert = []
     # We're going to check packages that match name-version-clean_release
     # Note that clean_release doesn't include the .module... str, we match:
@@ -537,6 +544,24 @@ async def get_matching_albs_packages(
         errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
+        if settings.github_integration_enabled:
+            try:
+                github_client = await get_github_client()
+                issues = await find_issues_by_record_id(
+                    github_client,
+                    [errata_package.errata_record_id],
+                )
+                if issues:
+                    await move_issues(
+                        github_client=github_client,
+                        issues=issues,
+                        status=GitHubIssueStatus.RELEASED,
+                    )
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
+                )
         return items_to_insert
 
     # If we couldn't find any pkg in production repos
@@ -617,6 +642,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     )
     platform = platform.scalars().first()
     items_to_insert = []
+    original_id = errata.id
 
     # Rebranding RHEL -> AlmaLinux
     for key in ("description", "title"):
@@ -673,6 +699,25 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
+
+    if settings.github_integration_enabled:
+        try:
+            github_client = await get_github_client()
+            await create_github_issue(
+                client=github_client,
+                title=errata.title,
+                description=errata.description,
+                advisory_id=alma_errata_id,
+                original_id=original_id,
+                platform_name=platform.name,
+                severity=errata.severity,
+                packages=errata.packages,
+            )
+        except Exception as err:
+            logging.exception(
+                "Cannot create GitHub issue: %s",
+                err,
+            )
 
     # References
     self_ref_exists = False
@@ -1479,6 +1524,24 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 missing_pkg_names=missing_pkg_names,
                 force_flag=False,
             )
+            if settings.github_integration_enabled:
+                try:
+                    github_client = await get_github_client()
+                    issues = await find_issues_by_record_id(
+                        github_client,
+                        [db_record.id],
+                    )
+                    if issues:
+                        await move_issues(
+                            github_client=github_client,
+                            issues=issues,
+                            status=GitHubIssueStatus.RELEASED,
+                        )
+                except Exception as err:
+                    logging.exception(
+                        "Cannot move issue to the Released section: %s",
+                        err,
+                    )
             if not tasks:
                 continue
             repos_to_publish.extend(repo_mapping.keys())

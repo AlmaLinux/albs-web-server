@@ -10,7 +10,12 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.build_planner import BuildPlanner
-from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
+from alws.config import settings
+from alws.constants import (
+    DRAMATIQ_TASK_TIMEOUT,
+    BuildTaskStatus,
+    GitHubIssueStatus,
+)
 from alws.crud import build_node as build_node_crud
 from alws.crud import test
 from alws.database import SyncSession
@@ -25,6 +30,12 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema, build_schema
+from alws.utils.github_integration_helper import (
+    find_issues_by_repo_name,
+    get_github_client,
+    move_issues,
+    set_build_id_to_issues,
+)
 
 __all__ = ['start_build', 'build_done']
 
@@ -99,6 +110,37 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
             await planner.init_build_repos()
             db.commit()
         db.close()
+
+    if settings.github_integration_enabled:
+        try:
+            github_client = await get_github_client()
+            repos = set()
+            for task in build_request.tasks:
+                if isinstance(task, build_schema.BuildTaskModuleRef):
+                    repos.add(f"module {task.module_name}")
+                    continue
+
+                repos.add(f"{task.url} {task.git_ref}")
+            issues = await find_issues_by_repo_name(
+                github_client=github_client,
+                repo_names=list(repos),
+            )
+            if issues:
+                await set_build_id_to_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    build_id=build_id,
+                )
+                await move_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    status=GitHubIssueStatus.BUILDING,
+                )
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Building section: %s",
+                err,
+            )
 
 
 async def _build_done(request: build_node_schema.BuildDone):

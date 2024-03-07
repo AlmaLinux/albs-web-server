@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     sentry_dsn: Optional[str] = None
     sentry_traces_sample_rate: float = 0.2
 
+    github_integration_enabled: bool = False
+    github_token: Optional[str] = None
+    github_organization_name: str = 'AlmaLinux'
+    github_project_number: Optional[int] = None
+    github_default_repository_name: str = 'updates'
+
     @property
     def codenotary_enabled(self) -> bool:
         return bool(self.immudb_username) and bool(self.immudb_password)

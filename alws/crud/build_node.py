@@ -13,7 +13,11 @@ from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.constants import BuildTaskStatus, ErrataPackageStatus
+from alws.constants import (
+    BuildTaskStatus,
+    ErrataPackageStatus,
+    GitHubIssueStatus,
+)
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -23,6 +27,12 @@ from alws.errors import (
 )
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
+from alws.utils.github_integration_helper import (
+    find_issues_by_build_id,
+    find_issues_by_record_id,
+    get_github_client,
+    move_issues,
+)
 from alws.utils.modularity import IndexWrapper, RpmArtifact
 from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
@@ -323,6 +333,7 @@ async def get_srpm_artifact_by_build_task_id(
 async def __process_rpms(
     db: AsyncSession,
     pulp_client: PulpClient,
+    build_id: int,
     task_id: int,
     task_arch: str,
     task_artifacts: list,
@@ -410,6 +421,7 @@ async def __process_rpms(
         for href, _, artifact in processed_packages
     ]
     rpms_info = get_rpm_packages_info(rpms)
+    errata_record_ids = set()
     for build_task_artifact in rpms:
         rpm_info = rpms_info[build_task_artifact.href]
         if rpm_info["arch"] != "src":
@@ -453,6 +465,31 @@ async def __process_rpms(
                 errata_package,
                 build_task_artifact,
                 rpm_info,
+            )
+            errata_record_ids.add(errata_package.errata_record_id)
+    if settings.github_integration_enabled:
+        try:
+            github_client = await get_github_client()
+            issues = await find_issues_by_record_id(
+                github_client=github_client,
+                record_ids=list(errata_record_ids),
+            )
+            issues.extend(
+                await find_issues_by_build_id(
+                    github_client=github_client,
+                    build_ids=[build_id],
+                )
+            )
+            if issues:
+                await move_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    status=GitHubIssueStatus.TESTING,
+                )
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Testing section: %s",
+                err,
             )
 
     # we need to put source RPM in module as well, but it can be skipped
@@ -654,6 +691,7 @@ async def __process_build_task_artifacts(
     rpm_entries = await __process_rpms(
         db,
         pulp_client,
+        build_task.build_id,
         build_task.id,
         build_task.arch,
         rpm_artifacts,
@@ -780,10 +818,10 @@ async def __update_built_srpm_url(
     ):
         # Set the error field to describe the reason why they are fast failing
         fast_fail_msg = (
-            f"Fast failed: SRPM build failed in the initial "
+            "Fast failed: SRPM build failed in the initial "
             f"architecture ({build_task.arch}). "
-            f"Please refer to the initial architecture build "
-            f"logs for more information about the failure."
+            "Please refer to the initial architecture build "
+            "logs for more information about the failure."
         )
         update_query = (
             update(models.BuildTask)
@@ -860,9 +898,9 @@ async def fast_fail_other_tasks_by_ref(
     if len(build_tasks) != len(uncompleted_tasks):
         return
     fast_fail_msg = (
-        f"Fast failed: build processing failed in the initial "
+        "Fast failed: build processing failed in the initial "
         f"architecture ({current_task.arch}). Please refer to the initial "
-        f"architecture build logs for more information about the failure."
+        "architecture build logs for more information about the failure."
     )
     uncompleted_tasks_ids = [task.id for task in uncompleted_tasks]
     await db.execute(
