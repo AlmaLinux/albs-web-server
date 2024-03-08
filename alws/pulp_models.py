@@ -235,7 +235,7 @@ class CoreContent(PulpBase):
         "RpmPackage",
         back_populates="content",
     )
-    core_contentartifact: Mapped["CoreContentArtifact"] = relationship(
+    core_contentartifact: Mapped[List["CoreContentArtifact"]] = relationship(
         "CoreContentArtifact",
         back_populates="content",
     )
@@ -325,7 +325,7 @@ class CoreArtifact(PulpBase):
         sqlalchemy.DATETIME,
         default=datetime.datetime.now,
     )
-    core_contentartifact: Mapped[CoreContentArtifact] = relationship(
+    core_contentartifact: Mapped[List[CoreContentArtifact]] = relationship(
         CoreContentArtifact,
         back_populates="artifact",
     )
