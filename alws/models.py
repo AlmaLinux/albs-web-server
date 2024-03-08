@@ -536,7 +536,7 @@ class BuildTask(TimeMixin, Base):
         "TestTask", back_populates="build_task", order_by="TestTask.revision"
     )
     rpm_module: Mapped["RpmModule"] = relationship("RpmModule")
-    performance_stats: Mapped["PerformanceStats"] = relationship(
+    performance_stats: Mapped[List["PerformanceStats"]] = relationship(
         "PerformanceStats",
         back_populates="build_task",
     )
@@ -1077,7 +1077,7 @@ class TestTask(TimeMixin, Base):
     scheduled_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         sqlalchemy.DateTime, nullable=True
     )
-    performance_stats: Mapped["PerformanceStats"] = relationship(
+    performance_stats: Mapped[List["PerformanceStats"]] = relationship(
         "PerformanceStats",
         back_populates="test_task",
     )
