@@ -2,7 +2,11 @@
 # author: Vyacheslav Potoropin <vpotoropin@almalinux.org>
 # created: 2021-06-22
 from sqlalchemy import MetaData, create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncSession,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -19,7 +23,7 @@ sync_engine = create_engine(
 )
 
 
-class Base(DeclarativeBase):
+class Base(AsyncAttrs, DeclarativeBase):
     __allow_unmapped__ = True
     metadata = MetaData()
 
@@ -29,7 +33,7 @@ Session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 SyncSession = scoped_session(sync_session_factory)
 
 
-class PulpBase(DeclarativeBase):
+class PulpBase(AsyncAttrs, DeclarativeBase):
     __allow_unmapped__ = True
 
 
