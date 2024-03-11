@@ -74,9 +74,11 @@ services:
     environment:
       CELERY_CONFIG_PATH: "/scheduler_config.yaml"
       SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
-    command: "bash -c 'source env/bin/activate && pip3 install --upgrade pip &&
-        pip3 install -r /tmp/requirements/scheduler.txt --no-cache-dir &&
-        uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+    command: "bash -c 'source env/bin/activate && \
+                       pip3 install --upgrade pip && \
+                       pip3 install -r /tmp/requirements/scheduler.txt --no-cache-dir && \
+                       /wait_for_it.sh web_server:8000 && \
+                       uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
     restart: on-failure
     volumes:
       - ../alts/configs/alts_config.yaml:/scheduler_config.yaml
@@ -524,6 +526,27 @@ services:
         max-size: "100Mb"
         max-file: "3"
 
+  sign_file:
+    image: sign-file:latest
+    build:
+      dockerfile: Dockerfile
+      context: ../albs-sign-file
+    command: >
+      bash -c "/app/env/bin/python /app/db_manage.py dev_init
+      && /app/env/bin/python /app/start.py"
+    restart: on-failure
+    volumes:
+      - "~/.gnupg:/home/alt/.gnupg"
+      - ../albs-sign-file/sign:/app/sign
+      - ../albs-sign-file/start.py:/app/start.py
+      - ../albs-sign-file/db_manage.py:/app/db_manage.py
+    ports:
+      - "8083:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
 volumes:
   frontend_node_modules:

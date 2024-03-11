@@ -210,8 +210,8 @@ class Exporter:
         self.logger = logging.getLogger(LOGGER_NAME)
         self.pulp_client = pulp_client
         self.createrepo_c = local["createrepo_c"]
-        self.headers = {
-            "Authorization": f"Bearer {settings.sign_server_token}",
+        self.web_server_headers = {
+            "Authorization": f"Bearer {settings.albs_jwt_token}",
         }
         self.pulp_system_user = pulp_user
         self.common_group = pulp_group
@@ -271,18 +271,36 @@ class Exporter:
         method: str,
         endpoint: str,
         params: dict = None,
-        data: dict = None,
+        body: dict = None,
+        user_headers: dict = None,
+        data: typing.Optional[list] = None,
+        send_to: typing.Literal['web_server', 'sign_server'] = 'web_server',
     ):
-        full_url = urllib.parse.urljoin(settings.sign_server_url, endpoint)
+        if send_to == 'web_server':
+            headers = {**self.web_server_headers}
+            full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
+        elif send_to == 'sign_server':
+            headers = {}
+            full_url = urllib.parse.urljoin(
+                settings.sign_server_api_url, endpoint
+            )
+        else:
+            raise ValueError(
+                "send_to parameter must be either web_server or sign_server"
+            )
+
+        if user_headers:
+            headers.update(user_headers)
+
         async with aiohttp.ClientSession(
-            headers=self.headers, raise_for_status=True
+            headers=headers, raise_for_status=True
         ) as session:
             async with session.request(
-                method, full_url, json=data, params=params
+                method, full_url, json=body, params=params, data=data
             ) as response:
-                json_data = await response.read()
-                json_data = json.loads(json_data)
-                return json_data
+                if response.headers['Content-Type'] == 'application/json':
+                    return await response.json()
+                return await response.text()
 
     async def create_filesystem_exporters(
         self,
@@ -348,9 +366,24 @@ class Exporter:
 
         return list(dict(results).values())
 
-    async def sign_repomd_xml(self, data):
-        endpoint = "sign-tasks/sync_sign_task/"
-        return await self.make_request("POST", endpoint, data=data)
+    async def sign_repomd_xml(
+        self, path_to_file: str, key_id: str, token: str
+    ):
+        endpoint = "sign"
+        result = {"asc_content": None, "error": None}
+        try:
+            response = await self.make_request(
+                "POST",
+                endpoint,
+                params={"keyid": key_id},
+                data={"file": Path(path_to_file).read_bytes()},
+                user_headers={"Authorization": f"Bearer {token}"},
+                send_to="sign_server",
+            )
+            result["asc_content"] = response
+        except Exception as err:
+            result['error'] = err
+        return result
 
     async def get_sign_keys(self):
         endpoint = "sign-keys/"
@@ -469,7 +502,7 @@ class Exporter:
         exported_paths = [i for i in results if i]
         return exported_paths
 
-    async def repomd_signer(self, repodata_path, key_id):
+    async def repomd_signer(self, repodata_path, key_id, token):
         string_repodata_path = str(repodata_path)
         if key_id is None:
             self.logger.info(
@@ -478,13 +511,9 @@ class Exporter:
             )
             return
 
-        with open(os.path.join(repodata_path, "repomd.xml"), "rt") as f:
-            file_content = f.read()
-        sign_data = {
-            "content": file_content,
-            "pgp_keyid": key_id,
-        }
-        result = await self.sign_repomd_xml(sign_data)
+        file_path = os.path.join(repodata_path, "repomd.xml")
+        result = await self.sign_repomd_xml(file_path, key_id, token)
+        self.logger.info('PGP key id: %s', key_id)
         result_data = result.get("asc_content")
         if result_data is None:
             self.logger.error(
@@ -741,6 +770,18 @@ class Exporter:
 
         self.logger.info(stdout)
 
+    async def get_sign_server_token(self) -> str:
+        body = {
+            'email': settings.sign_server_username,
+            'password': settings.sign_server_password,
+        }
+        endpoint = 'token'
+        method = 'POST'
+        response = await self.make_request(
+            method=method, endpoint=endpoint, body=body, send_to='sign_server'
+        )
+        return response['token']
+
 
 async def sign_repodata(
     exporter: Exporter,
@@ -752,6 +793,7 @@ async def sign_repodata(
     repodata_paths = []
 
     tasks = []
+    token = await exporter.get_sign_server_token()
 
     for repo_path in exported_paths:
         path = Path(repo_path)
@@ -775,8 +817,8 @@ async def sign_repodata(
                         None,
                     )
                     break
-
-        tasks.append(exporter.repomd_signer(repodata, key_id))
+        exporter.logger.info('Key ID: %s', str(key_id))
+        tasks.append(exporter.repomd_signer(repodata, key_id, token))
 
     await asyncio.gather(*tasks)
 
@@ -993,7 +1035,11 @@ def main():
                 exporter.logger.debug("JSON dump is done")
                 exporter.logger.debug("Generating OVAL data")
                 oval = sync(
-                    exporter.get_oval_xml(platform, only_released=True)
+                    # aiohttp is not able to send booleans in params.
+                    # For this reason, we're passing only_released as a string,
+                    # which in turn will be converted into boolean on backend
+                    # side by fastapi/pydantic.
+                    exporter.get_oval_xml(platform, only_released="true")
                 )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
