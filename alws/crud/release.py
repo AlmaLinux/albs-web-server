@@ -182,7 +182,7 @@ async def revert_release(
 async def remove_release(
     db: AsyncSession,
     release_id: int,
-    user: models.User
+    user: models.User,
 ):
     async with db.begin():
         release = (
