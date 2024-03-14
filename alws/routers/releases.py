@@ -134,31 +134,8 @@ async def delete_release(
     """
     Delete only a scheduled release
     """
-
-    async with db.begin():
-        release = (
-            (
-                await db.execute(
-                    select(models.Release).where(
-                        models.Release.id == release_id,
-                        models.Release.status == ReleaseStatus.SCHEDULED,
-                    )
-                )
-            )
-            .scalars()
-            .first()
-        )
-        if release is None:
-            return {
-                'message': (
-                    'There is no scheduled release plant with ID '
-                    f'"{release_id}"'
-                ),
-            }
-        else:
-            await db.delete(release)
-            return {
-                'message': (
-                    f'Scheduled release with ID "{release_id}" is removed'
-                ),
-            }
+    await r_crud.remove_release(
+        db=db,
+        release_id=release_id,
+        user=user,
+    )

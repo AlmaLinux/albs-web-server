@@ -148,6 +148,12 @@ UseSignKey = Action(
     description='Ability to use sign key'
 )
 
+# Release actions
+DeleteRelease = Action(
+    name='delete_release',
+    description='Ability to delete a release',
+)
+
 ActionsList = [
     ReadBuild,
     CreateBuild,
@@ -178,6 +184,8 @@ ActionsList = [
 
     ReadSignKeyInfo,
     UseSignKey,
+
+    DeleteRelease,
 ]
 
 ActionsMaskMapping = {
@@ -210,4 +218,6 @@ ActionsMaskMapping = {
 
     ReadSignKeyInfo.name: Permissions.READ,
     UseSignKey.name: Permissions.WRITE,
+
+    DeleteRelease.name: Permissions.DELETE,
 }
