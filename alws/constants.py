@@ -14,6 +14,7 @@ __all__ = [
     "REQUEST_TIMEOUT",
     "SYSTEM_USER_NAME",
     "UPLOAD_FILE_CHUNK_SIZE",
+    "BeholderKey",
     "BuildTaskStatus",
     "BuildTaskRefType",
     "ExportStatus",
@@ -24,6 +25,7 @@ __all__ = [
     "Permissions",
     "PermissionTriad",
     "ReleaseStatus",
+    "ReleasePackageTrustness",
     "RepoType",
     "SignStatus",
     "GenKeyStatus",
@@ -35,6 +37,7 @@ __all__ = [
 
 REQUEST_TIMEOUT = 60  # 1 minute
 DRAMATIQ_TASK_TIMEOUT = 60 * 60 * 1000  # 1 hour in milliseconds
+DRAMATIQ_GEN_KEY_TASK_TIMEOUT = 10 * 60 * 1000  # 10 minutes in milliseconds
 DEFAULT_FILE_CHUNK_SIZE = 1024 * 1024  # 1 MB
 UPLOAD_FILE_CHUNK_SIZE = 50 * 1024 * 1024  # 50 MB
 SYSTEM_USER_NAME = "base_user"

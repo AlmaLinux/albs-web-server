@@ -494,6 +494,12 @@ class RpmModulemd(PulpBase):
     version: Mapped[str] = mapped_column(sqlalchemy.Text)
     context: Mapped[str] = mapped_column(sqlalchemy.Text)
     arch: Mapped[str] = mapped_column(sqlalchemy.Text)
+    dependencies: Mapped[Dict[str, Any]] = mapped_column(JSONB)
+    artifacts: Mapped[Dict[str, Any]] = mapped_column(JSONB)
+    static_context: Mapped[bool] = mapped_column(sqlalchemy.Boolean)
+    snippet: Mapped[str] = mapped_column(sqlalchemy.Text)
+    description: Mapped[str] = mapped_column(sqlalchemy.Text)
+    profiles: Mapped[Dict[str, Any]] = mapped_column(JSONB)
 
     @property
     def nsvca(self):
@@ -512,3 +518,18 @@ class RpmModulemdPackages(PulpBase):
         UUID(as_uuid=True),
         sqlalchemy.ForeignKey(RpmPackage.content_ptr_id),
     )
+
+
+class RpmModulemdDefaults(PulpBase):
+    __tablename__ = "rpm_modulemddefaults"
+
+    content_ptr_id = sqlalchemy.Column(
+        UUID(as_uuid=True),
+        sqlalchemy.ForeignKey(CoreContent.pulp_id),
+        primary_key=True,
+    )
+    module = sqlalchemy.Column(sqlalchemy.Text)
+    stream = sqlalchemy.Column(sqlalchemy.Text)
+    profiles = sqlalchemy.Column(JSONB)
+    digest = sqlalchemy.Column(sqlalchemy.Text)
+    snippet = sqlalchemy.Column(sqlalchemy.Text)
