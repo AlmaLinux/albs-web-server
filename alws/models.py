@@ -33,7 +33,6 @@ from alws.constants import (
     SignStatus,
 )
 from alws.database import Base, engine
-
 __all__ = [
     "Build",
     "BuildTask",
