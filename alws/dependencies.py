@@ -1,12 +1,11 @@
 import asyncio
 from contextlib import contextmanager
 
-import aioredis
+from redis import asyncio as aioredis
 from sqlalchemy.orm import Session
 
 from alws import database
 from alws.config import settings
-
 
 __all__ = [
     'get_async_session',
