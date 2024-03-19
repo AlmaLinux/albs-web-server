@@ -325,14 +325,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     )
                     if key in modules_to_release:
                         continue
-                    for repo in task.build.repos:
-                        logging.info(
-                            'Repo name "%s", Repo type "%s", '
-                            'Repo platform_id "%s"',
-                            repo.name,
-                            repo.type,
-                            repo.platform_id,
-                        )
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
@@ -454,7 +446,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             self.db,
             product_id=payload.product_id,
         )
-        logging.info('Platform ID "%s"', platform.id)
         builds = (
             (
                 await self.db.execute(
