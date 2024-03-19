@@ -165,12 +165,10 @@ async def set_platform_for_products_repos(
     # name of a product's repo:
     # some-username-some-product-some-platform-x86_64-debug-dr
     repos_per_platform = {
-        # fmt: off
         (
             f"{product.owner.username}-{product.name}-{platform.name.lower()}"
             f"-{repo.arch}-{repo_debug_dict[repo.debug]}"
         ): platform
-        # fmt: on
         for repo in product.repositories
         for platform in product.platforms
         if repo.type != 'sign_key'
@@ -351,10 +349,12 @@ async def _perform_product_modification(
         db_product.builds.append(db_build)
     else:
         db_product.builds.remove(db_build)
-    db.add_all([
-        db_product,
-        db_build,
-    ])
+    db.add_all(
+        [
+            db_product,
+            db_build,
+        ]
+    )
     try:
         await db.commit()
     except Exception:

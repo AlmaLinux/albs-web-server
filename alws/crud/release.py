@@ -8,7 +8,7 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.constants import ReleaseStatus
-from alws.errors import DataNotFoundError, ProductError, PermissionDenied
+from alws.errors import DataNotFoundError, PermissionDenied, ProductError
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.release_planner import get_releaser_class
