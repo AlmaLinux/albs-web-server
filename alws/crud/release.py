@@ -204,14 +204,13 @@ async def remove_release(
                     f'"{release_id}"'
                 ),
             }
-        else:
-            if not can_perform(release, user, actions.DeleteRelease.name):
-                raise PermissionDenied(
-                    "User does not have permissions to delete this release"
-                )
-            await db.delete(release)
-            return {
-                'message': (
-                    f'Scheduled release with ID "{release_id}" is removed'
-                ),
-            }
+        if not can_perform(release, user, actions.DeleteRelease.name):
+            raise PermissionDenied(
+                "User does not have permissions to delete this release"
+            )
+        await db.delete(release)
+        return {
+            'message': (
+                f'Scheduled release with ID "{release_id}" is removed'
+            ),
+        }
