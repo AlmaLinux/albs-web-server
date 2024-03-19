@@ -423,7 +423,7 @@ async def complete_gen_key_task(
 
 
 def _get_mapping_rpm_per_platform(
-    rpms: list[typing.Union[models.SourceRpm, models.BinaryRpm]],
+    rpms: typing.List[typing.Union[models.SourceRpm, models.BinaryRpm]],
 ) -> dict[str, int]:
     return {
         rpm.artifact.name: rpm.artifact.build_task.platform_id for rpm in rpms
