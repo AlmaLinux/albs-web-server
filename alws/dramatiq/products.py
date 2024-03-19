@@ -230,11 +230,11 @@ async def get_packages_to_blacklist(
     # We don't need all the build tasks ids as
     # all them share the same ref_id
     failed_build_tasks = [
-        tasks[0][0]
-        for tasks in tasks_by_ref.values()
         # task[0] is its ID
         # task[1] is status. True if it's completed, False if not
-        if not any(task[1] for task in tasks)
+        tasks[0][0]
+        for tasks in tasks_by_ref.values()
+        if not any(task_status for task_id, task_status in tasks)
     ]
 
     pkgs_blacklist = (

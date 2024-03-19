@@ -200,7 +200,7 @@ async def remove_release(
         if release is None:
             return {
                 'message': (
-                    'There is no scheduled release plant with ID '
+                    'There is no scheduled release plan with ID '
                     f'"{release_id}"'
                 ),
             }
