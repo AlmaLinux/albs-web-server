@@ -484,7 +484,7 @@ async def __process_rpms(
                 await move_issues(
                     github_client=github_client,
                     issues=issues,
-                    status=GitHubIssueStatus.TESTING,
+                    status=GitHubIssueStatus.TESTING.value,
                 )
         except Exception as err:
             logging.exception(
