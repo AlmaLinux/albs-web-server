@@ -593,7 +593,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         await move_issues(
                             github_client=github_client,
                             issues=issues,
-                            status=GitHubIssueStatus.RELEASED,
+                            status=GitHubIssueStatus.RELEASED.value,
                         )
                 except Exception as err:
                     logging.exception(

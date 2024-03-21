@@ -134,7 +134,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 await move_issues(
                     github_client=github_client,
                     issues=issues,
-                    status=GitHubIssueStatus.BUILDING,
+                    status=GitHubIssueStatus.BUILDING.value,
                 )
         except Exception as err:
             logging.exception(
