@@ -14,7 +14,7 @@ aiofiles==23.2.1
 aioredis==2.0.1
 alembic==1.13.1
 alembic-postgresql-enum==1.1.2
-pytest==8.1.0
+pytest==8.1.1
 pytest-cov==4.1.0
 isort[colors]==5.13.2
 black==24.3.0
