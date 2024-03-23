@@ -229,13 +229,11 @@ async def virt_build_done(
             if build_task.arch == "i686":
                 status = "excluded"
             else:
-                packages.extend(
-                    [
-                        f'qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
-                        f'qemu-kvm-debugsource-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
-                        f'qemu-kvm-debuginfo-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
-                    ]
-                )
+                packages.extend([
+                    f'qemu-kvm-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                    f'qemu-kvm-debugsource-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                    f'qemu-kvm-debuginfo-6.2.0-32.module_el8.8.0+3553+bd08596b.{build_task.arch}.rpm',
+                ])
         if "SLOF" in build_task.ref.url:
             packages = ["SLOF-20210217-1.module_el8.6.0+2880+7d9e3703.src.rpm"]
             if build_task.arch == "ppc64le":
