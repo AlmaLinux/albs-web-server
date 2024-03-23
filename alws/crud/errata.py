@@ -544,24 +544,6 @@ async def get_matching_albs_packages(
         errata_package.source_srpm = src_nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
-        if settings.github_integration_enabled:
-            try:
-                github_client = await get_github_client()
-                issues = await find_issues_by_record_id(
-                    github_client,
-                    [errata_package.errata_record_id],
-                )
-                if issues:
-                    await move_issues(
-                        github_client=github_client,
-                        issues=issues,
-                        status=GitHubIssueStatus.RELEASED,
-                    )
-            except Exception as err:
-                logging.exception(
-                    "Cannot move issue to the Released section: %s",
-                    err,
-                )
         return items_to_insert
 
     # If we couldn't find any pkg in production repos
@@ -601,6 +583,7 @@ async def get_matching_albs_packages(
         RpmPackage.rpm_sourcerpm,
     ]
     pulp_pkgs = get_rpm_packages_by_ids(pulp_pkg_ids, pkg_fields)
+    errata_record_ids = set()
     for package in result:
         pulp_rpm_package = pulp_pkgs.get(package.href)
         if not pulp_rpm_package:
@@ -631,6 +614,25 @@ async def get_matching_albs_packages(
             errata_package.source_srpm = nevra.name
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
+        errata_record_ids.add(errata_package.errata_record_id)
+    if settings.github_integration_enabled:
+        try:
+            github_client = await get_github_client()
+            issues = await find_issues_by_record_id(
+                github_client,
+                list(errata_record_ids),
+            )
+            if issues:
+                await move_issues(
+                    github_client=github_client,
+                    issues=issues,
+                    status=GitHubIssueStatus.TESTING.value,
+                )
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Testing section: %s",
+                err,
+            )
     return items_to_insert
 
 
@@ -1456,6 +1458,24 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
             missing_pkg_names=missing_pkg_names,
         )
         await session.commit()
+        if settings.github_integration_enabled:
+            try:
+                github_client = await get_github_client()
+                issues = await find_issues_by_record_id(
+                    github_client,
+                    [record_id],
+                )
+                if issues:
+                    await move_issues(
+                        github_client=github_client,
+                        issues=issues,
+                        status=GitHubIssueStatus.RELEASED.value,
+                    )
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
+                )
     logging.info("Record %s successfully released", record_id)
 
 
@@ -1543,7 +1563,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
                         await move_issues(
                             github_client=github_client,
                             issues=issues,
-                            status=GitHubIssueStatus.RELEASED,
+                            status=GitHubIssueStatus.RELEASED.value,
                         )
                 except Exception as err:
                     logging.exception(

@@ -7,7 +7,10 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.errors import DataNotFoundError, ProductError
+from alws.constants import ReleaseStatus
+from alws.errors import DataNotFoundError, PermissionDenied, ProductError
+from alws.perms import actions
+from alws.perms.authorization import can_perform
 from alws.release_planner import get_releaser_class
 from alws.schemas import release_schema
 
@@ -174,3 +177,40 @@ async def revert_release(
     product = await __get_product(db, release.product_id)
     releaser = get_releaser_class(product)(db)
     await releaser.revert_release(release_id, user_id)
+
+
+async def remove_release(
+    db: AsyncSession,
+    release_id: int,
+    user: models.User,
+):
+    async with db.begin():
+        release = (
+            (
+                await db.execute(
+                    select(models.Release).where(
+                        models.Release.id == release_id,
+                        models.Release.status == ReleaseStatus.SCHEDULED,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if release is None:
+            return {
+                'message': (
+                    'There is no scheduled release plan with ID '
+                    f'"{release_id}"'
+                ),
+            }
+        if not can_perform(release, user, actions.DeleteRelease.name):
+            raise PermissionDenied(
+                "User does not have permissions to delete this release"
+            )
+        await db.delete(release)
+        return {
+            'message': (
+                f'Scheduled release with ID "{release_id}" is removed'
+            ),
+        }
