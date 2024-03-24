@@ -5,8 +5,9 @@ import logging
 import re
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import joinedload
 
 from alws import models
 from alws.config import settings
@@ -31,45 +32,61 @@ __all__ = ['BuildPlanner']
 class BuildPlanner:
     def __init__(
         self,
-        db: Session,
+        db: AsyncSession,
         build: models.Build,
-        platforms: typing.List[build_schema.BuildCreatePlatforms],
-        platform_flavors: typing.Optional[typing.List[int]],
         is_secure_boot: bool,
         module_build_index: typing.Optional[dict],
         logger: logging.Logger,
     ):
         self._db = db
+        self._gitea_client = None
+        self._pulp_client = None
+        self.__initialized = False
+        self.logger = logger
+        self._build = build
+        self._task_index = 0
+        self._request_platforms_arch_list = {}
+        self._parallel_modes = {}
+        self._platforms = []
+        self._platform_flavors = []
+        self._modules_by_platform_arch = collections.defaultdict(list)
+        self._module_build_index = module_build_index or {}
+        self._tasks_cache = collections.defaultdict(
+            lambda: collections.defaultdict(list)
+        )
+        self._is_secure_boot = is_secure_boot
+
+    async def init(
+        self,
+        platforms: typing.List[build_schema.BuildCreatePlatforms],
+        platform_flavors: typing.Optional[typing.List[int]],
+    ):
+        if self.__initialized:
+            return
+        for platform in platforms:
+            arch_list = platform.arch_list
+            if 'i686' in arch_list and arch_list.index('i686') != 0:
+                arch_list.remove('i686')
+                arch_list.insert(0, 'i686')
+            self._request_platforms_arch_list[platform.name] = arch_list
+
+            self._parallel_modes[platform.name] = (
+                platform.parallel_mode_enabled
+            )
+        await self.load_platforms()
+        if platform_flavors:
+            await self.load_platform_flavors(platform_flavors)
         self._gitea_client = GiteaClient(
             settings.gitea_host, logging.getLogger(__name__)
         )
         self._pulp_client = PulpClient(
             settings.pulp_host, settings.pulp_user, settings.pulp_password
         )
-        self.logger = logger
-        self._build = build
-        self._task_index = 0
-        self._request_platforms = {}
-        self._parallel_modes = {}
-        self._platforms = []
-        self._platform_flavors = []
-        self._modules_by_target = collections.defaultdict(list)
-        self._module_build_index = module_build_index or {}
-        self._module_modified_cache = {}
-        self._tasks_cache = collections.defaultdict(list)
-        self._is_secure_boot = is_secure_boot
-        for platform in platforms:
-            self._request_platforms[platform.name] = platform.arch_list
-            self._parallel_modes[platform.name] = (
-                platform.parallel_mode_enabled
-            )
-        self.load_platforms()
-        if platform_flavors:
-            self.load_platform_flavors(platform_flavors)
+        self.__initialized = True
 
-    def load_platforms(self):
-        platform_names = list(self._request_platforms.keys())
-        self._platforms = self._db.execute(
+    async def load_platforms(self):
+        platform_names = list(self._request_platforms_arch_list.keys())
+        self._platforms = await self._db.execute(
             select(models.Platform).where(
                 models.Platform.name.in_(platform_names)
             )
@@ -84,12 +101,14 @@ class BuildPlanner:
                 f'platforms: {missing_platforms} cannot be found in database'
             )
 
-    def load_platform_flavors(self, flavors):
+    async def load_platform_flavors(self, flavors):
         db_flavors = (
-            self._db.execute(
-                select(models.PlatformFlavour)
-                .where(models.PlatformFlavour.id.in_(flavors))
-                .options(selectinload(models.PlatformFlavour.repos))
+            (
+                await self._db.execute(
+                    select(models.PlatformFlavour)
+                    .where(models.PlatformFlavour.id.in_(flavors))
+                    .options(joinedload(models.PlatformFlavour.repos))
+                )
             )
             .scalars()
             .all()
@@ -120,7 +139,7 @@ class BuildPlanner:
         repo_url, pulp_href = await self._pulp_client.create_build_rpm_repo(
             repo_name
         )
-        modules = self._modules_by_target.get((platform.name, arch), [])
+        modules = self._modules_by_platform_arch.get((platform.name, arch), [])
         if modules and not is_debug:
             await self._pulp_client.modify_repository(
                 pulp_href, add=[module.pulp_href for module in modules]
@@ -172,7 +191,7 @@ class BuildPlanner:
                 platform.name,
                 platform.id,
             )
-            for arch in self._request_platforms[platform.name]:
+            for arch in self._request_platforms_arch_list[platform.name]:
                 tasks.append(self.create_build_repo(platform, arch, 'rpm'))
                 tasks.append(
                     self.create_build_repo(
@@ -413,178 +432,9 @@ class BuildPlanner:
                         module.add_rpm_artifact(artifact)
         return index
 
-    async def add_task(
+    async def _add_single_project(
         self,
-        task: typing.Union[
-            build_schema.BuildTaskRef,
-            build_schema.BuildTaskModuleRef,
-        ],
-    ):
-        if isinstance(task, build_schema.BuildTaskRef) and not task.is_module:
-            await self._add_single_ref(
-                models.BuildTaskRef(
-                    url=task.url,
-                    git_ref=task.git_ref,
-                    ref_type=task.ref_type,
-                    test_configuration=(
-                        task.test_configuration.model_dump()
-                        if task.test_configuration
-                        else None
-                    ),
-                ),
-                mock_options=task.mock_options,
-            )
-            return
-
-        if isinstance(task, build_schema.BuildTaskModuleRef):
-            raw_refs = [ref for ref in task.refs if ref.enabled]
-            _index = IndexWrapper.from_template(task.modules_yaml)
-            module = _index.get_module(task.module_name, task.module_stream)
-            devel_module = None
-            try:
-                devel_module = _index.get_module(
-                    task.module_name + '-devel', task.module_stream
-                )
-            except ModuleNotFoundError:
-                pass
-            module_templates = [module.render()]
-            if devel_module:
-                module_templates.append(devel_module.render())
-        else:
-            raw_refs = [
-                ref
-                for platform in self._platforms
-                for ref, *_ in await build_schema.get_module_refs(
-                    task, platform, self._platform_flavors
-                )
-            ]
-        refs = [
-            models.BuildTaskRef(
-                url=ref.url,
-                git_ref=ref.git_ref,
-                ref_type=BuildTaskRefType.GIT_BRANCH,
-                test_configuration=(
-                    ref.test_configuration.model_dump()
-                    if ref.test_configuration
-                    else None
-                ),
-            )
-            for ref in raw_refs
-        ]
-        if not refs:
-            raise EmptyBuildError
-        module = None
-        if self._build.mock_options:
-            mock_options = self._build.mock_options.copy()
-            if not mock_options.get('definitions'):
-                mock_options['definitions'] = {}
-        else:
-            mock_options = {'definitions': {}}
-        modularity_version = None
-        for platform in self._platforms:
-            modularity_version = platform.modularity['versions'][-1]
-            for flavour in self._platform_flavors:
-                if flavour.modularity and flavour.modularity.get('versions'):
-                    modularity_version = flavour.modularity['versions'][-1]
-            if task.module_platform_version:
-                flavour_versions = [
-                    flavour.modularity['versions']
-                    for flavour in self._platform_flavors
-                    if flavour.modularity
-                    and flavour.modularity.get('versions')
-                ]
-                modularity_version = next(
-                    item
-                    for item in itertools.chain(
-                        platform.modularity['versions'], *flavour_versions
-                    )
-                    if item['name'] == task.module_platform_version
-                )
-            module_version = ModuleWrapper.generate_new_version(
-                modularity_version['version_prefix']
-            )
-            if task.module_version:
-                module_version = int(task.module_version)
-            mock_enabled_modules = mock_options.get('module_enable', [])[:]
-            # Take the first task mock_options
-            # as all tasks share the same mock_options
-            if task.refs:
-                mock_enabled_modules.extend(
-                    task.refs[0].mock_options.get("module_enable", [])
-                )
-            for arch in self._request_platforms[platform.name]:
-                module_index = await self.prepare_module_index(
-                    platform, task, arch
-                )
-                module = module_index.get_module(
-                    task.module_name, task.module_stream
-                )
-                module.add_module_dependencies_from_mock_defs(
-                    enabled_modules=task.enabled_modules
-                )
-                mock_options['module_enable'] = mock_enabled_modules
-                module.version = module_version
-                module.context = module.generate_new_context()
-                module.arch = arch
-                module.set_arch_list(self._request_platforms[platform.name])
-                module_index.add_module(module)
-                if module_index.has_devel_module() and not module.is_devel:
-                    devel_module = module_index.get_module(
-                        f'{task.module_name}-devel', task.module_stream
-                    )
-                    devel_module.version = module.version
-                    devel_module.context = module.context
-                    devel_module.arch = module.arch
-                    devel_module.set_arch_list(
-                        self._request_platforms[platform.name]
-                    )
-                    devel_module.add_module_dependency_to_devel_module(
-                        module=module
-                    )
-                (
-                    module_pulp_href,
-                    sha256,
-                ) = await self._pulp_client.create_module(
-                    module_index.render(),
-                    module.name,
-                    module.stream,
-                    module.context,
-                    module.arch,
-                )
-                db_module = models.RpmModule(
-                    name=module.name,
-                    version=str(module.version),
-                    stream=module.stream,
-                    context=module.context,
-                    arch=module.arch,
-                    pulp_href=module_pulp_href,
-                    sha256=sha256,
-                )
-                self._modules_by_target[(platform.name, arch)].append(
-                    db_module
-                )
-        all_modules = []
-        for modules in self._modules_by_target.values():
-            all_modules.extend(modules)
-        self._db.add_all(all_modules)
-        for key, value in module.iter_mock_definitions():
-            mock_options['definitions'][key] = value
-        for ref in refs:
-            await self._add_single_ref(
-                ref,
-                mock_options=mock_options,
-                modularity_version=modularity_version,
-            )
-
-    async def get_ref_commit_id(self, git_name, git_branch):
-        response = await self._gitea_client.get_branch(
-            f'rpms/{git_name}', git_branch
-        )
-        return response['commit']['id']
-
-    async def _add_single_ref(
-        self,
-        ref: models.BuildTaskRef,
+        ref: build_schema.BuildTaskRef,
         mock_options: typing.Optional[dict[str, typing.Any]] = None,
         modularity_version: typing.Optional[dict] = None,
     ):
@@ -597,16 +447,8 @@ class BuildPlanner:
             mock_options['definitions'] = {}
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
-            arch_tasks = []
-            first_ref_dep = None
-            is_parallel = self._parallel_modes[platform.name]
-            arch_list = self._request_platforms[platform.name]
-            if 'i686' in arch_list and arch_list.index('i686') != 0:
-                arch_list.remove('i686')
-                arch_list.insert(0, 'i686')
-                self._request_platforms[platform.name] = arch_list
-            for arch in self._request_platforms[platform.name]:
-                modules = self._modules_by_target.get(
+            for arch in self._request_platforms_arch_list[platform.name]:
+                modules = self._modules_by_platform_arch.get(
                     (platform.name, arch), []
                 )
                 if modules:
@@ -632,32 +474,219 @@ class BuildPlanner:
                         'dist'
                     ] = f'.{parsed_dist_macro}'
                 build_task = models.BuildTask(
+                    build_id=self._build.id,
                     arch=arch,
                     platform=platform,
                     status=BuildTaskStatus.IDLE,
                     index=self._task_index,
                     ref=ref,
-                    rpm_module=modules[0] if modules else None,
                     is_secure_boot=self._is_secure_boot,
                     mock_options=mock_options,
                 )
-                task_key = (platform.name, arch)
-                self._tasks_cache[task_key].append(build_task)
-                if first_ref_dep and is_parallel:
-                    build_task.dependencies.append(first_ref_dep)
-                idx = self._task_index - 1
-                while idx >= 0:
-                    dep = self._tasks_cache[task_key][idx]
-                    build_task.dependencies.append(dep)
-                    idx -= 1
-                if not is_parallel:
-                    for dep in arch_tasks:
-                        build_task.dependencies.append(dep)
-                if first_ref_dep is None:
-                    first_ref_dep = build_task
-                arch_tasks.append(build_task)
-                self._build.tasks.append(build_task)
+                if modules:
+                    build_task.rpm_modules.extend(modules)
+                self._tasks_cache[platform.name][arch].append(build_task)
         self._task_index += 1
 
-    def create_build(self):
-        return self._build
+    async def _add_single_module(
+        self,
+        task: build_schema.BuildTaskModuleRef,
+    ):
+        raw_refs = [ref for ref in task.refs if ref.enabled]
+        _index = IndexWrapper.from_template(task.modules_yaml)
+        refs = [
+            models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=BuildTaskRefType.GIT_BRANCH,
+                test_configuration=(
+                    ref.test_configuration.model_dump()
+                    if ref.test_configuration
+                    else None
+                ),
+            )
+            for ref in raw_refs
+        ]
+        print('Raw refs: ', raw_refs)
+        print('Module refs: ', refs)
+        if not refs:
+            raise EmptyBuildError
+        if self._build.mock_options:
+            mock_options = self._build.mock_options.copy()
+            if not mock_options.get('definitions'):
+                mock_options['definitions'] = {}
+        else:
+            mock_options = {'definitions': {}}
+        for platform in self._platforms:
+            modularity_version = platform.modularity['versions'][-1]
+            for flavour in self._platform_flavors:
+                if flavour.modularity and flavour.modularity.get('versions'):
+                    modularity_version = flavour.modularity['versions'][-1]
+            if task.module_platform_version:
+                flavour_versions = [
+                    flavour.modularity['versions']
+                    for flavour in self._platform_flavors
+                    if flavour.modularity
+                    and flavour.modularity.get('versions')
+                ]
+                modularity_version = next(
+                    item
+                    for item in itertools.chain(
+                        platform.modularity['versions'], *flavour_versions
+                    )
+                    if item['name'] == task.module_platform_version
+                )
+            if task.module_version:
+                module_version = int(task.module_version)
+            else:
+                module_version = ModuleWrapper.generate_new_version(
+                    modularity_version['version_prefix']
+                )
+            mock_enabled_modules = mock_options.get('module_enable', [])[:]
+            # Take the first task mock_options
+            # as all tasks share the same mock_options
+            if task.refs:
+                mock_enabled_modules.extend(
+                    task.refs[0].mock_options.get("module_enable", [])
+                )
+            for arch in self._request_platforms_arch_list[platform.name]:
+                module_index = await self.prepare_module_index(
+                    platform, task, arch
+                )
+                module = module_index.get_module(
+                    task.module_name, task.module_stream
+                )
+                module.add_module_dependencies_from_mock_defs(
+                    enabled_modules=task.enabled_modules
+                )
+                mock_options['module_enable'] = mock_enabled_modules
+                module.version = module_version
+                module.context = module.generate_new_context()
+                module.arch = arch
+                module.set_arch_list(
+                    self._request_platforms_arch_list[platform.name]
+                )
+                module_index.add_module(module)
+                devel_module = None
+                if module_index.has_devel_module() and not module.is_devel:
+                    devel_module = module_index.get_module(
+                        f'{task.module_name}-devel', task.module_stream
+                    )
+                    devel_module.version = module.version
+                    devel_module.context = module.context
+                    devel_module.arch = module.arch
+                    devel_module.set_arch_list(
+                        self._request_platforms_arch_list[platform.name]
+                    )
+                    devel_module.add_module_dependency_to_devel_module(
+                        module=module
+                    )
+                # Pulp requires usual and devel modules to be separate entities
+                for module in (module, devel_module):
+                    if not module:
+                        continue
+                    # Create fake module in pulp without final version.
+                    # Final module in pulp will be created after all tasks are
+                    # done.
+                    # See: alws.crud.build_node.__process_build_task_artifacts
+                    module_pulp_href = await self._pulp_client.create_module(
+                        module.render(),
+                        module.name,
+                        module.stream,
+                        module.context,
+                        module.arch,
+                        module.description,
+                        artifacts=module.get_rpm_artifacts(),
+                        dependencies=list(module.get_runtime_deps().values()),
+                        packages=[],
+                        profiles=module.get_profiles(),
+                    )
+                    # Create module in db.
+                    # It has the final version and pulp_href is pointing
+                    # to the fake module in pulp created above.
+                    db_module = models.RpmModule(
+                        name=module.name,
+                        version=str(module.version),
+                        stream=module.stream,
+                        context=module.context,
+                        arch=module.arch,
+                        pulp_href=module_pulp_href,
+                    )
+                    self._modules_by_platform_arch[
+                        (platform.name, arch)
+                    ].append(db_module)
+                all_modules = []
+                for modules in self._modules_by_platform_arch.values():
+                    all_modules.extend(modules)
+                self._db.add_all(all_modules)
+                for key, value in module.iter_mock_definitions():
+                    mock_options['definitions'][key] = value
+            for ref in refs:
+                await self._add_single_project(
+                    ref,
+                    mock_options=mock_options,
+                    modularity_version=modularity_version,
+                )
+
+    async def add_git_project(
+        self,
+        ref: typing.Union[
+            build_schema.BuildTaskRef,
+            build_schema.BuildTaskModuleRef,
+        ],
+    ):
+        if isinstance(ref, build_schema.BuildTaskRef):
+            db_ref = models.BuildTaskRef(
+                url=ref.url,
+                git_ref=ref.git_ref,
+                ref_type=ref.ref_type,
+                test_configuration=(
+                    ref.test_configuration.model_dump()
+                    if ref.test_configuration
+                    else None
+                ),
+            )
+            await self._add_single_project(db_ref)
+        else:
+            await self._add_single_module(ref)
+        # TODO: Make sources build as first "arch" in all process
+        # Make dependencies between the tasks as following:
+        #   - If platform has i686 architecture then process it first;
+        #   - If i686 is absent then pick any architecture as first;
+        #   - Other architectures should depend on first architecture
+        #     for the corresponding project only;
+        #   - All architectures should have dependencies
+        #     between their own tasks to ensure correct build order.
+        all_tasks = []
+        for platform_task_cache in self._tasks_cache.values():
+            first_arch = 'i686'
+            first_arch_tasks = platform_task_cache.get('i686')
+            if not first_arch_tasks:
+                first_arch = next(iter(platform_task_cache))
+                first_arch_tasks = platform_task_cache.get(first_arch)
+            for index in range(1, len(first_arch_tasks)):
+                previous_task_index = index - 1
+                current_task = first_arch_tasks[index]
+                previous_task = first_arch_tasks[previous_task_index]
+                current_task.dependencies.append(previous_task)
+            all_tasks.extend(first_arch_tasks)
+            # If it's the only arch, do not need to go additional cycle
+            if len(platform_task_cache.keys()) == 1:
+                continue
+            for arch, tasks in platform_task_cache.items():
+                if arch == first_arch:
+                    continue
+                # Add dependency between first task of first architecture
+                # and first task of each following architecture
+                tasks[0].dependencies.append(first_arch_tasks[0])
+                # Add dependencies for all other tasks
+                for index in range(1, len(tasks)):
+                    previous_task_index = index - 1
+                    first_arch_task = first_arch_tasks[index]
+                    current_task = tasks[index]
+                    previous_task = tasks[previous_task_index]
+                    current_task.dependencies.extend(
+                        [first_arch_task, previous_task]
+                    )
+                all_tasks.extend(tasks)
+        self._db.add_all(all_tasks)
