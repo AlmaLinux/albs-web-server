@@ -254,11 +254,13 @@ class Platform(PermissionsMixin, Base):
     priority: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Integer, nullable=True
     )
-    arch_list: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    copy_priority_arches: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
+    arch_list: Mapped[List[Dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False
     )
-    weak_arch_list: Mapped[Optional[Dict[str, any]]] = mapped_column(
+    copy_priority_arches: Mapped[List[Optional[Dict[str, Any]]]] = (
+        mapped_column(JSONB, nullable=True)
+    )
+    weak_arch_list: Mapped[Optional[List[Dict[str, any]]]] = mapped_column(
         JSONB, nullable=True
     )
     data: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
@@ -533,7 +535,7 @@ class BuildTask(TimeMixin, Base):
         nullable=False,
         index=True,
     )
-    is_secure_boot: Mapped[Optional[str]] = mapped_column(
+    is_secure_boot: Mapped[Optional[bool]] = mapped_column(
         sqlalchemy.Boolean, default=False, nullable=True
     )
     mock_options: Mapped[Dict[str, Any]] = mapped_column(JSONB)
@@ -1468,37 +1470,37 @@ class NewErrataRecord(Base):
     definition_class: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False
     )
-    affected_cpe: Mapped[Dict[str, Any]] = mapped_column(
+    affected_cpe: Mapped[List[Dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=[]
     )
-    criteria: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    criteria: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_criteria: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_criteria: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    tests: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    tests: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_tests: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_tests: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    objects: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    objects: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_objects: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_objects: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    states: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    states: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_states: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_states: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    variables: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    variables: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_variables: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_variables: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
 
@@ -1768,37 +1770,37 @@ class ErrataRecord(Base):
     definition_class: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False
     )
-    affected_cpe: Mapped[Dict[str, Any]] = mapped_column(
+    affected_cpe: Mapped[List[Dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=[]
     )
-    criteria: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    criteria: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_criteria: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_criteria: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    tests: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    tests: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_tests: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_tests: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    objects: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    objects: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_objects: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_objects: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    states: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    states: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_states: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_states: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    variables: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    variables: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
-    original_variables: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    original_variables: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )
 
