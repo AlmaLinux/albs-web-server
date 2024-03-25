@@ -11,11 +11,12 @@ from contextlib import asynccontextmanager
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import requests
+from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from alws.config import settings
-from alws.dependencies import get_db, get_pulp_db
+from alws.dependencies import get_async_db_key
 from alws.models import (
     Build,
     BuildTask,
@@ -29,6 +30,7 @@ from alws.pulp_models import (
     CoreRepositoryContent,
 )
 from alws.utils import pulp_client
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.file_utils import hash_content
 
 logging.basicConfig(
@@ -51,6 +53,8 @@ async def main():
         settings.pulp_user,
         settings.pulp_password,
     )
+
+    await setup_all()
 
     def get_log_names_from_repo(repo: Repository):
         result = {}
@@ -93,8 +97,8 @@ async def main():
                 href,
             )
 
-    async with asynccontextmanager(get_db)() as session:
-        with get_pulp_db() as pulp_session:
+    async with open_async_session(key=get_async_db_key()) as session:
+        with open_session(key="pulp") as pulp_session:
             builds = (
                 (
                     await session.execute(
@@ -311,7 +315,6 @@ async def main():
                     Repository.id.in_(repo_ids_to_remove),
                 )
             )
-            await session.commit()
 
 
 if __name__ == "__main__":

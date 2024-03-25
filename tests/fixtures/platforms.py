@@ -13,7 +13,7 @@ from tests.test_utils.pulp_utils import get_repo_href
 @pytest.mark.anyio
 @pytest.fixture
 async def base_platform(
-    session: AsyncSession,
+    async_session: AsyncSession,
 ) -> AsyncIterable[models.Platform]:
     with open("reference_data/platforms.yaml", "rt") as file:
         loader = yaml.Loader(file)
@@ -22,7 +22,7 @@ async def base_platform(
     schema["repos"] = []
     platform = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(models.Platform).where(
                     models.Platform.name == schema["name"],
                 )
@@ -40,6 +40,6 @@ async def base_platform(
                 **repository_schema.RepositoryCreate(**repo).model_dump()
             )
             platform.repos.append(repository)
-        session.add(platform)
-        await session.commit()
+        async_session.add(platform)
+        await async_session.commit()
     yield platform

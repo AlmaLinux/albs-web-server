@@ -3,6 +3,7 @@ import logging
 
 import sentry_sdk
 from fastapi import FastAPI
+from fastapi_sqla import setup as fastapi_sqla_setup
 from pika.exceptions import StreamLostError
 from starlette.middleware.exceptions import ExceptionMiddleware
 
@@ -39,6 +40,7 @@ if settings.sentry_dsn:
 
 app = FastAPI()
 app.add_middleware(ExceptionMiddleware, handlers=handlers)
+fastapi_sqla_setup(app)
 
 for module in ROUTERS:
     for router_type in (

@@ -39,7 +39,7 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
 
     async def test_module_upload_build_repo(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         modules_yaml: bytes,
         base_platform,
         base_product,
@@ -57,7 +57,7 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
 
         build_task = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(BuildTask)
                     .where(
                         BuildTask.build_id == modular_build.id,

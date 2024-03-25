@@ -222,19 +222,16 @@ async def check_valuable_artifacts(user_id: int, db: AsyncSession):
         user_artifacts['team_membership'] = len(user.teams)
 
     valuable_artifacts = [
-        artifact
-        for artifact in user_artifacts
-        if user_artifacts[artifact] >= 1
+        artifact for artifact in user_artifacts if user_artifacts[artifact] >= 1
     ]
     return valuable_artifacts
 
 
 async def remove_user(user_id: int, db: AsyncSession):
-    async with db.begin():
-        user = await get_user(db, user_id=user_id)
-        if not user:
-            raise UserError(f'User with ID {user_id} does not exist')
-        valuable_artifacts = await check_valuable_artifacts(user_id, db)
+    user = await get_user(db, user_id=user_id)
+    if not user:
+        raise UserError(f'User with ID {user_id} does not exist')
+    valuable_artifacts = await check_valuable_artifacts(user_id, db)
 
     if valuable_artifacts:
         err = f"Can't delete the user {user.username} because he/she "
@@ -274,23 +271,22 @@ async def update_user(
         if v != None:
             setattr(user, k, v)
     db.add(user)
-    await db.commit()
+    await db.flush()
     await db.refresh(user)
 
 
 async def get_user_roles(db: AsyncSession, user_id: int):
-    async with db.begin():
-        user = (
-            (
-                await db.execute(
-                    select(models.User)
-                    .where(models.User.id == user_id)
-                    .options(selectinload(models.User.roles))
-                )
+    user = (
+        (
+            await db.execute(
+                select(models.User)
+                .where(models.User.id == user_id)
+                .options(selectinload(models.User.roles))
             )
-            .scalars()
-            .first()
         )
+        .scalars()
+        .first()
+    )
     if not user:
         raise UserError(f'User with ID {user_id} does not exist')
 
@@ -341,27 +337,24 @@ async def add_roles(
     roles_ids: typing.List[int],
     current_user_id: int,
 ):
-    async with db.begin():
-        user = await get_user(db, user_id)
+    user = await get_user(db, user_id)
 
-        if not await can_edit_teams_roles(db, roles_ids, current_user_id):
-            raise PermissionDenied(
-                "The user has no permissions to edit teams user roles"
-            )
-
-        add_roles = (
-            (
-                await db.execute(
-                    select(models.UserRole).where(
-                        models.UserRole.id.in_(roles_ids)
-                    )
-                )
-            )
-            .scalars()
-            .all()
+    if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+        raise PermissionDenied(
+            "The user has no permissions to edit teams user roles"
         )
-        user.roles.extend(add_roles)
-        db.add(user)
+
+    add_roles = (
+        (
+            await db.execute(
+                select(models.UserRole).where(models.UserRole.id.in_(roles_ids))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    user.roles.extend(add_roles)
+    db.add(user)
 
 
 async def remove_roles(
@@ -370,34 +363,32 @@ async def remove_roles(
     roles_ids: typing.List[int],
     current_user_id: int,
 ):
-    async with db.begin():
-        user = await get_user(db, user_id)
+    user = await get_user(db, user_id)
 
-        if not await can_edit_teams_roles(db, roles_ids, current_user_id):
-            raise PermissionDenied(
-                "The user has no permissions to edit teams user roles"
-            )
-
-        await db.execute(
-            delete(models.UserRoleMapping).where(
-                models.UserRoleMapping.c.role_id.in_(roles_ids),
-                models.UserRoleMapping.c.user_id == user_id,
-            )
+    if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+        raise PermissionDenied(
+            "The user has no permissions to edit teams user roles"
         )
+
+    await db.execute(
+        delete(models.UserRoleMapping).where(
+            models.UserRoleMapping.c.role_id.in_(roles_ids),
+            models.UserRoleMapping.c.user_id == user_id,
+        )
+    )
 
 
 async def get_user_teams(db: AsyncSession, user_id: int):
-    async with db.begin():
-        user = (
-            (
-                await db.execute(
-                    select(models.User)
-                    .where(models.User.id == user_id)
-                    .options(selectinload(models.User.teams))
-                )
+    user = (
+        (
+            await db.execute(
+                select(models.User)
+                .where(models.User.id == user_id)
+                .options(selectinload(models.User.teams))
             )
-            .scalars()
-            .first()
         )
+        .scalars()
+        .first()
+    )
     response = [{'id': team.id, 'name': team.name} for team in user.teams]
     return response

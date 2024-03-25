@@ -3,6 +3,7 @@ import itertools
 import typing
 
 from fastapi import APIRouter, Depends, Response, status
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import dramatiq
@@ -10,7 +11,7 @@ from alws.auth import get_current_user
 from alws.config import settings
 from alws.constants import BuildTaskRefType, BuildTaskStatus
 from alws.crud import build_node
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.schemas import build_node_schema
 
 router = APIRouter(
@@ -23,7 +24,7 @@ router = APIRouter(
 @router.post("/ping")
 async def ping(
     node_status: build_node_schema.Ping,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     if not node_status.active_tasks:
         return {}
@@ -35,7 +36,7 @@ async def ping(
 async def build_done(
     build_done_: build_node_schema.BuildDone,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     build_task = await build_node.get_build_task(db, build_done_.task_id)
     if BuildTaskStatus.is_finished(build_task.status):
@@ -46,7 +47,7 @@ async def build_done(
     # won't rebuild task again and again while it's in the queue
     # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-    await db.commit()
+    await db.flush()
     dramatiq.build_done.send(build_done_.model_dump())
     return {"ok": True}
 
@@ -57,7 +58,7 @@ async def build_done(
 )
 async def get_task(
     request: build_node_schema.RequestTask,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     task = await build_node.get_available_build_task(db, request)
     if not task:
@@ -140,14 +141,12 @@ async def get_task(
         module_build_options = {
             "definitions": {
                 "_module_build": "1",
-                "modularitylabel": ":".join(
-                    [
-                        module.name,
-                        module.stream,
-                        module.version,
-                        module.context,
-                    ]
-                ),
+                "modularitylabel": ":".join([
+                    module.name,
+                    module.stream,
+                    module.version,
+                    module.context,
+                ]),
             }
         }
         response["platform"].add_mock_options(module_build_options)

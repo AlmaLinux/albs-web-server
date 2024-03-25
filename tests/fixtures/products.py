@@ -78,11 +78,11 @@ def user_product_create_payload(request) -> dict:
 @pytest.mark.anyio
 @pytest.fixture
 async def base_product(
-    session: AsyncSession, product_create_payload: dict, create_repo
+    async_session: AsyncSession, product_create_payload: dict, create_repo
 ) -> AsyncIterable[Product]:
     product = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Product).where(
                     Product.name == product_create_payload["name"],
                 ),
@@ -93,9 +93,10 @@ async def base_product(
     )
     if not product:
         product = await create_product(
-            session,
+            async_session,
             ProductCreate(**product_create_payload),
         )
+    await async_session.commit()
     yield product
 
 
@@ -128,14 +129,14 @@ async def product_with_repo(
 @pytest.mark.anyio
 @pytest.fixture
 async def user_product(
-    session: AsyncSession,
+    async_session: AsyncSession,
     user_product_create_payload: dict,
     create_repo,
     create_file_repository,
 ) -> AsyncIterable[Product]:
     product = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Product).where(
                     Product.name == user_product_create_payload["name"],
                 ),
@@ -146,9 +147,8 @@ async def user_product(
     )
     if not product:
         product = await create_product(
-            session,
+            async_session,
             ProductCreate(**user_product_create_payload),
         )
-        session.add(product)
-        await session.commit()
+        await async_session.commit()
     yield product

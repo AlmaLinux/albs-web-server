@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-from contextlib import asynccontextmanager
 import datetime
 import logging
 import os
@@ -8,16 +7,18 @@ import sys
 import typing
 import urllib.parse
 
+from fastapi_sqla import open_async_session
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Query, selectinload
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from alws.models import Platform, Product, Repository
 from alws.config import settings
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
+from alws.models import Platform, Product, Repository
 from alws.utils import pulp_client
+from alws.utils.fastapi_sqla_setup import setup_all
 
 
 class NoarchProcessor:
@@ -97,7 +98,8 @@ class NoarchProcessor:
         destination_repo_href: str,
     ) -> None:
         self.logger.info(
-            'Collecting packages from: "%s"', destination_repo_name,
+            'Collecting packages from: "%s"',
+            destination_repo_name,
         )
         destination_repo_packages = await self.retrieve_all_packages_from_repo(
             await self.pulp.get_repo_latest_version(destination_repo_href)
@@ -109,28 +111,37 @@ class NoarchProcessor:
         replace_msg = 'Package "%s" replaced in "%s" repo from "%s" repo'
         if self.only_check:
             add_msg = 'Package "%s" can be added from "%s" repo into "%s" repo'
-            replace_msg = 'Package "%s" can be replaced in "%s" repo from "%s" repo'
+            replace_msg = (
+                'Package "%s" can be replaced in "%s" repo from "%s" repo'
+            )
         for package_dict in source_repo_packages:
             pkg_name = package_dict["name"]
             pkg_version = package_dict["version"]
             pkg_release = package_dict["release"]
             is_modular = ".module_el" in pkg_release
             full_name = f"{pkg_name}-{pkg_version}-{pkg_release}.noarch.rpm"
-            compared_pkg = next((
-                pkg for pkg in destination_repo_packages
-                if all((
-                    pkg["name"] == pkg_name,
-                    pkg["version"] == pkg_version,
-                    pkg["release"] == pkg_release,
-                ))
-            ), None)
+            compared_pkg = next(
+                (
+                    pkg
+                    for pkg in destination_repo_packages
+                    if all((
+                        pkg["name"] == pkg_name,
+                        pkg["version"] == pkg_version,
+                        pkg["release"] == pkg_release,
+                    ))
+                ),
+                None,
+            )
             if compared_pkg is None and not self.only_replace:
                 if is_modular or self.show_diff:
                     continue
                 if not self.only_check:
                     packages_to_add.append(package_dict["pulp_href"])
                 self.logger.info(
-                    add_msg, full_name, source_repo_name, destination_repo_name
+                    add_msg,
+                    full_name,
+                    source_repo_name,
+                    destination_repo_name,
                 )
                 continue
             if (
@@ -142,8 +153,10 @@ class NoarchProcessor:
                     packages_to_remove.append(compared_pkg["pulp_href"])
                     packages_to_add.append(package_dict["pulp_href"])
                 self.logger.info(
-                    replace_msg, full_name,
-                    destination_repo_name, source_repo_name
+                    replace_msg,
+                    full_name,
+                    destination_repo_name,
+                    source_repo_name,
                 )
 
         if packages_to_add and not self.only_check:
@@ -165,7 +178,8 @@ class NoarchProcessor:
         for source_repo_name, repo_data in source_repo_dict.items():
             repo_href, source_is_debug = repo_data
             self.logger.info(
-                'Collecting packages from: "%s"', source_repo_name,
+                'Collecting packages from: "%s"',
+                source_repo_name,
             )
             source_repo_packages = await self.retrieve_all_packages_from_repo(
                 await self.pulp.get_repo_latest_version(repo_href),
@@ -174,12 +188,14 @@ class NoarchProcessor:
                 dest_repo_href, dest_repo_is_debug = dest_repo_data
                 if source_is_debug != dest_repo_is_debug:
                     continue
-                tasks.append(self.copy_noarch_packages_from_source(
-                    source_repo_name=source_repo_name,
-                    source_repo_packages=source_repo_packages,
-                    destination_repo_name=dest_repo_name,
-                    destination_repo_href=dest_repo_href,
-                ))
+                tasks.append(
+                    self.copy_noarch_packages_from_source(
+                        source_repo_name=source_repo_name,
+                        source_repo_packages=source_repo_packages,
+                        destination_repo_name=dest_repo_name,
+                        destination_repo_href=dest_repo_href,
+                    )
+                )
         self.logger.info('Start checking noarch packages in repos')
         await asyncio.gather(*tasks)
         self.logger.info('Checking noarch packages in repos is done')
@@ -191,20 +207,12 @@ class NoarchProcessor:
             raise ValueError(f"Wrong model type: {model_type}")
         if model_type == "platform":
             model = Platform
-            conditions = (
-                Platform.name == obj_name,
-            )
-            options = (
-                selectinload(Platform.repos),
-            )
+            conditions = (Platform.name == obj_name,)
+            options = (selectinload(Platform.repos),)
         if model_type == "product":
             model = Product
-            conditions = (
-                Product.name == obj_name,
-            )
-            options = (
-                selectinload(Product.repositories),
-            )
+            conditions = (Product.name == obj_name,)
+            options = (selectinload(Product.repositories),)
         return select(model).where(*conditions).options(*options)
 
     @staticmethod
@@ -327,7 +335,8 @@ def parse_args():
 async def main():
     args = parse_args()
     pulp_client.PULP_SEMAPHORE = asyncio.Semaphore(10)
-    async with asynccontextmanager(get_db)() as session:
+    await setup_all()
+    async with open_async_session(key=get_async_db_key()) as session:
         processor = NoarchProcessor(
             session=session,
             source_obj_name=args.source,

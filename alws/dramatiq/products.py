@@ -4,6 +4,7 @@ import typing
 from collections import defaultdict
 
 import dramatiq
+from fastapi_sqla import open_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -11,8 +12,9 @@ from sqlalchemy.orm import selectinload
 from alws import models
 from alws.config import settings
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
-from alws.database import Session
+from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.log_utils import setup_logger
 from alws.utils.pulp_client import PulpClient
 
@@ -274,7 +276,7 @@ async def _perform_product_modification(
         build_id,
         product_id,
     )
-    async with Session() as db, db.begin():
+    async with open_async_session(key=get_async_db_key()) as db:
         db_product = (
             (
                 await db.execute(
@@ -322,49 +324,45 @@ async def _perform_product_modification(
                 db_build.tasks,
             )
 
-    await set_platform_for_products_repos(db=db, product=db_product)
-    await set_platform_for_build_repos(db=db, build=db_build)
+        await set_platform_for_products_repos(db=db, product=db_product)
+        await set_platform_for_build_repos(db=db, build=db_build)
 
-    modify = await prepare_repo_modify_dict(
-        db_build,
-        db_product,
-        pulp_client,
-        modification,
-        pkgs_blacklist,
-    )
-    tasks = []
-    publish_tasks = []
-    for key, value in modify.items():
+        modify = await prepare_repo_modify_dict(
+            db_build,
+            db_product,
+            pulp_client,
+            modification,
+            pkgs_blacklist,
+        )
+        tasks = []
+        publish_tasks = []
+        for key, value in modify.items():
+            if modification == "add":
+                tasks.append(
+                    pulp_client.modify_repository(add=value, repo_to=key)
+                )
+            else:
+                tasks.append(
+                    pulp_client.modify_repository(remove=value, repo_to=key)
+                )
+            # We've changed products repositories to not invoke
+            # automatic publications, so now we need
+            # to manually publish them after modification
+            publish_tasks.append(pulp_client.create_rpm_publication(key))
+        logger.debug('Adding packages to pulp repositories')
+        await asyncio.gather(*tasks)
+        logger.debug('Creating RPM publications for pulp repositories')
+        await asyncio.gather(*publish_tasks)
+
         if modification == "add":
-            tasks.append(pulp_client.modify_repository(add=value, repo_to=key))
+            db_product.builds.append(db_build)
         else:
-            tasks.append(
-                pulp_client.modify_repository(remove=value, repo_to=key)
-            )
-        # We've changed products repositories to not invoke
-        # automatic publications, so now we need
-        # to manually publish them after modification
-        publish_tasks.append(pulp_client.create_rpm_publication(key))
-    logger.debug('Adding packages to pulp repositories')
-    await asyncio.gather(*tasks)
-    logger.debug('Creating RPM publications for pulp repositories')
-    await asyncio.gather(*publish_tasks)
-
-    if modification == "add":
-        db_product.builds.append(db_build)
-    else:
-        db_product.builds.remove(db_build)
-    db.add_all(
-        [
+            db_product.builds.remove(db_build)
+        db.add_all([
             db_product,
             db_build,
-        ]
-    )
-    try:
-        await db.commit()
-    except Exception:
-        logger.exception('Cannot commit changes:')
-        await db.rollback()
+        ])
+        await db.flush()
     logger.info(
         'Packages from the build %d were added to the product %d',
         build_id,
@@ -383,6 +381,7 @@ def perform_product_modification(
     product_id: int,
     modification: str,
 ):
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(
         _perform_product_modification(build_id, product_id, modification)
     )

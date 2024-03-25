@@ -6,6 +6,7 @@ import typing
 from collections import defaultdict
 
 import sqlalchemy
+from fastapi_sqla import open_async_session
 from sqlalchemy import delete, insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -18,7 +19,6 @@ from alws.constants import (
     ErrataPackageStatus,
     GitHubIssueStatus,
 )
-from alws.database import PulpAsyncSession
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -45,47 +45,50 @@ async def get_available_build_task(
     db: AsyncSession,
     request: build_node_schema.RequestTask,
 ) -> typing.Optional[models.BuildTask]:
-    async with db.begin():
-        # TODO: here should be config value
-        ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
-        db_task = await db.execute(
-            select(models.BuildTask)
-            .where(~models.BuildTask.dependencies.any())
-            .with_for_update()
-            .filter(
-                sqlalchemy.and_(
-                    models.BuildTask.status < BuildTaskStatus.COMPLETED,
-                    models.BuildTask.arch.in_(request.supported_arches),
-                    sqlalchemy.or_(
-                        models.BuildTask.ts < ts_expired,
-                        models.BuildTask.ts.is_(None),
-                    ),
-                )
-            )
-            .options(
-                selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.build).selectinload(models.Build.repos),
-                selectinload(models.BuildTask.platform).selectinload(
-                    models.Platform.repos
+    # TODO: here should be config value
+    ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
+    db_task = await db.execute(
+        select(models.BuildTask)
+        .where(~models.BuildTask.dependencies.any())
+        .with_for_update()
+        .filter(
+            sqlalchemy.and_(
+                models.BuildTask.status < BuildTaskStatus.COMPLETED,
+                models.BuildTask.arch.in_(request.supported_arches),
+                sqlalchemy.or_(
+                    models.BuildTask.ts < ts_expired,
+                    models.BuildTask.ts.is_(None),
                 ),
-                selectinload(models.BuildTask.build).selectinload(models.Build.owner),
-                selectinload(models.BuildTask.build)
-                .selectinload(models.Build.linked_builds)
-                .selectinload(models.Build.repos),
-                selectinload(models.BuildTask.build)
-                .selectinload(models.Build.platform_flavors)
-                .selectinload(models.PlatformFlavour.repos),
-                selectinload(models.BuildTask.artifacts),
-                selectinload(models.BuildTask.rpm_modules),
             )
-            .order_by(models.BuildTask.id.asc())
         )
-        db_task = db_task.scalars().first()
-        if not db_task:
-            return
-        db_task.ts = datetime.datetime.utcnow()
-        db_task.status = BuildTaskStatus.STARTED
-        await db.commit()
+        .options(
+            selectinload(models.BuildTask.ref),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.repos
+            ),
+            selectinload(models.BuildTask.platform).selectinload(
+                models.Platform.repos
+            ),
+            selectinload(models.BuildTask.build).selectinload(
+                models.Build.owner
+            ),
+            selectinload(models.BuildTask.build)
+            .selectinload(models.Build.linked_builds)
+            .selectinload(models.Build.repos),
+            selectinload(models.BuildTask.build)
+            .selectinload(models.Build.platform_flavors)
+            .selectinload(models.PlatformFlavour.repos),
+            selectinload(models.BuildTask.artifacts),
+            selectinload(models.BuildTask.rpm_modules),
+        )
+        .order_by(models.BuildTask.id.asc())
+    )
+    db_task = db_task.scalars().first()
+    if not db_task:
+        return
+    db_task.ts = datetime.datetime.utcnow()
+    db_task.status = BuildTaskStatus.STARTED
+    await db.flush()
     return db_task
 
 
@@ -131,81 +134,79 @@ async def update_failed_build_items_in_parallel(
     db: AsyncSession,
     build_id: int,
 ):
-    async with db.begin():
-        tasks_cache = await get_failed_build_tasks_matrix(db, build_id)
-        tasks_indexes = list(tasks_cache.keys())
-        for task_index, index_dict in tasks_cache.items():
-            current_idx = tasks_indexes.index(task_index)
-            first_index_dep = None
+    tasks_cache = await get_failed_build_tasks_matrix(db, build_id)
+    tasks_indexes = list(tasks_cache.keys())
+    for task_index, index_dict in tasks_cache.items():
+        current_idx = tasks_indexes.index(task_index)
+        first_index_dep = None
 
-            completed_index_tasks = []
-            failed_tasks = []
-            for task in index_dict.values():
-                if task.status == BuildTaskStatus.COMPLETED:
-                    completed_index_tasks.append(task)
-                elif task.status == BuildTaskStatus.FAILED:
-                    failed_tasks.append(task)
+        completed_index_tasks = []
+        failed_tasks = []
+        for task in index_dict.values():
+            if task.status == BuildTaskStatus.COMPLETED:
+                completed_index_tasks.append(task)
+            elif task.status == BuildTaskStatus.FAILED:
+                failed_tasks.append(task)
 
-            drop_srpm = False
-            if len(failed_tasks) == len(index_dict):
-                drop_srpm = True
+        drop_srpm = False
+        if len(failed_tasks) == len(index_dict):
+            drop_srpm = True
 
-            for key in sorted(
-                list(index_dict.keys()),
-                key=lambda x: x[1] == "i686",
-                reverse=True,
-            ):
-                task = index_dict[key]
-                if task.status != BuildTaskStatus.FAILED:
-                    continue
-                if task.built_srpm_url and drop_srpm:
-                    task.built_srpm_url = None
-                task.status = BuildTaskStatus.IDLE
-                task.ts = None
-                if first_index_dep:
-                    await db.run_sync(
-                        add_build_task_dependencies, task, first_index_dep
-                    )
-                idx = current_idx - 1
-                while idx >= 0:
-                    prev_task_index = tasks_indexes[idx]
-                    dep = tasks_cache.get(prev_task_index, {}).get(key)
-                    # dependency.status can be completed because
-                    # we stores in cache completed tasks
-                    if dep and dep.status == BuildTaskStatus.IDLE:
-                        await db.run_sync(add_build_task_dependencies, task, dep)
-                    idx -= 1
-                # if at least one task in index is completed,
-                # we shouldn't wait first task completion
-                if first_index_dep is None and not completed_index_tasks:
-                    first_index_dep = task
-        await db.commit()
+        for key in sorted(
+            list(index_dict.keys()),
+            key=lambda x: x[1] == "i686",
+            reverse=True,
+        ):
+            task = index_dict[key]
+            if task.status != BuildTaskStatus.FAILED:
+                continue
+            if task.built_srpm_url and drop_srpm:
+                task.built_srpm_url = None
+            task.status = BuildTaskStatus.IDLE
+            task.ts = None
+            if first_index_dep:
+                await db.run_sync(
+                    add_build_task_dependencies, task, first_index_dep
+                )
+            idx = current_idx - 1
+            while idx >= 0:
+                prev_task_index = tasks_indexes[idx]
+                dep = tasks_cache.get(prev_task_index, {}).get(key)
+                # dependency.status can be completed because
+                # we stores in cache completed tasks
+                if dep and dep.status == BuildTaskStatus.IDLE:
+                    await db.run_sync(add_build_task_dependencies, task, dep)
+                idx -= 1
+            # if at least one task in index is completed,
+            # we shouldn't wait first task completion
+            if first_index_dep is None and not completed_index_tasks:
+                first_index_dep = task
+    await db.flush()
 
 
 async def update_failed_build_items(db: AsyncSession, build_id: int):
-    async with db.begin():
-        failed_tasks_matrix = await get_failed_build_tasks_matrix(db, build_id)
+    failed_tasks_matrix = await get_failed_build_tasks_matrix(db, build_id)
 
-        last_task = None
-        for tasks_dicts in failed_tasks_matrix.values():
-            failed_tasks = [
-                task
-                for task in tasks_dicts.values()
-                if task.status == BuildTaskStatus.FAILED
-            ]
-            drop_srpm = False
-            if len(failed_tasks) == len(tasks_dicts):
-                drop_srpm = True
+    last_task = None
+    for tasks_dicts in failed_tasks_matrix.values():
+        failed_tasks = [
+            task
+            for task in tasks_dicts.values()
+            if task.status == BuildTaskStatus.FAILED
+        ]
+        drop_srpm = False
+        if len(failed_tasks) == len(tasks_dicts):
+            drop_srpm = True
 
-            for task in failed_tasks:
-                if task.built_srpm_url and drop_srpm:
-                    task.built_srpm_url = None
-                task.status = BuildTaskStatus.IDLE
-                task.ts = None
-                if last_task is not None:
-                    await db.run_sync(add_build_task_dependencies, task, last_task)
-                last_task = task
-        await db.commit()
+        for task in failed_tasks:
+            if task.built_srpm_url and drop_srpm:
+                task.built_srpm_url = None
+            task.status = BuildTaskStatus.IDLE
+            task.ts = None
+            if last_task is not None:
+                await db.run_sync(add_build_task_dependencies, task, last_task)
+            last_task = task
+        await db.flush()
 
 
 async def mark_build_tasks_as_cancelled(
@@ -223,7 +224,6 @@ async def mark_build_tasks_as_cancelled(
             error="Build task cancelled by user",
         )
     )
-    await session.commit()
 
 
 async def log_repo_exists(db: AsyncSession, task: models.BuildTask):
@@ -268,15 +268,14 @@ async def create_build_log_repo(db: AsyncSession, task: models.BuildTask):
             build_id=task.build_id, repository_id=log_repo.id
         )
     )
-    await db.commit()
+    await db.flush()
 
 
 async def ping_tasks(db: AsyncSession, task_list: typing.List[int]):
     query = models.BuildTask.id.in_(task_list)
     now = datetime.datetime.utcnow()
-    async with db.begin():
-        await db.execute(update(models.BuildTask).where(query).values(ts=now))
-        await db.commit()
+    await db.execute(update(models.BuildTask).where(query).values(ts=now))
+    await db.flush()
 
 
 async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
@@ -766,7 +765,7 @@ async def __process_build_task_artifacts(
                 # rebuilding failed tasks. At this point, we delete the current
                 # module in pulp db and a new final one will be properly
                 # created/pubished below.
-                async with PulpAsyncSession() as pulp_db, pulp_db.begin():
+                async with open_async_session('pulp_async') as pulp_db:
                     module_in_pulp_db = await get_module_from_pulp_db(
                         pulp_db,
                         rpm_module,
@@ -978,9 +977,9 @@ async def safe_build_done(
     start_time = datetime.datetime.utcnow()
     logging.info("Start processing build_task: %d", request.task_id)
     try:
-        async with db.begin(), pulp.begin():
+        async with pulp.begin():
             build_task, build_done_stats = await build_done(db, pulp, request)
-            await db.commit()
+            await db.flush()
     except Exception:
         logging.exception("Build done failed:")
         success = False
@@ -1002,9 +1001,8 @@ async def safe_build_done(
             },
             **build_done_stats,
         }
-        async with db.begin():
-            await __update_built_srpm_url(db, build_task, request)
-            await db.commit()
+        await __update_built_srpm_url(db, build_task, request)
+        await db.flush()
     finally:
         remove_dep_query = delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency == request.task_id
@@ -1029,7 +1027,7 @@ async def safe_build_done(
             ),
         )
         await db.execute(remove_dep_query)
-        await db.commit()
+        await db.flush()
     logging.info("Build task: %d, processing is finished", request.task_id)
     return success
 

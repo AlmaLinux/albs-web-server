@@ -4,7 +4,6 @@ import datetime
 import logging
 import re
 import uuid
-from contextlib import asynccontextmanager
 from typing import (
     Any,
     Awaitable,
@@ -18,6 +17,7 @@ from typing import (
 
 import createrepo_c as cr
 import jinja2
+from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, load_only, selectinload
@@ -31,7 +31,7 @@ from alws.constants import (
     ErrataReferenceType,
     ErrataReleaseStatus,
 )
-from alws.dependencies import get_db, get_pulp_db
+from alws.dependencies import get_async_db_key
 from alws.pulp_models import (
     RpmPackage,
     UpdateCollection,
@@ -56,6 +56,7 @@ from alws.utils.github_integration_helper import (
     create_github_issue,
     get_github_client,
 )
+from alws.utils.oval_add_al8_gpg_keys import add_multiple_gpg_keys_to_oval
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
@@ -64,7 +65,6 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
-from alws.utils.oval_add_al8_gpg_keys import add_multiple_gpg_keys_to_oval
 
 try:
     # FIXME: ovallib dependency should stay optional
@@ -150,7 +150,9 @@ async def get_oval_xml(
     return errata_records_to_oval(records, platform_name)
 
 
-def errata_records_to_oval(records: List[models.NewErrataRecord], platform_name: str):
+def errata_records_to_oval(
+    records: List[models.NewErrataRecord], platform_name: str
+):
     oval = Composer()
     generator = Generator(
         product_name="AlmaLinux OS Errata System",
@@ -475,7 +477,7 @@ async def update_errata_record(
             record.description = None
         else:
             record.description = update_record.description
-    await db.commit()
+    await db.flush()
     await db.refresh(record)
     return record
 
@@ -743,7 +745,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         items_to_insert.extend(matching_packages)
 
     db.add_all(items_to_insert)
-    await db.commit()
+    await db.flush()
     await db.refresh(db_errata)
     if not settings.github_integration_enabled:
         return db_errata
@@ -860,36 +862,36 @@ async def update_package_status(
     db: AsyncSession,
     request: List[errata_schema.ChangeErrataPackageStatusRequest],
 ):
-    async with db.begin():
-        for record in request:
-            errata_record = await db.execute(
-                select(models.NewErrataRecord)
-                .where(
-                    models.NewErrataRecord.id == record.errata_record_id,
-                    models.NewErrataRecord.platform_id == record.errata_platform_id,
-                )
-                .options(
-                    selectinload(models.NewErrataRecord.packages)
-                    .selectinload(models.NewErrataPackage.albs_packages)
-                    .selectinload(models.NewErrataToALBSPackage.build_artifact)
-                    .selectinload(models.BuildTaskArtifact.build_task)
-                )
+    for record in request:
+        errata_record = await db.execute(
+            select(models.NewErrataRecord)
+            .where(
+                models.NewErrataRecord.id == record.errata_record_id,
+                models.NewErrataRecord.platform_id == record.errata_platform_id,
             )
-            errata_record = errata_record.scalars().first()
-            record_approved = record.status == ErrataPackageStatus.approved
-            for errata_pkg in errata_record.packages:
-                if errata_pkg.source_srpm != record.source:
-                    continue
-                for albs_pkg in errata_pkg.albs_packages:
-                    if albs_pkg.status == ErrataPackageStatus.released:
-                        raise ValueError(
-                            "There is already released package "
-                            f"with same source: {albs_pkg}"
-                        )
-                    if albs_pkg.build_id != record.build_id and record_approved:
-                        albs_pkg.status = ErrataPackageStatus.skipped
-                    if albs_pkg.build_id == record.build_id:
-                        albs_pkg.status = record.status
+            .options(
+                selectinload(models.NewErrataRecord.packages)
+                .selectinload(models.NewErrataPackage.albs_packages)
+                .selectinload(models.NewErrataToALBSPackage.build_artifact)
+                .selectinload(models.BuildTaskArtifact.build_task)
+            )
+        )
+        errata_record = errata_record.scalars().first()
+        record_approved = record.status == ErrataPackageStatus.approved
+        for errata_pkg in errata_record.packages:
+            if errata_pkg.source_srpm != record.source:
+                continue
+            for albs_pkg in errata_pkg.albs_packages:
+                if albs_pkg.status == ErrataPackageStatus.released:
+                    raise ValueError(
+                        "There is already released package "
+                        f"with same source: {albs_pkg}"
+                    )
+                if albs_pkg.build_id != record.build_id and record_approved:
+                    albs_pkg.status = ErrataPackageStatus.skipped
+                if albs_pkg.build_id == record.build_id:
+                    albs_pkg.status = record.status
+    await db.flush()
     return True
 
 
@@ -956,7 +958,11 @@ async def release_errata_packages(
         if not db_pkg:
             continue
         db_module = next(
-            (i for i in db_pkg.build_task.rpm_modules if '-devel' not in i.name),
+            (
+                i
+                for i in db_pkg.build_task.rpm_modules
+                if '-devel' not in i.name
+            ),
             None,
         )
         if db_module is not None:
@@ -1091,58 +1097,58 @@ def append_update_packages_in_update_records(
         List[Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]],
     ],
 ):
-    with pulp_db.begin():
-        for record in errata_records:
-            record_uuid = uuid.UUID(record["pulp_href"].split("/")[-2])
-            packages = updateinfo_mapping.get(record["id"])
-            if not packages:
+    for record in errata_records:
+        record_uuid = uuid.UUID(record["pulp_href"].split("/")[-2])
+        packages = updateinfo_mapping.get(record["id"])
+        if not packages:
+            continue
+        pulp_record = pulp_db.execute(
+            select(UpdateRecord)
+            .where(UpdateRecord.content_ptr_id == record_uuid)
+            .options(
+                selectinload(UpdateRecord.collections).selectinload(
+                    UpdateCollection.packages
+                ),
+            )
+        )
+        pulp_record: UpdateRecord = pulp_record.scalars().first()
+        for _, pulp_pkg, pkg in packages:
+            already_released = False
+            collection = pulp_record.collections[0]
+            collection_arch = re.search(
+                r"i686|x86_64|aarch64|ppc64le|s390x",
+                collection.name,
+            ).group()
+            if pulp_pkg["arch"] not in (collection_arch, "noarch"):
                 continue
-            pulp_record = pulp_db.execute(
-                select(UpdateRecord)
-                .where(UpdateRecord.content_ptr_id == record_uuid)
-                .options(
-                    selectinload(UpdateRecord.collections).selectinload(
-                        UpdateCollection.packages
-                    ),
+            already_released = next(
+                (
+                    package
+                    for package in collection.packages
+                    if package.filename == pulp_pkg["location_href"]
+                ),
+                None,
+            )
+            if already_released:
+                continue
+            collection.packages.append(
+                UpdatePackage(
+                    name=pulp_pkg["name"],
+                    filename=pulp_pkg["location_href"],
+                    arch=pulp_pkg["arch"],
+                    version=pulp_pkg["version"],
+                    release=pulp_pkg["release"],
+                    epoch=str(pulp_pkg["epoch"]),
+                    reboot_suggested=pkg.errata_package.reboot_suggested,
+                    src=pulp_pkg["rpm_sourcerpm"],
+                    sum=pulp_pkg["sha256"],
+                    sum_type=cr.checksum_type("sha256"),
                 )
             )
-            pulp_record: UpdateRecord = pulp_record.scalars().first()
-            for _, pulp_pkg, pkg in packages:
-                already_released = False
-                collection = pulp_record.collections[0]
-                collection_arch = re.search(
-                    r"i686|x86_64|aarch64|ppc64le|s390x",
-                    collection.name,
-                ).group()
-                if pulp_pkg["arch"] not in (collection_arch, "noarch"):
-                    continue
-                already_released = next(
-                    (
-                        package
-                        for package in collection.packages
-                        if package.filename == pulp_pkg["location_href"]
-                    ),
-                    None,
-                )
-                if already_released:
-                    continue
-                collection.packages.append(
-                    UpdatePackage(
-                        name=pulp_pkg["name"],
-                        filename=pulp_pkg["location_href"],
-                        arch=pulp_pkg["arch"],
-                        version=pulp_pkg["version"],
-                        release=pulp_pkg["release"],
-                        epoch=str(pulp_pkg["epoch"]),
-                        reboot_suggested=pkg.errata_package.reboot_suggested,
-                        src=pulp_pkg["rpm_sourcerpm"],
-                        sum=pulp_pkg["sha256"],
-                        sum_type=cr.checksum_type("sha256"),
-                    )
-                )
-                pulp_record.updated_date = datetime.datetime.utcnow().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+            pulp_record.updated_date = datetime.datetime.utcnow().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            pulp_db.flush()
 
 
 def get_albs_packages_from_record(
@@ -1230,7 +1236,7 @@ async def process_errata_release_for_repos(
                 repository_version=latest_repo_version,
             )
             logging.info("Appending packages to existing errata records")
-            with get_pulp_db() as pulp_db:
+            with open_session(key="pulp") as pulp_db:
                 append_update_packages_in_update_records(
                     pulp_db=pulp_db,
                     errata_records=errata_records,
@@ -1334,7 +1340,7 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
         settings.pulp_user,
         settings.pulp_password,
     )
-    async with asynccontextmanager(get_db)() as session:
+    async with open_async_session(key=get_async_db_key()) as session:
         session: AsyncSession
         query = generate_query_for_release([record_id])
         query = query.filter(models.NewErrataRecord.platform_id == platform_id)
@@ -1362,7 +1368,7 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
             db_record.release_status = ErrataReleaseStatus.FAILED
             db_record.last_release_log = str(exc)
             logging.exception("Cannot release %s record:", record_id)
-            await session.commit()
+            await session.flush()
             return
 
         await process_errata_release_for_repos(
@@ -1382,7 +1388,7 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
             force_flag=force,
             missing_pkg_names=missing_pkg_names,
         )
-        await session.commit()
+        await session.flush()
         if settings.github_integration_enabled:
             try:
                 await close_issues(record_ids=[db_record.id])
@@ -1402,7 +1408,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
     )
     release_tasks = []
     repos_to_publish = []
-    async with asynccontextmanager(get_db)() as session:
+    async with open_async_session(key=get_async_db_key()) as session:
         await session.execute(
             update(models.NewErrataRecord)
             .where(models.NewErrataRecord.id.in_(records_ids))
@@ -1411,9 +1417,8 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 last_release_log=None,
             )
         )
-        await session.commit()
 
-    async with asynccontextmanager(get_db)() as session:
+    async with open_async_session(key=get_async_db_key()) as session:
         session: AsyncSession
         db_records = await session.execute(
             generate_query_for_release(records_ids),
@@ -1478,7 +1483,6 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 continue
             repos_to_publish.extend(repo_mapping.keys())
             release_tasks.extend(tasks)
-        await session.commit()
     logging.info("Executing release tasks")
     await asyncio.gather(*release_tasks)
     logging.info("Executing publication tasks")
@@ -1506,16 +1510,15 @@ async def get_updateinfo_xml_from_pulp(
 
     platform_name = None
     if platform_id:
-        async with db.begin():
-            platform_name = (
-                await db.execute(
-                    select(models.Platform.name).where(
-                        models.Platform.id == platform_id
-                    )
+        platform_name = (
+            await db.execute(
+                select(models.Platform.name).where(
+                    models.Platform.id == platform_id
                 )
-            ).scalar()
-            if not platform_name:
-                return
+            )
+        ).scalar()
+        if not platform_name:
+            return
 
     cr_upd = cr.UpdateInfo()
     for errata_record in errata_records:
@@ -1658,4 +1661,4 @@ async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
         )
         items_to_insert.extend(matching_packages)
     session.add_all(items_to_insert)
-    await session.commit()
+    await session.flush()

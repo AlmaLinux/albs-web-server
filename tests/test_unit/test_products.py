@@ -143,13 +143,11 @@ build_task_artifacts = [
 ]
 
 build = {
-    "platforms": [
-        {
-            "name": "AlmaLinux-8",
-            "arch_list": ["x86_64", "i686"],
-            "parallel_mode_enabled": False,
-        }
-    ],
+    "platforms": [{
+        "name": "AlmaLinux-8",
+        "arch_list": ["x86_64", "i686"],
+        "parallel_mode_enabled": False,
+    }],
     "tasks": [
         {"id": 1, "url": "https://build.task.ref#1"},
         {"id": 2, "url": "https://build.task.ref#2"},
@@ -189,7 +187,7 @@ class TestProductsUnit(BaseAsyncTestCase):
     @pytest.fixture()
     async def create_build_and_artifacts(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         base_platform,
         base_product,
         create_build_rpm_repo,
@@ -197,13 +195,14 @@ class TestProductsUnit(BaseAsyncTestCase):
         modify_repository,
     ) -> Build:
         created_build = await create_build(
-            session, BuildCreate(**build), user_id=ADMIN_USER_ID
+            async_session, BuildCreate(**build), user_id=ADMIN_USER_ID
         )
+        await async_session.commit()
         await _start_build(created_build.id, BuildCreate(**build))
 
         db_build = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(Build)
                     .where(Build.id == created_build.id)
                     .options(selectinload(Build.tasks))
@@ -215,18 +214,20 @@ class TestProductsUnit(BaseAsyncTestCase):
 
         for task, artifact in zip(db_build.tasks, build_task_artifacts):
             artifact["build_task_id"] = task.id
-            await session.execute(insert(BuildTaskArtifact).values(**artifact))
-            await session.commit()
+            await async_session.execute(
+                insert(BuildTaskArtifact).values(**artifact)
+            )
+            await async_session.commit()
 
         return db_build
 
     @pytest.fixture
     async def tasks_and_expected_output(
-        self, session: AsyncSession, create_build_and_artifacts, request
+        self, async_session: AsyncSession, create_build_and_artifacts, request
     ) -> Tuple[List[BuildTask], List[str]]:
         db_build = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(Build)
                     .where(Build.id == create_build_and_artifacts.id)
                     .options(selectinload(Build.tasks))
@@ -247,24 +248,20 @@ class TestProductsUnit(BaseAsyncTestCase):
             )
         elif request.param == "first_ref_one_task_completed":
             db_build.tasks[0].status = BuildTaskStatus.COMPLETED
-            expected_output = set(
-                [
-                    artifact["href"]
-                    for artifact in build_task_artifacts
-                    if not artifact["href"].endswith("ae8b7e237275/")
-                ]
-            )
+            expected_output = set([
+                artifact["href"]
+                for artifact in build_task_artifacts
+                if not artifact["href"].endswith("ae8b7e237275/")
+            ])
         elif request.param == "first_and_second_refs_one_task_completed":
             db_build.tasks[0].status = BuildTaskStatus.COMPLETED
             db_build.tasks[2].status = BuildTaskStatus.COMPLETED
-            expected_output = set(
-                [
-                    artifact["href"]
-                    for artifact in build_task_artifacts
-                    if not artifact["href"].endswith("ae8b7e237275/")
-                    and not artifact["href"].endswith("4c193ab7f688/")
-                ]
-            )
+            expected_output = set([
+                artifact["href"]
+                for artifact in build_task_artifacts
+                if not artifact["href"].endswith("ae8b7e237275/")
+                and not artifact["href"].endswith("4c193ab7f688/")
+            ])
         return db_build.tasks, expected_output
 
     @pytest.mark.parametrize(

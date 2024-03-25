@@ -6,6 +6,7 @@ import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
 
+from fastapi_sqla import open_async_session
 from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -15,7 +16,7 @@ from alws import models
 from alws.config import settings
 from alws.constants import GenKeyStatus, SignStatus
 from alws.crud.user import get_user
-from alws.database import Session
+from alws.dependencies import get_async_db_key
 from alws.errors import (
     BuildAlreadySignedError,
     DataNotFoundError,
@@ -122,7 +123,7 @@ async def create_gen_key_task(
         product_id=product.id,
     )
     db.add(gen_key_task)
-    await db.commit()
+    await db.flush()
     await db.refresh(gen_key_task)
     return await get_gen_key_task(db=db, gen_key_task_id=gen_key_task.id)
 
@@ -132,68 +133,67 @@ async def create_sign_task(
     payload: sign_schema.SignTaskCreate,
     user_id: int,
 ) -> models.SignTask:
-    async with db.begin():
-        user = await get_user(db, user_id)
-        builds = await db.execute(
-            select(models.Build)
-            .where(models.Build.id == payload.build_id)
-            .options(
-                selectinload(models.Build.source_rpms),
-                selectinload(models.Build.binary_rpms),
-                selectinload(models.Build.owner)
-                .selectinload(models.User.roles)
-                .selectinload(models.UserRole.actions),
-                selectinload(models.Build.team)
-                .selectinload(models.Team.roles)
-                .selectinload(models.UserRole.actions),
-            )
+    user = await get_user(db, user_id)
+    builds = await db.execute(
+        select(models.Build)
+        .where(models.Build.id == payload.build_id)
+        .options(
+            selectinload(models.Build.source_rpms),
+            selectinload(models.Build.binary_rpms),
+            selectinload(models.Build.owner)
+            .selectinload(models.User.roles)
+            .selectinload(models.UserRole.actions),
+            selectinload(models.Build.team)
+            .selectinload(models.Team.roles)
+            .selectinload(models.UserRole.actions),
         )
-        build = builds.scalars().first()
-        if not build:
-            raise DataNotFoundError(
-                f"Build with ID {payload.build_id} does not exist"
-            )
-        if build.signed:
-            raise BuildAlreadySignedError(
-                f"Build with ID {payload.build_id} is already signed"
-            )
-        if not build.source_rpms or not build.binary_rpms:
-            raise ValueError(
-                f"No built packages in build with ID {payload.build_id}"
-            )
-        sign_keys = await db.execute(
-            select(models.SignKey)
-            .where(models.SignKey.id == payload.sign_key_id)
-            .options(
-                selectinload(models.SignKey.owner),
-                selectinload(models.SignKey.roles).selectinload(
-                    models.UserRole.actions
-                ),
-            )
+    )
+    build = builds.scalars().first()
+    if not build:
+        raise DataNotFoundError(
+            f"Build with ID {payload.build_id} does not exist"
         )
-        sign_key = sign_keys.scalars().first()
-
-        if not sign_key:
-            raise DataNotFoundError(
-                f"Sign key with ID {payload.sign_key_id} does not exist"
-            )
-
-        if not can_perform(build, user, actions.SignBuild.name):
-            raise PermissionDenied(
-                "User does not have permissions to sign this build"
-            )
-        if not can_perform(sign_key, user, actions.UseSignKey.name):
-            raise PermissionDenied(
-                "User does not have permissions to use this sign key"
-            )
-
-        sign_task = models.SignTask(
-            status=SignStatus.IDLE,
-            build_id=payload.build_id,
-            sign_key_id=payload.sign_key_id,
+    if build.signed:
+        raise BuildAlreadySignedError(
+            f"Build with ID {payload.build_id} is already signed"
         )
-        db.add(sign_task)
-        await db.commit()
+    if not build.source_rpms or not build.binary_rpms:
+        raise ValueError(
+            f"No built packages in build with ID {payload.build_id}"
+        )
+    sign_keys = await db.execute(
+        select(models.SignKey)
+        .where(models.SignKey.id == payload.sign_key_id)
+        .options(
+            selectinload(models.SignKey.owner),
+            selectinload(models.SignKey.roles).selectinload(
+                models.UserRole.actions
+            ),
+        )
+    )
+    sign_key = sign_keys.scalars().first()
+
+    if not sign_key:
+        raise DataNotFoundError(
+            f"Sign key with ID {payload.sign_key_id} does not exist"
+        )
+
+    if not can_perform(build, user, actions.SignBuild.name):
+        raise PermissionDenied(
+            "User does not have permissions to sign this build"
+        )
+    if not can_perform(sign_key, user, actions.UseSignKey.name):
+        raise PermissionDenied(
+            "User does not have permissions to use this sign key"
+        )
+
+    sign_task = models.SignTask(
+        status=SignStatus.IDLE,
+        build_id=payload.build_id,
+        sign_key_id=payload.sign_key_id,
+    )
+    db.add(sign_task)
+    await db.flush()
     await db.refresh(sign_task)
     sign_tasks = await db.execute(
         select(models.SignTask)
@@ -206,23 +206,22 @@ async def create_sign_task(
 async def get_available_gen_key_task(
     db: AsyncSession,
 ) -> typing.Optional[models.GenKeyTask]:
-    async with db.begin():
-        gen_key_tasks = await db.execute(
-            select(models.GenKeyTask)
-            .where(models.GenKeyTask.status == GenKeyStatus.IDLE)
-            .options(
-                selectinload(models.GenKeyTask.product).selectinload(
-                    models.Product.owner
-                ),
-            )
+    gen_key_tasks = await db.execute(
+        select(models.GenKeyTask)
+        .where(models.GenKeyTask.status == GenKeyStatus.IDLE)
+        .options(
+            selectinload(models.GenKeyTask.product).selectinload(
+                models.Product.owner
+            ),
         )
-        gen_key_task = gen_key_tasks.scalars().first()
-        if gen_key_task:
-            await db.execute(
-                update(models.GenKeyTask)
-                .where(models.GenKeyTask.id == gen_key_task.id)
-                .values(status=GenKeyStatus.IN_PROGRESS)
-            )
+    )
+    gen_key_task = gen_key_tasks.scalars().first()
+    if gen_key_task:
+        await db.execute(
+            update(models.GenKeyTask)
+            .where(models.GenKeyTask.id == gen_key_task.id)
+            .values(status=GenKeyStatus.IN_PROGRESS)
+        )
     if gen_key_task:
         await db.refresh(gen_key_task)
     return gen_key_task
@@ -294,18 +293,14 @@ async def get_available_sign_task(
             platform_id=src_rpm.artifact.build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
-        packages.append(
-            {
-                "id": src_rpm.artifact.id,
-                "name": src_rpm.artifact.name,
-                "cas_hash": src_rpm.artifact.cas_hash,
-                "arch": "src",
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, src_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": src_rpm.artifact.id,
+            "name": src_rpm.artifact.name,
+            "cas_hash": src_rpm.artifact.cas_hash,
+            "arch": "src",
+            "type": "rpm",
+            "download_url": __get_package_url(repo.url, src_rpm.artifact.name),
+        })
 
     for binary_rpm in build_binary_rpms:
         debug = is_debuginfo_rpm(binary_rpm.artifact.name)
@@ -315,20 +310,18 @@ async def get_available_sign_task(
             platform_id=binary_rpm.artifact.build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
-        packages.append(
-            {
-                "id": binary_rpm.artifact.id,
-                "name": binary_rpm.artifact.name,
-                "cas_hash": binary_rpm.artifact.cas_hash,
-                "arch": binary_rpm.artifact.build_task.arch,
-                "type": "rpm",
-                "download_url": __get_package_url(
-                    repo.url, binary_rpm.artifact.name
-                ),
-            }
-        )
+        packages.append({
+            "id": binary_rpm.artifact.id,
+            "name": binary_rpm.artifact.name,
+            "cas_hash": binary_rpm.artifact.cas_hash,
+            "arch": binary_rpm.artifact.build_task.arch,
+            "type": "rpm",
+            "download_url": __get_package_url(
+                repo.url, binary_rpm.artifact.name
+            ),
+        })
     sign_task_payload["packages"] = packages
-    await db.commit()
+    await db.flush()
     return sign_task_payload
 
 
@@ -354,9 +347,7 @@ async def complete_gen_key_task(
         gen_key_task_id=gen_key_task_id,
     )
     if not gen_key_task:
-        raise GenKeyError(
-            f'Gen key task with id "{gen_key_task_id}" is absent'
-        )
+        raise GenKeyError(f'Gen key task with id "{gen_key_task_id}" is absent')
     if payload.success:
         task_status = GenKeyStatus.COMPLETED
         error_message = None
@@ -423,7 +414,7 @@ async def complete_gen_key_task(
         roles=roles,
     )
     db.add(sign_key)
-    await db.commit()
+    await db.flush()
     await db.refresh(sign_key)
     return sign_key
 
@@ -479,7 +470,7 @@ async def complete_sign_task(
         task.stats = statistics
         task.status = SignStatus.FAILED
         db.add(task)
-        await db.commit()
+        await db.flush()
         await db.refresh(task)
         return task
 
@@ -500,7 +491,7 @@ async def complete_sign_task(
     srpms_mapping = defaultdict(list)
 
     logging.info("Start processing task %s", sign_task_id)
-    async with Session() as db, db.begin():
+    async with open_async_session(key=get_async_db_key()) as db:
         builds = await db.execute(
             select(models.Build)
             .where(models.Build.id == payload.build_id)
@@ -590,16 +581,12 @@ async def complete_sign_task(
                 [pkg.sha256 for pkg in packages_to_convert.values()],
             )
             logging.info("Start processing packages for task %s", sign_task_id)
-            results = await asyncio.gather(
-                *(
-                    __process_single_package(package, pulp_db_packages)
-                    for package in packages_to_convert.values()
-                )
-            )
+            results = await asyncio.gather(*(
+                __process_single_package(package, pulp_db_packages)
+                for package in packages_to_convert.values()
+            ))
             converted_packages = dict(results)
-            logging.info(
-                "Finish processing packages for task %s", sign_task_id
-            )
+            logging.info("Finish processing packages for task %s", sign_task_id)
             logging.info(
                 "Updating href and add sign key for every srpm in project"
             )
@@ -651,12 +638,10 @@ async def complete_sign_task(
                 sign_task = await __failed_post_processing(sign_task, stats)
                 return sign_task
             logging.info("Start modify repository for task %s", sign_task_id)
-            await asyncio.gather(
-                *(
-                    pulp_client.modify_repository(repo_href, add=packages)
-                    for repo_href, packages in packages_to_add.items()
-                )
-            )
+            await asyncio.gather(*(
+                pulp_client.modify_repository(repo_href, add=packages)
+                for repo_href, packages in packages_to_add.items()
+            ))
             logging.info("Finish modify repository for task %s", sign_task_id)
 
         if payload.success and not sign_failed:

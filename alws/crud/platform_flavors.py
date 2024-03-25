@@ -35,11 +35,9 @@ async def delete_flavour(db, pf_id: int) -> models.PlatformFlavour:
     )
 
     await db.execute(
-        delete(models.PlatformFlavour).where(
-            models.PlatformFlavour.id == pf_id
-        )
+        delete(models.PlatformFlavour).where(models.PlatformFlavour.id == pf_id)
     )
-    await db.commit()
+    await db.flush()
 
 
 async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
@@ -65,7 +63,7 @@ async def create_flavour(db, flavour: CreateFlavour) -> models.PlatformFlavour:
             db.add(db_repo)
         db_flavour.repos.append(db_repo)
     db.add(db_flavour)
-    await db.commit()
+    await db.flush()
     db_flavour = await db.execute(
         select(models.PlatformFlavour)
         .where(models.PlatformFlavour.name == flavour.name)
@@ -98,7 +96,7 @@ async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
             db.add(db_repo)
         db_flavour.repos.append(db_repo)
     db.add(db_flavour)
-    await db.commit()
+    await db.flush()
     return await find_flavour_by_name(db, flavour.name)
 
 

@@ -30,6 +30,28 @@ class Settings(BaseSettings):
     )
     sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
 
+    fastapi_sqla__async__sqlalchemy_url: str = (
+        'postgresql+asyncpg://postgres:password@db/almalinux-bs'
+    )
+    fastapi_sqla__async__sqlalchemy_echo_pool: bool = True
+
+    sqlalchemy_url: str = (
+        'postgresql+psycopg2://postgres:password@db/almalinux-bs'
+    )
+    sqlalchemy_pool_pre_ping: bool = True
+    sqlalchemy_pool_recycle: int = 3600
+
+    fastapi_sqla__pulp__sqlalchemy_url: str = (
+        'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
+    )
+    fastapi_sqla__pulp__sqlalchemy_pool_pre_ping: bool = True
+    fastapi_sqla__pulp__sqlalchemy_pool_recycle: int = 3600
+
+    fastapi_sqla__pulp_async__sqlalchemy_url: str = (
+        'postgresql+asyncpg://postgres:password@pulp:5432/pulp'
+    )
+    fastapi_sqla__pulp_async__sqlalchemy_echo_pool: bool = True
+
     github_client: str
     github_client_secret: str
 

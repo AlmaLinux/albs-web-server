@@ -1,12 +1,13 @@
 from typing import List
 
 from fastapi import APIRouter, Depends
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import dramatiq
 from alws.auth import get_current_user
 from alws.crud import test
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.schemas import test_schema
 
 router = APIRouter(
@@ -34,14 +35,18 @@ async def update_test_task_result(
     '/get_test_tasks/',
     response_model=List[test_schema.TestTaskPayload],
 )
-async def get_test_tasks(session: AsyncSession = Depends(get_db)):
+async def get_test_tasks(
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
+):
     return await test.get_available_test_tasks(session)
 
 
 @router.put('/build/{build_id}/restart')
 async def restart_build_tests(
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     await test.restart_build_tests(db, build_id)
     return {'ok': True}
@@ -50,7 +55,7 @@ async def restart_build_tests(
 @router.put('/build_task/{build_task_id}/restart')
 async def restart_build_task_tests(
     build_task_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     await test.restart_build_task_tests(db, build_task_id)
     return {'ok': True}
@@ -59,7 +64,7 @@ async def restart_build_task_tests(
 @router.put('/build/{build_id}/cancel')
 async def cancel_build_tests(
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     await test.cancel_build_tests(db, build_id)
     return {'ok': True}
@@ -71,7 +76,7 @@ async def cancel_build_tests(
 )
 async def get_latest_test_results(
     build_task_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await test.get_test_tasks_by_build_task(db, build_task_id)
 
@@ -82,7 +87,7 @@ async def get_latest_test_results(
 )
 async def get_test_logs(
     build_task_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await test.get_test_logs(build_task_id, db)
 
@@ -94,7 +99,7 @@ async def get_test_logs(
 async def get_latest_test_results_by_revision(
     build_task_id: int,
     revision: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await test.get_test_tasks_by_build_task(
         db,

@@ -7,12 +7,14 @@ import argparse
 import logging
 
 import yaml
+from fastapi_sqla import open_async_session
 from syncer import sync
 
-from alws import database
 from alws.crud import platform_flavors as pf_crud
 from alws.crud import repository as repo_crud
+from alws.dependencies import get_async_db_key
 from alws.schemas import platform_flavors_schema, repository_schema
+from alws.utils.fastapi_sqla_setup import setup_all
 
 
 def parse_args():
@@ -62,7 +64,7 @@ def parse_args():
 
 
 async def update_flavour(flavour_data: dict, logger: logging.Logger):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         data = platform_flavors_schema.UpdateFlavour(**flavour_data)
         flavor = await pf_crud.update_flavour(db, data)
         if not flavor:
@@ -74,7 +76,7 @@ async def update_flavour(flavour_data: dict, logger: logging.Logger):
 async def prune_flavours(
     flavours_data: [], logger: logging.Logger, confirmation_yes
 ):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         flavour_names_in_config = [e.get('name') for e in flavours_data]
         flavours_in_db = await pf_crud.list_flavours(db)
 
@@ -116,7 +118,7 @@ async def prune_flavours(
 
 
 async def add_flavor(flavor_data: dict, logger: logging.Logger):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         flavour = await pf_crud.find_flavour_by_name(db, flavor_data["name"])
         if flavour:
             logger.error("Flavor %s is already added", flavor_data["name"])
@@ -134,9 +136,12 @@ def main():
     else:
         logging.basicConfig(level=logging.INFO)
     config_path = os.path.expanduser(os.path.expandvars(args.config))
+
     with open(config_path, "rt") as f:
         loader = yaml.Loader(f)
         flavours_data = loader.get_data()
+
+    sync(setup_all())
 
     if args.prune:
         logger.info("Start to prune")

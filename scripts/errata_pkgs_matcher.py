@@ -5,13 +5,14 @@ import os
 import sys
 from contextlib import asynccontextmanager
 
+from fastapi_sqla import open_async_session
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alws.constants import ErrataPackageStatus
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.models import (
     BuildTask,
     BuildTaskArtifact,
@@ -20,6 +21,7 @@ from alws.models import (
     ErrataToALBSPackage,
 )
 from alws.pulp_models import RpmPackage
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_utils import (
     get_rpm_packages_by_ids,
@@ -47,7 +49,8 @@ async def main(
         advisory_id,
     )
     added = not_found = 0
-    async with asynccontextmanager(get_db)() as db, db.begin():
+    await setup_all()
+    async with open_async_session(key=get_async_db_key()) as db:
         advisory = (
             (
                 await db.execute(
@@ -144,7 +147,6 @@ async def main(
                 )
             not_found += 1
         db.add_all(new_entites)
-        await db.commit()
     logging.info('Total: added %d, not found %d', added, not_found)
 
 

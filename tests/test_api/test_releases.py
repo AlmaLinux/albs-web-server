@@ -71,7 +71,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
 
     async def test_commit_release(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         base_product: models.Product,
         disable_packages_check_in_prod_repos,
         disable_sign_verify,
@@ -95,7 +95,8 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot commit release:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
-        await commit_release(session, release_id, self.user_id)
+        await commit_release(async_session, release_id, self.user_id)
+        await async_session.commit()
         response = await self.make_request(
             "get",
             f"/api/v1/releases/{release_id}/",
@@ -106,7 +107,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
 
     async def test_commit_community_release(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         user_product: models.Product,
         modify_repository,
         create_rpm_publication,
@@ -131,7 +132,8 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot commit release:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
-        await commit_release(session, release_id, self.user_id)
+        await commit_release(async_session, release_id, self.user_id)
+        await async_session.commit()
         response = await self.make_request(
             "get",
             f"/api/v1/releases/{release_id}/",
@@ -158,7 +160,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
 
     async def test_revert_release(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         base_product: models.Product,
         modify_repository,
         create_rpm_publication,
@@ -174,7 +176,8 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             for row in response.json()
             if row["product"]["id"] == base_product.id
         )["id"]
-        await revert_release(session, release_id, self.user_id)
+        await revert_release(async_session, release_id, self.user_id)
+        await async_session.commit()
         response = await self.make_request(
             "get",
             f"/api/v1/releases/{release_id}/",
@@ -184,7 +187,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         assert release["status"] == ReleaseStatus.REVERTED, last_log
         builds = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(models.Build).where(
                         models.Build.release_id == release_id,
                     ),
@@ -198,7 +201,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             pkg_dict.get("package", {}).get("artifact_href", "")
             for pkg_dict in release["plan"].get("packages", [])
         ]
-        errata_pkgs = await session.execute(
+        errata_pkgs = await async_session.execute(
             select(models.NewErrataToALBSPackage).where(
                 models.NewErrataToALBSPackage.status
                 == ErrataPackageStatus.released,
@@ -221,7 +224,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
 
     async def test_revert_community_release(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         user_product: models.Product,
         modify_repository,
         create_rpm_publication,
@@ -237,7 +240,8 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             for row in response.json()
             if row["product"]["id"] == user_product.id
         )["id"]
-        await revert_release(session, release_id, self.user_id)
+        await revert_release(async_session, release_id, self.user_id)
+        await async_session.commit()
         response = await self.make_request(
             "get",
             f"/api/v1/releases/{release_id}/",
@@ -247,7 +251,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         assert release["status"] == ReleaseStatus.REVERTED, last_log
         builds = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(models.Build).where(
                         models.Build.release_id == release_id,
                     ),

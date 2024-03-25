@@ -2,12 +2,13 @@ import typing
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import select, and_
+from fastapi_sqla import AsyncSessionDependency
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from alws import database
 from alws import models
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.utils.copr import (
     generate_repo_config,
     get_clean_copr_chroot,
@@ -22,13 +23,17 @@ copr_router = APIRouter(
 @copr_router.get('/api_3/project/search')
 async def search_repos(
     query: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ) -> typing.Dict:
-    query = select(models.Product).where(
-        models.Product.name == query,
-    ).options(
-        selectinload(models.Product.repositories),
-        selectinload(models.Product.owner),
+    query = (
+        select(models.Product)
+        .where(
+            models.Product.name == query,
+        )
+        .options(
+            selectinload(models.Product.repositories),
+            selectinload(models.Product.owner),
+        )
     )
     db_products = (await db.execute(query)).scalars().all()
     return {'items': make_copr_plugin_response(db_products)}
@@ -37,13 +42,17 @@ async def search_repos(
 @copr_router.get('/api_3/project/list')
 async def list_repos(
     ownername: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ) -> typing.Dict:
-    query = select(models.Product).where(
-        models.Product.owner.has(username=ownername),
-    ).options(
-        selectinload(models.Product.repositories),
-        selectinload(models.Product.owner),
+    query = (
+        select(models.Product)
+        .where(
+            models.Product.owner.has(username=ownername),
+        )
+        .options(
+            selectinload(models.Product.repositories),
+            selectinload(models.Product.owner),
+        )
     )
     db_products = (await db.execute(query)).scalars().all()
     return {'items': make_copr_plugin_response(db_products)}
@@ -58,15 +67,19 @@ async def get_dnf_repo_config(
     name: str,
     platform: str,
     arch: str,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     chroot = f'{platform}-{arch}'
     clean_chroot = get_clean_copr_chroot(chroot)
     db_product = await db.execute(
-        select(models.Product).where(and_(
-            models.Product.name == name,
-            models.Product.owner.has(username=ownername),
-        )).options(
+        select(models.Product)
+        .where(
+            and_(
+                models.Product.name == name,
+                models.Product.owner.has(username=ownername),
+            )
+        )
+        .options(
             selectinload(models.Product.repositories),
             selectinload(models.Product.owner),
         ),
@@ -75,15 +88,16 @@ async def get_dnf_repo_config(
     if not db_product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Product {name} for user {ownername} is not found'
+            detail=f'Product {name} for user {ownername} is not found',
         )
     for product_repo in db_product.repositories:
         if product_repo.debug or arch != product_repo.arch:
             continue
         if product_repo.name.lower().endswith(clean_chroot):
             return generate_repo_config(
-                product_repo, db_product.name, ownername)
+                product_repo, db_product.name, ownername
+            )
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Didn't find matching repositories in {name} for chroot {chroot}"
+        detail=f"Didn't find matching repositories in {name} for chroot {chroot}",
     )

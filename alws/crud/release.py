@@ -112,7 +112,7 @@ async def create_release(
         release_id=release.id, statistics=releaser.stats.copy()
     )
     db.add(stats)
-    await db.commit()
+    await db.flush()
     return await releaser.get_final_release(release.id)
 
 
@@ -138,7 +138,7 @@ async def update_release(
         new_stats = copy.deepcopy(perf_stat.statistics)
         new_stats.update(**releaser.stats)
         perf_stat.statistics = new_stats
-    await db.commit()
+    await db.flush()
     return await releaser.get_final_release(release_id)
 
 
@@ -163,7 +163,7 @@ async def commit_release(
         new_stats = copy.deepcopy(perf_stat.statistics)
         new_stats.update(**releaser.stats)
         perf_stat.statistics = new_stats
-    await db.commit()
+    await db.flush()
 
 
 async def revert_release(
@@ -184,33 +184,30 @@ async def remove_release(
     release_id: int,
     user: models.User,
 ):
-    async with db.begin():
-        release = (
-            (
-                await db.execute(
-                    select(models.Release).where(
-                        models.Release.id == release_id,
-                        models.Release.status == ReleaseStatus.SCHEDULED,
-                    )
+    release = (
+        (
+            await db.execute(
+                select(models.Release).where(
+                    models.Release.id == release_id,
+                    models.Release.status == ReleaseStatus.SCHEDULED,
                 )
             )
-            .scalars()
-            .first()
         )
-        if release is None:
-            return {
-                'message': (
-                    'There is no scheduled release plan with ID '
-                    f'"{release_id}"'
-                ),
-            }
-        if not can_perform(release, user, actions.DeleteRelease.name):
-            raise PermissionDenied(
-                "User does not have permissions to delete this release"
-            )
-        await db.delete(release)
+        .scalars()
+        .first()
+    )
+    if release is None:
         return {
             'message': (
-                f'Scheduled release with ID "{release_id}" is removed'
+                'There is no scheduled release plan with ID ' f'"{release_id}"'
             ),
         }
+    if not can_perform(release, user, actions.DeleteRelease.name):
+        raise PermissionDenied(
+            "User does not have permissions to delete this release"
+        )
+    await db.delete(release)
+    await db.flush()
+    return {
+        'message': (f'Scheduled release with ID "{release_id}" is removed'),
+    }

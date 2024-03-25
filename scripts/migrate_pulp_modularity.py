@@ -13,17 +13,17 @@ import aiofiles
 import requests
 import yaml
 from aiohttp import ClientResponseError
+from fastapi_sqla import open_session
 from hawkey import NEVRA
 from requests.auth import HTTPBasicAuth
 from sqlalchemy import select
 
-from alws.database import PulpSession
-from alws.pulp_models import RpmModulemd, RpmModulemdPackages
-from alws.utils.parsing import parse_rpm_nevra
-from alws.utils.pulp_client import PulpClient
-
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+from alws.pulp_models import RpmModulemd, RpmModulemdPackages
+from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.parsing import parse_rpm_nevra
+from alws.utils.pulp_client import PulpClient
 
 ROOT_FOLDER = '/srv/pulp/media/'
 
@@ -221,12 +221,10 @@ def filter_debug_and_src_artifacts(artifacts: list[NEVRA]) -> list[NEVRA]:
     return [
         artifact
         for artifact in artifacts
-        if all(
-            [
-                artifact.arch != 'src',
-                'debug' not in artifact.name,
-            ]
-        )
+        if all([
+            artifact.arch != 'src',
+            'debug' not in artifact.name,
+        ])
     ]
 
 
@@ -351,6 +349,7 @@ async def main():
             logging.StreamHandler(),
         ],
     )
+    await setup_all()
     time1 = time.time()
     step = 100
     pulp_host = os.environ["PULP_HOST"]
@@ -378,23 +377,21 @@ async def main():
             logging.info('Artifact %s by path %s', j + i, artifact)
         migrated_modules.extend(
             result
-            for results in await asyncio.gather(
-                *(
-                    process_module_data(
-                        pulp_client,
-                        j + i,
-                        artifact,
-                        len(artifacts),
-                        args.pulp_storage_path,
-                        args.dry_run,
-                    )
-                    for j, artifact in enumerate(artifacts[0 + i : i + step])
+            for results in await asyncio.gather(*(
+                process_module_data(
+                    pulp_client,
+                    j + i,
+                    artifact,
+                    len(artifacts),
+                    args.pulp_storage_path,
+                    args.dry_run,
                 )
-            )
+                for j, artifact in enumerate(artifacts[0 + i : i + step])
+            ))
             for result in results
         )
 
-    with PulpSession() as pulp_db, pulp_db.begin():
+    with open_session(key="pulp") as pulp_db:
         query = select(RpmModulemd)
         result = pulp_db.execute(query).scalars().all()
         all_modules = {i.nsvca: i for i in result}
@@ -406,8 +403,7 @@ async def main():
             modulemd_packages = (
                 pulp_db.execute(
                     select(RpmModulemdPackages).where(
-                        RpmModulemdPackages.modulemd_id
-                        == module.content_ptr_id
+                        RpmModulemdPackages.modulemd_id == module.content_ptr_id
                     )
                 )
                 .scalars()
@@ -417,7 +413,6 @@ async def main():
                 for modulemd_package in modulemd_packages:
                     pulp_db.delete(modulemd_package)
                 pulp_db.delete(module)
-        pulp_db.commit()
     logging.info('Total time: %s', time.time() - time1)
 
 

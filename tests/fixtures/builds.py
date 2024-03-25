@@ -2,8 +2,10 @@ import copy
 import typing
 
 import pytest
+from fastapi_sqla import open_async_session
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.session import Session
 
 from alws.crud.build import create_build, get_builds
 from alws.dramatiq.build import _start_build
@@ -948,66 +950,76 @@ def build_payload() -> typing.Dict[str, typing.Any]:
 @pytest.mark.anyio
 @pytest.fixture
 async def modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     modular_build_payload: dict,
 ) -> typing.AsyncIterable[Build]:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**modular_build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def virt_modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     virt_build_payload: dict,
 ) -> typing.AsyncIterable:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**virt_build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def ruby_modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     ruby_build_payload: dict,
 ) -> typing.AsyncIterable:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**ruby_build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def subversion_modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     subversion_build_payload: dict,
 ) -> typing.AsyncIterable:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**subversion_build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def llvm_modular_build(
-    session: AsyncSession,
+    async_session: AsyncSession,
     llvm_build_payload: dict,
 ) -> typing.AsyncIterable:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**llvm_build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
@@ -1015,20 +1027,22 @@ async def llvm_modular_build(
 async def regular_build(
     base_platform,
     base_product,
-    session: AsyncSession,
+    async_session: AsyncSession,
     build_payload: dict,
 ) -> typing.AsyncIterable[Build]:
-    yield await create_build(
-        session,
+    build = await create_build(
+        async_session,
         BuildCreate(**build_payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
+    yield build
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def regular_build_with_user_product(
-    session: AsyncSession,
+    async_session: AsyncSession,
     build_payload: dict,
     create_build_rpm_repo,
     create_log_repo,
@@ -1037,7 +1051,7 @@ async def regular_build_with_user_product(
     payload = copy.deepcopy(build_payload)
     user_product_id = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Product.id).where(Product.is_community.is_(True))
             )
         )
@@ -1046,12 +1060,13 @@ async def regular_build_with_user_product(
     )
     payload['product_id'] = user_product_id
     build = await create_build(
-        session,
+        async_session,
         BuildCreate(**payload),
         user_id=ADMIN_USER_ID,
     )
+    await async_session.commit()
     await _start_build(build.id, BuildCreate(**payload))
-    yield await get_builds(session, build_id=build.id)
+    yield await get_builds(async_session, build_id=build.id)
 
 
 @pytest.fixture
@@ -1077,16 +1092,16 @@ def get_packages_info_from_pulp(monkeypatch):
 @pytest.mark.anyio
 @pytest.fixture
 async def build_for_release(
-    session: AsyncSession,
+    async_session: AsyncSession,
     regular_build: Build,
 ) -> typing.AsyncIterable[Build]:
-    yield await get_builds(session, build_id=regular_build.id)
+    yield await get_builds(async_session, build_id=regular_build.id)
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def modular_build_for_release(
-    session: AsyncSession,
+    async_session: AsyncSession,
     modular_build: Build,
 ) -> typing.AsyncIterable[Build]:
-    yield await get_builds(session, build_id=modular_build.id)
+    yield await get_builds(async_session, build_id=modular_build.id)

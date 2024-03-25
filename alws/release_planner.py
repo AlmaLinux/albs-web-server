@@ -103,17 +103,16 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             )
         try:
             await self.revert_release_plan(release)
-        except Exception:
-            await self.db.rollback()
-            await self.db.refresh(release)
+        except Exception as e:
             message = f"Cannot revert release:\n{traceback.format_exc()}"
             release.status = ReleaseStatus.FAILED
             logging.exception("Cannot revert release: %d", release_id)
+            raise e
         # for updating release plan, we should use deepcopy
         release_plan = copy.deepcopy(release.plan)
         release_plan["last_log"] = message
         release.plan = release_plan
-        await self.db.commit()
+        await self.db.flush()
         logging.info("Successfully reverted release: %s", release_id)
 
     async def remove_packages_from_repositories(
@@ -124,9 +123,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         repo_ids_to_remove = []
         for pkg_dict in release.plan.get("packages", []):
             pkg_href = pkg_dict.get("package", {}).get("artifact_href", "")
-            repo_ids = [
-                repo["id"] for repo in pkg_dict.get("repositories", [])
-            ]
+            repo_ids = [repo["id"] for repo in pkg_dict.get("repositories", [])]
             if not pkg_href or not repo_ids:
                 continue
             pkgs_to_remove.append(pkg_href)
@@ -513,7 +510,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         new_release.started_at = start
         new_release.finished_at = datetime.datetime.utcnow()
         self.db.add(new_release)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_release)
 
         logging.info("New release %d successfully created", new_release.id)
@@ -558,7 +555,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             release.plan = new_plan
         release.finished_at = datetime.datetime.utcnow()
         self.db.add(release)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(release)
         logging.info("Successfully updated release %d", release_id)
         return await self.get_final_release(release.id)
@@ -623,7 +620,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         release.plan = release_plan
         release.finished_at = datetime.datetime.utcnow()
         self.db.add(release)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(release)
         logging.info("Successfully committed release %d", release_id)
         release = await self.get_final_release(release_id)
@@ -846,9 +843,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
                     )
                     repo_module_index = IndexWrapper()
                     if template:
-                        repo_module_index = IndexWrapper.from_template(
-                            template
-                        )
+                        repo_module_index = IndexWrapper.from_template(template)
                     prod_repo_modules_cache[repo_url] = repo_module_index
                 module_info = module["module"]
                 release_module = ModuleWrapper.from_template(
@@ -952,9 +947,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     models.NewErrataToALBSPackage.albs_artifact_id.in_(
                         subquery
                     ),
-                    models.NewErrataToALBSPackage.pulp_href.in_(
-                        pkgs_to_remove
-                    ),
+                    models.NewErrataToALBSPackage.pulp_href.in_(pkgs_to_remove),
                 )
             )
         )
@@ -1336,8 +1329,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
 
         if not settings.package_beholder_enabled:
             rpm_modules = [
-                {"module": module, "repositories": []}
-                for module in rpm_modules
+                {"module": module, "repositories": []} for module in rpm_modules
             ]
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -1358,9 +1350,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            platforms_list = base_platform.reference_platforms + [
-                base_platform
-            ]
+            platforms_list = base_platform.reference_platforms + [base_platform]
             module_responses = await self._beholder_client.retrieve_responses(
                 platforms_list,
                 module_name=module_name,
@@ -1714,9 +1704,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     )
                     repo_module_index = IndexWrapper()
                     if template:
-                        repo_module_index = IndexWrapper.from_template(
-                            template
-                        )
+                        repo_module_index = IndexWrapper.from_template(template)
                     prod_repo_modules_cache[repo_url] = repo_module_index
                 if repo_name not in packages_to_repo_layout:
                     packages_to_repo_layout[repo_name] = {}
@@ -1832,9 +1820,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     models.NewErrataToALBSPackage.pulp_href.in_(package_hrefs),
                 )
             )
-            .options(
-                selectinload(models.NewErrataToALBSPackage.errata_package)
-            )
+            .options(selectinload(models.NewErrataToALBSPackage.errata_package))
         )
         albs_pkgs = albs_pkgs.scalars().all()
 
@@ -1858,7 +1844,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         if errata_record_status != ErrataReleaseStatus.RELEASED:
             for albs_pkg in albs_pkgs:
                 albs_pkg.status = ErrataPackageStatus.released
-            await self.db.commit()
+            await self.db.flush()
 
     @class_measure_work_time_async("update_release_plan")
     async def update_release_plan(

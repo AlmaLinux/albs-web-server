@@ -1,10 +1,10 @@
 import typing
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from alws import models
-from alws.database import Session
 from alws.perms.roles import RolesList
 
 __all__ = [
@@ -13,11 +13,11 @@ __all__ = [
 ]
 
 
-async def get_roles(db: Session) -> typing.List[models.UserRole]:
+async def get_roles(db: AsyncSession) -> typing.List[models.UserRole]:
     return (await db.execute(select(models.UserRole))).scalars().all()
 
 
-async def fix_roles_actions(db: Session, commit: bool = False):
+async def fix_roles_actions(db: AsyncSession, commit: bool = False):
     actions = (await db.execute(select(models.UserAction))).scalars().all()
     roles = (
         (
@@ -56,7 +56,4 @@ async def fix_roles_actions(db: Session, commit: bool = False):
         new_roles.append(role)
 
     db.add_all(new_roles)
-    if commit:
-        await db.commit()
-    else:
-        await db.flush()
+    await db.flush()

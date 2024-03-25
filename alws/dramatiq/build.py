@@ -1,13 +1,13 @@
 import datetime
 import logging
-from contextlib import asynccontextmanager
 from typing import Any, Dict
 
 import dramatiq
+from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -20,8 +20,7 @@ from alws.constants import (
 )
 from alws.crud import build_node as build_node_crud
 from alws.crud import test
-from alws.database import SyncSession
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
 from alws.errors import (
     ArtifactConversionError,
@@ -32,6 +31,7 @@ from alws.errors import (
     SrpmProvisionError,
 )
 from alws.schemas import build_node_schema, build_schema
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.github_integration_helper import (
     find_issues_by_repo_name,
     get_github_client,
@@ -44,7 +44,7 @@ __all__ = ['start_build', 'build_done']
 logger = logging.getLogger(__name__)
 
 
-def _sync_fetch_build(db: SyncSession, build_id: int) -> models.Build:
+def _sync_fetch_build(db: Session, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
     result = db.execute(query)
     return result.scalars().first()
@@ -73,7 +73,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
     module_build_index = {}
 
     if has_modules:
-        with SyncSession() as db, db.begin():
+        with open_session() as db:
             platforms = (
                 db.execute(
                     select(models.Platform).where(
@@ -98,34 +98,29 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
             db.flush()
             for platform in platforms:
                 module_build_index[platform.name] = platform.module_build_index
-            db.commit()
-            db.close()
 
-    async with asynccontextmanager(get_db)() as db:
-        async with db.begin():
-            build = await fetch_build(db, build_id)
-            planner = BuildPlanner(
-                db,
-                build,
-                is_secure_boot=build_request.is_secure_boot,
-                module_build_index=module_build_index,
-                logger=logger,
-            )
-            await planner.init(
-                platforms=build_request.platforms,
-                platform_flavors=build_request.platform_flavors,
-            )
-            for ref in build_request.tasks:
-                await planner.add_git_project(ref)
-            for linked_id in build_request.linked_builds:
-                linked_build = await fetch_build(db, linked_id)
-                if linked_build:
-                    await planner.add_linked_builds(linked_build)
-            await planner.build_dependency_map()
-            await db.flush()
-            await planner.init_build_repos()
-            await db.commit()
-        await db.close()
+    async with open_async_session(key=get_async_db_key()) as db:
+        build = await fetch_build(db, build_id)
+        planner = BuildPlanner(
+            db,
+            build,
+            is_secure_boot=build_request.is_secure_boot,
+            module_build_index=module_build_index,
+            logger=logger,
+        )
+        await planner.init(
+            platforms=build_request.platforms,
+            platform_flavors=build_request.platform_flavors,
+        )
+        for ref in build_request.tasks:
+            await planner.add_git_project(ref)
+        for linked_id in build_request.linked_builds:
+            linked_build = await fetch_build(db, linked_id)
+            if linked_build:
+                await planner.add_linked_builds(linked_build)
+        await planner.build_dependency_map()
+        await db.flush()
+        await planner.init_build_repos()
 
     if settings.github_integration_enabled:
         try:
@@ -160,7 +155,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 
 async def _build_done(request: build_node_schema.BuildDone):
-    async for db in get_db():
+    async with open_async_session(key=get_async_db_key()) as db:
         try:
             await build_node_crud.safe_build_done(db, request)
         except Exception as e:
@@ -185,7 +180,7 @@ async def _build_done(request: build_node_schema.BuildDone):
             build_task.error = str(e)
             build_task.status = BuildTaskStatus.FAILED
             await build_node_crud.fast_fail_other_tasks_by_ref(db, build_task)
-            await db.commit()
+            await db.flush()
 
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
@@ -219,52 +214,49 @@ async def _build_done(request: build_node_schema.BuildDone):
                 .where(models.Build.id == build_id)
                 .values(finished_at=datetime.datetime.utcnow())
             )
-            await db.commit()
 
 
 async def _get_build_id(db: AsyncSession, build_task_id: int) -> int:
-    async with db.begin():
-        build_id = (
-            (
-                await db.execute(
-                    select(models.BuildTask.build_id).where(
-                        models.BuildTask.id == build_task_id
-                    )
+    build_id = (
+        (
+            await db.execute(
+                select(models.BuildTask.build_id).where(
+                    models.BuildTask.id == build_task_id
                 )
             )
-            .scalars()
-            .first()
         )
-        return build_id
+        .scalars()
+        .first()
+    )
+    return build_id
 
 
 async def _check_build_and_completed_tasks(
     db: AsyncSession, build_id: int
 ) -> bool:
-    async with db.begin():
-        build_tasks = (
-            await db.execute(
-                select(func.count())
-                .select_from(models.BuildTask)
-                .where(models.BuildTask.build_id == build_id)
-            )
-        ).scalar()
+    build_tasks = (
+        await db.execute(
+            select(func.count())
+            .select_from(models.BuildTask)
+            .where(models.BuildTask.build_id == build_id)
+        )
+    ).scalar()
 
-        completed_tasks = (
-            await db.execute(
-                select(func.count())
-                .select_from(models.BuildTask)
-                .where(
-                    models.BuildTask.build_id == build_id,
-                    models.BuildTask.status.notin_([
-                        BuildTaskStatus.IDLE,
-                        BuildTaskStatus.STARTED,
-                    ]),
-                )
+    completed_tasks = (
+        await db.execute(
+            select(func.count())
+            .select_from(models.BuildTask)
+            .where(
+                models.BuildTask.build_id == build_id,
+                models.BuildTask.status.notin_([
+                    BuildTaskStatus.IDLE,
+                    BuildTaskStatus.STARTED,
+                ]),
             )
-        ).scalar()
+        )
+    ).scalar()
 
-        return completed_tasks == build_tasks
+    return completed_tasks == build_tasks
 
 
 async def _all_build_tasks_completed(
@@ -283,6 +275,7 @@ async def _all_build_tasks_completed(
 )
 def start_build(build_id: int, build_request: Dict[str, Any]):
     parsed_build = build_schema.BuildCreate(**build_request)
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_start_build(build_id, parsed_build))
 
 
@@ -301,4 +294,5 @@ def start_build(build_id: int, build_request: Dict[str, Any]):
 )
 def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_build_done(parsed_build))

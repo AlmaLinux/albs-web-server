@@ -21,6 +21,7 @@ import pgpy
 import rpm
 import sentry_sdk
 import sqlalchemy
+from fastapi_sqla import open_async_session
 
 # Required for generating RSS
 from feedgen.feed import FeedGenerator
@@ -32,9 +33,10 @@ from syncer import sync
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
-from alws import database, models
+from alws import models
 from alws.config import settings
 from alws.constants import SignStatusEnum
+from alws.dependencies import get_async_db_key
 from alws.utils.errata import (
     extract_errata_metadata,
     extract_errata_metadata_modern,
@@ -45,6 +47,7 @@ from alws.utils.errata import (
     merge_errata_records_modern,
 )
 from alws.utils.exporter import download_file, get_repodata_file_links
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.osv import export_errata_to_osv
 from alws.utils.pulp_client import PulpClient
 
@@ -304,7 +307,7 @@ class Exporter:
                     repo_exporter_dict["publication_href"] = publication_href
             return fs_exporter_href, repo_exporter_dict
 
-        async with database.Session() as db:
+        async with open_async_session(key=get_async_db_key()) as db:
             query = select(models.Repository).where(
                 models.Repository.id.in_(repository_ids)
             )
@@ -317,9 +320,7 @@ class Exporter:
 
         return list(dict(results).values())
 
-    async def sign_repomd_xml(
-        self, path_to_file: str, key_id: str, token: str
-    ):
+    async def sign_repomd_xml(self, path_to_file: str, key_id: str, token: str):
         endpoint = "sign"
         result = {"asc_content": None, "error": None}
         try:
@@ -582,7 +583,7 @@ class Exporter:
                 selectinload(models.Platform.sign_keys),
             )
         )
-        async with database.Session() as db:
+        async with open_async_session(key=get_async_db_key()) as db:
             db_platforms = await db.execute(query)
         db_platforms = db_platforms.scalars().all()
 
@@ -637,7 +638,7 @@ class Exporter:
         self.logger.info(
             "Start exporting packages from release id=%s", release_id
         )
-        async with database.Session() as db:
+        async with open_async_session(key=get_async_db_key()) as db:
             db_release = await db.execute(
                 select(models.Release).where(models.Release.id == release_id)
             )
@@ -776,6 +777,7 @@ def repo_post_processing(exporter: Exporter, repo_path: str):
 def main():
     args = parse_args()
     init_sentry()
+    sync(setup_all())
 
     platforms_dict = {}
     key_id_by_platform = None
@@ -948,9 +950,7 @@ def main():
                         platform_errata_cache[platform]["modern_cache"],
                     )
                 )
-                with open(
-                    os.path.join(platform_path, "errata.rss"), "w"
-                ) as fd:
+                with open(os.path.join(platform_path, "errata.rss"), "w") as fd:
                     fd.write(rss)
                 exporter.logger.debug(f"RSS generation for {platform} is done")
         except Exception:

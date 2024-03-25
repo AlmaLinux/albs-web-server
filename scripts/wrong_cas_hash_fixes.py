@@ -3,32 +3,37 @@ import os
 import sys
 import uuid
 
+from fastapi_sqla import open_session
 from sqlalchemy import select
-
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from alws.database import PulpSession, SyncSession
 from alws.models import Build, BuildTask, BuildTaskArtifact
 from alws.pulp_models import CoreArtifact, CoreContentArtifact
+from alws.utils.fastapi_sqla_setup import sync_setup
 
 
 def main():
+    sync_setup()
+
     first_subq = (
         select(Build.id)
         # commit date that brings wrong cas_hashes
-        .where(Build.created_at >= datetime.datetime(2022, 10, 30))
-        .scalar_subquery()
+        .where(
+            Build.created_at >= datetime.datetime(2022, 10, 30)
+        ).scalar_subquery()
     )
     second_subq = (
-        select(BuildTask.id).where(BuildTask.build_id.in_(first_subq)).scalar_subquery()
+        select(BuildTask.id)
+        .where(BuildTask.build_id.in_(first_subq))
+        .scalar_subquery()
     )
     query = select(BuildTaskArtifact).where(
         BuildTaskArtifact.build_task_id.in_(second_subq),
         BuildTaskArtifact.cas_hash.is_not(None),
         BuildTaskArtifact.type == "rpm",
     )
-    with SyncSession() as session, PulpSession() as pulp_session, session.begin():
+    with open_session() as session, open_session(key="pulp") as pulp_session:
         alma_artifacts_mapping = {}
         for artifact in session.execute(query).scalars().all():
             key = uuid.UUID(artifact.href.split("/")[-2])
@@ -53,7 +58,6 @@ def main():
                 if alma_artifact.cas_hash == pulp_artifact.sha256:
                     continue
                 alma_artifact.cas_hash = pulp_artifact.sha256
-        session.commit()
 
 
 if __name__ == "__main__":

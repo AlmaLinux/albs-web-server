@@ -8,13 +8,13 @@ import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
+from fastapi_sqla import open_session
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
-from alws.dependencies import get_pulp_db
 from alws.errors import UploadError
 from alws.pulp_models import CoreContent, RpmModulemd, RpmModulemdDefaults
 from alws.utils.modularity import IndexWrapper
@@ -74,7 +74,7 @@ class MetadataUploader:
         module_hrefs = []
         defaults_hrefs = []
         _index = IndexWrapper.from_template(module_content)
-        with get_pulp_db() as pulp_session:
+        with open_session('pulp') as pulp_session:
             for module in _index.iter_modules():
                 defaults_snippet = _index.get_module_defaults_as_str(module.name)
                 defaults_checksum = hashlib.sha256(
@@ -200,7 +200,6 @@ class MetadataUploader:
                     )
                 if href:
                     defaults_hrefs.append(href)
-            pulp_session.commit()
         return db_modules, module_hrefs, defaults_hrefs
 
     async def upload_modules(
@@ -215,7 +214,7 @@ class MetadataUploader:
         )
         if db_modules and not dry_run:
             self.session.add_all(db_modules)
-            await self.session.commit()
+            await self.session.flush()
             # we need to update module if we update template in build repo
             re_result = re.search(
                 # AlmaLinux-8-s390x-0000-debug-br
@@ -243,7 +242,7 @@ class MetadataUploader:
             for task in build_tasks:
                 task.rpm_modules = db_modules
                 self.session.add(task)
-            await self.session.commit()
+            await self.session.flush()
 
         final_additions = module_hrefs.copy()
         if defaults_hrefs:

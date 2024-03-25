@@ -12,7 +12,11 @@ from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
+from sqlalchemy.ext.associationproxy import (
+    AssociationProxy,
+    association_proxy,
+)
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import (
     Mapped,
     declarative_mixin,
@@ -22,6 +26,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql import func
 
+from alws.config import settings
 from alws.constants import (
     ErrataPackageStatus,
     ErrataReferenceType,
@@ -32,7 +37,7 @@ from alws.constants import (
     ReleaseStatus,
     SignStatus,
 )
-from alws.database import Base, engine
+from alws.database import Base
 
 __all__ = [
     "Build",
@@ -245,9 +250,7 @@ class Platform(PermissionsMixin, Base):
     modularity: Mapped[Optional[Dict[str, Any]]] = mapped_column(
         JSONB, nullable=True
     )
-    test_dist_name: Mapped[str] = mapped_column(
-        sqlalchemy.Text, nullable=False
-    )
+    test_dist_name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True, index=True
     )
@@ -660,9 +663,7 @@ class SourceRpm(Base):
         nullable=False,
         index=True,
     )
-    build: Mapped["Build"] = relationship(
-        "Build", back_populates="source_rpms"
-    )
+    build: Mapped["Build"] = relationship("Build", back_populates="source_rpms")
     artifact_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("build_artifacts.id"),
@@ -681,9 +682,7 @@ class BinaryRpm(Base):
     build_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer, sqlalchemy.ForeignKey("builds.id"), nullable=False
     )
-    build: Mapped["Build"] = relationship(
-        "Build", back_populates="binary_rpms"
-    )
+    build: Mapped["Build"] = relationship("Build", back_populates="binary_rpms")
     artifact_id: Mapped[int] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey("build_artifacts.id"),
@@ -1200,9 +1199,7 @@ class Release(PermissionsMixin, TeamMixin, TimeMixin, Base):
         nullable=False,
     )
     product: Mapped["Product"] = relationship("Product")
-    plan: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
+    plan: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     status: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=ReleaseStatus.SCHEDULED
     )
@@ -1253,9 +1250,7 @@ class SignKey(PermissionsMixin, Base):
         sqlalchemy.Text, nullable=True
     )
     keyid: Mapped[str] = mapped_column(sqlalchemy.String(16), unique=True)
-    fingerprint: Mapped[str] = mapped_column(
-        sqlalchemy.String(40), unique=True
-    )
+    fingerprint: Mapped[str] = mapped_column(sqlalchemy.String(40), unique=True)
     public_url: Mapped[str] = mapped_column(sqlalchemy.Text)
     inserted: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
@@ -1385,9 +1380,7 @@ class PlatformFlavour(PermissionsMixin, Base):
     repos: Mapped[List["Repository"]] = relationship(
         "Repository", secondary=FlavourRepo
     )
-    data: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
+    data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
 
 class NewErrataRecord(Base):
@@ -1445,15 +1438,11 @@ class NewErrataRecord(Base):
     original_description: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False
     )
-    title: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, nullable=True
-    )
+    title: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     oval_title: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
-    original_title: Mapped[str] = mapped_column(
-        sqlalchemy.Text, nullable=False
-    )
+    original_title: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     contact_mail: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     status: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
@@ -1745,15 +1734,11 @@ class ErrataRecord(Base):
     original_description: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False
     )
-    title: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, nullable=True
-    )
+    title: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     oval_title: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
-    original_title: Mapped[str] = mapped_column(
-        sqlalchemy.Text, nullable=False
-    )
+    original_title: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     contact_mail: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     status: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
@@ -2112,6 +2097,8 @@ new_errata_references_errata_record_id_platform_id_index = sqlalchemy.Index(
 
 
 async def create_tables():
+    engine = create_async_engine(settings.database_url, echo_pool=True)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

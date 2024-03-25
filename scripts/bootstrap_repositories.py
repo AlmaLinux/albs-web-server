@@ -8,12 +8,14 @@ import argparse
 import logging
 
 import yaml
+from fastapi_sqla import open_async_session
 from syncer import sync
 
-from alws import database
 from alws.crud import platform as pl_crud
 from alws.crud import repository as repo_crud
+from alws.dependencies import get_async_db_key
 from alws.schemas import platform_schema, remote_schema, repository_schema
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.pulp_client import PulpClient
 
 REPO_CACHE = {}
@@ -74,7 +76,7 @@ async def get_repository(
     production: bool,
     logger: logging.Logger,
 ):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         if production:
             repo_payload = repo_info.copy()
             repo_payload.pop("remote_url")
@@ -121,11 +123,9 @@ async def get_repository(
                 repository = await repo_crud.update_repository(
                     db=db,
                     repository_id=repository.id,
-                    payload=repository_schema.RepositoryUpdate(
-                        **{
-                            'pulp_href': repo_href,
-                        }
-                    ),
+                    payload=repository_schema.RepositoryUpdate(**{
+                        'pulp_href': repo_href,
+                    }),
                 )
 
         else:
@@ -142,7 +142,7 @@ async def get_repository(
 
 
 async def get_remote(repo_info: dict, remote_sync_policy: str):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         remote_payload = repo_info.copy()
         remote_payload["name"] = f'{repo_info["name"]}-{repo_info["arch"]}'
         remote_payload.pop("type", None)
@@ -157,7 +157,7 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
 
 
 async def update_remote(remote_id, remote_data: dict):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         return await repo_crud.update_repository_remote(
             db=db,
             remote_id=remote_id,
@@ -166,21 +166,21 @@ async def update_remote(remote_id, remote_data: dict):
 
 
 async def update_platform(platform_data: dict):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         await pl_crud.modify_platform(
             db, platform_schema.PlatformModify(**platform_data)
         )
 
 
 async def update_repository(repo_id: int, repo_data: dict):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         await repo_crud.update_repository(
             db, repo_id, repository_schema.RepositoryUpdate(**repo_data)
         )
 
 
 async def get_repositories_for_update(platform_name: str):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         return await repo_crud.get_repositories_by_platform_name(
             db, platform_name
         )
@@ -191,7 +191,7 @@ async def add_repositories_to_platform(
 ):
     platform_name = platform_data.get("name")
     platform_instance = None
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         for platform in await pl_crud.get_platforms(
             db, is_reference=platform_data.get("is_reference", False)
         ):
@@ -223,6 +223,8 @@ def main():
         platforms_data = loader.get_data()
 
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
+
+    sync(setup_all())
 
     for platform_data in platforms_data:
         if args.only_update:
@@ -271,7 +273,10 @@ def main():
             if repo:
                 distro = sync(pulp_client.get_rpm_distro(repo_name))
             if repo and distro:
-                REPO_CACHE[repo_name] = (distro["base_url"], repo["pulp_href"])
+                REPO_CACHE[repo_name] = (
+                    distro["base_url"],
+                    repo["pulp_href"],
+                )
 
         for repo_info in repositories_data:
             logger.info(
@@ -323,9 +328,7 @@ def main():
                     )
                 )
             if args.no_sync:
-                logger.info(
-                    "Synchronization from remote is disabled, skipping"
-                )
+                logger.info("Synchronization from remote is disabled, skipping")
                 continue
             try:
                 logger.info("Syncing %s from %s...", repository, remote)
