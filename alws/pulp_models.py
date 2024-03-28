@@ -165,7 +165,7 @@ class CoreRepository(PulpBase):
     )
     user_hidden: Mapped[bool] = mapped_column(sqlalchemy.Boolean)
 
-    repository_content: Mapped["CoreRepositoryContent"] = relationship(
+    repository_content: Mapped[List["CoreRepositoryContent"]] = relationship(
         "CoreRepositoryContent",
         back_populates="repository",
     )
@@ -239,9 +239,11 @@ class CoreContent(PulpBase):
         "CoreContentArtifact",
         back_populates="content",
     )
-    core_repositorycontent: Mapped["CoreRepositoryContent"] = relationship(
-        "CoreRepositoryContent",
-        back_populates="content",
+    core_repositorycontent: Mapped[List["CoreRepositoryContent"]] = (
+        relationship(
+            "CoreRepositoryContent",
+            back_populates="content",
+        )
     )
 
     @property
