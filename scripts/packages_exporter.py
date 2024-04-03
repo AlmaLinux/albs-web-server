@@ -120,22 +120,6 @@ def parse_args():
         help="Method of exporting (choices: write, hardlink, symlink)",
     )
     parser.add_argument(
-        "-u",
-        "--pulp-user",
-        type=str,
-        default="pulp",
-        required=False,
-        help="Pulp user, used for change the user ownership",
-    )
-    parser.add_argument(
-        "-g",
-        "--pulp-group",
-        type=str,
-        default="pulp-exports",
-        required=False,
-        help="Pulp group, used for change the group ownership",
-    )
-    parser.add_argument(
         "-osv-dir",
         type=str,
         default=settings.pulp_export_path,
@@ -143,35 +127,6 @@ def parse_args():
         help="The path to the directory where the OSV data will be generated",
     )
     return parser.parse_args()
-
-
-async def fix_permissions(
-    user: str,
-    group: str,
-    custom_path: str = None,
-    recursive: bool = True,
-):
-    path_to_fix = custom_path or str(settings.pulp_export_path)
-    cmds = ["sudo", "chown"]
-    if recursive:
-        cmds.append("-R")
-    cmds.extend([f"{user}:{group}", path_to_fix])
-    process = await asyncio.create_subprocess_exec(*cmds)
-    await process.communicate()
-
-
-def sync_fix_permissions(
-    user: str,
-    group: str,
-    custom_path: str = None,
-    recursive: bool = True,
-):
-    path_to_fix = custom_path or str(settings.pulp_export_path)
-    args = ["chown"]
-    if recursive:
-        args.append("-R")
-    args.extend([f"{user}:{group}", path_to_fix])
-    local["sudo"].run(args=args)
 
 
 def init_sentry():
@@ -191,8 +146,6 @@ class Exporter:
         repodata_cache_dir: str,
         verbose: bool = False,
         export_method: str = "hardlink",
-        pulp_user: str = "pulp",
-        pulp_group: str = "pulp-exports",
         osv_dir: str = settings.pulp_export_path,
     ):
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -213,8 +166,6 @@ class Exporter:
         self.web_server_headers = {
             "Authorization": f"Bearer {settings.albs_jwt_token}",
         }
-        self.pulp_system_user = pulp_user
-        self.common_group = pulp_group
         self.export_method = export_method
         self.osv_dir = osv_dir
         self.current_user = self.get_current_username()
@@ -399,7 +350,7 @@ class Exporter:
             endpoint,
             params={
                 "platform_name": platform_name,
-                "only_released": only_released,
+                "only_released": str(only_released).lower(),
             },
         )
 
@@ -469,28 +420,18 @@ class Exporter:
             )
             return
 
-        await fix_permissions(
-            self.current_user,
-            self.common_group,
-            custom_path=parent_dir,
-            recursive=False,
-        )
         repodata_path = os.path.abspath(os.path.join(parent_dir, "repodata"))
         repodata_url = urllib.parse.urljoin(exporter["repo_url"], "repodata/")
         if not os.path.exists(repodata_path):
             os.makedirs(repodata_path)
         else:
-            await fix_permissions(
-                self.current_user,
-                self.common_group,
-                custom_path=repodata_path,
-            )
             shutil.rmtree(repodata_path)
             os.makedirs(repodata_path)
+        self.logger.info('Downloading repodata from %s', repodata_url)
         try:
             await self.download_repodata(repodata_path, repodata_url)
         except Exception as e:
-            self.logger.error("Cannot download repodata file: %s", str(e))
+            self.logger.exception("Cannot download repodata file: %s", str(e))
 
         return export_path
 
@@ -665,11 +606,19 @@ class Exporter:
                 list(set(repo_ids_to_export))
             )
             final_export_paths.extend(exported_paths)
-            for repo_path in exported_paths:
-                if not os.path.exists(repo_path):
-                    self.logger.error("Path %s does not exist", repo_path)
-                    continue
-                self.check_rpms_signature(repo_path, db_platform.sign_keys)
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {}
+                for repo_path in exported_paths:
+                    if not os.path.exists(repo_path):
+                        self.logger.error("Path %s does not exist", repo_path)
+                        continue
+                    futures[
+                        executor.submit(
+                            self.check_rpms_signature, repo_path, db_platform.sign_keys)
+                    ] = repo_path
+                for future in as_completed(futures):
+                    repo_path = futures[future]
+                    self.logger.info('%s packages signatures are checked', repo_path)
             self.logger.debug(
                 "All repositories exported in following paths:\n%s",
                 "\n".join((str(path) for path in exported_paths)),
@@ -701,27 +650,11 @@ class Exporter:
             str(settings.pulp_export_path), "", str(repo_path)
         ).strip("/")
         repodata_path = os.path.join(repo_path, "repodata")
-        # We need to save downloaded modules metadata in order to include it
-        # correctly while using cached repodata
-        old_modules_path = None
-        new_modules_path = None
-        modules_temp_path = None
-        modules = find_metadata(repodata_path, "modules")
-        if modules:
-            old_modules_path = os.path.join(repodata_path, modules)
-            modules_temp_path = os.path.join(
-                self._temp_dir, os.path.basename(modules)
-            )
-            shutil.copyfile(old_modules_path, modules_temp_path)
         repo_repodata_cache = os.path.join(
             self.repodata_cache_dir, partial_path
         )
-        sync_fix_permissions(
-            self.current_user,
-            self.common_group,
-            custom_path=repo_path,
-            recursive=False,
-        )
+        cache_repodata_dir = os.path.join(repo_repodata_cache, "repodata")
+        self.logger.info('Repodata cache dir: %s', cache_repodata_dir)
         args = [
             "--update",
             "--keep-all-metadata",
@@ -729,36 +662,13 @@ class Exporter:
             self.checksums_cache_dir,
         ]
         if os.path.exists(repo_repodata_cache):
-            args.extend(["--update-md-path", repo_repodata_cache])
+            args.extend(["--update-md-path", cache_repodata_dir])
         args.append(repo_path)
+        self.logger.info('Starting createrepo_c')
         _, stdout, _ = self.createrepo_c.run(args=args)
-
-        # Regenerate module metadata
-        if old_modules_path and modules_temp_path:
-            try:
-                self.logger.info(
-                    "Regenerating module metadata for %s", repo_path
-                )
-                new_modules = find_metadata(repodata_path, "modules")
-                if new_modules:
-                    new_modules_path = os.path.join(repodata_path, new_modules)
-                    os.remove(new_modules_path)
-                if os.path.exists(old_modules_path):
-                    os.remove(old_modules_path)
-                shutil.copyfile(modules_temp_path, old_modules_path)
-                _, stdout, _ = self.createrepo_c.run(
-                    args=("--update", "--keep-all-metadata", repo_path)
-                )
-                self.logger.debug(stdout)
-                self.logger.info("Module metadata regeneration is finished")
-            finally:
-                if old_modules_path and old_modules_path != new_modules_path:
-                    os.remove(old_modules_path)
-                if modules_temp_path:
-                    os.remove(modules_temp_path)
-
+        self.logger.info(stdout)
+        self.logger.info('createrepo_c is finished')
         # Cache newly generated repodata into folder for future re-use
-        cache_repodata_dir = os.path.join(repo_repodata_cache, "repodata")
         if not os.path.exists(repo_repodata_cache):
             os.makedirs(repo_repodata_cache)
         else:
@@ -767,8 +677,6 @@ class Exporter:
                 shutil.rmtree(cache_repodata_dir)
 
         shutil.copytree(repodata_path, cache_repodata_dir)
-
-        self.logger.info(stdout)
 
     async def get_sign_server_token(self) -> str:
         body = {
@@ -881,9 +789,6 @@ def main():
         pulp_group=args.pulp_group,
         osv_dir=args.osv_dir,
     )
-    exporter.logger.debug("Fixing permissions before export")
-    sync_fix_permissions(exporter.pulp_system_user, exporter.common_group)
-    exporter.logger.debug("Permissions are fixed")
 
     db_sign_keys = sync(exporter.get_sign_keys())
     if args.release_id:
@@ -911,36 +816,21 @@ def main():
             )
         )
 
-    try:
-        local["sudo"][
-            "find",
-            settings.pulp_export_path,
-            "-type",
-            "f",
-            "-name",
-            "*snippet",
-            "-o",
-            "-name",
-            "modules.yaml",
-            "-exec",
-            "rm",
-            "-f",
-            "{}",
-            "+",
-        ].run()
-    except Exception:
-        pass
-
     platform_errata_cache = {}
     platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
 
-    for repo_path in exported_paths:
-        exporter.logger.info("%s post-processing started", repo_path)
-        result = repo_post_processing(exporter, repo_path)
-        if result:
-            exporter.logger.info("%s post-processing is successful", repo_path)
-        else:
-            exporter.logger.error("%s post-processing has failed", repo_path)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        post_processing_futures = {
+            executor.submit(repo_post_processing, exporter, repo_path): repo_path
+            for repo_path in exported_paths
+        }
+        for future in as_completed(post_processing_futures):
+            repo_path = post_processing_futures[future]
+            result = future.result()
+            if result:
+                exporter.logger.info("%s post-processing is successful", repo_path)
+            else:
+                exporter.logger.error("%s post-processing has failed", repo_path)
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         errata_futures = {
@@ -991,11 +881,6 @@ def main():
         exporter.logger.info("Starting export errata.json and oval.xml")
         errata_export_base_path = None
         try:
-            sync_fix_permissions(
-                exporter.pulp_system_user,
-                exporter.common_group,
-                recursive=False,
-            )
             errata_export_base_path = os.path.join(
                 settings.pulp_export_path, "errata"
             )
@@ -1039,7 +924,7 @@ def main():
                     # For this reason, we're passing only_released as a string,
                     # which in turn will be converted into boolean on backend
                     # side by fastapi/pydantic.
-                    exporter.get_oval_xml(platform, only_released="true")
+                    exporter.get_oval_xml(platform, only_released=True)
                 )
                 with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                     fd.write(oval)
@@ -1059,13 +944,6 @@ def main():
                 exporter.logger.debug(f"RSS generation for {platform} is done")
         except Exception:
             exporter.logger.exception("Error happened:\n")
-        finally:
-            if errata_export_base_path:
-                sync_fix_permissions(
-                    exporter.pulp_system_user,
-                    exporter.common_group,
-                    custom_path=errata_export_base_path,
-                )
 
 
 if __name__ == "__main__":
