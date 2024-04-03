@@ -52,10 +52,9 @@ from alws.utils.errata import (
     get_verbose_errata_title,
 )
 from alws.utils.github_integration_helper import (
+    close_issues,
     create_github_issue,
-    find_issues_by_record_id,
     get_github_client,
-    move_issues,
 )
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
@@ -250,73 +249,70 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
             title = record.title
         else:
             title = record.original_title
-        definition = Definition.from_dict(
-            {
-                "id": debrand_id(record.definition_id),
-                "version": record.definition_version,
-                "class": record.definition_class,
-                "metadata": {
-                    "title": title,
-                    "description": (
-                        record.description
-                        if record.description
-                        else record.original_description
+        definition = Definition.from_dict({
+            "id": debrand_id(record.definition_id),
+            "version": record.definition_version,
+            "class": record.definition_class,
+            "metadata": {
+                "title": title,
+                "description": (
+                    record.description
+                    if record.description
+                    else record.original_description
+                ),
+                "advisory": {
+                    "from": record.contact_mail,
+                    "severity": record.severity,
+                    "rights": record.rights,
+                    "issued_date": record.issued_date,
+                    "updated_date": record.updated_date,
+                    "affected_cpe_list": debrand_affected_cpe_list(
+                        record.affected_cpe, record.platform.distr_version
                     ),
-                    "advisory": {
-                        "from": record.contact_mail,
-                        "severity": record.severity,
-                        "rights": record.rights,
-                        "issued_date": record.issued_date,
-                        "updated_date": record.updated_date,
-                        "affected_cpe_list": debrand_affected_cpe_list(
-                            record.affected_cpe, record.platform.distr_version
-                        ),
-                        "bugzilla": [
-                            {
-                                "id": ref.ref_id,
-                                "href": ref.href,
-                                "title": ref.title,
-                            }
-                            for ref in record.references
-                            if ref.ref_type == ErrataReferenceType.bugzilla
-                        ],
-                        "cves": [
-                            {
-                                "name": ref.ref_id,
-                                "public": datetime.datetime.strptime(
-                                    # year-month-day
-                                    ref.cve.public[:10],
-                                    "%Y-%m-%d",
-                                ).date(),
-                                "href": ref.href,
-                                "impact": ref.cve.impact,
-                                "cwe": ref.cve.cwe,
-                                "cvss3": ref.cve.cvss3,
-                            }
-                            for ref in record.references
-                            if ref.ref_type == ErrataReferenceType.cve
-                            and ref.cve
-                        ],
-                    },
-                    "references": [
-                        debrand_reference(
-                            {
-                                "id": ref.ref_id,
-                                "source": ref.ref_type.value.upper(),
-                                "url": ref.href,
-                            },
-                            record.platform.distr_version,
-                        )
+                    "bugzilla": [
+                        {
+                            "id": ref.ref_id,
+                            "href": ref.href,
+                            "title": ref.title,
+                        }
                         for ref in record.references
-                        if ref.ref_type
-                        not in [
-                            ErrataReferenceType.bugzilla,
-                        ]
+                        if ref.ref_type == ErrataReferenceType.bugzilla
+                    ],
+                    "cves": [
+                        {
+                            "name": ref.ref_id,
+                            "public": datetime.datetime.strptime(
+                                # year-month-day
+                                ref.cve.public[:10],
+                                "%Y-%m-%d",
+                            ).date(),
+                            "href": ref.href,
+                            "impact": ref.cve.impact,
+                            "cwe": ref.cve.cwe,
+                            "cvss3": ref.cve.cvss3,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.cve and ref.cve
                     ],
                 },
-                "criteria": record.original_criteria,
-            }
-        )
+                "references": [
+                    debrand_reference(
+                        {
+                            "id": ref.ref_id,
+                            "source": ref.ref_type.value.upper(),
+                            "url": ref.href,
+                        },
+                        record.platform.distr_version,
+                    )
+                    for ref in record.references
+                    if ref.ref_type
+                    not in [
+                        ErrataReferenceType.bugzilla,
+                    ]
+                ],
+            },
+            "criteria": record.original_criteria,
+        })
         oval.append_object(definition)
         for test in record.original_tests:
             test["id"] = debrand_id(test["id"])
@@ -458,13 +454,11 @@ async def load_platform_packages(
                     cache[key] = []
                 cache[key].append(repo.pulp_href)
                 continue
-            short_pkg_name = "-".join(
-                (
-                    pkg.name,
-                    pkg.version,
-                    clean_release(pkg.release),
-                )
-            )
+            short_pkg_name = "-".join((
+                pkg.name,
+                pkg.version,
+                clean_release(pkg.release),
+            ))
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg.arch]
@@ -519,13 +513,11 @@ async def get_matching_albs_packages(
     #   - my-pkg-2.0-2
     #   - my-pkg-2.0-20191233git
     #   - etc
-    clean_package_name = "-".join(
-        (
-            errata_package.name,
-            errata_package.version,
-            clean_release(errata_package.release),
-        )
-    )
+    clean_package_name = "-".join((
+        errata_package.name,
+        errata_package.version,
+        clean_release(errata_package.release),
+    ))
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
@@ -562,8 +554,8 @@ async def get_matching_albs_packages(
     if module:
         module_name, module_stream = module.split(":")
         query = (
-            query.join(models.BuildTask)
-            .join(models.RpmModule)
+            query.join(models.BuildTaskArtifact.build_task)
+            .join(models.BuildTask.rpm_modules)
             .filter(
                 models.RpmModule.name == module_name,
                 models.RpmModule.stream == module_stream,
@@ -588,13 +580,11 @@ async def get_matching_albs_packages(
         pulp_rpm_package = pulp_pkgs.get(package.href)
         if not pulp_rpm_package:
             continue
-        clean_pulp_package_name = "-".join(
-            (
-                pulp_rpm_package.name,
-                pulp_rpm_package.version,
-                clean_release(pulp_rpm_package.release),
-            )
-        )
+        clean_pulp_package_name = "-".join((
+            pulp_rpm_package.name,
+            pulp_rpm_package.version,
+            clean_release(pulp_rpm_package.release),
+        ))
         if (
             pulp_rpm_package.arch not in (errata_package.arch, "noarch")
             or clean_pulp_package_name != clean_package_name
@@ -615,24 +605,6 @@ async def get_matching_albs_packages(
         items_to_insert.append(mapping)
         errata_package.albs_packages.append(mapping)
         errata_record_ids.add(errata_package.errata_record_id)
-    if settings.github_integration_enabled:
-        try:
-            github_client = await get_github_client()
-            issues = await find_issues_by_record_id(
-                github_client,
-                list(errata_record_ids),
-            )
-            if issues:
-                await move_issues(
-                    github_client=github_client,
-                    issues=issues,
-                    status=GitHubIssueStatus.TESTING.value,
-                )
-        except Exception as err:
-            logging.exception(
-                "Cannot move issue to the Testing section: %s",
-                err,
-            )
     return items_to_insert
 
 
@@ -701,25 +673,6 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         original_variables=errata.variables,
     )
     items_to_insert.append(db_errata)
-
-    if settings.github_integration_enabled:
-        try:
-            github_client = await get_github_client()
-            await create_github_issue(
-                client=github_client,
-                title=errata.title,
-                description=errata.description,
-                advisory_id=alma_errata_id,
-                original_id=original_id,
-                platform_name=platform.name,
-                severity=errata.severity,
-                packages=errata.packages,
-            )
-        except Exception as err:
-            logging.exception(
-                "Cannot create GitHub issue: %s",
-                err,
-            )
 
     # References
     self_ref_exists = False
@@ -803,6 +756,26 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     db.add_all(items_to_insert)
     await db.commit()
     await db.refresh(db_errata)
+    if not settings.github_integration_enabled:
+        return db_errata
+
+    try:
+        github_client = await get_github_client()
+        await create_github_issue(
+            client=github_client,
+            title=errata.title,
+            description=errata.description,
+            advisory_id=alma_errata_id,
+            original_id=original_id,
+            platform_name=platform.name,
+            severity=errata.severity,
+            packages=errata.packages,
+        )
+    except Exception as err:
+        logging.exception(
+            "Cannot create GitHub issue: %s",
+            err,
+        )
     return db_errata
 
 
@@ -851,17 +824,15 @@ async def list_errata_records(
             )
         )
     else:
-        options.extend(
-            [
-                selectinload(models.NewErrataRecord.packages)
-                .selectinload(models.NewErrataPackage.albs_packages)
-                .selectinload(models.NewErrataToALBSPackage.build_artifact)
-                .selectinload(models.BuildTaskArtifact.build_task),
-                selectinload(models.NewErrataRecord.references).selectinload(
-                    models.NewErrataReference.cve
-                ),
-            ]
-        )
+        options.extend([
+            selectinload(models.NewErrataRecord.packages)
+            .selectinload(models.NewErrataPackage.albs_packages)
+            .selectinload(models.NewErrataToALBSPackage.build_artifact)
+            .selectinload(models.BuildTaskArtifact.build_task),
+            selectinload(models.NewErrataRecord.references).selectinload(
+                models.NewErrataReference.cve
+            ),
+        ])
 
     def generate_query(count=False):
         query = select(func.count(models.NewErrataRecord.id))
@@ -980,20 +951,18 @@ async def release_errata_packages(
         if pkg_name_arch in released_pkgs:
             continue
         released_pkgs.add(pkg_name_arch)
-        dict_packages.append(
-            {
-                "name": pulp_pkg["name"],
-                "release": pulp_pkg["release"],
-                "version": pulp_pkg["version"],
-                "epoch": pulp_pkg["epoch"],
-                "arch": pulp_pkg["arch"],
-                "filename": pulp_pkg["location_href"],
-                "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
-                "src": pulp_pkg["rpm_sourcerpm"],
-                "sum": pulp_pkg["sha256"],
-                "sum_type": "sha256",
-            }
-        )
+        dict_packages.append({
+            "name": pulp_pkg["name"],
+            "release": pulp_pkg["release"],
+            "version": pulp_pkg["version"],
+            "epoch": pulp_pkg["epoch"],
+            "arch": pulp_pkg["arch"],
+            "filename": pulp_pkg["location_href"],
+            "reboot_suggested": errata_pkg.errata_package.reboot_suggested,
+            "src": pulp_pkg["rpm_sourcerpm"],
+            "sum": pulp_pkg["sha256"],
+            "sum_type": "sha256",
+        })
         if rpm_module or ".module_el" not in pulp_pkg["release"]:
             continue
         query = models.BuildTaskArtifact.href == errata_pkg.pulp_href
@@ -1011,13 +980,9 @@ async def release_errata_packages(
         db_pkg = db_pkg.scalars().first()
         if not db_pkg:
             continue
-        db_module = next(
-            (
-                i
-                for i in db_pkg.build_task.rpm_modules
-                if '-devel' not in i.name
-            )
-        )
+        db_module = next((
+            i for i in db_pkg.build_task.rpm_modules if '-devel' not in i.name
+        ))
         if db_module is not None:
             rpm_module = {
                 "name": db_module.name,
@@ -1054,14 +1019,12 @@ async def release_errata_packages(
         "release": "0",
         "rights": record.rights,
         "pushcount": "1",
-        "pkglist": [
-            {
-                "name": collection_name,
-                "short": collection_name,
-                "module": rpm_module,
-                "packages": dict_packages,
-            }
-        ],
+        "pkglist": [{
+            "name": collection_name,
+            "short": collection_name,
+            "module": rpm_module,
+            "packages": dict_packages,
+        }],
         "references": [
             {
                 "href": ref.href,
@@ -1388,16 +1351,13 @@ async def get_release_logs(
     if db_record.module:
         release_log.append(f"Module: {db_record.module}\n")
 
-    release_log.extend(
-        [
-            "Architecture(s): " + ", ".join(arches),
-            "\nPackages:\n" + "\n".join(pkgs),
-            f"\nForce flag: {force_flag}",
-            "\nMissing packages:\n" + "\n".join(missing_pkg_names),
-            "\nRepositories:\n"
-            + "\n".join([repo.url for repo in repositories]),
-        ]
-    )
+    release_log.extend([
+        "Architecture(s): " + ", ".join(arches),
+        "\nPackages:\n" + "\n".join(pkgs),
+        f"\nForce flag: {force_flag}",
+        "\nMissing packages:\n" + "\n".join(missing_pkg_names),
+        "\nRepositories:\n" + "\n".join([repo.url for repo in repositories]),
+    ])
     return "".join(release_log)
 
 
@@ -1460,17 +1420,7 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
         await session.commit()
         if settings.github_integration_enabled:
             try:
-                github_client = await get_github_client()
-                issues = await find_issues_by_record_id(
-                    github_client,
-                    [record_id],
-                )
-                if issues:
-                    await move_issues(
-                        github_client=github_client,
-                        issues=issues,
-                        status=GitHubIssueStatus.RELEASED.value,
-                    )
+                await close_issues(record_ids=[db_record.id])
             except Exception as err:
                 logging.exception(
                     "Cannot move issue to the Released section: %s",
@@ -1554,17 +1504,7 @@ async def bulk_errata_records_release(records_ids: List[str]):
             )
             if settings.github_integration_enabled:
                 try:
-                    github_client = await get_github_client()
-                    issues = await find_issues_by_record_id(
-                        github_client,
-                        [db_record.id],
-                    )
-                    if issues:
-                        await move_issues(
-                            github_client=github_client,
-                            issues=issues,
-                            status=GitHubIssueStatus.RELEASED.value,
-                        )
+                    await close_issues(record_ids=[db_record.id])
                 except Exception as err:
                     logging.exception(
                         "Cannot move issue to the Released section: %s",

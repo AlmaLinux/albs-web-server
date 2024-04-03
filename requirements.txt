@@ -37,4 +37,4 @@ email-validator>=2.0
 sentry-sdk[fastapi]==1.43.0  # requires FastAPI>=0.79.0
 git+https://github.com/AlmaLinux/immudb-wrapper.git@0.1.2#egg=immudb_wrapper
 git+https://github.com/AlmaLinux/errata2osv.git@0.0.3#egg=errata2osv
-git+https://github.com/AlmaLinux/albs-github-integration.git@0.2.0#egg=albs_github
+git+https://github.com/AlmaLinux/albs-github-integration.git@0.3.0#egg=albs_github

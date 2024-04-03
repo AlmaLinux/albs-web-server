@@ -46,9 +46,7 @@ from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import clean_debug_name, is_debuginfo_rpm
 from alws.utils.github_integration_helper import (
-    find_issues_by_build_id,
-    get_github_client,
-    move_issues,
+    close_issues,
 )
 from alws.utils.measurements import class_measure_work_time_async
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
@@ -350,23 +348,21 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     for module in module_index.iter_modules():
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append(
-                            {
-                                "build_id": build.id,
-                                "name": module.name,
-                                "stream": module.stream,
-                                # Module version needs to be converted into
-                                # string because it's going to be involved later
-                                # in release plan. When interacting with API
-                                # via Swagger or albs-frontend, we'll loose
-                                # precision as described here:
-                                # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
-                                "version": str(module.version),
-                                "context": module.context,
-                                "arch": module.arch,
-                                "template": module.render(),
-                            }
-                        )
+                        modules_to_release[key].append({
+                            "build_id": build.id,
+                            "name": module.name,
+                            "stream": module.stream,
+                            # Module version needs to be converted into
+                            # string because it's going to be involved later
+                            # in release plan. When interacting with API
+                            # via Swagger or albs-frontend, we'll loose
+                            # precision as described here:
+                            # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
+                            "version": str(module.version),
+                            "context": module.context,
+                            "arch": module.arch,
+                            "template": module.render(),
+                        })
         pulp_rpm_modules = [
             module_dict
             for module_list in modules_to_release.values()
@@ -602,17 +598,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             builds_released = True
             if settings.github_integration_enabled:
                 try:
-                    github_client = await get_github_client()
-                    issues = await find_issues_by_build_id(
-                        github_client=github_client,
-                        build_ids=release.build_ids,
-                    )
-                    if issues:
-                        await move_issues(
-                            github_client=github_client,
-                            issues=issues,
-                            status=GitHubIssueStatus.RELEASED.value,
-                        )
+                    await close_issues(build_ids=release.build_ids)
                 except Exception as err:
                     logging.exception(
                         "Cannot move issue to the Released section: %s",
