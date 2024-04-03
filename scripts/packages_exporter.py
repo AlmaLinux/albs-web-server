@@ -614,11 +614,16 @@ class Exporter:
                         continue
                     futures[
                         executor.submit(
-                            self.check_rpms_signature, repo_path, db_platform.sign_keys)
+                            self.check_rpms_signature,
+                            repo_path,
+                            db_platform.sign_keys,
+                        )
                     ] = repo_path
                 for future in as_completed(futures):
                     repo_path = futures[future]
-                    self.logger.info('%s packages signatures are checked', repo_path)
+                    self.logger.info(
+                        '%s packages signatures are checked', repo_path
+                    )
             self.logger.debug(
                 "All repositories exported in following paths:\n%s",
                 "\n".join((str(path) for path in exported_paths)),
@@ -821,16 +826,22 @@ def main():
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         post_processing_futures = {
-            executor.submit(repo_post_processing, exporter, repo_path): repo_path
+            executor.submit(
+                repo_post_processing, exporter, repo_path
+            ): repo_path
             for repo_path in exported_paths
         }
         for future in as_completed(post_processing_futures):
             repo_path = post_processing_futures[future]
             result = future.result()
             if result:
-                exporter.logger.info("%s post-processing is successful", repo_path)
+                exporter.logger.info(
+                    "%s post-processing is successful", repo_path
+                )
             else:
-                exporter.logger.error("%s post-processing has failed", repo_path)
+                exporter.logger.error(
+                    "%s post-processing has failed", repo_path
+                )
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         errata_futures = {
