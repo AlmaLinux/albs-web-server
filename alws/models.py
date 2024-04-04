@@ -597,9 +597,6 @@ class RpmModule(Base):
     context: Mapped[str] = mapped_column(sqlalchemy.TEXT, nullable=False)
     arch: Mapped[str] = mapped_column(sqlalchemy.TEXT, nullable=False)
     pulp_href: Mapped[str] = mapped_column(sqlalchemy.TEXT, nullable=False)
-    sha256: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.VARCHAR(64), nullable=True
-    )
 
     @property
     def nvsca(self):

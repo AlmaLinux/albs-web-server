@@ -125,6 +125,7 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
                 linked_build = await fetch_build(db, linked_id)
                 if linked_build:
                     await planner.add_linked_builds(linked_build)
+            await planner.build_dependency_map()
             await db.flush()
             await planner.init_build_repos()
             await db.commit()

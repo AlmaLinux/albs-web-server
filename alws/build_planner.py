@@ -649,6 +649,8 @@ class BuildPlanner:
             await self._add_single_project(db_ref)
         else:
             await self._add_single_module(ref)
+
+    async def build_dependency_map(self):
         # TODO: Make sources build as first "arch" in all process
         # Make dependencies between the tasks as following:
         #   - If platform has i686 architecture then process it first;
@@ -681,12 +683,11 @@ class BuildPlanner:
                 tasks[0].dependencies.append(first_arch_tasks[0])
                 # Add dependencies for all other tasks
                 for index in range(1, len(tasks)):
-                    previous_task_index = index - 1
+                    previous_tasks = tasks[:index]
                     first_arch_task = first_arch_tasks[index]
                     current_task = tasks[index]
-                    previous_task = tasks[previous_task_index]
                     current_task.dependencies.extend(
-                        [first_arch_task, previous_task]
+                        [first_arch_task, *previous_tasks]
                     )
                 all_tasks.extend(tasks)
         self._db.add_all(all_tasks)
