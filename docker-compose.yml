@@ -529,17 +529,17 @@ services:
   sign_file:
     image: sign-file:latest
     build:
-      dockerfile: Dockerfile
       context: ../albs-sign-file
-    command: >
-      bash -c "/app/env/bin/python /app/db_manage.py dev_init
-      && /app/env/bin/python /app/start.py"
+      dockerfile: Dockerfile
+      target: sign-file
+    env_file: "../albs-sign-file/.env"
+    command: "bash -c 'python3 db_manage.py dev_init && python3 start.py'"
     restart: on-failure
     volumes:
-      - "~/.gnupg:/home/alt/.gnupg"
-      - ../albs-sign-file/sign:/app/sign
-      - ../albs-sign-file/start.py:/app/start.py
-      - ../albs-sign-file/db_manage.py:/app/db_manage.py
+      - "${SF_HOST_GNUPG:-~/.gnupg}:/root/.gnupg"
+      - "../albs-sign-file/sign:/app/sign"
+      - "../albs-sign-file/start.py:/app/start.py"
+      - "../albs-sign-file/db_manage.py:/app/db_manage.py"
     ports:
       - "8083:8000"
     logging:
