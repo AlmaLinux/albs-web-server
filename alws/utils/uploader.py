@@ -1,3 +1,4 @@
+import datetime
 import io
 import logging
 import re
@@ -6,13 +7,15 @@ import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
+from alws.dependencies import get_pulp_db
 from alws.errors import UploadError
-from alws.utils.ids import get_random_unique_version
+from alws.pulp_models import CoreContent, RpmModulemd
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 
@@ -42,7 +45,16 @@ class MetadataUploader:
             if not next_page:
                 break
 
-    async def upload_comps(self, repo_href: str, comps_content: str) -> None:
+    async def upload_comps(
+        self,
+        repo_href: str,
+        comps_content: str,
+        dry_run: bool = False,
+    ) -> None:
+        if dry_run:
+            logging.info("DRY_RUN: Uploading comps:\n%s", comps_content)
+            return
+        logging.info("Uploading comps file")
         data = {
             "file": io.StringIO(comps_content),
             "repository": repo_href,
@@ -50,152 +62,111 @@ class MetadataUploader:
         }
         await self.pulp.upload_comps(data)
         await self.pulp.create_rpm_publication(repo_href)
+        logging.info("Comps file upload has been finished")
 
-    # TODO: Update this to work with new modularity workflow, see
-    # https://github.com/AlmaLinux/build-system/issues/192
     async def upload_modules(
         self,
         repo_href: str,
         module_content: str,
-    ) -> None:
-        latest_repo_href = await self.pulp.get_repo_latest_version(repo_href)
-        if not latest_repo_href:
-            raise ValueError(f"Cannot get latest repo version by {repo_href=}")
-        latest_repo_data = await self.pulp.get_latest_repo_present_content(
-            latest_repo_href
-        )
-        module_content_keys = ("rpm.modulemd_defaults", "rpm.modulemd")
-        repo_data_hrefs = [
-            latest_repo_data.get(key, {}).get("href")
-            for key in module_content_keys
-        ]
-        modules_to_remove = []
-        hrefs_to_add = []
-        for repo_type_href in repo_data_hrefs:
-            if repo_type_href is None:
-                continue
-            async for content in self.iter_repo(repo_type_href):
-                modules_to_remove.append(content["pulp_href"])
-        artifact_href, sha256 = await self.pulp.upload_file(module_content)
+        dry_run: bool = False,
+    ):
+        db_modules = []
+        module_hrefs = []
         _index = IndexWrapper.from_template(module_content)
-        module = next(_index.iter_modules())
-        payload = {
-            "relative_path": "modules.yaml",
-            "artifact": artifact_href,
-            "name": module.name,
-            "stream": module.stream,
-            "version": get_random_unique_version(),
-            "context": module.context,
-            "arch": module.arch,
-            "artifacts": [],
-            "dependencies": [],
-        }
-        module_href = await self.pulp.create_module_by_payload(payload)
-        hrefs_to_add.append(module_href)
-
-        # we can't associate same packages in modules twice in one repo version
-        # need to remove them before creating new modulemd
-        task_result = await self.pulp.modify_repository(
-            repo_href,
-            remove=modules_to_remove,
-        )
-        logging.debug(
-            'Removed the following entities from repo "%s":\n%s',
-            repo_href,
-            modules_to_remove,
-        )
-        # if we fall during next modifying repository, we can delete this
-        # repo version and rollback all changes that makes upload
-        new_version_href = next(
-            (
-                resource
-                for resource in task_result.get("created_resources", [])
-                if re.search(rf"{repo_href}versions/\d+/$", resource)
-            ),
-            None,
-        )
-        # not sure, but keep it for failsafe if we doesn't have new created
-        # repo version from modify task result
-        if not new_version_href:
-            new_version_href = await self.pulp.get_repo_latest_version(
-                repo_href,
-            )
-
-        # when we deleting modulemd's, associated packages also removes
-        # from repository, we need to add them in next repo version
-        removed_content = await self.pulp.get_latest_repo_removed_content(
-            new_version_href
-        )
-        removed_pkgs_href = removed_content.get("rpm.package", {}).get("href")
-        # in case if early removed modules doesn't contains associated packages
-        if removed_pkgs_href:
-            async for pkg in self.iter_repo(removed_pkgs_href):
-                hrefs_to_add.append(pkg["pulp_href"])
-
-        try:
-            logging.debug(
-                'Trying to add early removed packages in the repo "%s":\n%s',
-                repo_href,
-                hrefs_to_add,
-            )
-            await self.pulp.modify_repository(repo_href, add=hrefs_to_add)
-        except Exception as exc:
-            await self.pulp.delete_by_href(
-                new_version_href,
-                wait_for_result=True,
-            )
-            logging.exception("Cannot restore packages in repo:")
-            raise exc
-        finally:
-            await self.pulp.create_rpm_publication(repo_href)
-
-        # we need to update module if we update template in build repo
-        re_result = re.search(
-            # AlmaLinux-8-s390x-0000-debug-br
-            r".+-(?P<arch>\w+)-(?P<build_id>\d+)(-br|-debug-br)$",
-            self.repo_name,
-            flags=re.IGNORECASE,
-        )
-        if not re_result:
-            return
-        re_result = re_result.groupdict()
-        subq = (
-            select(models.BuildTask.rpm_module_id)
-            .where(
-                models.BuildTask.build_id == int(re_result["build_id"]),
-                models.BuildTask.arch == re_result["arch"],
-            )
-            .scalar_subquery()
-        )
-        rpm_modules = (
-            (
-                await self.session.execute(
-                    select(models.RpmModule).where(
-                        models.RpmModule.id.in_(subq),
+        with get_pulp_db() as pulp_session:
+            for module in _index.iter_modules():
+                pulp_module = pulp_session.execute(
+                    select(RpmModulemd).where(
+                        RpmModulemd.name == module.name,
+                        RpmModulemd.arch == module.arch,
+                        RpmModulemd.stream == module.stream,
+                        RpmModulemd.version == str(module.version),
+                        RpmModulemd.context == module.context,
                     )
-                )
+                ).scalars().first()
+                module_snippet = module.render()
+                if not pulp_module:
+                    if dry_run:
+                        logging.info("DRY_RUN: Module is not present in Pulp, creating")
+                        continue
+                    logging.info("Module is not present in Pulp, creating")
+                    pulp_module_href = await self.pulp.create_module(
+                        module_snippet,
+                        module.name,
+                        module.stream,
+                        module.context,
+                        module.arch,
+                        module.description,
+                        version=module.version,
+                        artifacts=module.get_rpm_artifacts(),
+                        dependencies=list(
+                            module.get_runtime_deps().values()
+                        ),
+                        packages=[],
+                        profiles=module.get_profiles(),
+                    )
+                    module_hrefs.append(pulp_module_href)
+                    db_module = models.RpmModule(
+                        name=module.name,
+                        stream=module.stream,
+                        context=module.context,
+                        arch=module.arch,
+                        version=module.version,
+                        pulp_href=pulp_module_href,
+                    )
+                    db_modules.append(db_module)
+                else:
+                    if dry_run:
+                        logging.info("DRY_RUN: Updating existing module in Pulp")
+                        continue
+                    logging.info("Updating existing module in Pulp")
+                    pulp_session.execute(
+                        update(RpmModulemd).where(
+                            RpmModulemd.content_ptr_id == pulp_module.content_ptr_id
+                        ).values(snippet=module_snippet)
+                    )
+                    pulp_session.execute(
+                        update(CoreContent).where(
+                            CoreContent.pulp_id == pulp_module.content_ptr_id
+                        ).values(pulp_last_updated=datetime.datetime.now())
+                    )
+                    pulp_session.commit()
+        if db_modules and not dry_run:
+            self.session.add_all(db_modules)
+            await self.session.commit()
+            # we need to update module if we update template in build repo
+            re_result = re.search(
+                # AlmaLinux-8-s390x-0000-debug-br
+                r".+-(?P<arch>\w+)-(?P<build_id>\d+)(-br|-debug-br)$",
+                self.repo_name,
+                flags=re.IGNORECASE,
             )
-            .scalars()
-            .all()
-        )
-        for rpm_module in rpm_modules:
-            for attr in (
-                "name",
-                "version",
-                "stream",
-                "context",
-                "arch",
-            ):
-                module_value = str(getattr(module, attr))
-                if module_value != str(getattr(rpm_module, attr)):
-                    setattr(rpm_module, attr, module_value)
-            rpm_module.pulp_href = module_href
-        await self.session.commit()
+            if not re_result:
+                return
+            re_result = re_result.groupdict()
+            build_tasks = (await self.session.execute(
+                select(models.BuildTask).where(
+                    models.BuildTask.build_id == int(re_result["build_id"]),
+                    models.BuildTask.arch == re_result["arch"],
+                ).options(selectinload(models.BuildTask.rpm_modules)))).scalars().all()
+            for task in build_tasks:
+                task.rpm_modules = db_modules
+                self.session.add(task)
+            await self.session.commit()
+
+        if module_hrefs and not dry_run:
+            logging.info("Adding created modules to repository")
+            await self.pulp.modify_repository(repo_href, add=module_hrefs)
+        if not dry_run:
+            logging.info("Publishing new repository version")
+            await self.pulp.create_rpm_publication(repo_href)
+        logging.info("Modules upload has been finished")
 
     async def process_uploaded_files(
         self,
         module_content: typing.Optional[UploadFile] = None,
         comps_content: typing.Optional[UploadFile] = None,
+        dry_run: bool = False,
     ) -> typing.List[str]:
         repo = await self.pulp.get_rpm_repository_by_params(
             {"name": self.repo_name},
@@ -211,11 +182,19 @@ class MetadataUploader:
         try:
             if module_content is not None:
                 module_content = await module_content.read()
-                await self.upload_modules(repo_href, module_content.decode())
+                await self.upload_modules(
+                    repo_href,
+                    module_content.decode(),
+                    dry_run=dry_run,
+                )
                 updated_metadata.append("modules.yaml")
             if comps_content is not None:
                 comps_content = await comps_content.read()
-                await self.upload_comps(repo_href, comps_content.decode())
+                await self.upload_comps(
+                    repo_href,
+                    comps_content.decode(),
+                    dry_run=dry_run,
+                )
                 updated_metadata.append("comps.xml")
         except ClientResponseError as exc:
             raise UploadError(exc.message, exc.status)
