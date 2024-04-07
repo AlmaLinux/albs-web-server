@@ -822,8 +822,10 @@ async def __process_build_task_artifacts(
                         .first()
                     )
 
-                    if rpm_module.version == str(module_for_pulp.version) \
-                        and module_in_pulp_db:
+                    if (
+                        rpm_module.version == str(module_for_pulp.version)
+                        and module_in_pulp_db
+                    ):
                         logging.info(
                             "Module already exists in Pulp, deleting current one: "
                             f"{rpm_module.name}:{rpm_module.stream}:"

@@ -4,8 +4,8 @@
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
-    create_async_engine,
     async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool
@@ -18,7 +18,7 @@ __all__ = [
     'SyncSession',
     'PulpAsyncSession',
     'PulpSession',
-    'engine'
+    'engine',
 ]
 
 
@@ -47,17 +47,14 @@ class PulpBase(AsyncAttrs, DeclarativeBase):
 
 
 pulp_async_engine = create_async_engine(
-    settings.pulp_async_database_url,
-    poolclass=NullPool,
-    echo_pool=True
+    settings.pulp_async_database_url, poolclass=NullPool, echo_pool=True
 )
-PulpAsyncSession = async_sessionmaker(pulp_async_engine, expire_on_commit=False)
+PulpAsyncSession = async_sessionmaker(
+    pulp_async_engine, expire_on_commit=False
+)
 
 pulp_engine = create_engine(
     settings.pulp_database_url, pool_pre_ping=True, pool_recycle=3600
 )
-pulp_session_factory = sessionmaker(
-    pulp_engine,
-    expire_on_commit=False
-)
+pulp_session_factory = sessionmaker(pulp_engine, expire_on_commit=False)
 PulpSession = scoped_session(pulp_session_factory)
