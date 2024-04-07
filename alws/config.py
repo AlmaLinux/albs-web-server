@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     pulp_database_url: str = (
         'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
     )
+    pulp_async_database_url: str = (
+        'postgresql+asyncpg://postgres:password@pulp:5432/pulp'
+    )
 
     alts_host: str = 'http://alts-scheduler:8000'
     alts_token: str
