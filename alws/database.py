@@ -4,17 +4,25 @@
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
-    AsyncSession,
     create_async_engine,
+    async_sessionmaker,
 )
 from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from alws.config import settings
 
-__all__ = ['Base', 'Session', 'SyncSession', 'PulpSession', 'engine']
+__all__ = [
+    'Base',
+    'Session',
+    'SyncSession',
+    'PulpAsyncSession',
+    'PulpSession',
+    'engine'
+]
 
 
+# ALBS db
 DATABASE_URL = settings.database_url
 
 engine = create_async_engine(DATABASE_URL, poolclass=NullPool, echo_pool=True)
@@ -29,16 +37,27 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 sync_session_factory = sessionmaker(sync_engine, expire_on_commit=False)
-Session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+Session = async_sessionmaker(engine, expire_on_commit=False)
 SyncSession = scoped_session(sync_session_factory)
 
 
+# Pulp db
 class PulpBase(AsyncAttrs, DeclarativeBase):
     __allow_unmapped__ = True
 
 
+pulp_async_engine = create_async_engine(
+    settings.pulp_async_database_url,
+    poolclass=NullPool,
+    echo_pool=True
+)
+PulpAsyncSession = async_sessionmaker(pulp_async_engine, expire_on_commit=False)
+
 pulp_engine = create_engine(
     settings.pulp_database_url, pool_pre_ping=True, pool_recycle=3600
 )
-pulp_session_factory = sessionmaker(pulp_engine, expire_on_commit=False)
+pulp_session_factory = sessionmaker(
+    pulp_engine,
+    expire_on_commit=False
+)
 PulpSession = scoped_session(pulp_session_factory)
