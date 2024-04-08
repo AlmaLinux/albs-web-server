@@ -34,17 +34,20 @@ async def main():
     module_content = None
     comps_content = None
     if args.modules_file:
-        with open(os.path.abspath(os.path.expanduser(
-                args.modules_file)), 'rt') as f:
+        with open(
+            os.path.abspath(os.path.expanduser(args.modules_file)), 'rt'
+        ) as f:
             module_content = UploadFile(BytesIO(f.read().encode('utf-8')))
     if args.comps_file:
-        with open(os.path.abspath(os.path.expanduser(
-                args.comps_file)), 'rt') as f:
+        with open(
+            os.path.abspath(os.path.expanduser(args.comps_file)), 'rt'
+        ) as f:
             comps_content = UploadFile(BytesIO(f.read().encode('utf-8')))
     async with asynccontextmanager(get_db)() as session:
         uploader = MetadataUploader(session, args.repo_name)
         await uploader.process_uploaded_files(
-            module_content, comps_content, dry_run=args.dry_run)
+            module_content, comps_content, dry_run=args.dry_run
+        )
     return 0
 
 

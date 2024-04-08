@@ -75,19 +75,25 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
-                pulp_module = pulp_session.execute(
-                    select(RpmModulemd).where(
-                        RpmModulemd.name == module.name,
-                        RpmModulemd.arch == module.arch,
-                        RpmModulemd.stream == module.stream,
-                        RpmModulemd.version == str(module.version),
-                        RpmModulemd.context == module.context,
+                pulp_module = (
+                    pulp_session.execute(
+                        select(RpmModulemd).where(
+                            RpmModulemd.name == module.name,
+                            RpmModulemd.arch == module.arch,
+                            RpmModulemd.stream == module.stream,
+                            RpmModulemd.version == str(module.version),
+                            RpmModulemd.context == module.context,
+                        )
                     )
-                ).scalars().first()
+                    .scalars()
+                    .first()
+                )
                 module_snippet = module.render()
                 if not pulp_module:
                     if dry_run:
-                        logging.info("DRY_RUN: Module is not present in Pulp, creating")
+                        logging.info(
+                            "DRY_RUN: Module is not present in Pulp, creating"
+                        )
                         continue
                     logging.info("Module is not present in Pulp, creating")
                     pulp_module_href = await self.pulp.create_module(
@@ -99,9 +105,7 @@ class MetadataUploader:
                         module.description,
                         version=module.version,
                         artifacts=module.get_rpm_artifacts(),
-                        dependencies=list(
-                            module.get_runtime_deps().values()
-                        ),
+                        dependencies=list(module.get_runtime_deps().values()),
                         packages=[],
                         profiles=module.get_profiles(),
                     )
@@ -117,18 +121,25 @@ class MetadataUploader:
                     db_modules.append(db_module)
                 else:
                     if dry_run:
-                        logging.info("DRY_RUN: Updating existing module in Pulp")
+                        logging.info(
+                            "DRY_RUN: Updating existing module in Pulp"
+                        )
                         continue
                     logging.info("Updating existing module in Pulp")
                     pulp_session.execute(
-                        update(RpmModulemd).where(
-                            RpmModulemd.content_ptr_id == pulp_module.content_ptr_id
-                        ).values(snippet=module_snippet)
+                        update(RpmModulemd)
+                        .where(
+                            RpmModulemd.content_ptr_id
+                            == pulp_module.content_ptr_id
+                        )
+                        .values(snippet=module_snippet)
                     )
                     pulp_session.execute(
-                        update(CoreContent).where(
+                        update(CoreContent)
+                        .where(
                             CoreContent.pulp_id == pulp_module.content_ptr_id
-                        ).values(pulp_last_updated=datetime.datetime.now())
+                        )
+                        .values(pulp_last_updated=datetime.datetime.now())
                     )
                     pulp_session.commit()
         if db_modules and not dry_run:
@@ -144,11 +155,21 @@ class MetadataUploader:
             if not re_result:
                 return
             re_result = re_result.groupdict()
-            build_tasks = (await self.session.execute(
-                select(models.BuildTask).where(
-                    models.BuildTask.build_id == int(re_result["build_id"]),
-                    models.BuildTask.arch == re_result["arch"],
-                ).options(selectinload(models.BuildTask.rpm_modules)))).scalars().all()
+            build_tasks = (
+                (
+                    await self.session.execute(
+                        select(models.BuildTask)
+                        .where(
+                            models.BuildTask.build_id
+                            == int(re_result["build_id"]),
+                            models.BuildTask.arch == re_result["arch"],
+                        )
+                        .options(selectinload(models.BuildTask.rpm_modules))
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for task in build_tasks:
                 task.rpm_modules = db_modules
                 self.session.add(task)
