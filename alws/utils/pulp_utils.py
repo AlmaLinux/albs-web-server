@@ -4,13 +4,16 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, load_only
 
+from alws.database import PulpAsyncSession
 from alws.dependencies import get_pulp_db
+from alws.models import RpmModule
 from alws.pulp_models import (
     CoreArtifact,
     CoreContent,
     CoreContentArtifact,
     CoreRepository,
     CoreRepositoryContent,
+    RpmModulemd,
     RpmPackage,
 )
 from alws.utils.modularity import IndexWrapper, get_modules_yaml_from_repo
@@ -261,3 +264,24 @@ def get_rpm_packages_by_checksums(
         for package in pulp_pkgs:
             result[package.sha256] = package
         return result
+
+
+async def get_module_from_pulp_db(
+    pulp_db: PulpAsyncSession,
+    module: RpmModule,
+) -> typing.Optional[RpmModulemd]:
+    return (
+        (
+            await pulp_db.execute(
+                select(RpmModulemd).where(
+                    RpmModulemd.name == module.name,
+                    RpmModulemd.stream == module.stream,
+                    RpmModulemd.version == module.version,
+                    RpmModulemd.context == module.context,
+                    RpmModulemd.arch == module.arch,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
