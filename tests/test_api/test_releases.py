@@ -46,6 +46,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         self,
         base_platform: models.Platform,
         user_product: models.Product,
+        get_empty_module_from_pulp_db,
         modular_build_done,
         modular_build_for_release: models.Build,
         get_pulp_packages_info,

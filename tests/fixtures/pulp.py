@@ -235,16 +235,14 @@ def modify_repository(monkeypatch):
             "parent_task": None,
             "child_tasks": [],
             "task_group": None,
-            "progress_reports": [
-                {
-                    "message": "Generating repository metadata",
-                    "code": "publish.generating_metadata",
-                    "state": "completed",
-                    "total": 1,
-                    "done": 1,
-                    "suffix": None,
-                }
-            ],
+            "progress_reports": [{
+                "message": "Generating repository metadata",
+                "code": "publish.generating_metadata",
+                "state": "completed",
+                "total": 1,
+                "done": 1,
+                "suffix": None,
+            }],
             "created_resources": [
                 f"/pulp/api/v3/publications/rpm/rpm/{uuid.uuid4()}/",
                 "/pulp/api/v3/repositories/rpm/rpm/78982ebd-68e5-42ff-9620-67023f26f399/versions/1/",
@@ -475,3 +473,11 @@ def get_modules(monkeypatch):
         return [{"pulp_href": get_module_href()}]
 
     monkeypatch.setattr(PulpClient, "get_modules", func)
+
+
+@pytest.fixture
+def get_empty_module_from_pulp_db(monkeypatch):
+    async def func(*args, **kwargs):
+        return
+
+    monkeypatch.setattr("alws.crud.build_node.get_module_from_pulp_db", func)

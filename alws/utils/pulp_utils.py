@@ -112,12 +112,10 @@ def get_rpm_module_packages_from_repository(
         .scalar_subquery()
     )
 
-    conditions.extend(
-        [
-            RpmPackage.content_ptr_id.in_(last_subq),
-            RpmPackage.release.in_(pkg_releases),
-        ]
-    )
+    conditions.extend([
+        RpmPackage.content_ptr_id.in_(last_subq),
+        RpmPackage.release.in_(pkg_releases),
+    ])
 
     query = select(RpmPackage).where(*conditions)
     with get_pulp_db() as pulp_db:
