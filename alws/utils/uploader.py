@@ -15,7 +15,7 @@ from alws import models
 from alws.config import settings
 from alws.dependencies import get_pulp_db
 from alws.errors import UploadError
-from alws.pulp_models import CoreContent, RpmModulemd
+from alws.pulp_models import CoreContent, RpmModulemd, RpmModulemdDefaults
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
 
@@ -72,6 +72,7 @@ class MetadataUploader:
     ):
         db_modules = []
         module_hrefs = []
+        defaults_hrefs = []
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
@@ -88,7 +89,18 @@ class MetadataUploader:
                     .scalars()
                     .first()
                 )
+                pulp_defaults = (
+                    pulp_session.execute(
+                        select(RpmModulemdDefaults).where(
+                            RpmModulemdDefaults.module == module.name,
+                            RpmModulemdDefaults.stream == module.stream,
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
                 module_snippet = module.render()
+                defaults_snippet = _index.get_module_defaults_as_str(module.name)
                 if not pulp_module:
                     if dry_run:
                         logging.info(
@@ -141,7 +153,38 @@ class MetadataUploader:
                         )
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
-                    pulp_session.commit()
+                default_profiles = _index.get_module_default_profiles(
+                    module.name, module.stream
+                )
+                if not pulp_defaults:
+
+                    href = await self.pulp.create_module_defaults(
+                        module.name,
+                        module.stream,
+                        default_profiles,
+                        defaults_snippet
+                    )
+                    defaults_hrefs.append(href)
+                else:
+                    pulp_session.execute(
+                        update(RpmModulemdDefaults)
+                        .where(
+                            RpmModulemdDefaults.content_ptr_id
+                            == pulp_defaults.content_ptr_id
+                        )
+                        .values(
+                            profiles=default_profiles,
+                            snippet=defaults_snippet
+                        )
+                    )
+                    pulp_session.execute(
+                        update(CoreContent)
+                        .where(
+                            CoreContent.pulp_id == pulp_defaults.content_ptr_id
+                        )
+                        .values(pulp_last_updated=datetime.datetime.now())
+                    )
+            pulp_session.commit()
         if db_modules and not dry_run:
             self.session.add_all(db_modules)
             await self.session.commit()
@@ -178,6 +221,9 @@ class MetadataUploader:
         if module_hrefs and not dry_run:
             logging.info("Adding created modules to repository")
             await self.pulp.modify_repository(repo_href, add=module_hrefs)
+        if defaults_hrefs and not dry_run:
+            logging.info("Adding created modules defaults to repository")
+            await self.pulp.modify_repository(repo_href, add=defaults_hrefs)
         if not dry_run:
             logging.info("Publishing new repository version")
             await self.pulp.create_rpm_publication(repo_href)
