@@ -18,7 +18,7 @@ from alws.constants import (
     ErrataPackageStatus,
     GitHubIssueStatus,
 )
-from alws.database import PulpAsyncSession
+from alws.dependencies import get_pulp_db
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -806,11 +806,8 @@ async def __process_build_task_artifacts(
                 # rebuilding failed tasks. At this point, we delete the current
                 # module in pulp db and a new final one will be properly
                 # created/pubished below.
-                async with PulpAsyncSession() as pulp_db, pulp_db.begin():
-                    module_in_pulp_db = await get_module_from_pulp_db(
-                        pulp_db,
-                        rpm_module,
-                    )
+                with get_pulp_db() as pulp_db:
+                    module_in_pulp_db = get_module_from_pulp_db(pulp_db, rpm_module)
                     if (
                         rpm_module.version == str(module_for_pulp.version)
                         and module_in_pulp_db
@@ -822,7 +819,8 @@ async def __process_build_task_artifacts(
                             f"{rpm_module.context}:{rpm_module.arch}) "
                             "before adding the new one."
                         )
-                        await pulp_db.delete(module_in_pulp_db)
+                        pulp_db.delete(module_in_pulp_db)
+                        pulp_db.commit()
 
                 module_for_pulp.version = int(module_version)
                 module_pulp_href = await pulp_client.create_module(
