@@ -117,6 +117,33 @@ async def move_issues(
         )
 
 
+async def close_issues(
+    record_ids: typing.Optional[typing.List[str]] = None,
+    build_ids: typing.Optional[typing.List[str]] = None,
+):
+    issues = []
+    github_client = await get_github_client()
+    if record_ids:
+        issues.extend(
+            await find_issues_by_record_id(
+                github_client,
+                record_ids,
+            )
+        )
+    if build_ids:
+        issues.extend(
+            await find_issues_by_build_id(
+                github_client=github_client,
+                build_ids=build_ids,
+            )
+        )
+    for issue in issues:
+        issue_id = issue["content"]["id"]
+        await github_client.close_issue(
+            issue_id=issue_id,
+        )
+
+
 async def get_github_issue_content_ids(
     github_client: IntegrationsGHGraphQLClient,
     query: str,
