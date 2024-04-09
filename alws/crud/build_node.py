@@ -18,6 +18,7 @@ from alws.constants import (
     ErrataPackageStatus,
     GitHubIssueStatus,
 )
+from alws.database import PulpAsyncSession
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -39,6 +40,7 @@ from alws.utils.multilib import MultilibProcessor
 from alws.utils.noarch import save_noarch_packages
 from alws.utils.parsing import clean_release, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import get_module_from_pulp_db
 from alws.utils.rpm_package import get_rpm_packages_info
 
 
@@ -785,34 +787,44 @@ async def __process_build_task_artifacts(
                 module_version = rpm_module.version
             else:
                 module_version = get_random_unique_version()
+
             try:
                 module_for_pulp = module_index.get_module(
                     rpm_module.name,
                     rpm_module.stream,
                 )
+                logging.debug("final module version: %s", rpm_module.version)
+                logging.debug(
+                    "current version in repo %s",
+                    module_for_pulp.version,
+                )
+                logging.debug(
+                    "about to set module version to %s",
+                    module_version,
+                )
+                # If the final module is already in pulp, it's because we are
+                # rebuilding failed tasks. At this point, we delete the current
+                # module in pulp db and a new final one will be properly
+                # created/pubished below.
+                async with PulpAsyncSession() as pulp_db, pulp_db.begin():
+                    module_in_pulp_db = await get_module_from_pulp_db(
+                        pulp_db,
+                        rpm_module,
+                    )
+                    if (
+                        rpm_module.version == str(module_for_pulp.version)
+                        and module_in_pulp_db
+                    ):
+                        logging.info(
+                            "Module already exists in Pulp, delete current one ("
+                            f"{rpm_module.name}:{rpm_module.stream}:"
+                            f"{rpm_module.version}:"
+                            f"{rpm_module.context}:{rpm_module.arch}) "
+                            "before adding the new one."
+                        )
+                        await pulp_db.delete(module_in_pulp_db)
+
                 module_for_pulp.version = int(module_version)
-
-                # TODO: Pass module_pkgs_hrefs in packages field when
-                # https://github.com/pulp/pulp_rpm/issues/3427 is fixed.
-                # Then, the following commented code should work as is.
-                # Shall we consider multilib pkgs here?
-                # In any case, and as a temporary solution, we can manually
-                # create the corresponding rpm_module_packages in pulp and link
-                # them to the modules.
-                # module_for_pulp_rpms = []
-                # for rpm in module_for_pulp.get_rpm_artifacts():
-                #    nevra = parse_rpm_nevra(rpm)
-                #    module_for_pulp_rpms.append(
-                #        f'{nevra.name}-{nevra.version}-{nevra.release}.{nevra.arch}'
-                #    )
-                # logging.info(f'{module_for_pulp_rpms=}')
-                # module_pkgs_hrefs = [
-                #    rpm_entry.href
-                #    for rpm_entry in rpm_entries
-                #    if rpm_entry.name.replace('.rpm', '') in module_for_pulp_rpms
-                # ]
-                # logging.info(f'{module_pkgs_hrefs=}')
-
                 module_pulp_href = await pulp_client.create_module(
                     module_for_pulp.render(),
                     rpm_module.name,

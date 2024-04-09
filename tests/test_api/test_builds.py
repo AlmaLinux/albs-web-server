@@ -108,6 +108,7 @@ class TestModularBuilds(BaseAsyncTestCase):
         multilib_virt_with_artifacts: str,
         modules_artifacts: dict,
         virt_modular_build: Build,
+        get_empty_module_from_pulp_db,
         virt_build_done,
         tmp_path,
     ):
@@ -149,6 +150,7 @@ class TestModularBuilds(BaseAsyncTestCase):
         multilib_ruby_with_artifacts: str,
         modules_artifacts: dict,
         ruby_modular_build: Build,
+        get_empty_module_from_pulp_db,
         ruby_build_done,
         tmp_path,
     ):
@@ -190,6 +192,7 @@ class TestModularBuilds(BaseAsyncTestCase):
         multilib_subversion_with_artifacts: str,
         modules_artifacts: dict,
         subversion_modular_build: Build,
+        get_empty_module_from_pulp_db,
         subversion_build_done,
         tmp_path,
     ):
@@ -230,6 +233,7 @@ class TestModularBuilds(BaseAsyncTestCase):
         multilib_llvm_with_artifacts: str,
         modules_artifacts: dict,
         llvm_modular_build: Build,
+        get_empty_module_from_pulp_db,
         llvm_build_done,
         tmp_path,
     ):
