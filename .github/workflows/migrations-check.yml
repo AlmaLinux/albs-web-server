@@ -64,6 +64,4 @@ jobs:
             db
             web_server
       - name: Check migratrions
-        run: docker-compose run --rm --no-deps web_server bash -c 'source
-          env/bin/activate && pip3 install -r requirements.txt &&
-          alembic --config alws/alembic.ini upgrade head'
+        run: docker-compose run --rm --no-deps web_server alembic --config alws/alembic.ini upgrade head

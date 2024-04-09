@@ -42,10 +42,11 @@ services:
     environment:
       CELERY_CONFIG_PATH: "/celery_config.yaml"
       EXTERNAL_NETWORK: "albs-web-server_default"
-    command: "celery -A alts.worker.app worker
-                --pool=threads --concurrency=20
-                --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
-                --without-mingle --without-heartbeat"
+    command:
+      celery -A alts.worker.app worker
+        --pool=threads --concurrency=20
+        --loglevel=INFO -Q docker-x86_64-0 -O fair --without-gossip
+        --without-mingle --without-heartbeat
     restart: on-failure
     privileged: true
     volumes:
@@ -72,9 +73,11 @@ services:
     environment:
       CELERY_CONFIG_PATH: "/scheduler_config.yaml"
       SCHEDULER_CONFIG_PATH: "/scheduler_config.yaml"
-    command: "bash -c '
-                /wait-for-it.sh web_server:8000 && \
-                uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000'"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh web_server:8000
+        uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000"
     restart: on-failure
     volumes:
       - "../alts/configs/alts_config.yaml:/scheduler_config.yaml"
@@ -90,7 +93,7 @@ services:
         max-file: "3"
 
   web_server:
-    image: quay.io/almalinuxorg/albs:latest
+    image: albs-web-server:latest
     env_file:
       - vars.env
     ports:
@@ -100,19 +103,15 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-      - "./tests:/code/tests"
-      - "./almalinux:/code/almalinux"
       - "./scripts:/code/scripts"
-      - "../volumes/pulp/exports:/srv/exports"
       - "./reference_data:/code/reference_data"
-    command:
-      bash -c 'source env/bin/activate &&
-               /wait_for_it.sh db:5432 &&
-               PYTHONPATH="." alembic --config alws/alembic.ini upgrade head &&
-               pip3 install --upgrade pip &&
-               pip3 install -r requirements.txt &&
-               uvicorn --host 0.0.0.0 alws.app:app'
+      - "../volumes/pulp/exports:/srv/exports"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh db:5432
+        PYTHONPATH=. alembic --config alws/alembic.ini upgrade head
+        uvicorn --host 0.0.0.0 alws.app:app"
     restart: on-failure
     depends_on:
       - db
@@ -124,7 +123,7 @@ services:
         max-file: "3"
 
   task_queue:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -132,15 +131,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./tests:/code/tests"
-      - "./scripts:/code/scripts"
-      - "./reference_data:/code/reference_data"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      /wait_for_it.sh rabbitmq:5672 &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --threads 1 -Q default'
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --threads 1 -Q default"
     restart: on-failure
     depends_on:
       - db
@@ -153,7 +148,7 @@ services:
         max-file: "3"
 
   task_queue_builds:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -161,12 +156,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      /wait_for_it.sh rabbitmq:5672 &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --threads 1 -Q builds'
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --threads 1 -Q builds"
     restart: on-failure
     depends_on:
       - db
@@ -179,7 +173,7 @@ services:
         max-file: "3"
 
   task_queue_errata:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -187,12 +181,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      /wait_for_it.sh rabbitmq:5672 &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q errata'
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --processes 1 --threads 1 -Q errata"
     restart: on-failure
     depends_on:
       - db
@@ -205,7 +198,7 @@ services:
         max-file: "3"
 
   task_queue_releases:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -213,12 +206,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      /wait_for_it.sh rabbitmq:5672 &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases'
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --processes 1 --threads 1 -Q releases"
     restart: on-failure
     depends_on:
       - db
@@ -231,7 +223,7 @@ services:
         max-file: "3"
 
   task_queue_sign:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -239,11 +231,7 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign'
+    command: dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign
     restart: on-failure
     logging:
       driver: "json-file"
@@ -252,7 +240,7 @@ services:
         max-file: "3"
 
   task_queue_product_modify:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -260,11 +248,7 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify'
+    command: dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify
     restart: on-failure
     logging:
       driver: "json-file"
@@ -273,7 +257,7 @@ services:
         max-file: "3"
 
   task_queue_tests:
-    image: quay.io/almalinuxorg/task-queue:latest
+    image: task-queue:latest
     env_file:
       - vars.env
     build:
@@ -281,12 +265,11 @@ services:
       context: .
     volumes:
       - "./alws:/code/alws"
-      - "./requirements.txt:/code/requirements.txt"
-    command: bash -c 'source env/bin/activate &&
-                      /wait_for_it.sh rabbitmq:5672 &&
-                      pip3 install --upgrade pip &&
-                      pip3 install -r requirements.txt --no-cache-dir &&
-                      dramatiq alws.dramatiq --processes 1 --threads 1 -Q tests'
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --processes 1 --threads 1 -Q tests"
     restart: on-failure
     depends_on:
       - db
@@ -332,7 +315,11 @@ services:
       - "../albs-node/build_node:/build-node/build_node"
       - "../albs-node/almalinux_build_node.py:/build-node/almalinux_build_node.py"
     restart: on-failure
-    command: "bash -c '/wait-for-it.sh web_server:8000 && python3 almalinux_build_node.py -v -t 2'"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh web_server:8000
+        python3 almalinux_build_node.py -v -t 2"
     depends_on:
       - web_server
     logging:
@@ -355,7 +342,11 @@ services:
       - "../albs-sign-node/almalinux_sign_node.py:/sign-node/almalinux_sign_node.py"
       - "../albs-sign-node/sign_node:/sign-node/sign_node"
     restart: on-failure
-    command: "bash -c '/wait-for-it.sh web_server:8000 && python3 almalinux_sign_node.py -v'"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh web_server:8000
+        python3 almalinux_sign_node.py -v"
     depends_on:
       - web_server
     logging:
@@ -365,7 +356,7 @@ services:
         max-file: "3"
 
   gitea_listener:
-    image: quay.io/almalinuxorg/gitea-listener:latest
+    image: gitea-listener:latest
     build:
       dockerfile: Dockerfile.gitea-listener
       context: .
@@ -380,7 +371,7 @@ services:
       - "./alws/scripts/albs-gitea-listener/albs-gitea-listener-config.yaml:/code/albs-gitea-listener-config.yaml"
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
       - "./alws:/code/alws"
-      - "./alws/scripts/albs-gitea-listener/requirements.txt:/code/requirements.txt"
+    command: python3 gitea_listener.py
     logging:
       driver: "json-file"
       options:
@@ -400,7 +391,7 @@ services:
     volumes:
       - "./alws:/code/alws"
       - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
-      - "./alws/scripts/git_cacher/requirements.txt:/code/requirements.txt"
+    command: python3 git_cacher.py
     logging:
       driver: "json-file"
       options:
@@ -418,7 +409,11 @@ services:
       - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
       - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
       - "../alma-tests-cacher/vars.yaml:/code/vars.yaml"
-    command: "bash -c '/wait-for-it.sh web_server:8000 && python3 alma_tests_cacher.py'"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh web_server:8000
+        python3 alma_tests_cacher.py"
     depends_on:
       - web_server
     logging:
@@ -515,8 +510,12 @@ services:
       context: ../albs-sign-file
       dockerfile: Dockerfile
       target: sign-file
-    env_file: "../albs-sign-file/.env"
-    command: "bash -c 'python3 db_manage.py dev_init && python3 start.py'"
+    env_file: ../albs-sign-file/.env
+    command: |
+      bash -c "
+        set -ex
+        python3 db_manage.py dev_init
+        python3 start.py"
     restart: on-failure
     volumes:
       - "${SF_HOST_GNUPG:-~/.gnupg}:/root/.gnupg"
