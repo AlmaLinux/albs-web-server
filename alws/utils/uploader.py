@@ -8,12 +8,7 @@ import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
-from sqlalchemy import (
-    and_,
-    or_,
-    select,
-    update,
-)
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -251,18 +246,18 @@ class MetadataUploader:
                 self.session.add(task)
             await self.session.commit()
 
-        if module_hrefs and not dry_run:
+        final_additions = module_hrefs.copy()
+        if defaults_hrefs:
+            final_additions.extend(defaults_hrefs)
+        if final_additions and not dry_run:
             logging.info("Getting information about repository")
             modules_in_version = await self.pulp.get_repo_modules(repo_href)
             logging.info("Deleting previous listed modules")
             await self.pulp.modify_repository(
                 repo_href, remove=modules_in_version
             )
-            logging.info("Adding created modules to repository")
-            await self.pulp.modify_repository(repo_href, add=module_hrefs)
-        if defaults_hrefs and not dry_run:
-            logging.info("Adding created modules defaults to repository")
-            await self.pulp.modify_repository(repo_href, add=defaults_hrefs)
+            logging.info("Adding modules and defaults to repository")
+            await self.pulp.modify_repository(repo_href, add=final_additions)
         if not dry_run:
             logging.info("Publishing new repository version")
             await self.pulp.create_rpm_publication(repo_href)
