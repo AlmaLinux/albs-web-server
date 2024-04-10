@@ -176,6 +176,7 @@ class MetadataUploader:
                 default_profiles = _index.get_module_default_profiles(
                     module.name, module.stream
                 )
+                href = None
                 if not pulp_defaults and defaults_snippet and default_profiles:
                     href = await self.pulp.create_module_defaults(
                         module.name,
@@ -204,7 +205,8 @@ class MetadataUploader:
                     )
                     href = (f'/pulp/api/v3/content/rpm/modulemd_defaults/'
                             f'{pulp_defaults.content_ptr_id}/')
-                defaults_hrefs.append(href)
+                if href:
+                    defaults_hrefs.append(href)
             pulp_session.commit()
         if db_modules and not dry_run:
             self.session.add_all(db_modules)
