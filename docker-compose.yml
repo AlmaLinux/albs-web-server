@@ -105,6 +105,7 @@ services:
       - "./alws:/code/alws"
       - "./scripts:/code/scripts"
       - "./reference_data:/code/reference_data"
+      - "./tests:/code/tests"
       - "../volumes/pulp/exports:/srv/exports"
     command: |
       bash -c "
