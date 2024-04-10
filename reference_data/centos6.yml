@@ -1,0 +1,49 @@
+---
+- name: CentOS6
+  distr_type: rhel
+  distr_version: '6'
+  contact_mail: packager@almalinux.org
+  copyright: Copyright {{ year }} AlmaLinux OS
+  test_dist_name: centos
+  type: rpm
+  arch_list:
+    - x86_64
+  copy_priority_arches:
+    - x86_64
+  weak_arch_list:
+  data:
+    definitions:
+      distribution: AlmaLinux
+      packager: AlmaLinux Packaging Team <packager@almalinux.org>
+      vendor: AlmaLinux
+    mock:
+      chroot_setup_cmd: install bash bzip2 coreutils centos-release cpio
+        diffutils findutils gawk gcc gcc-c++ grep gzip info make patch python
+        redhat-rpm-config rpm-build sed shadow-utils tar unzip util-linux-ng
+        which xz git
+      package_manager: yum
+      releasever: '6'
+      use_bootstrap_container: false
+      use_nspawn: false
+      dnf_warning: false
+    mock_dist: el6
+    timeout: 43200
+  repositories:
+    - arch: x86_64
+      name: centos-6-os
+      type: rpm
+      remote_url: https://vault.centos.org/6.10/os/x86_64/
+      export_path: centos/6/os/x86_64/
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: x86_64
+      name: centos-6-updates
+      type: rpm
+      remote_url: https://vault.centos.org/6.10/updates/x86_64/
+      export_path: centos/6/updates/x86_64/
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
