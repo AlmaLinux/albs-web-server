@@ -19,7 +19,7 @@
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
       vendor: AlmaLinux
     mock:
-      chroot_setup_cmd: install bash bzip2 coreutils cloudlinux-release 
+      chroot_setup_cmd: install bash bzip2 coreutils centos-release 
         findutils gawk grep gzip info redhat-rpm-config 
         sed shadow-utils tar unzip util-linux-ng which xz yum git
       dnf_common_opts:
