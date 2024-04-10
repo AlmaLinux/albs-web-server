@@ -62,9 +62,9 @@ jobs:
         run: docker compose up -d --no-deps web_server db
       - name: Run unit tests (pytest)
         run: docker compose run -v /tmp:/tmp --no-deps web_server bash -o pipefail -c '
-          pytest -v --cov --cov-report term-missing:skip-covered
-          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml
-          | tee /tmp/pytest-coverage.txt'
+          pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
+          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
+          tests/ | tee /tmp/pytest-coverage.txt'
       - name: Stop services
         run: docker compose down --volumes
       - name: Pytest coverage comment
