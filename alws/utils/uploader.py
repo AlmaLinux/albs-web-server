@@ -127,7 +127,7 @@ class MetadataUploader:
                         stream=module.stream,
                         context=module.context,
                         arch=module.arch,
-                        version=module.version,
+                        version=str(module.version),
                         pulp_href=pulp_href,
                     )
                     db_modules.append(db_module)
