@@ -252,12 +252,10 @@ class MetadataUploader:
         if final_additions and not dry_run:
             logging.info("Getting information about repository")
             modules_in_version = await self.pulp.get_repo_modules(repo_href)
-            logging.info("Deleting previous listed modules")
-            await self.pulp.modify_repository(
-                repo_href, remove=modules_in_version
-            )
             logging.info("Adding modules and defaults to repository")
-            await self.pulp.modify_repository(repo_href, add=final_additions)
+            await self.pulp.modify_repository(
+                repo_href, add=final_additions, remove=modules_in_version,
+            )
         if not dry_run:
             logging.info("Publishing new repository version")
             await self.pulp.create_rpm_publication(repo_href)
