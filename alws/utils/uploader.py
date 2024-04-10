@@ -82,10 +82,6 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
-                defaults_snippet = _index.get_module_defaults_as_str(module.name)
-                defaults_checksum = hashlib.sha256(
-                    defaults_snippet.encode('utf-8')
-                ).hexdigest()
                 pulp_module = (
                     pulp_session.execute(
                         select(RpmModulemd).where(
@@ -102,11 +98,11 @@ class MetadataUploader:
                 pulp_defaults = (
                     pulp_session.execute(
                         select(RpmModulemdDefaults).where(
-                            and_(
+                            or_(
                                 RpmModulemdDefaults.module == module.name,
-                                or_(
-                                    RpmModulemdDefaults.digest == None,
-                                    RpmModulemdDefaults.digest == defaults_checksum,
+                                and_(
+                                    RpmModulemdDefaults.module == module.name,
+                                    RpmModulemdDefaults.stream == module.stream,
                                 )
                             )
                         )
@@ -177,6 +173,10 @@ class MetadataUploader:
                     module.name, module.stream
                 )
                 href = None
+                defaults_snippet = _index.get_module_defaults_as_str(module.name)
+                defaults_checksum = hashlib.sha256(
+                    defaults_snippet.encode('utf-8')
+                ).hexdigest()
                 if not pulp_defaults and defaults_snippet and default_profiles:
                     href = await self.pulp.create_module_defaults(
                         module.name,
@@ -193,7 +193,8 @@ class MetadataUploader:
                         )
                         .values(
                             profiles=default_profiles,
-                            snippet=defaults_snippet
+                            snippet=defaults_snippet,
+                            digest=defaults_checksum,
                         )
                     )
                     pulp_session.execute(
