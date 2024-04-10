@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import io
 import logging
 import re
@@ -7,7 +8,12 @@ import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
-from sqlalchemy import select, update
+from sqlalchemy import (
+    and_,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -76,6 +82,10 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
+                defaults_snippet = _index.get_module_defaults_as_str(module.name)
+                defaults_checksum = hashlib.sha256(
+                    defaults_snippet.encode('utf-8')
+                ).hexdigest()
                 pulp_module = (
                     pulp_session.execute(
                         select(RpmModulemd).where(
@@ -92,16 +102,19 @@ class MetadataUploader:
                 pulp_defaults = (
                     pulp_session.execute(
                         select(RpmModulemdDefaults).where(
-                            RpmModulemdDefaults.module == module.name,
-                            RpmModulemdDefaults.stream == module.stream,
+                            and_(
+                                RpmModulemdDefaults.module == module.name,
+                                or_(
+                                    RpmModulemdDefaults.digest == None,
+                                    RpmModulemdDefaults.digest == defaults_checksum,
+                                )
+                            )
                         )
                     )
                     .scalars()
                     .first()
                 )
                 module_snippet = module.render()
-                module_description = module.description
-                defaults_snippet = _index.get_module_defaults_as_str(module.name)
                 if not pulp_module:
                     if dry_run:
                         logging.info(
@@ -146,7 +159,7 @@ class MetadataUploader:
                         )
                         .values(
                             snippet=module_snippet,
-                            description=module_description,
+                            description=module.description,
                         )
                     )
                     pulp_session.execute(
@@ -157,20 +170,20 @@ class MetadataUploader:
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
                     pulp_href = (f'/pulp/api/v3/content/rpm/modulemds/'
-                                 f'{pulp_module.content_ptr_id}')
+                                 f'{pulp_module.content_ptr_id}/')
                 module_hrefs.append(pulp_href)
 
                 default_profiles = _index.get_module_default_profiles(
                     module.name, module.stream
                 )
-                if not pulp_defaults:
+                if not pulp_defaults and defaults_snippet and default_profiles:
                     href = await self.pulp.create_module_defaults(
                         module.name,
                         module.stream,
                         default_profiles,
                         defaults_snippet
                     )
-                else:
+                elif pulp_defaults and defaults_snippet and default_profiles:
                     pulp_session.execute(
                         update(RpmModulemdDefaults)
                         .where(
@@ -190,7 +203,7 @@ class MetadataUploader:
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
                     href = (f'/pulp/api/v3/content/rpm/modulemd_defaults/'
-                            f'{pulp_defaults.content_ptr_id}')
+                            f'{pulp_defaults.content_ptr_id}/')
                 defaults_hrefs.append(href)
             pulp_session.commit()
         if db_modules and not dry_run:
