@@ -45,6 +45,7 @@ jobs:
           echo FASTAPI_SQLA__PULP__SQLALCHEMY_POOL_RECYCLE=3600 >> ./vars.env
           echo FASTAPI_SQLA__ASYNC__SQLALCHEMY_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo FASTAPI_SQLA__ASYNC__SQLALCHEMY_ECHO_POOL=True >> ./vars.env
+          echo FASTAPI_SQLA__TEST__SQLALCHEMY_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo SQLALCHEMY_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
           echo SQLALCHEMY_POOL_PRE_PING=True >> ./vars.env
           echo SQLALCHEMY_POOL_RECYCLE=3600 >> ./vars.env
