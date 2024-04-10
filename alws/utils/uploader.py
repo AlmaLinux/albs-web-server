@@ -100,6 +100,7 @@ class MetadataUploader:
                     .first()
                 )
                 module_snippet = module.render()
+                module_description = module.description
                 defaults_snippet = _index.get_module_defaults_as_str(module.name)
                 if not pulp_module:
                     if dry_run:
@@ -108,7 +109,7 @@ class MetadataUploader:
                         )
                         continue
                     logging.info("Module is not present in Pulp, creating")
-                    pulp_module_href = await self.pulp.create_module(
+                    pulp_href = await self.pulp.create_module(
                         module_snippet,
                         module.name,
                         module.stream,
@@ -121,14 +122,13 @@ class MetadataUploader:
                         packages=[],
                         profiles=module.get_profiles(),
                     )
-                    module_hrefs.append(pulp_module_href)
                     db_module = models.RpmModule(
                         name=module.name,
                         stream=module.stream,
                         context=module.context,
                         arch=module.arch,
                         version=module.version,
-                        pulp_href=pulp_module_href,
+                        pulp_href=pulp_href,
                     )
                     db_modules.append(db_module)
                 else:
@@ -144,7 +144,10 @@ class MetadataUploader:
                             RpmModulemd.content_ptr_id
                             == pulp_module.content_ptr_id
                         )
-                        .values(snippet=module_snippet)
+                        .values(
+                            snippet=module_snippet,
+                            description=module_description,
+                        )
                     )
                     pulp_session.execute(
                         update(CoreContent)
@@ -153,18 +156,20 @@ class MetadataUploader:
                         )
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
+                    pulp_href = (f'/pulp/api/v3/content/rpm/modulemds/'
+                                 f'{pulp_module.content_ptr_id}')
+                module_hrefs.append(pulp_href)
+
                 default_profiles = _index.get_module_default_profiles(
                     module.name, module.stream
                 )
                 if not pulp_defaults:
-
                     href = await self.pulp.create_module_defaults(
                         module.name,
                         module.stream,
                         default_profiles,
                         defaults_snippet
                     )
-                    defaults_hrefs.append(href)
                 else:
                     pulp_session.execute(
                         update(RpmModulemdDefaults)
@@ -184,6 +189,9 @@ class MetadataUploader:
                         )
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
+                    href = (f'/pulp/api/v3/content/rpm/modulemd_defaults/'
+                            f'{pulp_defaults.content_ptr_id}')
+                defaults_hrefs.append(href)
             pulp_session.commit()
         if db_modules and not dry_run:
             self.session.add_all(db_modules)
@@ -219,6 +227,12 @@ class MetadataUploader:
             await self.session.commit()
 
         if module_hrefs and not dry_run:
+            logging.info("Getting information about repository")
+            modules_in_version = await self.pulp.get_repo_modules(repo_href)
+            logging.info("Deleting previous listed modules")
+            await self.pulp.modify_repository(
+                repo_href, remove=modules_in_version
+            )
             logging.info("Adding created modules to repository")
             await self.pulp.modify_repository(repo_href, add=module_hrefs)
         if defaults_hrefs and not dry_run:
