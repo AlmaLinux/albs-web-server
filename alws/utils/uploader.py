@@ -82,6 +82,10 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
+                defaults_snippet = _index.get_module_defaults_as_str(module.name)
+                defaults_checksum = hashlib.sha256(
+                    defaults_snippet.encode('utf-8')
+                ).hexdigest()
                 pulp_module = (
                     pulp_session.execute(
                         select(RpmModulemd).where(
@@ -95,21 +99,30 @@ class MetadataUploader:
                     .scalars()
                     .first()
                 )
-                pulp_defaults = (
-                    pulp_session.execute(
-                        select(RpmModulemdDefaults).where(
-                            or_(
-                                RpmModulemdDefaults.module == module.name,
-                                and_(
-                                    RpmModulemdDefaults.module == module.name,
-                                    RpmModulemdDefaults.stream == module.stream,
-                                )
-                            )
-                        )
+                conditions = [
+                    (
+                        RpmModulemdDefaults.module == module.name,
+                        RpmModulemdDefaults.digest == defaults_checksum,
+                    ),
+                    (
+                        RpmModulemdDefaults.module == module.name,
+                        RpmModulemdDefaults.stream == module.stream,
+                    ),
+                    (
+                        RpmModulemdDefaults.module == module.name,
                     )
-                    .scalars()
-                    .first()
-                )
+                ]
+                pulp_defaults = None
+                for cond in conditions:
+                    pulp_defaults = (
+                        pulp_session.execute(
+                            select(RpmModulemdDefaults).where(*cond)
+                        )
+                        .scalars()
+                        .first()
+                    )
+                    if pulp_defaults:
+                        break
                 module_snippet = module.render()
                 if not pulp_module:
                     if dry_run:
@@ -169,14 +182,10 @@ class MetadataUploader:
                                  f'{pulp_module.content_ptr_id}/')
                 module_hrefs.append(pulp_href)
 
+                href = None
                 default_profiles = _index.get_module_default_profiles(
                     module.name, module.stream
                 )
-                href = None
-                defaults_snippet = _index.get_module_defaults_as_str(module.name)
-                defaults_checksum = hashlib.sha256(
-                    defaults_snippet.encode('utf-8')
-                ).hexdigest()
                 if not pulp_defaults and defaults_snippet and default_profiles:
                     href = await self.pulp.create_module_defaults(
                         module.name,
