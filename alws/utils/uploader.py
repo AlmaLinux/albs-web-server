@@ -105,7 +105,7 @@ class MetadataUploader:
                         RpmModulemdDefaults.module == module.name,
                         RpmModulemdDefaults.stream == module.stream,
                     ),
-                    (RpmModulemdDefaults.module == module.name,)
+                    (RpmModulemdDefaults.module == module.name,),
                 ]
                 pulp_defaults = None
                 for cond in conditions:
