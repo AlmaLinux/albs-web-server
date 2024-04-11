@@ -77,7 +77,9 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
-                defaults_snippet = _index.get_module_defaults_as_str(module.name)
+                defaults_snippet = _index.get_module_defaults_as_str(
+                    module.name
+                )
                 defaults_checksum = hashlib.sha256(
                     defaults_snippet.encode('utf-8')
                 ).hexdigest()
@@ -103,9 +105,7 @@ class MetadataUploader:
                         RpmModulemdDefaults.module == module.name,
                         RpmModulemdDefaults.stream == module.stream,
                     ),
-                    (
-                        RpmModulemdDefaults.module == module.name,
-                    )
+                    (RpmModulemdDefaults.module == module.name,)
                 ]
                 pulp_defaults = None
                 for cond in conditions:
@@ -173,8 +173,10 @@ class MetadataUploader:
                         )
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
-                    pulp_href = (f'/pulp/api/v3/content/rpm/modulemds/'
-                                 f'{pulp_module.content_ptr_id}/')
+                    pulp_href = (
+                        f'/pulp/api/v3/content/rpm/modulemds/'
+                        f'{pulp_module.content_ptr_id}/'
+                    )
                 module_hrefs.append(pulp_href)
 
                 href = None
@@ -186,7 +188,7 @@ class MetadataUploader:
                         module.name,
                         module.stream,
                         default_profiles,
-                        defaults_snippet
+                        defaults_snippet,
                     )
                 elif pulp_defaults and defaults_snippet and default_profiles:
                     pulp_session.execute(
@@ -208,8 +210,10 @@ class MetadataUploader:
                         )
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
-                    href = (f'/pulp/api/v3/content/rpm/modulemd_defaults/'
-                            f'{pulp_defaults.content_ptr_id}/')
+                    href = (
+                        f'/pulp/api/v3/content/rpm/modulemd_defaults/'
+                        f'{pulp_defaults.content_ptr_id}/'
+                    )
                 if href:
                     defaults_hrefs.append(href)
             pulp_session.commit()
@@ -254,7 +258,9 @@ class MetadataUploader:
             modules_in_version = await self.pulp.get_repo_modules(repo_href)
             logging.info("Adding modules and defaults to repository")
             await self.pulp.modify_repository(
-                repo_href, add=final_additions, remove=modules_in_version,
+                repo_href,
+                add=final_additions,
+                remove=modules_in_version,
             )
         if not dry_run:
             logging.info("Publishing new repository version")
