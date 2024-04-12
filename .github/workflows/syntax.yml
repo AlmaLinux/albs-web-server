@@ -18,21 +18,17 @@ jobs:
         with:
           files: |
             **/*.py
-      - name: Prepare python env
+      - name: Install python packages
         if: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          python -m venv env
-          source env/bin/activate
-          pip install -U pip
-          pip install -r requirements.txt
+        run: pip install -r requirements-tests.txt
       - name: Run pylint
         id: pylint
         if: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          delimiter='$(openssl rand -hex 8)'
-          echo 'report<<$(delimiter)' >> $GITHUB_OUTPUT
-          env/bin/pylint ${{ steps.changed-files.outputs.all_changed_files }} --py-version 3.9 --exit-zero >> $GITHUB_OUTPUT
-          echo '$(delimiter)' >> $GITHUB_OUTPUT
+          delimiter=$(openssl rand -hex 8)
+          echo "report<<$delimiter" >> $GITHUB_OUTPUT
+          pylint ${{ steps.changed-files.outputs.all_changed_files }} --py-version 3.9 --exit-zero >> $GITHUB_OUTPUT
+          echo $delimiter >> $GITHUB_OUTPUT
       - name: Post pylint output
         uses: mshick/add-pr-comment@v2
         if: ${{ steps.changed-files.outputs.all_changed_files }}
@@ -48,7 +44,7 @@ jobs:
           message-id: pylint-report
       - name: Run black
         if: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: env/bin/black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alws/alembic --check --diff --color --target-version py39
+        run: black ${{ steps.changed-files.outputs.all_changed_files }} --exclude alws/alembic --check --diff --color --target-version py39
       - name: Run isort
         if: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: env/bin/isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39
+        run: isort ${{ steps.changed-files.outputs.all_changed_files }} --diff --color --check-only --py 39

@@ -11,63 +11,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        name: Check out repository
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Create dirs and files
         run: |
-          mkdir -p /home/runner/work/albs-web-server/alts
-          mkdir -p /home/runner/work/albs-web-server/albs-frontend
-          mkdir -p /home/runner/work/albs-web-server/albs-node
-          mkdir -p /home/runner/work/albs-web-server/albs-sign-file
-          mkdir -p /home/runner/work/albs-web-server/albs-sign-node
-          mkdir -p /home/runner/work/albs-web-server/alma-tests-cacher
-          touch /home/runner/work/albs-web-server/alma-tests-cacher/vars.env
-          touch /home/runner/work/albs-web-server/albs-sign-file/.env
-      - name: Add env file
-        run: |
-          touch ./vars.env
-          echo ALTS_TOKEN="secret" >> ./vars.env
-          echo ALMALINUX_CLIENT="secret" >> ./vars.env
-          echo ALMALINUX_CLIENT_SECRET="secret" >> ./vars.env
-          echo GITHUB_CLIENT="secret" >> ./vars.env
-          echo GITHUB_CLIENT_SECRET="secret" >> ./vars.env
-          echo POSTGRES_PASSWORD="password" >> ./vars.env
-          echo JWT_SECRET="secret" >> ./vars.env
-          echo POSTGRES_DB="test-almalinux-bs" >> ./vars.env
-          echo PACKAGE_BEHOLDER_ENABLED="False" >> ./vars.env
-          echo DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo FASTAPI_SQLA__PULP__SQLALCHEMY_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo FASTAPI_SQLA__PULP__SQLALCHEMY_POOL_PRE_PING=True >> ./vars.env
-          echo FASTAPI_SQLA__PULP__SQLALCHEMY_POOL_RECYCLE=3600 >> ./vars.env
-          echo FASTAPI_SQLA__ASYNC__SQLALCHEMY_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo FASTAPI_SQLA__ASYNC__SQLALCHEMY_ECHO_POOL=True >> ./vars.env
-          echo FASTAPI_SQLA__TEST__SQLALCHEMY_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo SQLALCHEMY_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs" >> ./vars.env
-          echo SQLALCHEMY_POOL_PRE_PING=True >> ./vars.env
-          echo SQLALCHEMY_POOL_RECYCLE=3600 >> ./vars.env
-          cat alws/alembic.ini | sed 's/almalinux-bs/test-almalinux-bs/' | tee alws/alembic.ini
+          mkdir -p ../{alts,albs-frontend,albs-node,albs-sign-file,albs-sign-node,alma-tests-cacher}
+          touch ../albs-sign-file/.env
+          ln -sf tests/test-vars.env vars.env
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          target: web-server-tests
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
       - name: Start services
-        run: docker compose up -d --no-deps web_server db
+        run: docker compose up -d test_db
+
       - name: Run unit tests (pytest)
-        run: docker compose run -v /tmp:/tmp --no-deps web_server bash -o pipefail -c '
-          pytest -vv --ignore alws/ --cov-report term-missing:skip-covered
-          --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml --cov=alws
-          tests/ | tee /tmp/pytest-coverage.txt'
+        run: docker compose run --rm -v /tmp:/tmp web_server_tests bash -c "
+          pytest -v --cov
+            --cov-report xml:/tmp/coverage.xml --junitxml=/tmp/pytest.xml
+            --cov-report term-missing:skip-covered | tee /tmp/pytest-coverage.txt"
+
       - name: Stop services
         run: docker compose down --volumes
+
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
         id: coverageComment
@@ -82,6 +58,7 @@ jobs:
           hide-comment: false
           remove-link-from-badge: false
           junitxml-path: /tmp/pytest.xml
+
       - name: Create the Badge
         if: ${{ github.ref == 'refs/heads/master' && steps.coverageComment.outputs.coverage }}
         uses: schneegans/dynamic-badges-action@v1.7.0

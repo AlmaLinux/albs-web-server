@@ -1,3 +1,4 @@
+import os
 import typing
 from contextlib import asynccontextmanager
 
@@ -12,7 +13,7 @@ from alws.database import Base
 from tests.constants import ADMIN_USER_ID, CUSTOM_USER_ID
 
 engine = create_async_engine(
-    settings.test_database_url,
+    os.getenv('DATABASE_URL', settings.test_database_url),
     poolclass=NullPool,
     echo_pool=True,
 )

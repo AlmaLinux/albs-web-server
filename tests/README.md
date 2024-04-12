@@ -6,21 +6,23 @@
 
 `mock_classes.py` - a module which contain base class with `httpx` request method, setup logic for each test suite and HTTP status codes
 ## How to run tests locally
-1. Create `test-almalinux-bs` database
-2. Adjust variables in `vars.env`
+1. Adjust variables in `vars.env`
     ```
     POSTGRES_DB="test-almalinux-bs"
     POSTGRES_PASSWORD="password"
-    DATABASE_URL="postgresql+asyncpg://postgres:password@db/test-almalinux-bs"
-    SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs"
-    PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@db/test-almalinux-bs"
+    DATABASE_URL="postgresql+asyncpg://postgres:password@test_db/test-almalinux-bs"
+    SYNC_DATABASE_URL="postgresql+psycopg2://postgres:password@test_db/test-almalinux-bs"
+    PULP_DATABASE_URL="postgresql+psycopg2://postgres:password@test_db/test-almalinux-bs"
     ```
-3. Up docker-compose services
+   or use `test-vars.env` in the `tests` folder
+   ```bash
+   ln -sf tests/test-vars.env vars.env
+   ```
+3. Start the `test_db` service
     ```bash
-    docker-compose up -d --no-deps web_server db
+    docker compose up -d test_db
     ```
-4. Run `pytest` within `web_server` container
+3. Run `pytest` within `web_server_tests` container
     ```bash
-    docker-compose run --no-deps --rm web_server bash -c 'source env/bin/activate && pytest -v --ignore alws/'
+    docker compose run --rm web_server_tests pytest -v
     ```
-    - we ignore `alws/` directory because it's contains files which names starts with `test*.py`

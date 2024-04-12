@@ -1,4 +1,4 @@
-FROM almalinux/9-base:latest
+FROM almalinux/9-base:latest as web-server
 
 RUN <<EOT
   set -ex
@@ -18,3 +18,13 @@ RUN <<EOT
 EOT
 
 ADD --chmod=755 https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /
+
+
+FROM web-server as web-server-tests
+
+COPY requirements-tests.txt .
+RUN <<EOT
+  set -ex
+  pip3 install -r requirements-tests.txt
+  rm requirements-tests.txt
+EOT
