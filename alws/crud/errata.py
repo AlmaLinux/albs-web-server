@@ -1525,7 +1525,9 @@ async def bulk_errata_records_release(records_ids: List[str]):
 
 
 async def get_updateinfo_xml_from_pulp(
+    db: AsyncSession,
     record_id: str,
+    platform_id: Optional[int],
 ) -> Optional[str]:
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -1537,8 +1539,40 @@ async def get_updateinfo_xml_from_pulp(
     )
     if not errata_records:
         return
+
+    platform_name = None
+    if platform_id:
+        async with db.begin():
+            platform_name = (
+                await db.execute(
+                    select(models.Platform.name).where(
+                        models.Platform.id == platform_id
+                    )
+                )
+            ).scalar()
+            if not platform_name:
+                return
+
     cr_upd = cr.UpdateInfo()
     for errata_record in errata_records:
+        # Filter out advisories that don't belong to the platform based on
+        # advisory's repo name inside pkglist. We rely on the fact that
+        # repo names inside advisory's pkglist pulp follow the naming convention
+        # {platform_name}-for-{arch}-{stream}-rpms__{major}_{minor}_default,
+        # i.e.: almalinux-8-for-x86_64-powertools-rpms__8_9_default
+        if platform_name:
+            # It'd be very weird to have an advisory without packages
+            repo_name = errata_record.get("pkglist", [{}])[0].get("name")
+            if not repo_name:
+                logging.warning(
+                    "Unable to filter results by platform_name %s, error: ",
+                    platform_name,
+                    str(exc),
+                )
+                return
+            if not repo_name.startswith(platform_name.lower()):
+                continue
+
         cr_ref = cr.UpdateReference()
         cr_rec = cr.UpdateRecord()
         cr_col = cr.UpdateCollection()
@@ -1611,7 +1645,7 @@ async def get_updateinfo_xml_from_pulp(
             cr_col.append(cr_pkg)
         cr_rec.append_collection(cr_col)
         cr_upd.append(cr_rec)
-    return cr_upd.xml_dump()
+    return cr_upd.xml_dump() if cr_upd.updates else None
 
 
 async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
