@@ -2,6 +2,24 @@ version: "3.9"
 
 services:
 
+  test_db:
+    image: postgres:13
+    env_file:
+      - vars.env
+    ports:
+      - "5432:5432"
+
+  web_server_tests:
+    image: albs-web-server-tests:latest
+    env_file:
+      - vars.env
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-server-tests
+    volumes:
+      - ".:/code"
+
   db:
     image: postgres:13
     env_file:
@@ -99,13 +117,13 @@ services:
     ports:
       - "8088:8000"
     build:
-      dockerfile: Dockerfile
       context: .
+      dockerfile: Dockerfile
+      target: web-server
     volumes:
       - "./alws:/code/alws"
       - "./scripts:/code/scripts"
       - "./reference_data:/code/reference_data"
-      - "./tests:/code/tests"
       - "../volumes/pulp/exports:/srv/exports"
     command: |
       bash -c "
@@ -380,7 +398,7 @@ services:
         max-file: "3"
 
   git_cacher:
-    image: quay.io/almalinuxorg/git-cacher:latest
+    image: git-cacher:latest
     build:
       dockerfile: Dockerfile.git-cacher
       context: .
