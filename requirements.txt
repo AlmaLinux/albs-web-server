@@ -4,7 +4,7 @@ aiofiles==23.2.1
 aiohttp-retry==2.8.3
 aiohttp==3.9.3
 aioredis==2.0.1
-alembic-postgresql-enum==1.1.2
+alembic-postgresql-enum==1.2.0
 alembic==1.13.1
 asyncpg==0.29.0
 dramatiq[rabbitmq, watch]==1.16.0
