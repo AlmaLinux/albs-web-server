@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.2
 
     github_integration_enabled: bool = False
+    github_app_id: Optional[str] = None
+    path_to_github_app_pem: Optional[str] = None
+    github_installation_id: Optional[str] = None
     github_token: Optional[str] = None
     github_organization_name: str = 'AlmaLinux'
     github_project_number: Optional[int] = None

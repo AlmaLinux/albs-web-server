@@ -19,10 +19,26 @@ async def get_github_client() -> IntegrationsGHGraphQLClient:
     github_client = None
     github_token = settings.github_token
     if not github_token:
-        raise ValueError(
-            'Config for GitHub integration is incomplete, '
-            'please check the settings'
+        app_id = settings.github_app_id
+        pem = settings.path_to_github_app_pem
+        installation_id = settings.github_installation_id
+        if not all([
+            app_id,
+            pem,
+            installation_id,
+        ]):
+            raise ValueError(
+                'Config for GitHub integration is incomplete, '
+                'please check the settings'
+            )
+        github_token = (
+            await IntegrationsGHGraphQLClient.generate_token_for_gh_app(
+                gh_app_id=app_id,
+                path_to_gh_app_pem=pem,
+                installation_id=installation_id,
+            )
         )
+
     github_client = IntegrationsGHGraphQLClient(
         github_token,
         settings.github_organization_name,
