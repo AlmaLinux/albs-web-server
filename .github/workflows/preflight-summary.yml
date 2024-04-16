@@ -1,0 +1,78 @@
+name: Preflight Summary
+on:
+  workflow_run:
+    workflows: [Preflight]
+    types: [completed]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+
+  submit-summary:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+
+      - name: Download Preflight artifacts
+        # https://github.com/marketplace/actions/download-workflow-artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: preflight-reports
+          run_id: ${{ github.event.workflow_run.id }}
+
+      - name: Load Environment
+        run: cat environment.txt | tee -a $GITHUB_ENV
+
+      - name: Generate Test Summary
+        # https://github.com/marketplace/actions/junit-test-dashboard
+        uses: test-summary/action@v2
+        with:
+          paths: pytest-report.xml
+          output: test-summary.md
+
+      - name: Generate Coverage Summary
+        # https://github.com/marketplace/actions/code-coverage-summary
+        # Generates code-coverage-results.md
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: pytest-coverage.xml
+          badge: false
+          hide_branch_rate: true
+          hide_complexity: true
+          indicators: false
+          format: markdown
+          output: file
+
+      - name: Generate Preflight Summary
+        run: |
+          {
+            cat test-summary.md
+            printf "\n\n### Code Coverage Summary\n"
+            cat code-coverage-results.md
+            printf "\n"
+
+            cat {pylint,black,isort,bandit}-report.md > linter-reports.md 2>/dev/null || true
+            if [[ -s linter-reports.md ]]; then
+              printf "### Linter reports\n"
+              # Max size of comments on GitHub is 64KB. If the reports > 54KB, don't post them
+              if [[ $(stat --format=%s linter-reports.md) -gt 55296 ]]; then
+                printf "The reports are too big to be posted here.\n"
+              else
+                cat linter-reports.md
+              fi
+            fi
+
+            JOB_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}"
+            printf "View full reports on the [Job Summary]($JOB_URL \"Go to Job Summary\") page.\n"
+          } > preflight-report.md
+
+      - name: Comment PR
+        # https://github.com/marketplace/actions/comment-pull-request
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          filePath: preflight-report.md
+          comment_tag: preflight_summary
+          pr_number: ${{ env.PR_NUMBER }}
