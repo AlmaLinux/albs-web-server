@@ -493,6 +493,24 @@ class IndexWrapper:
                 return ModuleWrapper(module_stream)
         raise ModuleNotFoundError(f"Index doesn't contain {name}:{stream}")
 
+    def get_module_default_profiles(
+        self, name: str, stream: str
+    ) -> typing.List[str]:
+        module = self._index.get_module(name)
+        defaults = module.get_defaults()
+        if not defaults:
+            return []
+        return defaults.get_default_profiles_for_stream(stream)
+
+    def get_module_defaults_as_str(self, name: str) -> str:
+        module = self._index.get_module(name)
+        defaults = module.get_defaults()
+        if not defaults:
+            return ''
+        index = Modulemd.ModuleIndex.new()
+        index.add_defaults(defaults)
+        return index.dump_to_string().strip()
+
     def add_module(self, module: ModuleWrapper):
         self._index.add_module_stream(module.raw_stream)
 

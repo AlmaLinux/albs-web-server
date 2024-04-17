@@ -310,6 +310,25 @@ class PulpClient:
         task_result = await self.wait_for_task(task["task"])
         return task_result["created_resources"][0]
 
+    async def create_module_defaults(
+        self,
+        name: str,
+        stream: str,
+        profiles: typing.List[str],
+        snippet: str,
+    ) -> str:
+        endpoint = "pulp/api/v3/content/rpm/modulemd_defaults/"
+        payload = {
+            "module": name,
+            "stream": stream,
+            "profiles": profiles,
+            "snippet": snippet,
+        }
+        logging.debug('create_module_defaults payload: %s', payload)
+        task = await self.request("POST", endpoint, json=payload)
+        task_result = await self.wait_for_task(task["task"])
+        return task_result["created_resources"][0]
+
     async def check_if_artifact_exists(
         self, sha256: str
     ) -> typing.Optional[str]:
