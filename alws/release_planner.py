@@ -273,7 +273,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             )
         )
         build_result = await self.db.execute(builds_q)
-        modules_to_release = defaultdict(list)
+        modules_to_release = defaultdict(dict)
         for build in build_result.scalars().all():
             build_rpms = [
                 build_rpm
@@ -320,7 +320,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     source_name = artifact_name
                 pkg_info["source"] = source_name
                 pulp_packages.append(pkg_info)
+
             for task in build.tasks:
+                skip_modules_processing = True
                 if task.rpm_modules and task.id in build_tasks:
                     for module in task.rpm_modules:
                         key = (
@@ -329,8 +331,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                             module.version,
                             module.arch,
                         )
-                        if key in modules_to_release:
-                            continue
+                        if key not in modules_to_release:
+                            skip_modules_processing = False
+                    if skip_modules_processing:
+                        continue
                     module_repo = next(
                         build_repo
                         for build_repo in task.build.repos
@@ -346,9 +350,15 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     if template:
                         module_index = IndexWrapper.from_template(template)
                     for module in module_index.iter_modules():
+                        key = (
+                            module.name,
+                            module.stream,
+                            str(module.version),
+                            module.arch,
+                        )
                         # in some cases we have also devel module in template,
                         # we should add all modules from template
-                        modules_to_release[key].append({
+                        modules_to_release[key] = {
                             "build_id": build.id,
                             "name": module.name,
                             "stream": module.stream,
@@ -362,12 +372,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                             "context": module.context,
                             "arch": module.arch,
                             "template": module.render(),
-                        })
-        pulp_rpm_modules = [
-            module_dict
-            for module_list in modules_to_release.values()
-            for module_dict in module_list
-        ]
+                        }
+
+        pulp_rpm_modules = list(modules_to_release.values())
         return pulp_packages, src_rpm_names, pulp_rpm_modules
 
     async def get_final_release(self, release_id: int) -> models.Release:
