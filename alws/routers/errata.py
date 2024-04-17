@@ -93,19 +93,19 @@ async def list_errata_records(
 )
 async def get_updateinfo_xml(
     record_id: str,
+    platform_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
 ):
-    # TODO: Retrieve updateinfo based on record_id AND platform_id
-    # Treating updateinfos as a whole shouldn't be a problem since
-    # updateinfo that ends up in repos is based on the repo itself.
-    # Also, this is only "problematic" when there is a errata with the
-    # same id in more than one platform.
-    # In any case, it would be great if we address this as soon as possible.
-    # See https://github.com/AlmaLinux/build-system/issues/206
-    updateinfo_xml = await errata_crud.get_updateinfo_xml_from_pulp(record_id)
+    updateinfo_xml = await errata_crud.get_updateinfo_xml_from_pulp(
+        db, record_id, platform_id
+    )
     if updateinfo_xml is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Unable to find errata records with {record_id=} in pulp",
+            detail=(
+                f"Unable to find errata records with {record_id=} and "
+                f"{platform_id=} in pulp"
+            ),
         )
     return updateinfo_xml
 
@@ -179,8 +179,6 @@ async def release_errata_record(
     }
 
 
-# TODO: Update endpoint to take into account platform_id, see
-# https://github.com/AlmaLinux/build-system/issues/208
 @router.post("/bulk_release_records/")
 async def bulk_release_errata_records(records_ids: List[str]):
     bulk_errata_release.send(records_ids)
