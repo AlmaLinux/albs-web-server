@@ -139,6 +139,10 @@ async def get_oval_xml(
         select(models.Platform).where(models.Platform.name == platform_name)
     )
     platform: models.Platform = platform.scalars().first()
+
+    if not platform:
+        return
+
     query = query.filter(models.NewErrataRecord.platform_id == platform.id)
 
     if only_released:
