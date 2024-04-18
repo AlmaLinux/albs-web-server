@@ -3,7 +3,7 @@ profile = "black"
 split_on_trailing_comma = true
 
 [tool.black]
-line-length = 120
+line-length = 88
 skip-string-normalization = true
 # see https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style
 preview = true
@@ -11,7 +11,7 @@ enable-unstable-feature = ["hug_parens_with_braces_and_square_brackets"]
 extend-exclude = 'alws/alembic'
 
 [tool.pylint]
-max-line-length = 120
+max-line-length = 88
 
 # Minimum line length for functions/classes that require docstrings
 docstring-min-length = 50
