@@ -984,9 +984,10 @@ async def release_errata_packages(
         db_pkg = db_pkg.scalars().first()
         if not db_pkg:
             continue
-        db_module = next((
-            i for i in db_pkg.build_task.rpm_modules if '-devel' not in i.name
-        ))
+        db_module = next(
+            (i for i in db_pkg.build_task.rpm_modules if '-devel' not in i.name),
+            None,
+        )
         if db_module is not None:
             rpm_module = {
                 "name": db_module.name,
