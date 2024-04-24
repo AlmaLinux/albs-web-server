@@ -23,7 +23,7 @@ pgpy==0.6.0
 plumbum==1.8.2
 psycopg2-binary==2.9.9
 pydantic-settings==2.2.1
-pydantic==2.7.0
+pydantic==2.7.1
 python-multipart>=0.0.7
 sentry-sdk[fastapi]==1.45.0  # requires FastAPI>=0.79.0
 syncer==2.0.3
