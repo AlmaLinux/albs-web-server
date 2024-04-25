@@ -64,6 +64,7 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
+from alws.utils.oval_add_gpg_keys import add_multiple_gpg_keys_to_oval
 
 try:
     # FIXME: ovallib dependency should stay optional
@@ -152,10 +153,10 @@ async def get_oval_xml(
         )
 
     records = (await db.execute(query)).scalars().all()
-    return errata_records_to_oval(records)
+    return errata_records_to_oval(records, platform_name)
 
 
-def errata_records_to_oval(records: List[models.NewErrataRecord]):
+def errata_records_to_oval(records: List[models.NewErrataRecord], platform_name: str):
     oval = Composer()
     generator = Generator(
         product_name="AlmaLinux OS Errata System",
@@ -164,10 +165,6 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
         timestamp=datetime.datetime.utcnow(),
     )
     oval.generator = generator
-    # TODO:
-    # * add gpg_keys info platform
-    # * Ensure that packages in OVAL data refer to the right sign key, see
-    #   https://github.com/AlmaLinux/build-system/issues/205
     gpg_keys = {
         "8": "51D6647EC21AD6EA",
         "9": "D36CB86CB86B3716",
@@ -404,6 +401,10 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
                 oval.append_object(
                     get_object_cls_by_tag(obj["type"]).from_dict(obj)
                 )
+    # currently only Almalinux8 have multiple GPG keys. So only this platfrom requires
+    # additional oval processing
+    if platform_name.lower() == 'almalinux-8':
+        oval = add_multiple_gpg_keys_to_oval(oval, 8)
     return oval.dump_to_string()
 
 
