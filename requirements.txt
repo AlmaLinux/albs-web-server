@@ -20,7 +20,7 @@ jmespath==1.0.1
 lxml==5.2.1
 markdown==3.6
 pgpy==0.6.0
-plumbum==1.8.2
+plumbum==1.8.3
 psycopg2-binary==2.9.9
 pydantic-settings==2.2.1
 pydantic==2.7.1
