@@ -312,7 +312,7 @@ async def get_module_data_from_beholder(
     try:
         beholder_response = await beholder_client.get(endpoint)
     except Exception:
-        logging.error('Cannot get module info')
+        logging.warning('Cannot get module info')
         return result
     result['devel'] = devel
     result['arch'] = arch

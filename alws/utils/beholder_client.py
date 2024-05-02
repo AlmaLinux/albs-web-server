@@ -61,7 +61,7 @@ class BeholderClient:
                     coro = self.post(endpoint, data)
                 yield await coro
             except Exception:
-                logging.error(
+                logging.warning(
                     "Cannot retrieve beholder info, "
                     "trying next reference platform"
                 )

@@ -3,6 +3,7 @@ import logging
 
 import sentry_sdk
 from fastapi import FastAPI
+from pika.exceptions import StreamLostError
 from starlette.middleware.exceptions import ExceptionMiddleware
 
 from alws import routers
@@ -29,6 +30,10 @@ if settings.sentry_dsn:
         dsn=settings.sentry_dsn,
         traces_sample_rate=settings.sentry_traces_sample_rate,
         environment=settings.sentry_environment,
+        ignore_errors=[
+            ConnectionResetError,
+            StreamLostError,
+        ],
     )
 
 
