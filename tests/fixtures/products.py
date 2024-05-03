@@ -3,11 +3,14 @@ from typing import AsyncIterable
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from alws.crud.products import create_product
-from alws.models import Product
+from alws.models import Product, Repository
 from alws.schemas.product_schema import ProductCreate
+from alws.schemas.repository_schema import RepositoryCreate
 from tests.constants import ADMIN_USER_ID
+from tests.test_utils.pulp_utils import get_repo_href
 
 
 @pytest.fixture(
@@ -93,6 +96,33 @@ async def base_product(
             session,
             ProductCreate(**product_create_payload),
         )
+    yield product
+
+
+@pytest.fixture
+async def product_with_repo(
+    session: AsyncSession,
+    base_product: Product,
+    repository_for_product: Repository,
+    base_platform,
+):
+    product = (
+        (
+            await session.execute(
+                select(Product)
+                .where(
+                    Product.name == base_product.name,
+                )
+                .options(selectinload(Product.repositories))
+            )
+        )
+        .scalars()
+        .first()
+    )
+    product.repositories.append(repository_for_product)
+    session.add(product)
+    print([repo.name for repo in product.repositories])
+    await session.commit()
     yield product
 
 

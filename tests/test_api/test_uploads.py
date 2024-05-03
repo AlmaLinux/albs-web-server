@@ -1,19 +1,13 @@
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from alws.models import BuildTask, RpmModule
 from alws.utils.modularity import IndexWrapper
 from tests.mock_classes import BaseAsyncTestCase
 
 
-# @pytest.mark.skip(
-#     reason=(
-#         "This test needs to be refactored because "
-#         "upload_repometadata is disabled, see "
-#         "https://github.com/AlmaLinux/build-system/issues/192"
-#     )
-# )
 @pytest.mark.usefixtures(
     "create_repo",
     "create_module_by_payload",
@@ -22,15 +16,17 @@ from tests.mock_classes import BaseAsyncTestCase
     "get_latest_version",
     "get_latest_repo_present_content",
     "get_latest_repo_removed_content",
+    "get_repo_modules",
     "get_by_href",
     "modify_repository",
     "upload_file",
+    "upload_rpm_modules",
 )
 class TestUploadsEndpoints(BaseAsyncTestCase):
     async def test_module_upload_prod_repo(
         self,
         modules_yaml: bytes,
-        base_platform,
+        product_with_repo,
     ):
         response = await self.make_request(
             "post",
@@ -59,29 +55,26 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
         message = f"Cannot upload module template:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
-        rpm_modules = (
+        build_task = (
             (
                 await session.execute(
-                    select(RpmModule).where(
-                        RpmModule.id.in_(
-                            select(BuildTask.rpm_module_id)
-                            .where(
-                                BuildTask.build_id == modular_build.id,
-                                BuildTask.arch == "i686",
-                            )
-                            .scalar_subquery(),
-                        )
+                    select(BuildTask)
+                    .where(
+                        BuildTask.build_id == modular_build.id,
+                        BuildTask.arch == "i686",
                     )
+                    .options(selectinload(BuildTask.rpm_modules))
                 )
             )
             .scalars()
-            .all()
+            .first()
         )
+        rpm_modules = build_task.rpm_modules
         if not rpm_modules:
             assert False, "rpm_modules not found"
         module_index = IndexWrapper.from_template(modules_yaml.decode())
-        module = next(module_index.iter_modules())
-        for rpm_module in rpm_modules:
+        modules = module_index.iter_modules()
+        for rpm_module, module in zip(rpm_modules, modules):
             for attr in (
                 "name",
                 "version",
@@ -92,6 +85,4 @@ class TestUploadsEndpoints(BaseAsyncTestCase):
                 module_value = str(getattr(module, attr))
                 db_module_value = str(getattr(rpm_module, attr))
                 if module_value != db_module_value:
-                    assert (
-                        False
-                    ), f"{module_value=} not equal to {db_module_value=}"
+                    assert False, f"{module_value=} not equal to {db_module_value=}"
