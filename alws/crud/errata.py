@@ -64,7 +64,7 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
-from alws.utils.oval_add_gpg_keys import add_multiple_gpg_keys_to_oval
+from alws.utils.oval_add_al8_gpg_keys import add_multiple_gpg_keys_to_oval
 
 try:
     # FIXME: ovallib dependency should stay optional
@@ -401,10 +401,11 @@ def errata_records_to_oval(records: List[models.NewErrataRecord], platform_name:
                 oval.append_object(
                     get_object_cls_by_tag(obj["type"]).from_dict(obj)
                 )
-    # currently only Almalinux8 have multiple GPG keys. So only this platfrom requires
-    # additional oval processing
+    # Almalinux8 have multiple GPG keys.
+    # https://almalinux.org/blog/2023-12-20-almalinux-8-key-update/
+    # So this platfrom requires additional oval processing
     if platform_name.lower() == 'almalinux-8':
-        oval = add_multiple_gpg_keys_to_oval(oval, 8)
+        oval = add_multiple_gpg_keys_to_oval(oval)
     return oval.dump_to_string()
 
 

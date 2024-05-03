@@ -81,8 +81,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from almalinux.liboval.composer import Composer, Definition, RpminfoState, RpminfoTest
 
-# Map for GPG key ids for different distributions
-GPG = {8: ['51d6647ec21ad6ea', '2ae81e8aced7258b'], 9: ['d36cb86cb86b3716']}
+
+# AL8 GPG keys ids
+GPG_KEYS = ['51d6647ec21ad6ea', '2ae81e8aced7258b']
 
 
 COMMENT_SIGN_PATTERNS = re.compile(r"(\S+) is signed with")
@@ -168,24 +169,22 @@ def get_first_available_ids(oval: Composer) -> Tuple[int, int]:
 
 
 def generate_gpg_keys_states(
-    states_counter: IdCounter, distr_version: int, original_state: RpminfoState
+    states_counter: IdCounter, original_state: RpminfoState
 ) -> List[RpminfoState]:
     """
-    Generate GPG keys states based on the given distribution version and original state.
+    Generate GPG keys states original state.
 
     Args:
       states_counter (IdCounter): An instance of IdCounter used to generate unique state IDs.
-      distr_version (int): The distribution version.
       original_state (RpminfoState): The original state to base the generated states on.
 
     Returns:
       List[RpminfoState]: A list of RpminfoState objects representing the generated GPG keys states.
     """
-    gpg_keys = GPG[distr_version]
     original_state_dict = original_state.as_dict()
     state_id_prefix = ":".join(original_state_dict['id'].split(":")[:-1])
     states = []
-    for key in gpg_keys:
+    for key in GPG_KEYS:
         attrs = original_state_dict.copy()
         attrs['id'] = f"{state_id_prefix}:{str(states_counter.get_next())}"
         attrs['signature_keyid'] = key
@@ -195,14 +194,13 @@ def generate_gpg_keys_states(
 
 
 def get_new_tests_states(
-    oval: Composer, distr_version: int
+    oval: Composer,
 ) -> Tuple[List[RpminfoTest], List[RpminfoState], Dict[str, List[RpminfoTest]]]:
     """
-    Generates new tests and states based on the given Oval Composer and distribution version.
+    Generates new tests and states based on the given Oval Composer.
 
     Args:
         oval (Composer): The Oval Composer object containing the original tests and states.
-        distr_version (int): The distribution version.
 
     Returns:
         Tuple[List[RpminfoTest], List[RpminfoState], Dict[str, List[RpminfoTest]]]:
@@ -222,9 +220,7 @@ def get_new_tests_states(
             original_gpg_state = state
             break
     assert original_gpg_state, "Original GPG state not found"
-    gpg_keys_states = generate_gpg_keys_states(
-        states_counter, distr_version, original_gpg_state
-    )
+    gpg_keys_states = generate_gpg_keys_states(states_counter, original_gpg_state)
     new_states = list(oval.iter_states()) + gpg_keys_states
 
     # Preparing new tests
@@ -255,22 +251,18 @@ def get_new_tests_states(
     return new_tests, new_states, old_to_new_test_map
 
 
-def add_multiple_gpg_keys_to_oval(oval: Composer, distr_version: int) -> Composer:
+def add_multiple_gpg_keys_to_oval(oval: Composer) -> Composer:
     """
     Adds support for multiple GPG keys to the given Oval Composer object.
 
     Args:
         oval (Composer): The Oval Composer object to add the GPG keys to.
-        distr_version (int): The distribution version.
-
     Returns:
         Composer: The Oval Composer object with the added GPG keys.
     """
     new_oval = Composer()
     new_oval.generator = oval.generator
-    new_tests, new_states, old_to_new_tests_map = get_new_tests_states(
-        oval, distr_version
-    )
+    new_tests, new_states, old_to_new_tests_map = get_new_tests_states(oval)
     for old_definition in oval.iter_definitions():
         definition_as_dict = old_definition.as_dict()
         definition_as_dict['criteria'] = convert_sign_criterion_to_criteria(
