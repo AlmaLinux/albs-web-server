@@ -21,14 +21,15 @@ def upload_rpm_modules(monkeypatch):
         for module in _index.iter_modules():
             pulp_href = get_repo_href()
             db_module = models.RpmModule(
-                            name=module.name,
-                            stream=module.stream,
-                            context=module.context,
-                            arch=module.arch,
-                            version=str(module.version),
-                            pulp_href=pulp_href,
-                        )
+                name=module.name,
+                stream=module.stream,
+                context=module.context,
+                arch=module.arch,
+                version=str(module.version),
+                pulp_href=pulp_href,
+            )
             db_modules.append(db_module)
             module_hrefs.append(pulp_href)
         return db_modules, module_hrefs, defaults_hrefs
+
     monkeypatch.setattr(MetadataUploader, "upload_rpm_modules", func)

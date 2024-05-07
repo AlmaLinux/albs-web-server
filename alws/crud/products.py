@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -15,6 +15,7 @@ from alws.crud.teams import create_team, create_team_roles, get_teams
 from alws.crud.user import get_user
 from alws.dramatiq import perform_product_modification
 from alws.errors import DataNotFoundError, PermissionDenied, ProductError
+from alws.models import Build, Product, Repository, Team, UserRole
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas.product_schema import ProductCreate
@@ -58,9 +59,7 @@ async def create_product(
     if teams:
         team = teams[0]
     else:
-        team_payload = TeamCreate(
-            team_name=team_name, user_id=payload.owner_id
-        )
+        team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
         team = await create_team(db, team_payload, flush=True)
     team_roles = await create_team_roles(db, team_name)
 
@@ -84,20 +83,18 @@ async def create_product(
 
     for platform in product.platforms:
         platform_name = platform.name.lower()
-        repo_tasks.extend(
-            (
-                create_product_repo(
-                    pulp_client,
-                    product.name,
-                    owner.username,
-                    platform_name,
-                    arch,
-                    is_debug,
-                )
-                for arch in platform.arch_list
-                for is_debug in (True, False)
+        repo_tasks.extend((
+            create_product_repo(
+                pulp_client,
+                product.name,
+                owner.username,
+                platform_name,
+                arch,
+                is_debug,
             )
-        )
+            for arch in platform.arch_list
+            for is_debug in (True, False)
+        ))
         repo_tasks.append(
             create_product_repo(
                 pulp_client,
@@ -175,18 +172,12 @@ async def get_products(
                 selectinload(models.Product.roles).selectinload(
                     models.UserRole.actions
                 ),
-                selectinload(models.Product.team).selectinload(
-                    models.Team.owner
-                ),
+                selectinload(models.Product.team).selectinload(models.Team.owner),
                 selectinload(models.Product.team)
                 .selectinload(models.Team.roles)
                 .selectinload(models.UserRole.actions),
-                selectinload(models.Product.team).selectinload(
-                    models.Team.members
-                ),
-                selectinload(models.Product.team).selectinload(
-                    models.Team.products
-                ),
+                selectinload(models.Product.team).selectinload(models.Team.members),
+                selectinload(models.Product.team).selectinload(models.Team.products),
             )
         )
         if count:
@@ -205,9 +196,7 @@ async def get_products(
     if page_number:
         return {
             'products': (await db.execute(generate_query())).scalars().all(),
-            'total_products': (
-                await db.execute(generate_query(count=True))
-            ).scalar(),
+            'total_products': (await db.execute(generate_query(count=True))).scalar(),
             'current_page': page_number,
         }
     if product_id or product_name:
@@ -241,12 +230,10 @@ async def remove_product(
                 .join(models.BuildTask)
                 .where(
                     models.Build.team_id == db_product.team_id,
-                    models.BuildTask.status.in_(
-                        [
-                            BuildTaskStatus.IDLE,
-                            BuildTaskStatus.STARTED,
-                        ]
-                    ),
+                    models.BuildTask.status.in_([
+                        BuildTaskStatus.IDLE,
+                        BuildTaskStatus.STARTED,
+                    ]),
                 )
             )
         )
@@ -300,8 +287,7 @@ async def modify_product(
             raise DataNotFoundError(f"User={user_id} doesn't exist")
         if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
             raise PermissionDenied(
-                'User has no permissions '
-                f'to modify the product "{db_product.name}"'
+                f'User has no permissions to modify the product "{db_product.name}"'
             )
 
         db_build = await db.execute(
@@ -338,3 +324,48 @@ async def modify_product(
                 raise ProductError(error_msg)
 
     perform_product_modification.send(db_build.id, db_product.id, modification)
+
+
+async def get_repo_product(
+    session: AsyncSession,
+    repository: str,
+):
+    product_relationships = (
+        selectinload(Product.owner),
+        selectinload(Product.roles).selectinload(UserRole.actions),
+        selectinload(Product.team)
+        .selectinload(Team.roles)
+        .selectinload(UserRole.actions),
+    )
+    if repository.endswith("br"):
+        build = (
+            (
+                await session.execute(
+                    select(Build)
+                    .filter(Build.repos.any(Repository.name.ilike(f'%{repository}')))
+                    .options(
+                        joinedload(Build.team)
+                        .joinedload(Team.products)
+                        .options(*product_relationships)
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if build:
+            return build.team.products[0]
+        return None
+    return (
+        (
+            await session.execute(
+                select(Product)
+                .filter(
+                    Product.repositories.any(Repository.name.ilike(f'%{repository}'))
+                )
+                .options(*product_relationships)
+            )
+        )
+        .scalars()
+        .first()
+    )

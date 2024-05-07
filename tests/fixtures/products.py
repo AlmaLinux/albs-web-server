@@ -121,7 +121,6 @@ async def product_with_repo(
     )
     product.repositories.append(repository_for_product)
     session.add(product)
-    print([repo.name for repo in product.repositories])
     await session.commit()
     yield product
 
