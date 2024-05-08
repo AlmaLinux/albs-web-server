@@ -5,7 +5,7 @@ ADD https://packages.codenotary.org/codenotary.repo /etc/yum.repos.d/
 RUN <<EOT
   set -ex
   dnf upgrade -y
-  dnf install -y cas git modulemd-tools libmodulemd python3-libmodulemd python3-gobject
+  dnf install -y git modulemd-tools libmodulemd python3-libmodulemd python3-gobject
   dnf clean all
 EOT
 
