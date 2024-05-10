@@ -169,7 +169,7 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
     # * Ensure that packages in OVAL data refer to the right sign key, see
     #   https://github.com/AlmaLinux/build-system/issues/205
     gpg_keys = {
-        "8": "51D6647EC21AD6EA",
+        "8": "2AE81E8ACED7258B",
         "9": "D36CB86CB86B3716",
     }
     objects = set()
@@ -372,12 +372,9 @@ def errata_records_to_oval(records: List[models.NewErrataRecord]):
                     ]
             objects.add(state["id"])
             state_cls = get_state_cls_by_tag(state["type"])
-            if state_cls == RpminfoState:
-                if not is_freezed:
-                    if state["signature_keyid"]:
-                        state["signature_keyid"] = gpg_keys[
-                            record.platform.distr_version
-                        ].lower()
+            if state_cls == RpminfoState and state["signature_keyid"]:
+                state["signature_keyid"] = gpg_keys[
+                    record.platform.distr_version].lower()
             elif state_cls == RpmverifyfileState:
                 if state["name"] == "^redhat-release":
                     state["name"] = "^almalinux-release"
