@@ -79,8 +79,15 @@ import re
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
-from almalinux.liboval.composer import Composer, Definition, RpminfoState, RpminfoTest
-
+try:
+    from almalinux.liboval.composer import (
+        Composer,
+        Definition,
+        RpminfoState,
+        RpminfoTest,
+    )
+except ImportError:
+    pass
 
 # AL8 GPG keys ids
 GPG_KEYS = ['51d6647ec21ad6ea', '2ae81e8aced7258b']
@@ -105,7 +112,7 @@ class IdCounter:
 
 def convert_sign_criterion_to_criteria(
     root_criteria: List[Dict[str, Any]],
-    old_to_new_tests_map: Dict[str, List[RpminfoTest]],
+    old_to_new_tests_map: Dict[str, Any],
 ):
     """
     Converts single sign criterion to criteria with multiple sign criterion with new tests.
@@ -151,7 +158,7 @@ def convert_sign_criterion_to_criteria(
     return fixed_criteria
 
 
-def get_first_available_ids(oval: Composer) -> Tuple[int, int]:
+def get_first_available_ids(oval) -> Tuple[int, int]:
     """
     Returns the first available test ID and state ID in the given Composer object.
 
@@ -168,9 +175,7 @@ def get_first_available_ids(oval: Composer) -> Tuple[int, int]:
     return max_test_id + 1, max_state_id + 1
 
 
-def generate_gpg_keys_states(
-    states_counter: IdCounter, original_state: RpminfoState
-) -> List[RpminfoState]:
+def generate_gpg_keys_states(states_counter, original_state) -> List:
     """
     Generate GPG keys states original state.
 
@@ -194,8 +199,8 @@ def generate_gpg_keys_states(
 
 
 def get_new_tests_states(
-    oval: Composer,
-) -> Tuple[List[RpminfoTest], List[RpminfoState], Dict[str, List[RpminfoTest]]]:
+    oval,
+) -> Tuple[List, List, Dict[str, List]]:
     """
     Generates new tests and states based on the given Oval Composer.
 
@@ -251,7 +256,7 @@ def get_new_tests_states(
     return new_tests, new_states, old_to_new_test_map
 
 
-def add_multiple_gpg_keys_to_oval(oval: Composer) -> Composer:
+def add_multiple_gpg_keys_to_oval(oval):
     """
     Adds support for multiple GPG keys to the given Oval Composer object.
 
