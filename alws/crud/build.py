@@ -10,6 +10,7 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
+from alws.crud.repository import remove_repos_from_pulp
 from alws.dramatiq import start_build
 from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
@@ -267,21 +268,7 @@ async def get_module_preview(
     )
 
 
-async def remove_build_job(db: AsyncSession, build_id: int):
-    query_bj = (
-        select(models.Build)
-        .where(models.Build.id == build_id)
-        .options(
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.artifacts
-            ),
-            selectinload(models.Build.repos),
-            selectinload(models.Build.products),
-            selectinload(models.Build.tasks)
-            .selectinload(models.BuildTask.test_tasks)
-            .selectinload(models.TestTask.artifacts),
-        )
-    )
+def get_task_data_from_build(build: models.Build):
     repos = []
     repo_ids = []
     build_task_ids = []
@@ -289,18 +276,6 @@ async def remove_build_job(db: AsyncSession, build_id: int):
     build_task_ref_ids = []
     test_task_ids = []
     test_task_artifact_ids = []
-    build = await db.execute(query_bj)
-    build = build.scalars().first()
-    if build is None:
-        raise DataNotFoundError(f'Build with {build_id} not found')
-    if build.products:
-        product_names = "\n".join((product.name for product in build.products))
-        raise BuildError(
-            f"Cannot delete Build={build_id}, "
-            f"build contains in following products:\n{product_names}"
-        )
-    if build.released:
-        raise BuildError(f"Build with {build_id} is released")
     for bt in build.tasks:
         build_task_ids.append(bt.id)
         build_task_ref_ids.append(bt.ref_id)
@@ -314,9 +289,28 @@ async def remove_build_job(db: AsyncSession, build_id: int):
     for br in build.repos:
         repos.append(br.pulp_href)
         repo_ids.append(br.id)
-    pulp_client = PulpClient(
-        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    return (
+        repos,
+        repo_ids,
+        build_task_ids,
+        build_task_artifact_ids,
+        build_task_ref_ids,
+        test_task_ids,
+        test_task_artifact_ids,
     )
+
+
+async def remove_build_data(db: AsyncSession, build: models.Build):
+    (
+        repos,
+        repo_ids,
+        build_task_ids,
+        build_task_artifact_ids,
+        build_task_ref_ids,
+        test_task_ids,
+        test_task_artifact_ids,
+    ) = get_task_data_from_build(build)
+    build_id = build.id
     await db.execute(
         delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
     )
@@ -393,8 +387,37 @@ async def remove_build_job(db: AsyncSession, build_id: int):
     # "Remove Artifact only if it is not associated with any Content."
     # for artifact in artifacts:
     # await pulp_client.remove_artifact(artifact)
-    for repo in repos:
-        try:
-            await pulp_client.delete_by_href(repo, wait_for_result=True)
-        except Exception as err:
-            logging.exception("Cannot delete repo from pulp: %s", err)
+    try:
+        await remove_repos_from_pulp(repos)
+    except Exception as err:
+        logging.exception("Cannot delete repo from pulp: %s", err)
+
+
+async def remove_build_job(db: AsyncSession, build_id: int):
+    query_bj = (
+        select(models.Build)
+        .where(models.Build.id == build_id)
+        .options(
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.artifacts
+            ),
+            selectinload(models.Build.repos),
+            selectinload(models.Build.products),
+            selectinload(models.Build.tasks)
+            .selectinload(models.BuildTask.test_tasks)
+            .selectinload(models.TestTask.artifacts),
+        )
+    )
+    build = await db.execute(query_bj)
+    build = build.scalars().first()
+    if build is None:
+        raise DataNotFoundError(f'Build with {build_id} not found')
+    if build.products:
+        product_names = "\n".join((product.name for product in build.products))
+        raise BuildError(
+            f"Cannot delete Build={build_id}, "
+            f"build contains in following products:\n{product_names}"
+        )
+    if build.released:
+        raise BuildError(f"Build with {build_id} is released")
+    await remove_build_data(db, build)

@@ -287,3 +287,11 @@ async def sync_repo_from_remote(
         sync_policy=payload.sync_policy,
         wait_for_result=wait_for_result,
     )
+
+
+async def remove_repos_from_pulp(repos: typing.List):
+    pulp_client = PulpClient(
+        settings.pulp_host, settings.pulp_user, settings.pulp_password
+    )
+    for repo in repos:
+        await pulp_client.delete_by_href(repo, wait_for_result=True)
