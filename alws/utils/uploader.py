@@ -65,9 +65,8 @@ class MetadataUploader:
         await self.pulp.create_rpm_publication(repo_href)
         logging.info("Comps file upload has been finished")
 
-    async def upload_modules(
+    async def upload_rpm_modules(
         self,
-        repo_href: str,
         module_content: str,
         dry_run: bool = False,
     ):
@@ -77,9 +76,7 @@ class MetadataUploader:
         _index = IndexWrapper.from_template(module_content)
         with get_pulp_db() as pulp_session:
             for module in _index.iter_modules():
-                defaults_snippet = _index.get_module_defaults_as_str(
-                    module.name
-                )
+                defaults_snippet = _index.get_module_defaults_as_str(module.name)
                 defaults_checksum = hashlib.sha256(
                     defaults_snippet.encode('utf-8')
                 ).hexdigest()
@@ -110,9 +107,7 @@ class MetadataUploader:
                 pulp_defaults = None
                 for cond in conditions:
                     pulp_defaults = (
-                        pulp_session.execute(
-                            select(RpmModulemdDefaults).where(*cond)
-                        )
+                        pulp_session.execute(select(RpmModulemdDefaults).where(*cond))
                         .scalars()
                         .first()
                     )
@@ -121,9 +116,7 @@ class MetadataUploader:
                 module_snippet = module.render()
                 if not pulp_module:
                     if dry_run:
-                        logging.info(
-                            "DRY_RUN: Module is not present in Pulp, creating"
-                        )
+                        logging.info("DRY_RUN: Module is not present in Pulp, creating")
                         continue
                     logging.info("Module is not present in Pulp, creating")
                     pulp_href = await self.pulp.create_module(
@@ -150,17 +143,12 @@ class MetadataUploader:
                     db_modules.append(db_module)
                 else:
                     if dry_run:
-                        logging.info(
-                            "DRY_RUN: Updating existing module in Pulp"
-                        )
+                        logging.info("DRY_RUN: Updating existing module in Pulp")
                         continue
                     logging.info("Updating existing module in Pulp")
                     pulp_session.execute(
                         update(RpmModulemd)
-                        .where(
-                            RpmModulemd.content_ptr_id
-                            == pulp_module.content_ptr_id
-                        )
+                        .where(RpmModulemd.content_ptr_id == pulp_module.content_ptr_id)
                         .values(
                             snippet=module_snippet,
                             description=module.description,
@@ -168,9 +156,7 @@ class MetadataUploader:
                     )
                     pulp_session.execute(
                         update(CoreContent)
-                        .where(
-                            CoreContent.pulp_id == pulp_module.content_ptr_id
-                        )
+                        .where(CoreContent.pulp_id == pulp_module.content_ptr_id)
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
                     pulp_href = (
@@ -205,9 +191,7 @@ class MetadataUploader:
                     )
                     pulp_session.execute(
                         update(CoreContent)
-                        .where(
-                            CoreContent.pulp_id == pulp_defaults.content_ptr_id
-                        )
+                        .where(CoreContent.pulp_id == pulp_defaults.content_ptr_id)
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
                     href = (
@@ -217,6 +201,18 @@ class MetadataUploader:
                 if href:
                     defaults_hrefs.append(href)
             pulp_session.commit()
+        return db_modules, module_hrefs, defaults_hrefs
+
+    async def upload_modules(
+        self,
+        repo_href: str,
+        module_content: str,
+        dry_run: bool = False,
+    ):
+        db_modules, module_hrefs, defaults_hrefs = await self.upload_rpm_modules(
+            module_content,
+            dry_run,
+        )
         if db_modules and not dry_run:
             self.session.add_all(db_modules)
             await self.session.commit()
@@ -235,8 +231,7 @@ class MetadataUploader:
                     await self.session.execute(
                         select(models.BuildTask)
                         .where(
-                            models.BuildTask.build_id
-                            == int(re_result["build_id"]),
+                            models.BuildTask.build_id == int(re_result["build_id"]),
                             models.BuildTask.arch == re_result["arch"],
                         )
                         .options(selectinload(models.BuildTask.rpm_modules))
