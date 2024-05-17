@@ -102,14 +102,14 @@ async def base_product(
 
 @pytest.fixture
 async def product_with_repo(
-    session: AsyncSession,
+    async_session: AsyncSession,
     base_product: Product,
     repository_for_product: Repository,
     base_platform,
 ):
     product = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Product)
                 .where(
                     Product.name == base_product.name,
@@ -121,8 +121,8 @@ async def product_with_repo(
         .first()
     )
     product.repositories.append(repository_for_product)
-    session.add(product)
-    await session.commit()
+    async_session.add(product)
+    await async_session.commit()
     yield product
 
 

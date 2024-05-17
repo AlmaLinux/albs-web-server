@@ -32,11 +32,11 @@ def create_test_repository_payload() -> Dict[str, Any]:
 
 @pytest.fixture
 async def repository_for_product(
-    session: AsyncSession, repo_for_upload_payload: Dict[str, Any]
+    async_session: AsyncSession, repo_for_upload_payload: Dict[str, Any]
 ):
     repo = (
         (
-            await session.execute(
+            await async_session.execute(
                 select(Repository).where(
                     Repository.name == repo_for_upload_payload['name'],
                 )
@@ -47,6 +47,6 @@ async def repository_for_product(
     )
     if not repo:
         repo = Repository(**repo_for_upload_payload)
-        session.add(repo)
-        await session.commit()
+        async_session.add(repo)
+        await async_session.commit()
     yield repo
