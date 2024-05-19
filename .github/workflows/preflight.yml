@@ -79,17 +79,6 @@ jobs:
       - name: Start services
         run: docker compose up -d test_db
 
-      - name: Check migrations
-        run: docker compose run --rm web_server_tests alembic --config tests/test-alembic.ini upgrade head
-
-      - name: Run pytest
-        run: |
-          docker compose run --rm web_server_tests bash -c "
-            pytest -v --cov \
-              --junit-xml=$REPORTS_DIR/pytest-report.xml \
-              --cov-report=xml:$REPORTS_DIR/pytest-coverage.xml \
-              --cov-report=term | tee $REPORTS_DIR/pytest-output.txt"
-
       - name: Run pylint
         if: ${{ steps.changed-files.outputs.src == 'true' }}
         run: |
@@ -118,11 +107,23 @@ jobs:
             bandit -c pyproject.toml ${{ steps.changed-files.outputs.src_files }} \
               | tee >(sed 's/\x1B\[[0-9;]*m//g' > $REPORTS_DIR/bandit-report.txt)"
 
+      - name: Run pytest
+        run: |
+          docker compose run --rm web_server_tests bash -o pipefail -c "
+            pytest -v --cov \
+              --junit-xml=$REPORTS_DIR/pytest-report.xml \
+              --cov-report=xml:$REPORTS_DIR/pytest-coverage.xml \
+              --cov-report=term | tee $REPORTS_DIR/pytest-output.txt"
+
+      - name: Check migrations
+        run: docker compose run --rm web_server_tests alembic --config tests/test-alembic.ini upgrade head
+
       - name: Stop services
         if: always()
         run: docker compose down --volumes
 
       - name: Generate .md reports
+        if: success() || failure()
         run: |
           awk 'NR == 1 {next}; /^-+ coverage:/ {exit}; {print}' $REPORTS_DIR/pytest-output.txt \
             > $REPORTS_DIR/pytest-report.txt
@@ -142,12 +143,14 @@ jobs:
           done
 
       - name: Save environment
+        if: success() || failure()
         run: |
           {
             echo "PR_NUMBER=${{ github.event.number }}"
           } > $REPORTS_DIR/environment.txt
 
       - name: Upload Pytest reports
+        if: success() || failure()
         # https://github.com/actions/upload-artifact
         uses: actions/upload-artifact@v4
         with:
@@ -156,6 +159,7 @@ jobs:
           compression-level: 9
 
       - name: Publish Job Summary
+        if: success() || failure()
         run: |
           cat $REPORTS_DIR/{coverage,pytest,pylint,black,isort,bandit}-report.md \
             > $GITHUB_STEP_SUMMARY 2>/dev/null || true
