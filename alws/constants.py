@@ -139,6 +139,11 @@ class ErrataReleaseStatus(enum.Enum):
     FAILED = "failed"
 
 
+class ErrataPackagesType(enum.Enum):
+    PROD = "prod"
+    BUILD = "build"
+
+
 class ReleaseStatus(enum.IntEnum):
     SCHEDULED = 1
     IN_PROGRESS = 2

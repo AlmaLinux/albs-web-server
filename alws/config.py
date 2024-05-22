@@ -9,9 +9,7 @@ class Settings(BaseSettings):
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
-    pulp_database_url: str = (
-        'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
-    )
+    pulp_database_url: str = 'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
     pulp_async_database_url: str = (
         'postgresql+asyncpg://postgres:password@pulp:5432/pulp'
     )
@@ -26,15 +24,11 @@ class Settings(BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
 
-    database_url: str = (
-        'postgresql+asyncpg://postgres:password@db/almalinux-bs'
-    )
+    database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
     test_database_url: str = (
         'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
     )
-    sync_database_url: str = (
-        'postgresql+psycopg2://postgres:password@db/almalinux-bs'
-    )
+    sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
 
     github_client: str
     github_client_secret: str
@@ -76,6 +70,9 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.2
 
     github_integration_enabled: bool = False
+    github_app_id: Optional[str] = None
+    path_to_github_app_pem: Optional[str] = None
+    github_installation_id: Optional[str] = None
     github_token: Optional[str] = None
     github_organization_name: str = 'AlmaLinux'
     github_project_number: Optional[int] = None
