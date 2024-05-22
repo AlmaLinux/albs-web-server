@@ -32,4 +32,4 @@ uvicorn==0.29.0
 websockets==12.0
 git+https://github.com/AlmaLinux/immudb-wrapper.git@0.1.2#egg=immudb_wrapper
 git+https://github.com/AlmaLinux/errata2osv.git@0.0.3#egg=errata2osv
-git+https://github.com/AlmaLinux/albs-github-integration.git@0.4.0#egg=albs_github
+git+https://github.com/AlmaLinux/albs-github-integration.git@0.4.1#egg=albs_github

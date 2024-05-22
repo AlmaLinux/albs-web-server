@@ -4,15 +4,7 @@ from urllib.parse import urljoin
 from albs_github.graphql.client import IntegrationsGHGraphQLClient
 
 from alws.config import settings
-
-__all__ = [
-    'get_github_client',
-    'find_issues_by_record_id',
-    'find_issues_by_repo_name',
-    'move_issues',
-    'create_github_issue',
-    'set_build_id_to_issues',
-]
+from alws.constants import ErrataPackagesType, GitHubIssueStatus
 
 
 async def get_github_client() -> IntegrationsGHGraphQLClient:
@@ -31,13 +23,13 @@ async def get_github_client() -> IntegrationsGHGraphQLClient:
                 'Config for GitHub integration is incomplete, '
                 'please check the settings'
             )
-        github_token = (
-            await IntegrationsGHGraphQLClient.generate_token_for_gh_app(
-                gh_app_id=app_id,
-                path_to_gh_app_pem=pem,
-                installation_id=installation_id,
-            )
+        github_token = await IntegrationsGHGraphQLClient.generate_token_for_gh_app(
+            gh_app_id=app_id,
+            path_to_gh_app_pem=pem,
+            installation_id=installation_id,
         )
+    if not github_token:
+        raise Exception("Can not get Github token")
 
     github_client = IntegrationsGHGraphQLClient(
         github_token,
@@ -55,14 +47,15 @@ async def find_issues_by_repo_name(
 ) -> typing.List[dict]:
     issue_ids = []
     for name in repo_names:
-        query = f"{name} in:title,body"
-        issue_ids.extend(
-            await get_github_issue_content_ids(github_client, query)
-        )
+        query = f"conflict for {name} in:title"
+        issue_ids.extend(await get_github_issue_content_ids(github_client, query))
     issue_ids = set(issue_ids)
     project_issues = await github_client.get_project_content_issues()
     filtered_issues = []
-    valid_statuses = ["Todo", "In Development"]
+    valid_statuses = [
+        GitHubIssueStatus.TODO.value,
+        GitHubIssueStatus.DEVELOPMENT.value,
+    ]
     for issue_id in list(issue_ids):
         project_issue = project_issues[issue_id]
         if project_issue.fields["Status"]["value"] in valid_statuses:
@@ -77,9 +70,7 @@ async def find_issues_by_record_id(
     issue_ids = []
     for record_id in record_ids:
         query = f"{record_id} in:title"
-        issue_ids.extend(
-            await get_github_issue_content_ids(github_client, query)
-        )
+        issue_ids.extend(await get_github_issue_content_ids(github_client, query))
     project_issues = await github_client.get_project_content_issues()
     issues = []
     for issue_id in list(issue_ids):
@@ -112,12 +103,87 @@ async def set_build_id_to_issues(
 ):
     for issue in issues:
         issue_id = issue["id"]
+        if "Build URL" in issue["fields"]:
+            continue
+
         url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
         await github_client.set_text_field(
             issue_id=issue_id,
             field_name="Build URL",
             field_value=url,
         )
+        comment = f"Build: {build_id}"
+        await github_client.create_comment(item_id=issue_id, body=comment)
+
+
+async def find_issues(
+    github_client: IntegrationsGHGraphQLClient,
+    record_ids: typing.Optional[typing.List[str]] = None,
+    build_ids: typing.Optional[typing.List[str]] = None,
+):
+    issues = []
+    if record_ids:
+        issues.extend(
+            await find_issues_by_record_id(
+                github_client,
+                record_ids,
+            )
+        )
+    if build_ids:
+        issues.extend(
+            await find_issues_by_build_id(
+                github_client=github_client,
+                build_ids=build_ids,
+            )
+        )
+    return issues
+
+
+async def move_issue_to_testing(
+    build_id: str,
+    record_ids: typing.List[str],
+):
+    github_client = await get_github_client()
+    issues = await find_issues(
+        github_client=github_client,
+        record_ids=record_ids,
+        build_ids=[build_id],
+    )
+    issues = await filter_issues(
+        issues=filter_issues,
+        valid_statuses=[
+            GitHubIssueStatus.TODO.value,
+            GitHubIssueStatus.DEVELOPMENT.value,
+            GitHubIssueStatus.BUILDING.value,
+        ],
+    )
+    await set_build_id_to_issues(
+        github_client=github_client,
+        issues=issues,
+        build_id=build_id,
+    )
+    await move_issues(
+        github_client=github_client,
+        issues=issues,
+        status=GitHubIssueStatus.TESTING.value,
+    )
+
+
+async def filter_issues(
+    issues: list,
+    valid_statuses: typing.Optional[list] = None,
+    platform: typing.Optional[str] = None,
+):
+    filtered = []
+    for issue in issues:
+        condition = []
+        if valid_statuses:
+            condition.append(issue["fields"]["Status"]["value"] in valid_statuses)
+        if platform:
+            condition.append(issue["fields"]["Platform"]["value"] == platform)
+        if all(condition):
+            filtered.append(issue)
+    return filtered
 
 
 async def move_issues(
@@ -139,25 +205,18 @@ async def close_issues(
 ):
     issues = []
     github_client = await get_github_client()
-    if record_ids:
-        issues.extend(
-            await find_issues_by_record_id(
-                github_client,
-                record_ids,
-            )
-        )
-    if build_ids:
-        issues.extend(
-            await find_issues_by_build_id(
-                github_client=github_client,
-                build_ids=build_ids,
-            )
-        )
+    issues = await find_issues(
+        github_client=github_client,
+        record_ids=record_ids,
+        build_ids=build_ids,
+    )
     for issue in issues:
         issue_id = issue["content"]["id"]
         await github_client.close_issue(
             issue_id=issue_id,
         )
+        comment = f"{record_ids} is released"
+        await github_client.create_comment(item_id=issue_id, body=comment)
 
 
 async def get_github_issue_content_ids(
@@ -182,6 +241,8 @@ async def create_github_issue(
     platform_name: str,
     severity: str,
     packages: list,
+    platform_id: str,
+    find_packages_types: typing.Optional[list] = None,
 ):
     packages_section = "\n".join(
         (f"{p.name}-{p.version}-{p.release}.{p.arch}" for p in packages)
@@ -194,9 +255,45 @@ async def create_github_issue(
         f'Description\n{description}\n\n'
         f'Affected packages:\n{packages_section}'
     )
-    issue_id, project_item_id = await client.create_issue(
-        issue_title, issue_body
-    )
+    issue_id, project_item_id = await client.create_issue(issue_title, issue_body)
     await client.set_issue_platform(project_item_id, platform_name)
+    errata_url = urljoin(
+        settings.frontend_baseurl,
+        f"/errata?id={advisory_id}&platform_id={platform_id}",
+    )
+    await client.set_text_field(
+        issue_id=project_item_id,
+        field_name="Errata URL",
+        field_value=errata_url,
+    )
     await client.set_text_field(project_item_id, 'Upstream ID', original_id)
     await client.set_text_field(project_item_id, 'AlmaLinux ID', advisory_id)
+    comment = f"Errata created in ALBS: {errata_url}"
+    await client.create_comment(item_id=issue_id, body=comment)
+    if not find_packages_types:
+        comment = "Can not find packages in any repos"
+        await client.create_comment(item_id=issue_id, body=comment)
+        return
+
+    comments = set()
+    build_ids = set()
+    for pkg in find_packages_types:
+        if pkg["type"] == ErrataPackagesType.BUILD:
+            for build_id in pkg["build_ids"]:
+                build_ids.add(build_id)
+        else:
+            comments.add("Find packages in prod repos")
+    for build_id in build_ids:
+        await client.set_text_field(
+            issue_id=project_item_id,
+            field_name="Build URL",
+            field_value=url,
+        )
+        url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
+        comments.add(f"Find packages in Build: {url}")
+    for comment in comments:
+        await client.create_comment(item_id=issue_id, body=comment)
+    await client.set_issue_status(
+        issue_id=issue_id,
+        status=GitHubIssueStatus.TESTING.value,
+    )

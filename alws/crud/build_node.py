@@ -29,10 +29,7 @@ from alws.errors import (
 from alws.schemas import build_node_schema
 from alws.schemas.build_node_schema import BuildDoneArtifact
 from alws.utils.github_integration_helper import (
-    find_issues_by_build_id,
-    find_issues_by_record_id,
-    get_github_client,
-    move_issues,
+    move_issue_to_testing,
 )
 from alws.utils.ids import get_random_unique_version
 from alws.utils.modularity import IndexWrapper, RpmArtifact
@@ -50,9 +47,7 @@ async def get_available_build_task(
 ) -> typing.Optional[models.BuildTask]:
     async with db.begin():
         # TODO: here should be config value
-        ts_expired = datetime.datetime.utcnow() - datetime.timedelta(
-            minutes=20
-        )
+        ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
         db_task = await db.execute(
             select(models.BuildTask)
             .where(~models.BuildTask.dependencies.any())
@@ -69,15 +64,11 @@ async def get_available_build_task(
             )
             .options(
                 selectinload(models.BuildTask.ref),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.repos
-                ),
+                selectinload(models.BuildTask.build).selectinload(models.Build.repos),
                 selectinload(models.BuildTask.platform).selectinload(
                     models.Platform.repos
                 ),
-                selectinload(models.BuildTask.build).selectinload(
-                    models.Build.owner
-                ),
+                selectinload(models.BuildTask.build).selectinload(models.Build.owner),
                 selectinload(models.BuildTask.build)
                 .selectinload(models.Build.linked_builds)
                 .selectinload(models.Build.repos),
@@ -182,9 +173,7 @@ async def update_failed_build_items_in_parallel(
                     # dependency.status can be completed because
                     # we stores in cache completed tasks
                     if dep and dep.status == BuildTaskStatus.IDLE:
-                        await db.run_sync(
-                            add_build_task_dependencies, task, dep
-                        )
+                        await db.run_sync(add_build_task_dependencies, task, dep)
                     idx -= 1
                 # if at least one task in index is completed,
                 # we shouldn't wait first task completion
@@ -214,9 +203,7 @@ async def update_failed_build_items(db: AsyncSession, build_id: int):
                 task.status = BuildTaskStatus.IDLE
                 task.ts = None
                 if last_task is not None:
-                    await db.run_sync(
-                        add_build_task_dependencies, task, last_task
-                    )
+                    await db.run_sync(add_build_task_dependencies, task, last_task)
                 last_task = task
         await db.commit()
 
@@ -258,9 +245,7 @@ async def create_build_log_repo(db: AsyncSession, task: models.BuildTask):
         pulp_href = pulp_repo["pulp_href"]
         distro = await pulp_client.get_log_distro(repo_name)
         if not distro:
-            repo_url = await pulp_client.create_file_distro(
-                repo_name, pulp_href
-            )
+            repo_url = await pulp_client.create_file_distro(repo_name, pulp_href)
         else:
             repo_url = distro["base_url"]
     else:
@@ -380,9 +365,7 @@ async def __process_rpms(
         try:
             results = await asyncio.gather(*tasks)
         except Exception as e:
-            logging.exception(
-                "Cannot create RPM packages for repo %s", str(repo)
-            )
+            logging.exception("Cannot create RPM packages for repo %s", str(repo))
             raise ArtifactConversionError(
                 f"Cannot put RPM packages into Pulp storage: {e}"
             )
@@ -438,9 +421,7 @@ async def __process_rpms(
         if rpm_info["arch"] != "noarch":
             conditions.append(models.NewErrataPackage.arch == rpm_info["arch"])
 
-        query = select(models.NewErrataPackage).where(
-            sqlalchemy.and_(*conditions)
-        )
+        query = select(models.NewErrataPackage).where(sqlalchemy.and_(*conditions))
 
         if module_index:
             module = None
@@ -469,25 +450,12 @@ async def __process_rpms(
                 rpm_info,
             )
             errata_record_ids.add(errata_package.errata_record_id)
-    if settings.github_integration_enabled:
+    if settings.github_integration_enabled and errata_record_ids:
         try:
-            github_client = await get_github_client()
-            issues = await find_issues_by_record_id(
-                github_client=github_client,
+            await move_issue_to_testing(
                 record_ids=list(errata_record_ids),
+                build_id=build_id,
             )
-            issues.extend(
-                await find_issues_by_build_id(
-                    github_client=github_client,
-                    build_ids=[build_id],
-                )
-            )
-            if issues:
-                await move_issues(
-                    github_client=github_client,
-                    issues=issues,
-                    status=GitHubIssueStatus.TESTING.value,
-                )
         except Exception as err:
             logging.exception(
                 "Cannot move issue to the Testing section: %s",
@@ -506,9 +474,7 @@ async def __process_rpms(
         try:
             for module in module_index.iter_modules():
                 for artifact in module_artifacts:
-                    module.add_rpm_artifact(
-                        artifact, task_excluded=task_excluded
-                    )
+                    module.add_rpm_artifact(artifact, task_excluded=task_excluded)
         except Exception as e:
             raise ModuleUpdateError("Cannot update module: %s", str(e)) from e
 
@@ -525,9 +491,7 @@ async def __process_logs(
         logging.error("Log repository is absent, skipping logs processing")
         return
     logs = []
-    tasks = [
-        pulp_client.create_entity(artifact) for artifact in task_artifacts
-    ]
+    tasks = [pulp_client.create_entity(artifact) for artifact in task_artifacts]
     try:
         results = await asyncio.gather(*tasks)
     except Exception as e:
@@ -653,18 +617,14 @@ async def __process_build_task_artifacts(
             if build_repo.arch == build_task.arch and build_repo.debug is False
         )
         try:
-            repo_modules_yaml = await pulp_client.get_repo_modules_yaml(
-                module_repo.url
-            )
+            repo_modules_yaml = await pulp_client.get_repo_modules_yaml(module_repo.url)
             module_index = IndexWrapper.from_template(repo_modules_yaml)
         except Exception as e:
             message = f"Cannot parse modules index: {str(e)}"
             logging.exception("Cannot parse modules index: %s", str(e))
             raise ModuleUpdateError(message) from e
     rpm_artifacts = [item for item in task_artifacts if item.type == "rpm"]
-    log_artifacts = [
-        item for item in task_artifacts if item.type == "build_log"
-    ]
+    log_artifacts = [item for item in task_artifacts if item.type == "build_log"]
     src_rpm = _get_srpm_name(
         artifacts=task_artifacts,
         task=build_task,
@@ -834,9 +794,7 @@ async def __process_build_task_artifacts(
                     module_for_pulp.description,
                     version=module_version,
                     artifacts=module_for_pulp.get_rpm_artifacts(),
-                    dependencies=list(
-                        module_for_pulp.get_runtime_deps().values()
-                    ),
+                    dependencies=list(module_for_pulp.get_runtime_deps().values()),
                     # packages=module_pkgs_hrefs,
                     packages=[],
                     profiles=module_for_pulp.get_profiles(),
@@ -854,9 +812,7 @@ async def __process_build_task_artifacts(
                     "delta": str(end_time - start_time),
                 }
             except Exception as e:
-                message = (
-                    f"Cannot update module information inside Pulp: {str(e)}"
-                )
+                message = f"Cannot update module information inside Pulp: {str(e)}"
                 logging.exception(message)
                 raise ModuleUpdateError(message) from e
             logging.info("Module template processing is finished")
@@ -1014,9 +970,7 @@ async def safe_build_done(
     request: build_node_schema.BuildDone,
 ):
     success = True
-    pulp = PulpClient(
-        settings.pulp_host, settings.pulp_user, settings.pulp_password
-    )
+    pulp = PulpClient(settings.pulp_host, settings.pulp_user, settings.pulp_password)
     build_task_stats = {
         "build_node_stats": request.stats,
         "build_done_stats": {},
@@ -1031,9 +985,7 @@ async def safe_build_done(
         logging.exception("Build done failed:")
         success = False
         build_task = await db.execute(
-            select(models.BuildTask).where(
-                models.BuildTask.id == request.task_id
-            )
+            select(models.BuildTask).where(models.BuildTask.id == request.task_id)
         )
         build_task = build_task.scalars().first()
         build_task.ts = datetime.datetime.utcnow()
@@ -1055,12 +1007,9 @@ async def safe_build_done(
             await db.commit()
     finally:
         remove_dep_query = delete(models.BuildTaskDependency).where(
-            models.BuildTaskDependency.c.build_task_dependency
-            == request.task_id
+            models.BuildTaskDependency.c.build_task_dependency == request.task_id
         )
-        build_task_start_time = request.stats.get("build_node_task", {}).get(
-            "start_ts"
-        )
+        build_task_start_time = request.stats.get("build_node_task", {}).get("start_ts")
         if build_task_start_time:
             build_task_start_time = datetime.datetime.fromisoformat(
                 build_task_start_time
