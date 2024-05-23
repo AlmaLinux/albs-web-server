@@ -1,11 +1,11 @@
 import typing
 import uuid
 
+from fastapi_sqla import open_session
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
-from alws.database import PulpAsyncSession
-from alws.dependencies import get_pulp_db
 from alws.models import RpmModule
 from alws.pulp_models import (
     CoreArtifact,
@@ -35,10 +35,8 @@ def get_rpm_module_packages_from_repository(
     pkg_epochs: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
     result = []
-    repo_query = select(CoreRepository).where(
-        CoreRepository.pulp_id == repo_id
-    )
-    with get_pulp_db() as pulp_db:
+    repo_query = select(CoreRepository).where(CoreRepository.pulp_id == repo_id)
+    with open_session(key="pulp") as pulp_db:
         repo = pulp_db.execute(repo_query).scalars().first()
         repo_name = repo.name
 
@@ -118,7 +116,7 @@ def get_rpm_module_packages_from_repository(
     ])
 
     query = select(RpmPackage).where(*conditions)
-    with get_pulp_db() as pulp_db:
+    with open_session(key="pulp") as pulp_db:
         result = pulp_db.execute(query).scalars().all()
     return result
 
@@ -159,7 +157,7 @@ def get_rpm_packages_from_repositories(
             )
         )
     )
-    with get_pulp_db() as pulp_db:
+    with open_session(key="pulp") as pulp_db:
         return pulp_db.execute(query).scalars().unique().all()
 
 
@@ -205,7 +203,7 @@ def get_rpm_packages_from_repository(
         conditions.append(RpmPackage.arch.in_(pkg_arches))
 
     query = select(RpmPackage).where(*conditions)
-    with get_pulp_db() as pulp_db:
+    with open_session(key="pulp") as pulp_db:
         return pulp_db.execute(query).scalars().all()
 
 
@@ -214,7 +212,8 @@ def get_rpm_packages_by_ids(
     pkg_fields: typing.List[typing.Any],
 ) -> typing.Dict[str, RpmPackage]:
     result = {}
-    with get_pulp_db() as pulp_db:
+    with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         pulp_pkgs = (
             pulp_db.execute(
                 select(RpmPackage)
@@ -241,7 +240,7 @@ def get_rpm_packages_by_checksums(
     pkg_checksums: typing.List[str],
 ) -> typing.Dict[str, RpmPackage]:
     result = {}
-    with get_pulp_db() as pulp_db:
+    with open_session(key="pulp") as pulp_db:
         pulp_pkgs = (
             pulp_db.execute(
                 select(RpmPackage)
@@ -265,7 +264,7 @@ def get_rpm_packages_by_checksums(
 
 
 async def get_module_from_pulp_db(
-    pulp_db: PulpAsyncSession,
+    pulp_db: AsyncSession,
     module: RpmModule,
 ) -> typing.Optional[RpmModulemd]:
     return (

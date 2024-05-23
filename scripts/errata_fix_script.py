@@ -1,21 +1,21 @@
 import asyncio
-from contextlib import asynccontextmanager
 import logging
 import re
 import typing
 
-import yaml
-from sqlalchemy import select
 import createrepo_c as cr
+import yaml
+from fastapi_sqla import open_async_session, open_session
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from alws.utils import pulp_client
-from alws.database import PulpSession, SyncSession
 from alws.config import settings
-from alws.constants import ErrataReferenceType, ErrataPackageStatus
-from alws.pulp_models import UpdateRecord, UpdatePackage
+from alws.constants import ErrataPackageStatus, ErrataReferenceType
+from alws.dependencies import get_async_db_key
 from alws.models import ErrataRecord, ErrataReference
-from alws.dependencies import get_db
-
+from alws.pulp_models import UpdatePackage, UpdateRecord
+from alws.utils import pulp_client
+from alws.utils.fastapi_sqla_setup import setup_all
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -35,7 +35,7 @@ async def update_pulp_repo(repo, pulp):
 
 
 async def prepare_albs_packages_cache(
-    albs_db: SyncSession,
+    albs_db: Session,
     pulp: pulp_client.PulpClient,
     record_id: str,
 ) -> typing.Dict[str, typing.Any]:
@@ -53,10 +53,13 @@ async def prepare_albs_packages_cache(
         'sha256',
         'checksum_type',
     ]
-    albs_record: typing.Optional[ErrataRecord] = albs_db.execute(
-        select(ErrataRecord)
-        .where(ErrataRecord.id == record_id)
-    ).scalars().first()
+    albs_record: typing.Optional[ErrataRecord] = (
+        albs_db.execute(
+            select(ErrataRecord).where(ErrataRecord.id == record_id)
+        )
+        .scalars()
+        .first()
+    )
     if not albs_record:
         return albs_packages_cache
     logging.info('Collecting pulp_packages for record %s', record_id)
@@ -71,9 +74,7 @@ async def prepare_albs_packages_cache(
             pulp_pkg['reboot_suggested'] = (
                 albs_package.errata_package.reboot_suggested
             )
-            location_href = re.sub(
-                r'^Packages/', '', pulp_pkg['location_href']
-            )
+            location_href = re.sub(r'^Packages/', '', pulp_pkg['location_href'])
             pulp_pkg['location_href'] = location_href
             albs_packages_cache[location_href] = pulp_pkg
     return albs_packages_cache
@@ -87,11 +88,12 @@ async def update_pulp_db():
     albs_packages_cache = {}
     latest_record_id = ''
     logging.info('updating pulp db records')
-    with PulpSession() as pulp_db, SyncSession() as albs_db:
-        records: typing.List[UpdateRecord] = pulp_db.execute(
-            select(UpdateRecord)
-            .order_by(UpdateRecord.id)
-        ).scalars().all()
+    with open_session(key="pulp") as pulp_db, open_session() as albs_db:
+        records: typing.List[UpdateRecord] = (
+            pulp_db.execute(select(UpdateRecord).order_by(UpdateRecord.id))
+            .scalars()
+            .all()
+        )
         for record in records:
             logging.info("Processing errata %s", record.id)
             if latest_record_id != record.id:
@@ -99,8 +101,9 @@ async def update_pulp_db():
                     albs_db, pulp, record.id
                 )
             if not albs_packages_cache:
-                logging.info('Skipping record %s, there is no ErrataRecord',
-                             record.id)
+                logging.info(
+                    'Skipping record %s, there is no ErrataRecord', record.id
+                )
                 continue
             collection = record.collections[0]
             collection_arch = re.search(
@@ -113,10 +116,7 @@ async def update_pulp_db():
                 for location_href, pkg in albs_packages_cache.items()
                 if pkg['arch'] in (collection_arch, 'noarch')
             }
-            errata_packages = {
-                pkg.filename
-                for pkg in collection.packages
-            }
+            errata_packages = {pkg.filename for pkg in collection.packages}
             missing_filenames = albs_packages.difference(errata_packages)
             if not missing_filenames:
                 logging.info('Errata %s is ok', record.id)
@@ -132,20 +132,23 @@ async def update_pulp_db():
                         filename,
                     )
                     pulp_pkg['sha256'] = pulp_pkg['pkgId']
-                collection.packages.append(UpdatePackage(
-                    name=pulp_pkg['name'],
-                    filename=pulp_pkg['location_href'],
-                    arch=pulp_pkg['arch'],
-                    version=pulp_pkg['version'],
-                    release=pulp_pkg['release'],
-                    epoch=str(pulp_pkg['epoch']),
-                    reboot_suggested=pulp_pkg['reboot_suggested'],
-                    src=pulp_pkg['rpm_sourcerpm'],
-                    sum=pulp_pkg['sha256'],
-                    sum_type=cr.checksum_type('sha256'),
-                ))
-                logging.info('Added package %s for errata %s',
-                             filename, record.id)
+                collection.packages.append(
+                    UpdatePackage(
+                        name=pulp_pkg['name'],
+                        filename=pulp_pkg['location_href'],
+                        arch=pulp_pkg['arch'],
+                        version=pulp_pkg['version'],
+                        release=pulp_pkg['release'],
+                        epoch=str(pulp_pkg['epoch']),
+                        reboot_suggested=pulp_pkg['reboot_suggested'],
+                        src=pulp_pkg['rpm_sourcerpm'],
+                        sum=pulp_pkg['sha256'],
+                        sum_type=cr.checksum_type('sha256'),
+                    )
+                )
+                logging.info(
+                    'Added package %s for errata %s', filename, record.id
+                )
             logging.info('Start checking record %s references', record.id)
             for reference in record.references:
                 if (
@@ -156,7 +159,6 @@ async def update_pulp_db():
                 reference.title = reference.ref_id
                 logging.info('Fixed ref_title for ref_id %s', reference.ref_id)
             latest_record_id = record.id
-        pulp_db.commit()
     logging.info('pulp db records updated')
     platforms = yaml.safe_load(
         open("reference_data/platforms.yaml", "r").read()
@@ -173,14 +175,11 @@ async def update_pulp_db():
 
 async def update_albs_db():
     logging.info("Update albs db started")
-    query = (
-        select(ErrataReference)
-        .where(
-            ErrataReference.ref_type != ErrataReferenceType.bugzilla,
-            ErrataReference.title == '',
-        )
+    query = select(ErrataReference).where(
+        ErrataReference.ref_type != ErrataReferenceType.bugzilla,
+        ErrataReference.title == '',
     )
-    async with asynccontextmanager(get_db)() as db, db.begin():
+    async with open_async_session(key=get_async_db_key()) as db:
         for reference in (await db.execute(query)).scalars().all():
             reference.title = reference.ref_id
     logging.info("Update albs db is done")
@@ -192,6 +191,7 @@ async def main():
         update_pulp_db(),
         update_albs_db(),
     ]
+    await setup_all()
     await asyncio.gather(*tasks)
 
 

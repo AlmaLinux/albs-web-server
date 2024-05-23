@@ -1,11 +1,11 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from alws.database import Session
 from alws.models import UserAction
 from alws.perms.actions import ActionsList
 
 
-async def ensure_all_actions_exist(session: Session, commit: bool = False):
+async def ensure_all_actions_exist(session: AsyncSession):
     existing_actions = (
         (await session.execute(select(UserAction))).scalars().all()
     )
@@ -19,7 +19,4 @@ async def ensure_all_actions_exist(session: Session, commit: bool = False):
 
     if new_actions:
         session.add_all(new_actions)
-        if commit:
-            await session.commit()
-        else:
-            await session.flush()
+        await session.flush()

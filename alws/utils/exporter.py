@@ -1,22 +1,25 @@
 import os
 import typing
-import aiohttp
-import aiofiles
 import urllib
 from pathlib import Path
 
+import aiofiles
+import aiohttp
 from lxml.html import document_fromstring
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws import database
 from alws.crud import repo_exporter
 
 
-async def fs_export_repository(repository_ids: typing.List[int],
-                               db: database.Session):
+async def fs_export_repository(
+    repository_ids: typing.List[int], db: AsyncSession
+):
     export_task = await repo_exporter.create_pulp_exporters_to_fs(
-        db, repository_ids)
+        db, repository_ids
+    )
     export_data = await repo_exporter.execute_pulp_exporters_to_fs(
-        db, export_task)
+        db, export_task
+    )
     export_paths = list(export_data.keys())
     for repo_elem, repo_data in export_data.items():
         repo_url = urllib.parse.urljoin(repo_data, 'repodata/')
@@ -34,8 +37,7 @@ async def get_repodata_file_links(base_url: str):
             response.raise_for_status()
             content = await response.text()
             doc = document_fromstring(content)
-            children_urls = [base_url + a.get('href')
-                             for a in doc.xpath('//a')]
+            children_urls = [base_url + a.get('href') for a in doc.xpath('//a')]
             return children_urls
 
 

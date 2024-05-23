@@ -22,7 +22,6 @@ from alws.perms.roles import (
 )
 from alws.schemas import team_schema
 
-
 __all__ = [
     'create_team',
     'create_team_roles',
@@ -36,20 +35,35 @@ def get_team_role_name(team_name: str, role_name: str):
 
 
 async def create_team_roles(session: AsyncSession, team_name: str):
-    required_roles = (Contributor, Manager, Observer, ProductMaintainer, Signer)
-    new_role_names = [get_team_role_name(team_name, role.name)
-                      for role in required_roles]
+    required_roles = (
+        Contributor,
+        Manager,
+        Observer,
+        ProductMaintainer,
+        Signer,
+    )
+    new_role_names = [
+        get_team_role_name(team_name, role.name) for role in required_roles
+    ]
 
-    existing_roles = (await session.execute(select(UserRole).where(
-        UserRole.name.in_(new_role_names)))).scalars().all()
+    existing_roles = (
+        (
+            await session.execute(
+                select(UserRole).where(UserRole.name.in_(new_role_names))
+            )
+        )
+        .scalars()
+        .all()
+    )
     existing_role_names = {r.name for r in existing_roles}
 
     if len(new_role_names) == len(existing_roles):
         return existing_roles
 
     await ensure_all_actions_exist(session)
-    existing_actions = (await session.execute(
-        select(UserAction))).scalars().all()
+    existing_actions = (
+        (await session.execute(select(UserAction))).scalars().all()
+    )
 
     new_roles = []
     for role in required_roles:
@@ -79,20 +93,36 @@ async def create_team(
     payload: team_schema.TeamCreate,
     flush: bool = False,
 ) -> Team:
-    owner = (await session.execute(select(User).where(
-        User.id == payload.user_id).options(
-            selectinload(User.roles)
-    ))).scalars().first()
+    owner = (
+        (
+            await session.execute(
+                select(User)
+                .where(User.id == payload.user_id)
+                .options(selectinload(User.roles))
+            )
+        )
+        .scalars()
+        .first()
+    )
 
     if not owner:
         raise TeamError(f'Unknown user ID: {payload.user_id}')
 
-    existing_team = (await session.execute(select(Team).where(
-        Team.name == payload.team_name).options(
-        selectinload(Team.roles),
-        selectinload(Team.owner),
-        selectinload(Team.members),
-    ))).scalars().first()
+    existing_team = (
+        (
+            await session.execute(
+                select(Team)
+                .where(Team.name == payload.team_name)
+                .options(
+                    selectinload(Team.roles),
+                    selectinload(Team.owner),
+                    selectinload(Team.members),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
 
     if existing_team:
         raise TeamError(f'Team={payload.team_name} already exist')
@@ -109,10 +139,7 @@ async def create_team(
     session.add(new_team)
     session.add_all(team_roles)
     session.add(owner)
-    if flush:
-        await session.flush()
-    else:
-        await session.commit()
+    await session.flush()
     await session.refresh(new_team)
     return new_team
 
@@ -125,11 +152,15 @@ async def get_teams(
 ) -> typing.Union[typing.List[Team], typing.Dict[str, typing.Any], Team]:
 
     def generate_query(count=False):
-        query = select(Team).order_by(Team.id.desc()).options(
-            selectinload(Team.members),
-            selectinload(Team.owner),
-            selectinload(Team.roles).selectinload(UserRole.actions),
-            selectinload(Team.products),
+        query = (
+            select(Team)
+            .order_by(Team.id.desc())
+            .options(
+                selectinload(Team.members),
+                selectinload(Team.owner),
+                selectinload(Team.roles).selectinload(UserRole.actions),
+                selectinload(Team.products),
+            )
         )
         if name:
             query = query.where(Team.name == name)
@@ -162,26 +193,30 @@ async def update_members(
     modification: str,
 ) -> Team:
     items_to_update = []
-    db_team = (await session.execute(
-        select(Team).where(Team.id == team_id).options(
-            selectinload(Team.members),
-            selectinload(Team.owner),
-            selectinload(Team.roles),
-        ),
-    )).scalars().first()
+    db_team = (
+        (
+            await session.execute(
+                select(Team)
+                .where(Team.id == team_id)
+                .options(
+                    selectinload(Team.members),
+                    selectinload(Team.owner),
+                    selectinload(Team.roles),
+                ),
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not db_team:
         raise TeamError(f'Team={team_id} doesn`t exist')
     db_users = await session.execute(
-        select(User).where(User.id.in_((
-            user.id for user in payload.members_to_update
-        ))).options(
-            selectinload(User.roles),
-            selectinload(User.oauth_accounts)
-        ),
+        select(User)
+        .where(User.id.in_((user.id for user in payload.members_to_update)))
+        .options(selectinload(User.roles), selectinload(User.oauth_accounts)),
     )
     db_contributor_team_role = next(
-        role for role in db_team.roles
-        if Contributor.name in role.name
+        role for role in db_team.roles if Contributor.name in role.name
     )
     operation = 'append' if modification == 'add' else 'remove'
     db_team_members_update_operation = getattr(db_team.members, operation)
@@ -201,7 +236,7 @@ async def update_members(
         items_to_update.append(db_user)
     items_to_update.append(db_team)
     session.add_all(items_to_update)
-    await session.commit()
+    await session.flush()
     await session.refresh(db_team)
     return db_team
 
@@ -215,4 +250,4 @@ async def remove_team(db: AsyncSession, team_id: int):
             f"Cannot delete Team={team_id}, team contains undeleted products",
         )
     await db.delete(db_team)
-    await db.commit()
+    await db.flush()

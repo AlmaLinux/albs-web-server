@@ -6,11 +6,12 @@ from fastapi import (
     HTTPException,
     status,
 )
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.auth import get_current_user
 from alws.crud import products, sign_task
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.models import User
 from alws.schemas import (
     product_schema,
@@ -39,7 +40,7 @@ router = APIRouter(
 async def get_products(
     pageNumber: Optional[int] = None,
     search_string: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await products.get_products(
         db, page_number=pageNumber, search_string=search_string
@@ -49,12 +50,11 @@ async def get_products(
 @public_router.post("/", response_model=product_schema.Product)
 async def create_product(
     product: product_schema.ProductCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
-    async with db.begin():
-        db_product = await products.create_product(db, product)
-        await db.commit()
+    db_product = await products.create_product(db, product)
+    await db.flush()
     await db.refresh(db_product)
     # await sign_task.create_gen_key_task(
     #     db=db,
@@ -67,7 +67,7 @@ async def create_product(
 @public_router.get("/{product_id}/", response_model=product_schema.Product)
 async def get_product(
     product_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     db_product = await products.get_products(db, product_id=product_id)
     if db_product is None:
@@ -85,7 +85,7 @@ async def get_product(
 async def add_to_product(
     product: str,
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
     try:
@@ -108,7 +108,7 @@ async def add_to_product(
 async def remove_from_product(
     product: str,
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
     try:
@@ -132,7 +132,7 @@ async def remove_from_product(
 )
 async def remove_product(
     product_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
     try:
@@ -154,7 +154,7 @@ async def remove_product(
 )
 async def create_gen_key_task(
     product_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
     product = await products.get_products(db=db, product_id=product_id)

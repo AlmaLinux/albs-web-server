@@ -3,16 +3,18 @@ import datetime
 import logging
 import os
 import sys
-from contextlib import asynccontextmanager
 
 from sqlalchemy import select
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from alws.dependencies import get_db, get_pulp_db
+from fastapi_sqla import open_async_session, open_session
+
+from alws.dependencies import get_async_db_key
 from alws.models import ErrataRecord
 from alws.pulp_models import UpdateRecord
 from alws.utils.errata import debrand_description_and_title
+from alws.utils.fastapi_sqla_setup import setup_all
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -27,7 +29,8 @@ logging.basicConfig(
 
 async def main():
     affected_updateinfos = {}
-    async with asynccontextmanager(get_db)() as session, session.begin():
+    await setup_all()
+    async with open_async_session(get_async_db_key()) as session:
         records = await session.execute(
             select(ErrataRecord).where(
                 ErrataRecord.original_description.like("%[rhel%")
@@ -39,9 +42,9 @@ async def main():
             )
             record.original_description = debranded_description
             affected_updateinfos[record.id] = debranded_description
-        await session.commit()
-    with get_pulp_db() as pulp_session:
-        records = session.execute(
+
+    with open_session(key="pulp") as pulp_session:
+        records = pulp_session.execute(
             select(UpdateRecord).where(
                 UpdateRecord.id.in_(list(affected_errata_ids)),
             )
@@ -52,7 +55,6 @@ async def main():
             )
             record.description = affected_updateinfos[record.id]
             session.flush()
-        session.commit()
 
 
 if __name__ == "__main__":

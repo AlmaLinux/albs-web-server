@@ -18,25 +18,29 @@
 # REMEMBER: Do Pulp storoge backup before running the script in
 # production just in case anything goes wrong.
 #
-import asyncio
-import os
-import sys
 import argparse
-import typing
-import re
-import logging
-import urllib.parse
+import asyncio
 import datetime
+import logging
+import os
+import re
+import sys
+import typing
+import urllib.parse
+
+from fastapi_sqla import open_async_session
 from sqlalchemy.future import select
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from alws import database
 from alws import models
 from alws.crud import build as build_crud
-from alws.utils.pulp_client import PulpClient
+from alws.dependencies import get_async_db_key
 from alws.errors import (
     BuildError,
     DataNotFoundError,
 )
+from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.pulp_client import PulpClient
 
 
 def parse_args():
@@ -57,7 +61,7 @@ def parse_args():
 
 # Get old unsigned, unreleased and unrelated builds
 async def get_old_unsigned_builds(logger: logging.Logger):
-    async with database.Session() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         build_dependency = select(
             models.BuildDependency.c.build_dependency
         ).scalar_subquery()
@@ -83,7 +87,7 @@ async def get_old_unsigned_builds(logger: logging.Logger):
 
 async def remove_builds(builds: list, logger: logging.Logger):
     for build in builds:
-        async with database.Session() as db:
+        async with open_async_session(key=get_async_db_key()) as db:
             try:
                 logger.debug("Delete build with id: %s", build.id)
                 await build_crud.remove_build_job(db, build.id)
@@ -116,7 +120,7 @@ async def remove_unnecessary_versions(
     result = await pulp_client.request("PATCH", endpoint, json=params)
     logger.debug(
         "Create task to back retain repo versions to %s",
-        params["retain_repo_versions"]
+        params["retain_repo_versions"],
     )
     logger.debug(result)
 
@@ -165,6 +169,7 @@ async def main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
+    await setup_all()
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
     logger.info("Get old unsigned builds")
     builds = await get_old_unsigned_builds(logger)

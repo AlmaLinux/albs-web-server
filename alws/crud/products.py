@@ -252,7 +252,7 @@ async def remove_product(
     )
     delete_tasks = []
     all_product_distros = await pulp_client.get_rpm_distros(
-        include_fields=["pulp_href"],
+        include_fields=["pulp_href", "name"],
         **{"name__startswith": db_product.pulp_base_distro_name},
     )
     for product_repo in db_product.repositories:
@@ -270,7 +270,7 @@ async def remove_product(
         )
     await asyncio.gather(*delete_tasks)
     await db.delete(db_product)
-    await db.commit()
+    await db.flush()
 
 
 async def modify_product(
@@ -280,49 +280,66 @@ async def modify_product(
     user_id: int,
     modification: str,
 ):
-    async with db.begin():
-        db_product = await get_products(db, product_name=product)
-        db_user = await get_user(db, user_id=user_id)
-        if not db_user:
-            raise DataNotFoundError(f"User={user_id} doesn't exist")
-        if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
-            raise PermissionDenied(
-                f'User has no permissions to modify the product "{db_product.name}"'
-            )
-
-        db_build = await db.execute(
-            select(models.Build)
-            .where(
-                models.Build.id == build_id,
-            )
-            .options(
-                selectinload(models.Build.repos),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
-                ),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.platform
-                ),
-            ),
+    db_product = await get_products(db, product_name=product)
+    db_user = await get_user(db, user_id=user_id)
+    if not db_user:
+        raise DataNotFoundError(f"User={user_id} doesn't exist")
+    if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
+        raise PermissionDenied(
+            'User has no permissions '
+            f'to modify the product "{db_product.name}"'
         )
-        db_build = db_build.scalars().first()
 
-        if modification == 'add':
-            if db_build in db_product.builds:
-                error_msg = (
-                    f"Can't add build {build_id} to {product} "
-                    "as it's already part of the product"
-                )
-                raise ProductError(error_msg)
-        if modification == 'remove':
-            if db_build not in db_product.builds:
-                error_msg = (
-                    f"Can't remove build {build_id} "
-                    f"from {product} as it's not part "
-                    "of the product"
-                )
-                raise ProductError(error_msg)
+    db_build = await db.execute(
+        select(models.Build)
+        .where(
+            models.Build.id == build_id,
+        )
+        .options(
+            selectinload(models.Build.repos),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.platform
+            ),
+        ),
+    )
 
+    db_build = await db.execute(
+        select(models.Build)
+        .where(
+            models.Build.id == build_id,
+        )
+        .options(
+            selectinload(models.Build.repos),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.platform
+            ),
+        ),
+    )
+    db_build = db_build.scalars().first()
+
+    if modification == 'add':
+        if db_build in db_product.builds:
+            error_msg = (
+                f"Can't add build {build_id} to {product} "
+                "as it's already part of the product"
+            )
+            raise ProductError(error_msg)
+    if modification == 'remove':
+        if db_build not in db_product.builds:
+            error_msg = (
+                f"Can't remove build {build_id} "
+                f"from {product} as it's not part "
+                "of the product"
+            )
+            raise ProductError(error_msg)
+
+    await db.flush()
     perform_product_modification.send(db_build.id, db_product.id, modification)
 
 

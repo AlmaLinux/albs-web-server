@@ -33,7 +33,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         self,
         regular_build: Build,
         user_product: Product,
-        session: AsyncSession,
+        async_session: AsyncSession,
     ):
         product_id = user_product.id
         product_name = user_product.name
@@ -52,9 +52,10 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         # In case there's an error in add_to_product, it will be raised and
         # the test will be reported as failed.
         await _perform_product_modification(build_id, product_id, "add")
+        await async_session.commit()
         db_product = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(Product)
                     .where(Product.id == product_id)
                     .options(selectinload(Product.builds))
@@ -69,7 +70,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
     async def test_remove_from_product(
         self,
         user_product: Product,
-        session: AsyncSession,
+        async_session: AsyncSession,
     ):
         product_id = user_product.id
         product_name = user_product.name
@@ -86,7 +87,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         await _perform_product_modification(build_id, product_id, "remove")
         db_product = (
             (
-                await session.execute(
+                await async_session.execute(
                     select(Product)
                     .where(Product.id == product_id)
                     .options(selectinload(Product.builds))
@@ -101,7 +102,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
 
     async def test_user_product_remove_when_build_is_running(
         self,
-        session: AsyncSession,
+        async_session: AsyncSession,
         user_product: Product,
         regular_build_with_user_product: Build,
     ):
@@ -112,9 +113,9 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         ), response.text
         # we need to delete active build for further product deletion
         for task in regular_build_with_user_product.tasks:
-            await session.delete(task)
-        await session.delete(regular_build_with_user_product)
-        await session.commit()
+            await async_session.delete(task)
+        await async_session.delete(regular_build_with_user_product)
+        await async_session.commit()
 
     async def test_user_product_remove(
         self,

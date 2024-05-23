@@ -10,6 +10,7 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.config import settings
+from alws.crud.repository import remove_repos_from_pulp
 from alws.dramatiq import start_build
 from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
@@ -85,7 +86,7 @@ async def create_build(
         for flavour in flavors:
             db_build.platform_flavors.append(flavour)
     db.add(db_build)
-    await db.commit()
+    await db.flush()
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
     return db_build
@@ -175,9 +176,7 @@ async def get_builds(
                 sqlalchemy.or_(
                     models.BuildTaskRef.url.like(f"%/{project_name}.git"),
                     models.BuildTaskRef.url.like(f"%/{project_name}%.src.rpm"),
-                    models.BuildTaskRef.url.like(
-                        f"%/rpms/{project_name}%.git"
-                    ),
+                    models.BuildTaskRef.url.like(f"%/rpms/{project_name}%.git"),
                 )
             )
             if not (await db.execute(project_query)).scalars().all():
@@ -201,13 +200,11 @@ async def get_builds(
         if build_task_arch is not None:
             query = query.filter(models.BuildTask.arch == build_task_arch)
         if any(rpm_params.values()):
-            pulp_params.update(
-                {
-                    key: value
-                    for key, value in rpm_params.items()
-                    if value is not None
-                }
-            )
+            pulp_params.update({
+                key: value
+                for key, value in rpm_params.items()
+                if value is not None
+            })
             # TODO: we can get packages from pulp database
             pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
             pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
@@ -271,6 +268,131 @@ async def get_module_preview(
     )
 
 
+def get_task_data_from_build(build: models.Build):
+    repos = []
+    repo_ids = []
+    build_task_ids = []
+    build_task_artifact_ids = []
+    build_task_ref_ids = []
+    test_task_ids = []
+    test_task_artifact_ids = []
+    for bt in build.tasks:
+        build_task_ids.append(bt.id)
+        build_task_ref_ids.append(bt.ref_id)
+        for build_artifact in bt.artifacts:
+            build_task_artifact_ids.append(build_artifact.id)
+        for tt in bt.test_tasks:
+            test_task_ids.append(tt.id)
+            repo_ids.append(tt.repository_id)
+            for test_artifact in tt.artifacts:
+                test_task_artifact_ids.append(test_artifact.id)
+    for br in build.repos:
+        repos.append(br.pulp_href)
+        repo_ids.append(br.id)
+    return (
+        repos,
+        repo_ids,
+        build_task_ids,
+        build_task_artifact_ids,
+        build_task_ref_ids,
+        test_task_ids,
+        test_task_artifact_ids,
+    )
+
+
+async def remove_build_data(db: AsyncSession, build: models.Build):
+    (
+        repos,
+        repo_ids,
+        build_task_ids,
+        build_task_artifact_ids,
+        build_task_ref_ids,
+        test_task_ids,
+        test_task_artifact_ids,
+    ) = get_task_data_from_build(build)
+    build_id = build.id
+    await db.execute(
+        delete(models.BuildRepo).where(models.BuildRepo.c.build_id == build_id)
+    )
+    await db.execute(
+        delete(models.BuildPlatformFlavour).where(
+            models.BuildPlatformFlavour.c.build_id == build_id
+        )
+    )
+    await db.execute(
+        delete(models.SignTask).where(models.SignTask.build_id == build_id)
+    )
+    await db.execute(
+        delete(models.BinaryRpm).where(models.BinaryRpm.build_id == build_id)
+    )
+    await db.execute(
+        delete(models.SourceRpm).where(models.SourceRpm.build_id == build_id)
+    )
+    await db.execute(
+        delete(models.PerformanceStats).where(
+            models.PerformanceStats.build_task_id.in_(build_task_ids)
+        )
+    )
+    await db.execute(
+        delete(models.PerformanceStats).where(
+            models.PerformanceStats.test_task_id.in_(test_task_ids)
+        )
+    )
+    await db.execute(
+        delete(models.TestTaskArtifact).where(
+            models.TestTaskArtifact.id.in_(test_task_artifact_ids)
+        )
+    )
+    await db.execute(
+        delete(models.TestTask).where(models.TestTask.id.in_(test_task_ids))
+    )
+    await db.execute(
+        delete(models.BuildTaskArtifact).where(
+            models.BuildTaskArtifact.id.in_(build_task_artifact_ids)
+        )
+    )
+    await db.execute(
+        delete(models.BuildTaskDependency).where(
+            models.BuildTaskDependency.c.build_task_dependency.in_(
+                build_task_ids
+            )
+        )
+    )
+    await db.execute(
+        delete(models.Repository).where(models.Repository.id.in_(repo_ids))
+    )
+    await db.execute(
+        delete(models.BuildTask).where(models.BuildTask.build_id == build_id)
+    )
+    await db.execute(
+        delete(models.BuildDependency).where(
+            sqlalchemy.or_(
+                models.BuildDependency.c.build_dependency == build_id,
+                models.BuildDependency.c.build_id == build_id,
+            )
+        )
+    )
+    await db.execute(
+        delete(models.BuildTaskRef).where(
+            models.BuildTaskRef.id.in_(build_task_ref_ids)
+        )
+    )
+    await db.execute(delete(models.Build).where(models.Build.id == build_id))
+    # FIXME
+    # it seems we cannot just delete any files because
+    # https://docs.pulpproject.org/pulpcore/restapi.html#tag/Content:-Files
+    # does not content delete option, but artifact does:
+    # https://docs.pulpproject.org/pulpcore/restapi.html#operation/
+    # artifacts_delete
+    # "Remove Artifact only if it is not associated with any Content."
+    # for artifact in artifacts:
+    # await pulp_client.remove_artifact(artifact)
+    try:
+        await remove_repos_from_pulp(repos)
+    except Exception as err:
+        logging.exception("Cannot delete repo from pulp: %s", err)
+
+
 async def remove_build_job(db: AsyncSession, build_id: int):
     query_bj = (
         select(models.Build)
@@ -286,135 +408,16 @@ async def remove_build_job(db: AsyncSession, build_id: int):
             .selectinload(models.TestTask.artifacts),
         )
     )
-    repos = []
-    repo_ids = []
-    build_task_ids = []
-    build_task_artifact_ids = []
-    build_task_ref_ids = []
-    test_task_ids = []
-    test_task_artifact_ids = []
-    async with db.begin():
-        build = await db.execute(query_bj)
-        build = build.scalars().first()
-        if build is None:
-            raise DataNotFoundError(f'Build with {build_id} not found')
-        if build.products:
-            product_names = "\n".join(
-                (product.name for product in build.products)
-            )
-            raise BuildError(
-                f"Cannot delete Build={build_id}, "
-                f"build contains in following products:\n{product_names}"
-            )
-        if build.released:
-            raise BuildError(f"Build with {build_id} is released")
-        for bt in build.tasks:
-            build_task_ids.append(bt.id)
-            build_task_ref_ids.append(bt.ref_id)
-            for build_artifact in bt.artifacts:
-                build_task_artifact_ids.append(build_artifact.id)
-            for tt in bt.test_tasks:
-                test_task_ids.append(tt.id)
-                repo_ids.append(tt.repository_id)
-                for test_artifact in tt.artifacts:
-                    test_task_artifact_ids.append(test_artifact.id)
-        for br in build.repos:
-            repos.append(br.pulp_href)
-            repo_ids.append(br.id)
-        pulp_client = PulpClient(
-            settings.pulp_host, settings.pulp_user, settings.pulp_password
+    build = await db.execute(query_bj)
+    build = build.scalars().first()
+    if build is None:
+        raise DataNotFoundError(f'Build with {build_id} not found')
+    if build.products:
+        product_names = "\n".join((product.name for product in build.products))
+        raise BuildError(
+            f"Cannot delete Build={build_id}, "
+            f"build contains in following products:\n{product_names}"
         )
-        await db.execute(
-            delete(models.BuildRepo).where(
-                models.BuildRepo.c.build_id == build_id
-            )
-        )
-        await db.execute(
-            delete(models.BuildPlatformFlavour).where(
-                models.BuildPlatformFlavour.c.build_id == build_id
-            )
-        )
-        await db.execute(
-            delete(models.SignTask).where(models.SignTask.build_id == build_id)
-        )
-        await db.execute(
-            delete(models.BinaryRpm).where(
-                models.BinaryRpm.build_id == build_id
-            )
-        )
-        await db.execute(
-            delete(models.SourceRpm).where(
-                models.SourceRpm.build_id == build_id
-            )
-        )
-        await db.execute(
-            delete(models.PerformanceStats).where(
-                models.PerformanceStats.build_task_id.in_(build_task_ids)
-            )
-        )
-        await db.execute(
-            delete(models.PerformanceStats).where(
-                models.PerformanceStats.test_task_id.in_(test_task_ids)
-            )
-        )
-        await db.execute(
-            delete(models.TestTaskArtifact).where(
-                models.TestTaskArtifact.id.in_(test_task_artifact_ids)
-            )
-        )
-        await db.execute(
-            delete(models.TestTask).where(
-                models.TestTask.id.in_(test_task_ids)
-            )
-        )
-        await db.execute(
-            delete(models.BuildTaskArtifact).where(
-                models.BuildTaskArtifact.id.in_(build_task_artifact_ids)
-            )
-        )
-        await db.execute(
-            delete(models.BuildTaskDependency).where(
-                models.BuildTaskDependency.c.build_task_dependency.in_(
-                    build_task_ids
-                )
-            )
-        )
-        await db.execute(
-            delete(models.Repository).where(models.Repository.id.in_(repo_ids))
-        )
-        await db.execute(
-            delete(models.BuildTask).where(
-                models.BuildTask.build_id == build_id
-            )
-        )
-        await db.execute(
-            delete(models.BuildDependency).where(
-                sqlalchemy.or_(
-                    models.BuildDependency.c.build_dependency == build_id,
-                    models.BuildDependency.c.build_id == build_id,
-                )
-            )
-        )
-        await db.execute(
-            delete(models.BuildTaskRef).where(
-                models.BuildTaskRef.id.in_(build_task_ref_ids)
-            )
-        )
-        await db.execute(
-            delete(models.Build).where(models.Build.id == build_id)
-        )
-        # FIXME
-        # it seems we cannot just delete any files because
-        # https://docs.pulpproject.org/pulpcore/restapi.html#tag/Content:-Files
-        # does not content delete option, but artifact does:
-        # https://docs.pulpproject.org/pulpcore/restapi.html#operation/
-        # artifacts_delete
-        # "Remove Artifact only if it is not associated with any Content."
-        # for artifact in artifacts:
-        # await pulp_client.remove_artifact(artifact)
-        for repo in repos:
-            try:
-                await pulp_client.delete_by_href(repo, wait_for_result=True)
-            except Exception as err:
-                logging.exception("Cannot delete repo from pulp: %s", err)
-        await db.commit()
+    if build.released:
+        raise BuildError(f"Build with {build_id} is released")
+    await remove_build_data(db, build)

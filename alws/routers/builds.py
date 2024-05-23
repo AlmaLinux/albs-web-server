@@ -1,6 +1,7 @@
 import typing
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
@@ -9,7 +10,7 @@ from alws.crud import build as build_crud
 from alws.crud import build_node
 from alws.crud import platform as platform_crud
 from alws.crud import platform_flavors as flavors_crud
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.errors import BuildError, DataNotFoundError
 from alws.schemas import build_schema
 
@@ -29,7 +30,7 @@ public_router = APIRouter(
 async def create_build(
     build: build_schema.BuildCreate,
     user: models.User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await build_crud.create_build(db, build, user.id)
 
@@ -56,7 +57,7 @@ async def get_builds_per_page(
     released: typing.Optional[bool] = None,
     signed: typing.Optional[bool] = None,
     is_running: typing.Optional[bool] = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await build_crud.get_builds(
         db=db,
@@ -80,7 +81,7 @@ async def get_builds_per_page(
 @router.post('/get_module_preview/', response_model=build_schema.ModulePreview)
 async def get_module_preview(
     module_request: build_schema.ModulePreviewRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     platform = await platform_crud.get_platform(
         db,
@@ -100,7 +101,10 @@ async def get_module_preview(
 
 
 @public_router.get('/{build_id}/', response_model=build_schema.Build)
-async def get_build(build_id: int, db: AsyncSession = Depends(get_db)):
+async def get_build(
+    build_id: int,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
     db_build = await build_crud.get_builds(db, build_id)
     if db_build is None:
         raise HTTPException(
@@ -113,7 +117,7 @@ async def get_build(build_id: int, db: AsyncSession = Depends(get_db)):
 @router.patch('/{build_id}/restart-failed', status_code=status.HTTP_200_OK)
 async def restart_failed_build_items(
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await build_node.update_failed_build_items(db, build_id)
 
@@ -121,7 +125,9 @@ async def restart_failed_build_items(
 @router.patch("/{build_id}/cancel", status_code=status.HTTP_200_OK)
 async def cancel_idle_build_items(
     build_id: int,
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
 ):
     await build_node.mark_build_tasks_as_cancelled(session, build_id)
 
@@ -132,13 +138,16 @@ async def cancel_idle_build_items(
 )
 async def parallel_restart_failed_build_items(
     build_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await build_node.update_failed_build_items_in_parallel(db, build_id)
 
 
 @router.delete('/{build_id}/remove', status_code=status.HTTP_204_NO_CONTENT)
-async def remove_build(build_id: int, db: AsyncSession = Depends(get_db)):
+async def remove_build(
+    build_id: int,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
     try:
         await build_crud.remove_build_job(db, build_id)
     except DataNotFoundError as exc:

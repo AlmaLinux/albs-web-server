@@ -1,12 +1,13 @@
 import typing
 
 from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.auth import get_current_user
 from alws.crud import products as products_crud
 from alws.crud import user as user_crud
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.errors import PermissionDenied
 from alws.models import User
 from alws.perms import actions
@@ -25,7 +26,9 @@ async def upload_repometada(
     modules: typing.Optional[UploadFile] = None,
     comps: typing.Optional[UploadFile] = None,
     repository: str = Form(...),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key()),
+    ),
     user: User = Depends(get_current_user),
 ):
     msg = ""

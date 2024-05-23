@@ -61,7 +61,7 @@ async def create_sign_key(
             )
     sign_key = models.SignKey(**payload.model_dump())
     db.add(sign_key)
-    await db.commit()
+    await db.flush()
     await db.refresh(sign_key)
     return sign_key
 
@@ -75,6 +75,6 @@ async def update_sign_key(
     for k, v in payload.model_dump().items():
         setattr(sign_key, k, v)
     db.add(sign_key)
-    await db.commit()
+    await db.flush()
     await db.refresh(sign_key)
     return sign_key

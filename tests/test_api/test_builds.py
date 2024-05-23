@@ -83,6 +83,7 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         assert response.status_code == self.status_codes.HTTP_403_FORBIDDEN
         self.headers["Authorization"] = old_token
 
+    # @pytest.mark.skip(reason="Checking the reason for freezing tests")
     async def test_build_delete(
         self,
         create_errata,
@@ -140,9 +141,7 @@ class TestModularBuilds(BaseAsyncTestCase):
                     module_file.read_text()
                 )
                 for build_module in build_index.iter_modules():
-                    artifacts = modules_artifacts[
-                        f"{build_module.name}:{arch}"
-                    ]
+                    artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
                     assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_ruby(
@@ -182,9 +181,7 @@ class TestModularBuilds(BaseAsyncTestCase):
                     module_file.read_text()
                 )
                 for build_module in build_index.iter_modules():
-                    artifacts = modules_artifacts[
-                        f"{build_module.name}:{arch}"
-                    ]
+                    artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
                     assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_subversion(
@@ -223,9 +220,7 @@ class TestModularBuilds(BaseAsyncTestCase):
                     module_file.read_text()
                 )
                 for build_module in build_index.iter_modules():
-                    artifacts = modules_artifacts[
-                        f"{build_module.name}:{arch}"
-                    ]
+                    artifacts = modules_artifacts[f"{build_module.name}:{arch}"]
                     assert build_module.get_rpm_artifacts() == artifacts
 
     async def test_multilib_llvm(

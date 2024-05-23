@@ -6,19 +6,19 @@ from fastapi import (
     HTTPException,
     status,
 )
+from fastapi_sqla import AsyncSessionDependency
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws import database
 from alws.auth import get_current_superuser
 from alws.crud import teams
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.errors import TeamError
 from alws.schemas import team_schema
-
 
 router = APIRouter(
     prefix='/teams',
     tags=['teams'],
-    dependencies=[Depends(get_current_superuser)]
+    dependencies=[Depends(get_current_superuser)],
 )
 
 public_router = APIRouter(
@@ -27,11 +27,15 @@ public_router = APIRouter(
 )
 
 
-@public_router.get('/', response_model=typing.Union[
-    typing.List[team_schema.Team], team_schema.TeamResponse])
+@public_router.get(
+    '/',
+    response_model=typing.Union[
+        typing.List[team_schema.Team], team_schema.TeamResponse
+    ],
+)
 async def get_teams(
     pageNumber: int = None,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await teams.get_teams(db, page_number=pageNumber)
 
@@ -39,7 +43,7 @@ async def get_teams(
 @public_router.get('/{team_id}/', response_model=team_schema.Team)
 async def get_team(
     team_id: int,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await teams.get_teams(db, team_id=team_id)
 
@@ -48,7 +52,7 @@ async def get_team(
 async def add_members(
     team_id: int,
     payload: team_schema.TeamMembersUpdate,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     try:
         db_team = await teams.update_members(db, payload, team_id, 'add')
@@ -64,7 +68,7 @@ async def add_members(
 async def remove_members(
     team_id: int,
     payload: team_schema.TeamMembersUpdate,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     try:
         db_team = await teams.update_members(db, payload, team_id, 'remove')
@@ -79,7 +83,7 @@ async def remove_members(
 @router.post('/create/', response_model=team_schema.Team)
 async def create_team(
     payload: team_schema.TeamCreate,
-    db: database.Session = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     try:
         db_team = await teams.create_team(db, payload)
@@ -94,7 +98,7 @@ async def create_team(
 @router.delete('/{team_id}/remove/', status_code=status.HTTP_202_ACCEPTED)
 async def remove_team(
     team_id: int,
-    db: database.Session = Depends(get_db)
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     try:
         await teams.remove_team(db, team_id)

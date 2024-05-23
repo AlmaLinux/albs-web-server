@@ -20,25 +20,24 @@
 #
 import asyncio
 import logging
-import typing
-
-import yaml
-from sqlalchemy import select, delete
-from sqlalchemy.orm import selectinload
-
-import sys
 import os
 import re
+import sys
+import typing
 import urllib.parse
+
+import yaml
+from fastapi_sqla import open_session
+from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from alws.utils import pulp_client
-from alws.database import PulpSession, SyncSession
 from alws.config import settings
-from alws.pulp_models import UpdateRecord, UpdatePackage
 from alws.models import ErrataRecord, Platform, Repository
-
+from alws.pulp_models import UpdatePackage, UpdateRecord
+from alws.utils import pulp_client
+from alws.utils.fastapi_sqla_setup import setup_all
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -55,7 +54,7 @@ albs_errata_cache = {"AlmaLinux-8": [], "AlmaLinux-9": []}
 
 async def prepare_albs_errata_cache():
     logging.info("Collecting errata records from ALBS DB")
-    with SyncSession() as albs_db:
+    with open_session() as albs_db:
         albs_records = albs_db.execute(
             select(ErrataRecord).options(selectinload(ErrataRecord.platform))
         )
@@ -101,7 +100,7 @@ async def delete_unmatched_packages():
     pulp = pulp_client.PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    with PulpSession() as pulp_db, SyncSession() as albs_db, pulp_db.begin():
+    with open_session(key="pulp") as pulp_db, open_session() as albs_db:
         albs_records = albs_db.execute(
             select(ErrataRecord)
             # we shouldn't delete unmatched packages
@@ -133,14 +132,15 @@ async def delete_unmatched_packages():
                             )
                         )
                         pulp_db.flush()
-        pulp_db.commit()
 
 
 async def delete_pulp_advisory(pulp_href_id):
-    with PulpSession() as pulp_db, pulp_db.begin():
+    with open_session(key="pulp") as pulp_db:
         pulp_record = (
             pulp_db.execute(
-                select(UpdateRecord).where(UpdateRecord.content_ptr_id == pulp_href_id)
+                select(UpdateRecord).where(
+                    UpdateRecord.content_ptr_id == pulp_href_id
+                )
             )
             .scalars()
             .first()
@@ -173,7 +173,8 @@ async def delete_advisories_from_wrong_repos():
             repo_version = await pulp.get_repo_latest_version(repo.pulp_href)
         except Exception:
             logging.exception(
-                "Cannot get latest repo_version for %s", f"{repo.name}-{repo.arch}"
+                "Cannot get latest repo_version for %s",
+                f"{repo.name}-{repo.arch}",
             )
         return repo, repo_version
 
@@ -210,7 +211,7 @@ async def delete_advisories_from_wrong_repos():
                 break
         return result
 
-    with SyncSession() as albs_db:
+    with open_session() as albs_db:
         db_platforms: typing.List[Platform] = (
             albs_db.execute(
                 select(Platform)
@@ -228,9 +229,11 @@ async def delete_advisories_from_wrong_repos():
                 platform = "AlmaLinux-9"
                 opposite_platform = "AlmaLinux-8"
 
-            latest_repo_versions = await asyncio.gather(
-                *(get_repo_latest_version(repo) for repo in db_platform.repos if repo)
-            )
+            latest_repo_versions = await asyncio.gather(*(
+                get_repo_latest_version(repo)
+                for repo in db_platform.repos
+                if repo
+            ))
             for repo, repo_href in latest_repo_versions:
                 if not repo or not repo_href:
                     continue
@@ -255,7 +258,7 @@ async def delete_advisories_from_wrong_repos():
 
 async def delete_wrong_packages():
     logging.info("Deleting wrong packages from advisories")
-    with PulpSession() as pulp_db, SyncSession() as albs_db, pulp_db.begin():
+    with open_session(key="pulp") as pulp_db, open_session() as albs_db:
         albs_records = albs_db.execute(select(ErrataRecord))
         for albs_record in albs_records.scalars().all():
             distr_version = albs_record.platform.distr_version
@@ -265,7 +268,9 @@ async def delete_wrong_packages():
 
             pulp_records = (
                 pulp_db.execute(
-                    select(UpdateRecord).where(UpdateRecord.id == albs_record.id)
+                    select(UpdateRecord).where(
+                        UpdateRecord.id == albs_record.id
+                    )
                 )
                 .scalars()
                 .all()
@@ -283,22 +288,20 @@ async def delete_wrong_packages():
                                 f"albs_record_release '{albs_record_release}'"
                             )
                             pulp_db.delete(pkg)
-        pulp_db.commit()
 
 
 async def delete_packages_prefix():
     logging.info("Removing 'Packages/' prefix from filenames")
-    with PulpSession() as pulp_db, pulp_db.begin():
+    with open_session(key="pulp") as pulp_db:
         advisory_pkgs = pulp_db.execute(select(UpdatePackage)).scalars().all()
 
         for pkg in advisory_pkgs:
             if pkg.filename.startswith("Packages/"):
                 logging.info(
-                    "Removing 'Packages/' prefix from %s filename", pkg.filename
+                    "Removing 'Packages/' prefix from %s filename",
+                    pkg.filename,
                 )
                 pkg.filename = pkg.filename.replace("Packages/", "")
-
-        pulp_db.commit()
 
 
 async def update_pulp_repo(repo, pulp):
@@ -316,7 +319,9 @@ async def update_pulp_repos():
     pulp = pulp_client.PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    platforms = yaml.safe_load(open("reference_data/platforms.yaml", "r").read())
+    platforms = yaml.safe_load(
+        open("reference_data/platforms.yaml", "r").read()
+    )
     tasks = []
     for platform in platforms:
         for repo in platform["repositories"]:
@@ -327,6 +332,7 @@ async def update_pulp_repos():
 
 
 async def main():
+    await setup_all()
     pulp_client.PULP_SEMAPHORE = asyncio.Semaphore(10)
 
     await prepare_albs_errata_cache()

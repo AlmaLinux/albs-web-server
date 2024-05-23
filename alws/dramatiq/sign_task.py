@@ -6,6 +6,7 @@ from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import sign_task
 from alws.dramatiq import event_loop
 from alws.schemas import sign_schema
+from alws.utils.fastapi_sqla_setup import setup_all
 
 __all__ = ['complete_sign_task']
 
@@ -27,4 +28,5 @@ async def _complete_sign_task(
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def complete_sign_task(task_id: int, payload: typing.Dict[str, typing.Any]):
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_complete_sign_task(task_id, payload))

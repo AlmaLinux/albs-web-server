@@ -1,22 +1,24 @@
 from contextlib import asynccontextmanager
 
 import dramatiq
+from fastapi_sqla import open_async_session
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import release as r_crud
+from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
-from alws.dependencies import get_db
+from alws.utils.fastapi_sqla_setup import setup_all
 
 __all__ = ["execute_release_plan"]
 
 
 async def _commit_release(release_id, user_id):
-    async with asynccontextmanager(get_db)() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         await r_crud.commit_release(db, release_id, user_id)
 
 
 async def _revert_release(release_id, user_id):
-    async with asynccontextmanager(get_db)() as db:
+    async with open_async_session(key=get_async_db_key()) as db:
         await r_crud.revert_release(db, release_id, user_id)
 
 
@@ -27,6 +29,7 @@ async def _revert_release(release_id, user_id):
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def execute_release_plan(release_id: int, user_id: int):
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_commit_release(release_id, user_id))
 
 
@@ -37,4 +40,5 @@ def execute_release_plan(release_id: int, user_id: int):
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
 def revert_release(release_id: int, user_id: int):
+    event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_revert_release(release_id, user_id))

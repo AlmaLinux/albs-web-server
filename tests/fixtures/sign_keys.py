@@ -1,6 +1,7 @@
 import typing
 
 import pytest
+from fastapi_sqla import open_async_session
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,9 +21,11 @@ def basic_sign_key_payload() -> dict:
     }
 
 
-async def __create_sign_key(session: AsyncSession, payload: dict) -> SignKey:
-    await create_sign_key(session, SignKeyCreate(**payload))
-    sign_key_cursor = await session.execute(
+async def __create_sign_key(
+    async_session: AsyncSession, payload: dict
+) -> SignKey:
+    await create_sign_key(async_session, SignKeyCreate(**payload))
+    sign_key_cursor = await async_session.execute(
         select(SignKey).where(SignKey.keyid == payload['keyid'])
     )
     sign_key = sign_key_cursor.scalars().first()
@@ -32,10 +35,11 @@ async def __create_sign_key(session: AsyncSession, payload: dict) -> SignKey:
 @pytest.mark.anyio
 @pytest.fixture
 async def sign_key(
-    session: AsyncSession,
+    async_session: AsyncSession,
     basic_sign_key_payload,
 ) -> typing.AsyncIterable[SignKey]:
-    sign_key = await __create_sign_key(session, basic_sign_key_payload)
+    sign_key = await __create_sign_key(async_session, basic_sign_key_payload)
+    await async_session.commit()
     yield sign_key
-    await session.execute(delete(SignKey))
-    await session.commit()
+    await async_session.execute(delete(SignKey))
+    await async_session.commit()

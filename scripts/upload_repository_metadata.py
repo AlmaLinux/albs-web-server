@@ -6,9 +6,10 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 
 from fastapi import UploadFile
+from fastapi_sqla import open_async_session
 from syncer import sync
 
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.utils.uploader import MetadataUploader
 
 
@@ -43,7 +44,7 @@ async def main():
             os.path.abspath(os.path.expanduser(args.comps_file)), 'rt'
         ) as f:
             comps_content = UploadFile(BytesIO(f.read().encode('utf-8')))
-    async with asynccontextmanager(get_db)() as session:
+    async with open_async_session(get_async_db_key()) as session:
         uploader = MetadataUploader(session, args.repo_name)
         await uploader.process_uploaded_files(
             module_content, comps_content, dry_run=args.dry_run

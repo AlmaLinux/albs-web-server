@@ -108,10 +108,7 @@ async def create_package_mapping(
     )
     new_package.test_repository = test_repository
     session.add(new_package)
-    if flush:
-        await session.flush()
-    else:
-        await session.commit()
+    await session.flush()
     await session.refresh(new_package)
     return new_package
 
@@ -139,7 +136,7 @@ async def bulk_create_package_mapping(
         if (pkg.package_name, pkg.folder_name) not in existing_packages
     ]
     session.add_all(new_packages)
-    await session.commit()
+    await session.flush()
 
 
 async def create_repository(
@@ -167,10 +164,7 @@ async def create_repository(
 
     repository = models.TestRepository(**payload.model_dump())
     session.add(repository)
-    if flush:
-        await session.flush()
-    else:
-        await session.commit()
+    await session.flush()
     await session.refresh(repository)
     return repository
 
@@ -190,7 +184,7 @@ async def update_repository(
     for field, value in payload.model_dump().items():
         setattr(db_repo, field, value)
     session.add(db_repo)
-    await session.commit()
+    await session.flush()
     await session.refresh(db_repo)
     return db_repo
 
@@ -200,7 +194,7 @@ async def delete_package_mapping(session: AsyncSession, package_id: int):
     if not db_package:
         raise DataNotFoundError(f"Package={package_id} doesn`t exist")
     await session.delete(db_package)
-    await session.commit()
+    await session.flush()
 
 
 async def bulk_delete_package_mapping(
@@ -214,7 +208,7 @@ async def bulk_delete_package_mapping(
             models.PackageTestRepository.test_repository_id == repository_id,
         )
     )
-    await session.commit()
+    await session.flush()
 
 
 async def delete_repository(session: AsyncSession, repository_id: int):
@@ -224,4 +218,4 @@ async def delete_repository(session: AsyncSession, repository_id: int):
             f"Test repository={repository_id} doesn`t exist"
         )
     await session.delete(db_repo)
-    await session.commit()
+    await session.flush()

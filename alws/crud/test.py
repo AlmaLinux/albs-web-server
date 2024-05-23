@@ -65,88 +65,81 @@ def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
 
 async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
     response = []
-    async with session.begin():
-        updated_tasks = []
-        test_tasks = await session.execute(
-            select(models.TestTask)
-            .where(
-                models.TestTask.status == TestTaskStatus.CREATED,
-            )
-            .with_for_update()
-            .options(
-                selectinload(models.TestTask.build_task)
-                .selectinload(models.BuildTask.build)
-                .selectinload(models.Build.repos),
-                selectinload(models.TestTask.build_task).selectinload(
-                    models.BuildTask.ref
-                ),
-                selectinload(models.TestTask.build_task)
-                .selectinload(models.BuildTask.build)
-                .selectinload(models.Build.linked_builds),
-                selectinload(models.TestTask.build_task)
-                .selectinload(models.BuildTask.build)
-                .selectinload(models.Build.platform_flavors)
-                .selectinload(models.PlatformFlavour.repos),
-                selectinload(models.TestTask.build_task).selectinload(
-                    models.BuildTask.platform
-                ),
-                selectinload(models.TestTask.build_task).selectinload(
-                    models.BuildTask.rpm_modules
-                ),
-            )
-            .order_by(models.TestTask.id.asc())
-            .limit(10)
+    updated_tasks = []
+    test_tasks = await session.execute(
+        select(models.TestTask)
+        .where(
+            models.TestTask.status == TestTaskStatus.CREATED,
         )
-        for task in test_tasks.scalars().all():
-            platform = task.build_task.platform
-            module_info = next(
-                (
-                    i
-                    for i in task.build_task.rpm_modules
-                    if '-devel' not in i.name
-                ),
-                None,
-            )
-            module_name = module_info.name if module_info else None
-            module_stream = module_info.stream if module_info else None
-            module_version = module_info.version if module_info else None
-            repositories = get_repos_for_test_task(task)
-            task.status = TestTaskStatus.STARTED
-            task.scheduled_at = datetime.datetime.utcnow()
-            test_configuration = task.build_task.ref.test_configuration
-            payload = {
-                'bs_task_id': task.id,
-                'runner_type': 'docker',
-                'dist_name': platform.test_dist_name,
-                'dist_version': platform.distr_version,
-                'dist_arch': task.env_arch,
-                'package_name': task.package_name,
-                'package_version': (
-                    f'{task.package_version}-{task.package_release}'
-                    if task.package_release
-                    else task.package_version
-                ),
-                'callback_href': f'/api/v1/tests/{task.id}/result/',
-            }
-            if module_name and module_stream and module_version:
-                payload.update(
-                    {
-                        'module_name': module_name,
-                        'module_stream': module_stream,
-                        'module_version': module_version,
-                    }
-                )
-            if repositories:
-                payload['repositories'] = repositories
-            if test_configuration:
-                if test_configuration['tests'] is None:
-                    test_configuration['tests'] = []
-                payload['test_configuration'] = test_configuration
-            response.append(payload)
-            updated_tasks.append(task)
-        if updated_tasks:
-            session.add_all(updated_tasks)
-            await session.commit()
+        .with_for_update()
+        .options(
+            selectinload(models.TestTask.build_task)
+            .selectinload(models.BuildTask.build)
+            .selectinload(models.Build.repos),
+            selectinload(models.TestTask.build_task).selectinload(
+                models.BuildTask.ref
+            ),
+            selectinload(models.TestTask.build_task)
+            .selectinload(models.BuildTask.build)
+            .selectinload(models.Build.linked_builds),
+            selectinload(models.TestTask.build_task)
+            .selectinload(models.BuildTask.build)
+            .selectinload(models.Build.platform_flavors)
+            .selectinload(models.PlatformFlavour.repos),
+            selectinload(models.TestTask.build_task).selectinload(
+                models.BuildTask.platform
+            ),
+            selectinload(models.TestTask.build_task).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+        )
+        .order_by(models.TestTask.id.asc())
+        .limit(10)
+    )
+    for task in test_tasks.scalars().all():
+        platform = task.build_task.platform
+        module_info = next(
+            (i for i in task.build_task.rpm_modules if '-devel' not in i.name),
+            None,
+        )
+        module_name = module_info.name if module_info else None
+        module_stream = module_info.stream if module_info else None
+        module_version = module_info.version if module_info else None
+        repositories = get_repos_for_test_task(task)
+        task.status = TestTaskStatus.STARTED
+        task.scheduled_at = datetime.datetime.utcnow()
+        test_configuration = task.build_task.ref.test_configuration
+        payload = {
+            'bs_task_id': task.id,
+            'runner_type': 'docker',
+            'dist_name': platform.test_dist_name,
+            'dist_version': platform.distr_version,
+            'dist_arch': task.env_arch,
+            'package_name': task.package_name,
+            'package_version': (
+                f'{task.package_version}-{task.package_release}'
+                if task.package_release
+                else task.package_version
+            ),
+            'callback_href': f'/api/v1/tests/{task.id}/result/',
+        }
+        if module_name and module_stream and module_version:
+            payload.update({
+                'module_name': module_name,
+                'module_stream': module_stream,
+                'module_version': module_version,
+            })
+        if repositories:
+            payload['repositories'] = repositories
+        if test_configuration:
+            if test_configuration['tests'] is None:
+                test_configuration['tests'] = []
+            payload['test_configuration'] = test_configuration
+        response.append(payload)
+        updated_tasks.append(task)
+    if updated_tasks:
+        session.add_all(updated_tasks)
+        await session.flush()
     return response
 
 
@@ -177,23 +170,22 @@ async def __get_log_repository(
 
 
 async def create_test_tasks_for_build_id(db: AsyncSession, build_id: int):
-    async with db.begin():
-        # We get all build_tasks with the same build_id
-        # and whose status is COMPLETED
-        build_task_ids = (
-            (
-                await db.execute(
-                    select(models.BuildTask.id).where(
-                        models.BuildTask.build_id == build_id,
-                        models.BuildTask.status == BuildTaskStatus.COMPLETED,
-                    )
+    # We get all build_tasks with the same build_id
+    # and whose status is COMPLETED
+    build_task_ids = (
+        (
+            await db.execute(
+                select(models.BuildTask.id).where(
+                    models.BuildTask.build_id == build_id,
+                    models.BuildTask.status == BuildTaskStatus.COMPLETED,
                 )
             )
-            .scalars()
-            .all()
         )
+        .scalars()
+        .all()
+    )
 
-        test_log_repository = await __get_log_repository(db, build_id)
+    test_log_repository = await __get_log_repository(db, build_id)
 
     for build_task_id in build_task_ids:
         await create_test_tasks(db, build_task_id, test_log_repository.id)
@@ -219,79 +211,78 @@ async def create_test_tasks(
     build_task_id: int,
     repository_id: int,
 ):
-    async with db.begin():
-        build_task_query = await db.execute(
-            select(models.BuildTask)
-            .where(
-                models.BuildTask.id == build_task_id,
-            )
-            .options(selectinload(models.BuildTask.artifacts)),
+    build_task_query = await db.execute(
+        select(models.BuildTask)
+        .where(
+            models.BuildTask.id == build_task_id,
         )
-        build_task = build_task_query.scalars().first()
+        .options(selectinload(models.BuildTask.artifacts)),
+    )
+    build_task = build_task_query.scalars().first()
 
-        latest_revision_query = select(
-            func.max(models.TestTask.revision),
-        ).filter(
-            models.TestTask.build_task_id == build_task_id,
-        )
-        result = await db.execute(latest_revision_query)
-        latest_revision = result.scalars().first()
-        new_revision = 1
-        if latest_revision:
-            new_revision = latest_revision + 1
+    latest_revision_query = select(
+        func.max(models.TestTask.revision),
+    ).filter(
+        models.TestTask.build_task_id == build_task_id,
+    )
+    result = await db.execute(latest_revision_query)
+    latest_revision = result.scalars().first()
+    new_revision = 1
+    if latest_revision:
+        new_revision = latest_revision + 1
 
-        test_tasks = []
-        pulp_packages = get_pulp_packages(build_task.artifacts)
-        for artifact in build_task.artifacts:
-            if artifact.type != 'rpm':
-                continue
-            artifact_info = pulp_packages.get(artifact.href)
-            if not artifact_info:
-                logging.error(
-                    'Cannot get information about artifact %s with href %s',
-                    artifact.name,
-                    artifact.href,
-                )
-                continue
-            if artifact_info.arch == 'src':
-                continue
-            task = models.TestTask(
-                build_task_id=build_task_id,
-                package_name=artifact_info.name,
-                package_version=artifact_info.version,
-                env_arch=build_task.arch,
-                status=TestTaskStatus.CREATED,
-                revision=new_revision,
-                repository_id=repository_id,
+    test_tasks = []
+    pulp_packages = get_pulp_packages(build_task.artifacts)
+    for artifact in build_task.artifacts:
+        if artifact.type != 'rpm':
+            continue
+        artifact_info = pulp_packages.get(artifact.href)
+        if not artifact_info:
+            logging.error(
+                'Cannot get information about artifact %s with href %s',
+                artifact.name,
+                artifact.href,
             )
-            if artifact_info.release:
-                task.package_release = artifact_info.release
-            test_tasks.append(task)
-        if test_tasks:
-            db.add_all(test_tasks)
-            await db.commit()
+            continue
+        if artifact_info.arch == 'src':
+            continue
+        task = models.TestTask(
+            build_task_id=build_task_id,
+            package_name=artifact_info.name,
+            package_version=artifact_info.version,
+            env_arch=build_task.arch,
+            status=TestTaskStatus.CREATED,
+            revision=new_revision,
+            repository_id=repository_id,
+        )
+        if artifact_info.release:
+            task.package_release = artifact_info.release
+        test_tasks.append(task)
+    if test_tasks:
+        db.add_all(test_tasks)
+        await db.flush()
 
 
 async def restart_build_tests(db: AsyncSession, build_id: int):
     # Note that this functionality is triggered by frontend,
     # which only restarts tests for those builds that already
     # had passed the tests
-    async with db.begin():
-        # Set cancel_testing to False just in case
-        await db.execute(
-            update(models.Build)
-            .where(models.Build.id == build_id)
-            .values(cancel_testing=False)
-        )
-        query = (
-            select(models.BuildTask)
-            .options(joinedload(models.BuildTask.test_tasks))
-            .where(models.BuildTask.build_id == build_id)
-        )
+    # Set cancel_testing to False just in case
+    await db.execute(
+        update(models.Build)
+        .where(models.Build.id == build_id)
+        .values(cancel_testing=False)
+    )
+    query = (
+        select(models.BuildTask)
+        .options(joinedload(models.BuildTask.test_tasks))
+        .where(models.BuildTask.build_id == build_id)
+    )
 
-        build_tasks = await db.execute(query)
-        build_tasks = build_tasks.scalars().unique().all()
-        test_log_repository = await __get_log_repository(db, build_id)
+    build_tasks = await db.execute(query)
+    build_tasks = build_tasks.scalars().unique().all()
+    test_log_repository = await __get_log_repository(db, build_id)
+    await db.flush()
     for build_task in build_tasks:
         if not build_task.test_tasks:
             continue
@@ -315,78 +306,77 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
 
 
 async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
-    async with db.begin():
-        build_task = (
-            (
-                await db.execute(
-                    select(models.BuildTask)
-                    .where(models.BuildTask.id == build_task_id)
-                    .options(
-                        selectinload(models.BuildTask.build).selectinload(
-                            models.Build.repos
-                        )
+    build_task = (
+        (
+            await db.execute(
+                select(models.BuildTask)
+                .where(models.BuildTask.id == build_task_id)
+                .options(
+                    selectinload(models.BuildTask.build).selectinload(
+                        models.Build.repos
                     )
                 )
             )
-            .scalars()
-            .first()
         )
-        test_log_repository = next(
-            (i for i in build_task.build.repos if i.type == 'test_log'),
-            None,
+        .scalars()
+        .first()
+    )
+    test_log_repository = next(
+        (i for i in build_task.build.repos if i.type == 'test_log'),
+        None,
+    )
+    if not test_log_repository:
+        raise ValueError(
+            'Cannot create test tasks: the log repository is not found'
         )
-        if not test_log_repository:
-            raise ValueError(
-                'Cannot create test tasks: the log repository is not found'
-            )
     await create_test_tasks(db, build_task_id, test_log_repository.id)
 
 
 async def cancel_build_tests(db: AsyncSession, build_id: int):
-    async with db.begin():
-        # Set cancel_testing to True in db
-        await db.execute(
-            update(models.Build)
-            .where(models.Build.id == build_id)
-            .values(cancel_testing=True)
-        )
+    # Set cancel_testing to True in db
+    await db.execute(
+        update(models.Build)
+        .where(models.Build.id == build_id)
+        .values(cancel_testing=True)
+    )
 
-        build_task_ids = (
-            (
-                await db.execute(
-                    select(models.BuildTask.id).where(
-                        models.BuildTask.build_id == build_id
-                    )
+    build_task_ids = (
+        (
+            await db.execute(
+                select(models.BuildTask.id).where(
+                    models.BuildTask.build_id == build_id
                 )
             )
-            .scalars()
-            .all()
         )
+        .scalars()
+        .all()
+    )
 
-        # Set TestTaskStatus.CANCELLED for those that are still
-        # with status TestTaskStatus.CREATED
-        await db.execute(
-            update(models.TestTask)
-            .where(
-                models.TestTask.status == TestTaskStatus.CREATED,
-                models.TestTask.build_task_id.in_(build_task_ids),
-            )
-            .values(status=TestTaskStatus.CANCELLED)
+    # Set TestTaskStatus.CANCELLED for those that are still
+    # with status TestTaskStatus.CREATED
+    await db.execute(
+        update(models.TestTask)
+        .where(
+            models.TestTask.status == TestTaskStatus.CREATED,
+            models.TestTask.build_task_id.in_(build_task_ids),
         )
+        .values(status=TestTaskStatus.CANCELLED)
+    )
 
-        started_test_tasks_ids = (
-            (
-                await db.execute(
-                    select(models.TestTask.id).where(
-                        models.TestTask.status == TestTaskStatus.STARTED,
-                        models.TestTask.build_task_id.in_(build_task_ids),
-                    )
+    started_test_tasks_ids = (
+        (
+            await db.execute(
+                select(models.TestTask.id).where(
+                    models.TestTask.status == TestTaskStatus.STARTED,
+                    models.TestTask.build_task_id.in_(build_task_ids),
                 )
             )
-            .scalars()
-            .all()
         )
+        .scalars()
+        .all()
+    )
 
+    await db.flush()
     # Tell ALTS to cancel those with TestTaskStatus.STARTED. ALTS
     # will notify statuses back when its done cancelling tests
     if started_test_tasks_ids:

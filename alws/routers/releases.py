@@ -1,6 +1,7 @@
 import typing
 
 from fastapi import APIRouter, Depends
+from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,7 +9,7 @@ from alws import models
 from alws.auth import get_current_user
 from alws.constants import ReleaseStatus
 from alws.crud import release as r_crud
-from alws.dependencies import get_db
+from alws.dependencies import get_async_db_key
 from alws.dramatiq import execute_release_plan, revert_release
 from alws.schemas import release_schema
 
@@ -37,7 +38,7 @@ async def get_releases(
     platform_id: typing.Optional[int] = None,
     status: typing.Optional[int] = None,
     package_name: typing.Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await r_crud.get_releases(
         db,
@@ -52,7 +53,7 @@ async def get_releases(
 @public_router.get("/{release_id}/", response_model=release_schema.Release)
 async def get_release(
     release_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await r_crud.get_releases(db, release_id=release_id)
 
@@ -60,7 +61,7 @@ async def get_release(
 @router.post("/new/", response_model=release_schema.Release)
 async def create_new_release(
     payload: release_schema.ReleaseCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
     release = await r_crud.create_release(db, user.id, payload)
@@ -71,7 +72,7 @@ async def create_new_release(
 async def update_release(
     release_id: int,
     payload: release_schema.ReleaseUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
     release = await r_crud.update_release(db, release_id, user.id, payload)
@@ -84,18 +85,18 @@ async def update_release(
 )
 async def commit_release(
     release_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
     # it's ugly hack for updating release status before execution in background
-    async with db.begin():
-        await db.execute(
-            update(models.Release)
-            .where(
-                models.Release.id == release_id,
-            )
-            .values(status=ReleaseStatus.IN_PROGRESS)
+    await db.execute(
+        update(models.Release)
+        .where(
+            models.Release.id == release_id,
         )
+        .values(status=ReleaseStatus.IN_PROGRESS)
+    )
+    await db.flush()
     execute_release_plan.send(release_id, user.id)
     return {"message": "Release plan execution has been started"}
 
@@ -106,18 +107,18 @@ async def commit_release(
 )
 async def revert_db_release(
     release_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
     # it's ugly hack for updating release status before execution in background
-    async with db.begin():
-        await db.execute(
-            update(models.Release)
-            .where(
-                models.Release.id == release_id,
-            )
-            .values(status=ReleaseStatus.IN_PROGRESS)
+    await db.execute(
+        update(models.Release)
+        .where(
+            models.Release.id == release_id,
         )
+        .values(status=ReleaseStatus.IN_PROGRESS)
+    )
+    await db.flush()
     revert_release.send(release_id, user.id)
     return {"message": "Release plan revert has been started"}
 
@@ -128,7 +129,7 @@ async def revert_db_release(
 )
 async def delete_release(
     release_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
     """

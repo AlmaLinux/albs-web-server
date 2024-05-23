@@ -136,7 +136,7 @@ def prepare_build_done_payload(
 @pytest.mark.anyio
 @pytest.fixture
 async def build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     regular_build: Build,
     start_build,
     create_entity,
@@ -144,11 +144,11 @@ async def build_done(
     mock_get_pulp_packages,
     get_packages_info_from_pulp,
 ):
-    build = await get_builds(db=session, build_id=regular_build.id)
-    await session.close()
+    build = await get_builds(db=async_session, build_id=regular_build.id)
+    await async_session.close()
     for build_task in build.tasks:
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(
                 **prepare_build_done_payload(
                     build_task.id,
@@ -159,17 +159,19 @@ async def build_done(
                 )
             ),
         )
-    build = await get_builds(db=session, build_id=regular_build.id)
+        await async_session.commit()
+    build = await get_builds(db=async_session, build_id=regular_build.id)
     for build_task in build.tasks:
         assert build_task.status == BuildTaskStatus.COMPLETED
-    await session.close()
-    await test.create_test_tasks_for_build_id(session, build.id)
+    await async_session.close()
+    await test.create_test_tasks_for_build_id(async_session, build.id)
+    await async_session.commit()
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def modular_build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     modular_build: Build,
     start_modular_build,
     create_entity,
@@ -177,11 +179,11 @@ async def modular_build_done(
     get_repo_modules_yaml,
     get_repo_modules,
 ):
-    build = await get_builds(db=session, build_id=modular_build.id)
-    await session.close()
+    build = await get_builds(db=async_session, build_id=modular_build.id)
+    await async_session.close()
     for build_task in build.tasks:
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(
                 **prepare_build_done_payload(
                     build_task.id,
@@ -192,12 +194,13 @@ async def modular_build_done(
                 )
             ),
         )
+    await async_session.commit()
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def virt_build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     virt_modular_build: Build,
     modify_repository,
     start_modular_virt_build,
@@ -206,8 +209,8 @@ async def virt_build_done(
     get_repo_virt_modules_yaml,
     get_repo_modules,
 ):
-    build = await get_builds(db=session, build_id=virt_modular_build.id)
-    await session.close()
+    build = await get_builds(db=async_session, build_id=virt_modular_build.id)
+    await async_session.close()
     for build_task in build.tasks:
         status = "done"
         packages = []
@@ -244,7 +247,7 @@ async def virt_build_done(
                 status = "excluded"
 
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(
                 **prepare_build_done_payload(
                     build_task.id,
@@ -253,12 +256,13 @@ async def virt_build_done(
                 )
             ),
         )
+    await async_session.commit()
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def ruby_build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     ruby_modular_build: Build,
     modify_repository,
     start_modular_ruby_build,
@@ -267,8 +271,8 @@ async def ruby_build_done(
     get_repo_ruby_modules_yaml,
     get_repo_modules,
 ):
-    build = await get_builds(db=session, build_id=ruby_modular_build.id)
-    await session.close()
+    build = await get_builds(db=async_session, build_id=ruby_modular_build.id)
+    await async_session.close()
     for build_task in build.tasks:
         packages = [
             "ruby-3.1.2-141.module_el8.1.0+8+503f6fbd.src.rpm",
@@ -288,15 +292,16 @@ async def ruby_build_done(
                 "rubygem-pg-doc-3.3.7-141.module_el8.1.0+8+503f6fbd.noarch.rpm",
             ]
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(**prepare_build_done_payload(build_task.id, packages)),
         )
+    await async_session.commit()
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def subversion_build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     subversion_modular_build: Build,
     modify_repository,
     start_modular_subversion_build,
@@ -305,8 +310,10 @@ async def subversion_build_done(
     get_repo_subversion_modules_yaml,
     get_repo_modules,
 ):
-    build = await get_builds(db=session, build_id=subversion_modular_build.id)
-    await session.close()
+    build = await get_builds(
+        db=async_session, build_id=subversion_modular_build.id
+    )
+    await async_session.close()
     for build_task in build.tasks:
         packages = [
             "subversion-1.10.2-5.module_el8.6.0+3347+66c1e1d6.src.rpm",
@@ -317,15 +324,16 @@ async def subversion_build_done(
             f"subversion-ruby-1.10.2-5.module_el8.6.0+3347+66c1e1d6.{build_task.arch}.rpm",
         ]
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(**prepare_build_done_payload(build_task.id, packages)),
         )
+    await async_session.commit()
 
 
 @pytest.mark.anyio
 @pytest.fixture
 async def llvm_build_done(
-    session: AsyncSession,
+    async_session: AsyncSession,
     llvm_modular_build: Build,
     modify_repository,
     start_modular_llvm_build,
@@ -334,8 +342,8 @@ async def llvm_build_done(
     get_repo_llvm_modules_yaml,
     get_repo_modules,
 ):
-    build = await get_builds(db=session, build_id=llvm_modular_build.id)
-    await session.close()
+    build = await get_builds(db=async_session, build_id=llvm_modular_build.id)
+    await async_session.close()
     for build_task in build.tasks:
         packages = []
         if "python" in build_task.ref.url:
@@ -349,6 +357,7 @@ async def llvm_build_done(
                 f"llvm-13.0.1-1.module+el8.6.0+14118+d530a951.{build_task.arch}.rpm",
             ]
         await safe_build_done(
-            session,
+            async_session,
             BuildDone(**prepare_build_done_payload(build_task.id, packages)),
         )
+    await async_session.commit()
