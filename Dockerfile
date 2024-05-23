@@ -3,7 +3,7 @@ FROM almalinux/9-base:latest as web-server
 RUN <<EOT
   set -ex
   dnf upgrade -y
-  dnf install -y git modulemd-tools libmodulemd python3-libmodulemd python3-gobject
+  dnf install -y git modulemd-tools libmodulemd python3-libmodulemd python3-gobject gcc python3-devel
   dnf clean all
 EOT
 
