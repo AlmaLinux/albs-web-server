@@ -3,12 +3,14 @@ import typing
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
-
+# from alws.dependencies import get_db
 from alws.auth import get_current_user
 from alws.crud import test_repository
 from alws.dependencies import get_async_db_key
 from alws.errors import DataNotFoundError, TestRepositoryError
 from alws.schemas import test_repository_schema
+from alws import models
+
 
 router = APIRouter(
     prefix='/test_repositories',
@@ -82,15 +84,15 @@ async def create_repository(
 async def update_test_repository(
     repository_id: int,
     payload: test_repository_schema.TestRepositoryUpdate,
-    session: AsyncSession = Depends(
-        AsyncSessionDependency(key=get_async_db_key())
-    ),
+    session: AsyncSession = Depends(get_async_db_key()),
+    user: models.User = Depends(get_current_user),
 ):
     try:
         await test_repository.update_repository(
             session,
             repository_id,
             payload,
+            user,
         )
     except DataNotFoundError as exc:
         raise HTTPException(
@@ -105,12 +107,11 @@ async def update_test_repository(
 )
 async def remove_test_repository(
     repository_id: int,
-    session: AsyncSession = Depends(
-        AsyncSessionDependency(key=get_async_db_key())
-    ),
+    session: AsyncSession = Depends(get_async_db_key()),
+    user: models.User = Depends(get_current_user),
 ):
     try:
-        await test_repository.delete_repository(session, repository_id)
+        await test_repository.delete_repository(session, repository_id, user)
     except DataNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

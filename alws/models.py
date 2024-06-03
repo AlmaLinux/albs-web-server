@@ -823,6 +823,33 @@ TeamRoleMapping = sqlalchemy.Table(
     ),
 )
 
+
+TestRepositoryRoleMapping = sqlalchemy.Table(
+    "test_repository_role_mapping",
+    Base.metadata,
+    sqlalchemy.Column(
+        "test_repository_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "test_repositories.id",
+            ondelete="CASCADE",
+            name="fk_test_repositories_role_mapping_product_id",
+        ),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "role_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "user_roles.id",
+            ondelete="CASCADE",
+            name="fk_test_repositories_role_mapping_role_id",
+        ),
+        primary_key=True,
+    ),
+)
+
+
 TeamUserMapping = sqlalchemy.Table(
     "team_user_mapping",
     Base.metadata,
@@ -923,6 +950,9 @@ class Team(PermissionsMixin, Base):
     )
     products: Mapped[List["Product"]] = relationship(
         "Product", back_populates="team"
+    )
+    test_repositories: Mapped[List["TestRepository"]] = relationship(
+         "TestRepository", back_populates="team"
     )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole",
@@ -1145,7 +1175,7 @@ class PackageTestRepository(Base):
     )
 
 
-class TestRepository(Base):
+class TestRepository(PermissionsMixin, TeamMixin, Base):
     __tablename__ = "test_repositories"
     id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
     name: Mapped[str] = mapped_column(
@@ -1162,6 +1192,10 @@ class TestRepository(Base):
         "PackageTestRepository",
         back_populates="test_repository",
         cascade="all, delete",
+    )
+    team: Mapped["Team"] = relationship("Team", back_populates="test_repositories")
+    roles: Mapped[List["UserRole"]] = relationship(
+        "UserRole", secondary=TestRepositoryRoleMapping
     )
 
 

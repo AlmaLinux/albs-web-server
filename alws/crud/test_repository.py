@@ -6,8 +6,32 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import func
 
 from alws import models
+from alws.crud.teams import get_teams
 from alws.errors import DataNotFoundError, TestRepositoryError
 from alws.schemas import test_repository_schema
+# Permissions Check Imports
+from alws.perms.authorization import can_perform
+from alws.errors import (
+    PermissionDenied,
+)
+from alws.perms import actions
+from alws.crud import user as user_crud
+from alws.perms.roles import (
+    Contributor,
+    Observer,
+)
+from alws.perms.actions import (
+    UpdateTest,
+    DeleteTest,
+)
+from alws.models import (
+    Team,
+    User,
+    UserAction,
+    UserRole,
+)
+from alws.crud.actions import ensure_all_actions_exist
+
 
 
 async def get_repositories(
@@ -24,7 +48,12 @@ async def get_repositories(
         query = (
             select(models.TestRepository)
             .order_by(models.TestRepository.id.desc())
-            .options(joinedload(models.TestRepository.packages))
+            .options(
+                joinedload(models.TestRepository.packages),
+                joinedload(models.TestRepository.team).joinedload(models.Team.roles),
+                joinedload(models.TestRepository.owner),
+                joinedload(models.TestRepository.roles),
+            )
         )
         if name:
             query = query.where(models.TestRepository.name == name)
@@ -139,9 +168,58 @@ async def bulk_create_package_mapping(
     await session.flush()
 
 
+def get_team_role_name(team_name: str, role_name: str):
+    return f'{team_name}_{role_name}'
+
+async def create_test_repository_role_mapping(session: AsyncSession, team_name: str):
+    print('*MappingDB:0')
+    required_roles = (Contributor, Observer)
+    required_actions = (UpdateTest, DeleteTest)
+    new_role_names = [get_team_role_name(team_name, role.name)
+                      for role in required_roles]
+
+    existing_roles = (await session.execute(select(UserRole).where(
+        UserRole.name.in_(new_role_names)))).scalars().all()
+    existing_role_names = {r.name for r in existing_roles}
+
+    print('*MappingDB:1')
+
+    await ensure_all_actions_exist(session)
+    existing_actions = (await session.execute(
+        select(UserAction))).scalars().all()
+    print('*MappingDB:2')
+
+    new_roles = []
+    for role in required_roles:
+        role_name = f'{team_name}_{role.name}'
+        print('*MappingDB:', role_name)
+        # if role_name in existing_role_names:
+        #     print('*MappingDB: Continue')
+        #     continue
+        new_role_actions = []
+        for required_action in required_actions:
+            if required_action not in role.actions:
+                print('*MappingDB:', role_name, required_action.name)
+                new_role_actions.append(required_action)
+
+        new_roles.append(UserRole(name=role_name, actions=new_role_actions))
+
+    print('*MappingDB:3')
+
+    if new_roles:
+        session.add_all(new_roles)
+        await session.flush()
+
+    for role in new_roles:
+        await session.refresh(role)
+
+    return new_roles + existing_roles
+
+
 async def create_repository(
     session: AsyncSession,
     payload: test_repository_schema.TestRepositoryCreate,
+    # team_id: int,
     flush: bool = False,
 ) -> models.TestRepository:
     test_repository = (
@@ -163,6 +241,12 @@ async def create_repository(
         raise TestRepositoryError("Test Repository already exists")
 
     repository = models.TestRepository(**payload.model_dump())
+
+    team = await get_teams(session, team_id=payload.team_id)
+    repository_roles = await create_test_repository_role_mapping(session, payload.team_id)
+    repository.team = team
+    repository.roles = repository_roles
+
     session.add(repository)
     await session.flush()
     await session.refresh(repository)
@@ -173,6 +257,7 @@ async def update_repository(
     session: AsyncSession,
     repository_id: int,
     payload: test_repository_schema.TestRepositoryUpdate,
+    user: models.User,
 ) -> models.TestRepository:
     db_repo = await get_repositories(
         session,
@@ -180,6 +265,12 @@ async def update_repository(
     )
     if not db_repo:
         raise DataNotFoundError(f"Unknown test repository ID: {repository_id}")
+
+    db_user = await user_crud.get_user(session, user_id=user.id)
+    if not can_perform(db_repo, db_user, actions.UpdateTest.name):
+        raise PermissionDenied(
+            "User does not have permissions to update this test repository"
+        )
 
     for field, value in payload.model_dump().items():
         setattr(db_repo, field, value)
@@ -211,11 +302,22 @@ async def bulk_delete_package_mapping(
     await session.flush()
 
 
-async def delete_repository(session: AsyncSession, repository_id: int):
+async def delete_repository(
+        session: AsyncSession,
+        repository_id: int,
+        user: models.User,
+):
     db_repo = await get_repositories(session, repository_id=repository_id)
     if not db_repo:
         raise DataNotFoundError(
             f"Test repository={repository_id} doesn`t exist"
         )
+
+    db_user = await user_crud.get_user(session, user_id=user.id)
+    if not can_perform(db_repo, db_user, actions.DeleteTest.name):
+        raise PermissionDenied(
+            "User does not have permissions to delete this test repository"
+        )
+
     await session.delete(db_repo)
     await session.flush()
