@@ -2,7 +2,7 @@ import typing
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -178,8 +178,15 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
     new_role_names = [get_team_role_name(team_name, role.name)
                       for role in required_roles]
 
-    existing_roles = (await session.execute(select(UserRole).where(
-        UserRole.name.in_(new_role_names)))).scalars().all()
+    existing_roles = (
+        await session.execute(
+            select(UserRole).where(
+                UserRole.name.in_(new_role_names)
+            ).options(
+                selectinload(UserRole.actions)
+            )
+        )
+    ).scalars().all()
     existing_role_names = {r.name for r in existing_roles}
 
     print('*MappingDB:1')
@@ -189,31 +196,26 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
         select(UserAction))).scalars().all()
     print('*MappingDB:2')
 
-    new_roles = []
-    for role in required_roles:
+    actions_to_add = []
+    for existing_action in existing_actions:
+        for action in required_actions:
+            if action.name == existing_action.name:
+                actions_to_add.append(existing_action)
+
+    for role in existing_roles:
         role_name = f'{team_name}_{role.name}'
         print('*MappingDB:', role_name)
-        # if role_name in existing_role_names:
-        #     print('*MappingDB: Continue')
-        #     continue
-        new_role_actions = []
-        for required_action in required_actions:
-            if required_action not in role.actions:
-                print('*MappingDB:', role_name, required_action.name)
-                new_role_actions.append(required_action)
-
-        new_roles.append(UserRole(name=role_name, actions=new_role_actions))
-
+        for action in actions_to_add:
+            if action not in role.actions:
+                print('*MappingDB:', role_name, action.name)
+                role.actions.append(action)
+            else:
+                print('*MappingDB action already added:', action.name)
     print('*MappingDB:3')
 
-    if new_roles:
-        session.add_all(new_roles)
-        await session.flush()
+    await session.flush()
 
-    for role in new_roles:
-        await session.refresh(role)
-
-    return new_roles + existing_roles
+    return existing_roles
 
 
 async def create_repository(
