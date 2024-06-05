@@ -124,6 +124,7 @@ class ErrataListResponse(BaseModel):
 class CompactErrataRecord(BaseModel):
     id: str
     updated_date: datetime.datetime
+    platform_id: int
 
 
 class CreateErrataResponse(BaseModel):

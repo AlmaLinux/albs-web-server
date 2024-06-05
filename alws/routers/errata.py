@@ -130,12 +130,16 @@ async def update_errata_record(
 @router.get("/all/", response_model=List[errata_schema.CompactErrataRecord])
 async def list_all_errata_records(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    platform_id: Optional[int] = None,
 ):
-    records = await errata_crud.list_errata_records(db, compact=True)
+    records = await errata_crud.list_errata_records(
+        db, compact=True, platform=platform_id
+    )
     return [
         {
             "id": record.id,
             "updated_date": record.updated_date,
+            "platform_id": record.platform_id,
         }
         for record in records["records"]
     ]
