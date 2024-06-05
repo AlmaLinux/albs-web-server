@@ -77,14 +77,16 @@ async def create_repository(
     return created_repo
 
 
-# @router.patch(
-#     '/{repository_id}/',
-#     status_code=status.HTTP_204_NO_CONTENT,
-# )
+@router.patch(
+    '/{repository_id}/',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def update_test_repository(
     repository_id: int,
     payload: test_repository_schema.TestRepositoryUpdate,
-    session: AsyncSessionDependency = Depends(get_async_db_key()),
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
     user: models.User = Depends(get_current_user),
 ):
     try:
@@ -101,13 +103,15 @@ async def update_test_repository(
         )
 
 
-# @router.delete(
-#     '/{repository_id}/remove/',
-#     status_code=status.HTTP_204_NO_CONTENT,
-# )
+@router.delete(
+    '/{repository_id}/remove/',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def remove_test_repository(
     repository_id: int,
-    session: AsyncSessionDependency = Depends(get_async_db_key()),
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
     user: models.User = Depends(get_current_user),
 ):
     try:
