@@ -172,7 +172,7 @@ def get_team_role_name(team_name: str, role_name: str):
     return f'{team_name}_{role_name}'
 
 async def create_test_repository_role_mapping(session: AsyncSession, team_name: str):
-    print('*MappingDB:0')
+    # print('*MappingDB:0')
     required_roles = (Contributor, Observer)
     required_actions = (UpdateTest, DeleteTest)
     role_names = [get_team_role_name(team_name, role.name)
@@ -189,12 +189,12 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
     ).scalars().all()
     existing_role_names = {r.name for r in existing_roles}
 
-    print('*MappingDB:1')
+    # print('*MappingDB:1')
 
     await ensure_all_actions_exist(session)
     existing_actions = (await session.execute(
         select(UserAction))).scalars().all()
-    print('*MappingDB:2')
+    # print('*MappingDB:2')
 
     actions_to_add = []
     for existing_action in existing_actions:
@@ -204,15 +204,16 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
 
     for role in existing_roles:
         role_name = f'{team_name}_{role.name}'
-        print('*MappingDB:', role_name)
+        # print('*MappingDB:', role_name)
         for action in actions_to_add:
             if action not in role.actions:
-                print('*MappingDB:', role_name, action.name)
+                # print('*MappingDB:', role_name, action.name)
                 role.actions.append(action)
-            else:
-                print('*MappingDB action already added:', action.name)
-    print('*MappingDB:3')
+            # else:
+                # print('*MappingDB action already added:', action.name)
+    # print('*MappingDB:3')
 
+    #todo flush if flush see parameters
     await session.flush()
 
     return existing_roles
@@ -320,6 +321,5 @@ async def delete_repository(
         raise PermissionDenied(
             "User does not have permissions to delete this test repository"
         )
-
     await session.delete(db_repo)
     await session.flush()
