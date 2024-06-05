@@ -175,13 +175,13 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
     print('*MappingDB:0')
     required_roles = (Contributor, Observer)
     required_actions = (UpdateTest, DeleteTest)
-    new_role_names = [get_team_role_name(team_name, role.name)
-                      for role in required_roles]
+    role_names = [get_team_role_name(team_name, role.name)
+                       for role in required_roles]
 
     existing_roles = (
         await session.execute(
             select(UserRole).where(
-                UserRole.name.in_(new_role_names)
+                UserRole.name.in_(role_names)
             ).options(
                 selectinload(UserRole.actions)
             )
@@ -245,7 +245,7 @@ async def create_repository(
     repository = models.TestRepository(**payload.model_dump())
 
     team = await get_teams(session, team_id=payload.team_id)
-    repository_roles = await create_test_repository_role_mapping(session, payload.team_id)
+    repository_roles = await create_test_repository_role_mapping(session, team.name)
     repository.team = team
     repository.roles = repository_roles
 
