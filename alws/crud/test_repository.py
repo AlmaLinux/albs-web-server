@@ -172,10 +172,9 @@ def get_team_role_name(team_name: str, role_name: str):
     return f'{team_name}_{role_name}'
 
 async def create_test_repository_role_mapping(session: AsyncSession, team_name: str):
-    required_roles = (Contributor, Observer)
+    required_roles = (Contributor,)
     required_actions = (UpdateTest, DeleteTest)
-    role_names = [get_team_role_name(team_name, role.name)
-                       for role in required_roles]
+    role_names = [get_team_role_name(team_name, role.name) for role in required_roles]
 
     existing_roles = (
         await session.execute(
@@ -210,7 +209,6 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
 async def create_repository(
     session: AsyncSession,
     payload: test_repository_schema.TestRepositoryCreate,
-    # team_id: int,
     flush: bool = False,
 ) -> models.TestRepository:
     test_repository = (

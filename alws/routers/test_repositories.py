@@ -3,7 +3,6 @@ import typing
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
-# from alws.dependencies import get_db
 from alws.auth import get_current_user
 from alws.crud import test_repository
 from alws.dependencies import get_async_db_key
