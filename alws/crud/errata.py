@@ -1227,8 +1227,8 @@ def get_albs_packages_from_record(
             missing_pkg_names.append(full_name)
         msg = (
             "Cannot release updateinfo record, the following packages "
-            "are missing from platform repositories or have wrong status: "
-            + ", ".join(missing_pkg_names)
+            "are missing from platform repositories or have wrong status:\n"
+            + ",\n".join(missing_pkg_names)
         )
         if not force:
             raise ValueError(msg)
