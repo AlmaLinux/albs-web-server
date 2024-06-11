@@ -37,6 +37,7 @@ def get_rpm_module_packages_from_repository(
     result = []
     repo_query = select(CoreRepository).where(CoreRepository.pulp_id == repo_id)
     with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         repo = pulp_db.execute(repo_query).scalars().first()
         repo_name = repo.name
 
@@ -117,6 +118,7 @@ def get_rpm_module_packages_from_repository(
 
     query = select(RpmPackage).where(*conditions)
     with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         result = pulp_db.execute(query).scalars().all()
     return result
 
@@ -158,6 +160,7 @@ def get_rpm_packages_from_repositories(
         )
     )
     with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         return pulp_db.execute(query).scalars().unique().all()
 
 
@@ -204,6 +207,7 @@ def get_rpm_packages_from_repository(
 
     query = select(RpmPackage).where(*conditions)
     with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         return pulp_db.execute(query).scalars().all()
 
 
@@ -241,6 +245,7 @@ def get_rpm_packages_by_checksums(
 ) -> typing.Dict[str, RpmPackage]:
     result = {}
     with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
         pulp_pkgs = (
             pulp_db.execute(
                 select(RpmPackage)
