@@ -1,12 +1,12 @@
 ---
-mqtt_queue_host: "albs_mosquitto_1"
+mqtt_queue_host: "mosquitto"
 mqtt_queue_port: 1883
 mqtt_queue_topic_unmodified: gitea-webhooks-unmodified
 mqtt_queue_topic_modified: gitea-webhooks-modified
 mqtt_queue_qos: 2
 mqtt_client_id: albs_gitea_listener
-mqtt_queue_username: "\"\""
-mqtt_queue_password: "\"\""
+mqtt_queue_username:
+mqtt_queue_password:
 mqtt_queue_clean_session: False
-albs_jwt_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Nzc2Mjg0NjEsInN1YiI6IjEiLCJhdWQiOlsiZmFzdGFwaS11c2VyczphdXRoIl19.wHIROKLOk0bG9dfmd3Fc9cL9aigxMel789JYUS5Q7Cc"
-albs_address: "http://albs_web_server_1:8000"
+albs_jwt_token:
+albs_address: http://web_server:8080
