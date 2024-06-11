@@ -9,14 +9,17 @@ import logging
 
 import yaml
 from fastapi_sqla import open_async_session
+from sqlalchemy import update
 from syncer import sync
 
+from alws import models
 from alws.crud import platform as pl_crud
 from alws.crud import repository as repo_crud
 from alws.dependencies import get_async_db_key
 from alws.schemas import platform_schema, remote_schema, repository_schema
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.pulp_client import PulpClient
+from scripts.bootstrap_permissions import ensure_system_user_exists
 
 REPO_CACHE = {}
 
@@ -186,6 +189,21 @@ async def get_repositories_for_update(platform_name: str):
         )
 
 
+async def add_owner_id():
+    async with open_async_session(key=get_async_db_key()) as db:
+        system_user = await ensure_system_user_exists(db)
+        await db.execute(
+            update(models.Platform)
+            .where(models.Platform.owner_id.is_(None))
+            .values(owner_id=system_user.id)
+        )
+        await db.execute(
+            update(models.Repository)
+            .where(models.Repository.owner_id.is_(None))
+            .values(owner_id=system_user.id)
+        )
+
+
 async def add_repositories_to_platform(
     platform_data: dict, repositories_ids: typing.List[int]
 ):
@@ -347,6 +365,7 @@ def main():
                     "Repository %s sync is failed: \n%s", repository, str(e)
                 )
         sync(add_repositories_to_platform(platform_data, repository_ids))
+        sync(add_owner_id())
 
 
 if __name__ == "__main__":
