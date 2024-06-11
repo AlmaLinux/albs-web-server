@@ -5,5 +5,5 @@ pyfakefs==5.5.0
 # Linters
 isort[colors]==5.13.2
 black==24.4.2
-pylint==3.2.2
+pylint==3.2.3
 bandit[toml]==1.7.8
