@@ -101,12 +101,12 @@ async def set_build_id_to_issues(
     issues: list,
     build_id: str,
 ):
+    url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
     for issue in issues:
         issue_id = issue["id"]
         if "Build URL" in issue["fields"]:
             continue
 
-        url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
         await github_client.set_text_field(
             issue_id=issue_id,
             field_name="Build URL",
@@ -284,12 +284,12 @@ async def create_github_issue(
         else:
             comments.add("Find packages in prod repos")
     for build_id in build_ids:
+        url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
         await client.set_text_field(
             issue_id=project_item_id,
             field_name="Build URL",
             field_value=url,
         )
-        url = urljoin(settings.frontend_baseurl, f"build/{build_id}")
         comments.add(f"Find packages in Build: {url}")
     for comment in comments:
         await client.create_comment(item_id=issue_id, body=comment)
