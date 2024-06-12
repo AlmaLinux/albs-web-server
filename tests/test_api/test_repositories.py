@@ -3,11 +3,13 @@ from typing import Dict, List, Union
 import pytest
 
 from tests.mock_classes import BaseAsyncTestCase
+from alws.models import Product
 
 
 class TestRepositoriesEndpoints(BaseAsyncTestCase):
     async def test_create_test_repository(
         self,
+        user_product: Product,
         create_test_repository_payload: dict,
     ):
         response = await self.make_request(
