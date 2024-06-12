@@ -1,6 +1,7 @@
 import urllib.parse
-from typing import Optional
+from typing import Annotated, Optional
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -83,7 +84,7 @@ class Settings(BaseSettings):
 
     logging_level: Optional[str] = 'INFO'
 
-    frontend_baseurl: str = 'http://localhost:8080'
+    frontend_baseurl: Annotated[str, Field(validate_default=True)] = 'http://localhost:8080'
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
     almalinux_callback_endpoint: str = 'api/v1/auth/almalinux/callback'
 
@@ -99,6 +100,13 @@ class Settings(BaseSettings):
     github_organization_name: str = 'AlmaLinux'
     github_project_number: Optional[int] = None
     github_default_repository_name: str = 'updates'
+
+    @field_validator('frontend_baseurl')
+    @classmethod
+    def validate_frontend_url(cls, value: str) -> str:
+        if not value.endswith('/'):
+            value += '/'
+        return value
 
     @property
     def codenotary_enabled(self) -> bool:
