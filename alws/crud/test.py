@@ -81,7 +81,8 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
             ),
             selectinload(models.TestTask.build_task)
             .selectinload(models.BuildTask.build)
-            .selectinload(models.Build.linked_builds),
+            .selectinload(models.Build.linked_builds)
+            .selectinload(models.Build.repos),
             selectinload(models.TestTask.build_task)
             .selectinload(models.BuildTask.build)
             .selectinload(models.Build.platform_flavors)
