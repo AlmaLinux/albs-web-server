@@ -9,7 +9,6 @@ from alws import models
 from alws.crud.teams import get_teams
 from alws.errors import DataNotFoundError, TestRepositoryError
 from alws.schemas import test_repository_schema
-# Permissions Check Imports
 from alws.perms.authorization import can_perform
 from alws.errors import (
     PermissionDenied,
@@ -185,7 +184,6 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
             )
         )
     ).scalars().all()
-    # existing_role_names = {r.name for r in existing_roles}
     await ensure_all_actions_exist(session)
     existing_actions = (await session.execute(
         select(UserAction))).scalars().all()
@@ -196,11 +194,9 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
                 actions_to_add.append(existing_action)
 
     for role in existing_roles:
-        # role_name = f'{team_name}_{role.name}'
         for action in actions_to_add:
             if action not in role.actions:
                 role.actions.append(action)
-    #todo flush if flush see parameters
     await session.flush()
 
     return existing_roles
