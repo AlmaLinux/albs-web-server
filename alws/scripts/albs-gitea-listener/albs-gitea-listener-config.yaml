@@ -1,5 +1,5 @@
 ---
-mqtt_queue_host: "mosquitto"
+mqtt_queue_host: mosquitto
 mqtt_queue_port: 1883
 mqtt_queue_topic_unmodified: gitea-webhooks-unmodified
 mqtt_queue_topic_modified: gitea-webhooks-modified
