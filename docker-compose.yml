@@ -501,6 +501,7 @@ services:
     depends_on:
       - web_server
       - frontend
+      - sign_file
     logging:
       driver: "json-file"
       options:
