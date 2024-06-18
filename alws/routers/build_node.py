@@ -94,12 +94,18 @@ async def get_task(
             "email": task.build.owner.email,
         },
     }
+    supported_arches = request.supported_arches
+    if 'src' in request.supported_arches:
+        supported_arches.remove('src')
+    task_arch = task.arch
+    if task_arch == 'src':
+        task_arch = supported_arches[0]
     for repo in itertools.chain(task.platform.repos, task.build.repos):
-        if repo.arch == task.arch and repo.type != "build_log":
+        if repo.arch == task_arch and repo.type != "build_log":
             response["repositories"].append(repo)
     for build in task.build.linked_builds:
         for repo in build.repos:
-            if repo.arch == task.arch and repo.type != "build_log":
+            if repo.arch == task_arch and repo.type != "build_log":
                 response["repositories"].append(repo)
     if task.build.platform_flavors:
         for flavour in task.build.platform_flavors:
@@ -120,7 +126,7 @@ async def get_task(
                         flavour.data["definitions"]
                     )
             for repo in flavour.repos:
-                if repo.arch == task.arch:
+                if repo.arch == task_arch:
                     response["repositories"].append(repo)
 
     # TODO: Get rid of this fixes when all affected builds would be processed
