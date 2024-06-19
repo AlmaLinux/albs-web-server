@@ -1,5 +1,5 @@
 PyYAML==6.0.1
-SQLAlchemy==2.0.30
+SQLAlchemy==2.0.31
 aiofiles==23.2.1
 aiohttp-retry==2.8.3
 aiohttp==3.9.5
