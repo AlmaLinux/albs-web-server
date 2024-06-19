@@ -9,16 +9,18 @@ from fastapi import (
 from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws.auth import get_current_superuser
+from alws.auth import get_current_user
 from alws.crud import teams
 from alws.dependencies import get_async_db_key
 from alws.errors import TeamError
 from alws.schemas import team_schema
+from alws.models import User
+
 
 router = APIRouter(
     prefix='/teams',
     tags=['teams'],
-    dependencies=[Depends(get_current_superuser)],
+    dependencies=[Depends(get_current_user)],
 )
 
 public_router = APIRouter(
@@ -53,9 +55,10 @@ async def add_members(
     team_id: int,
     payload: team_schema.TeamMembersUpdate,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: User = Depends(get_current_user),
 ):
     try:
-        db_team = await teams.update_members(db, payload, team_id, 'add')
+        db_team = await teams.update_members(db, payload, team_id, 'add', user.id)
     except TeamError as exc:
         raise HTTPException(
             detail=str(exc),
@@ -69,9 +72,10 @@ async def remove_members(
     team_id: int,
     payload: team_schema.TeamMembersUpdate,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: User = Depends(get_current_user),
 ):
     try:
-        db_team = await teams.update_members(db, payload, team_id, 'remove')
+        db_team = await teams.update_members(db, payload, team_id, 'remove', user.id)
     except TeamError as exc:
         raise HTTPException(
             detail=str(exc),
@@ -99,9 +103,10 @@ async def create_team(
 async def remove_team(
     team_id: int,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: User = Depends(get_current_user),
 ):
     try:
-        await teams.remove_team(db, team_id)
+        await teams.remove_team(db, team_id, user.id)
     except TeamError as exc:
         raise HTTPException(
             detail=str(exc),
