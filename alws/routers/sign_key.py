@@ -38,8 +38,10 @@ async def get_sign_keys(
 async def create_sign_key(
     payload: sign_schema.SignKeyCreate,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user=Depends(get_current_user),
 ):
     try:
+        payload.owner_id = user.id
         return await sign_key.create_sign_key(db, payload)
     except (PlatformMissingError, SignKeyAlreadyExistsError) as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))

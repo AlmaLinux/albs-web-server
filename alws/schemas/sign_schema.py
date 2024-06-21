@@ -25,6 +25,7 @@ class SignKeyCreate(BaseModel):
     fingerprint: str
     public_url: str
     platform_id: typing.Optional[int] = None
+    owner_id: typing.Optional[int] = None
 
 
 class SignKeyUpdate(BaseModel):

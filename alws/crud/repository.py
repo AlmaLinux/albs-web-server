@@ -169,6 +169,8 @@ async def add_to_platform(
     new_repos_list = list(set(repositories + platform.repos))
 
     platform.repos = new_repos_list
+    for repo in new_repos_list:
+        repo.platform_id = platform_id
     db.add(platform)
     db.add_all(new_repos_list)
     await db.flush()
