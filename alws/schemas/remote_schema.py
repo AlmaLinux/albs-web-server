@@ -19,6 +19,9 @@ class RemoteCreate(BaseModel):
     arch: str
     url: str
     policy: str = 'on_demand'
+    proxy_url: typing.Optional[str] = None
+    proxy_username: typing.Optional[str] = None
+    proxy_password: typing.Optional[str] = None
 
 
 class RemoteUpdate(BaseModel):

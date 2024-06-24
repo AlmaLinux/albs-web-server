@@ -760,6 +760,9 @@ class PulpClient:
         remote_name: str,
         remote_url: str,
         remote_policy: str = "on_demand",
+        proxy_url: typing.Optional[str] = None,
+        proxy_username: typing.Optional[str] = None,
+        proxy_password: typing.Optional[str] = None,
     ) -> str:
         """
         Policy variants: 'on_demand', 'immediate', 'streamed'
@@ -770,17 +773,29 @@ class PulpClient:
             "url": remote_url,
             "policy": remote_policy,
             "download_concurrency": 5,
+            "proxy_url": proxy_url,
+            "proxy_username": proxy_username,
+            "proxy_password": proxy_password,
         }
         result = await self.request("POST", endpoint, json=payload)
         return result["pulp_href"]
 
     async def update_rpm_remote(
-        self, remote_href, remote_url: str, remote_policy: str = "on_demand"
+        self,
+        remote_href: str,
+        remote_url: str,
+        remote_policy: str = "on_demand",
+        proxy_url: typing.Optional[str] = None,
+        proxy_username: typing.Optional[str] = None,
+        proxy_password: typing.Optional[str] = None,
     ) -> str:
         payload = {
             "url": remote_url,
             "policy": remote_policy,
             "download_concurrency": 5,
+            "proxy_url": proxy_url,
+            "proxy_username": proxy_username,
+            "proxy_password": proxy_password,
         }
 
         await self.request("PATCH", remote_href, data=payload)
