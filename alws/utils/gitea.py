@@ -27,7 +27,7 @@ def modules_yaml_path_from_url(url: str, ref: str, ref_type: str) -> str:
 
 async def download_modules_yaml(url: str, ref: str, ref_type: str) -> str:
     template_path = modules_yaml_path_from_url(url, ref, ref_type)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(template_path) as response:
             template = await response.text()
             try:
@@ -56,7 +56,7 @@ class GiteaClient:
                     f' {full_url}, with params: {params}'
                 )
                 async with self.requests_lock:
-                    async with aiohttp.ClientSession() as session:
+                    async with aiohttp.ClientSession(trust_env=True) as session:
                         async with session.get(
                             full_url, params=params
                         ) as response:
