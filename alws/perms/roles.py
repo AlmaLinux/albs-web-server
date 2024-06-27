@@ -43,6 +43,8 @@ Manager = Role(
         actions.UpdateProduct.name,
         actions.DeleteProduct.name,
         actions.ReadSignKeyInfo.name,
+        actions.UpdateTest.name,
+        actions.DeleteTest.name,
     ],
 )
 
