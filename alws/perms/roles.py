@@ -59,6 +59,7 @@ Contributor = Role(
         actions.CreateProduct.name,
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
+        actions.UpdateTest.name,
     ],
 )
 
