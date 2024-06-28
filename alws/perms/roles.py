@@ -16,7 +16,7 @@ __all__ = [
 
 class Role(BaseModel):
     name: str
-    actions: typing.Iterable[str]
+    actions: typing.List[str]
 
 
 Manager = Role(
