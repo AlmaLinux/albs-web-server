@@ -205,6 +205,7 @@ async def create_test_repository_role_mapping(session: AsyncSession, team_name: 
 async def create_repository(
     session: AsyncSession,
     payload: test_repository_schema.TestRepositoryCreate,
+    owner_id: int,
     flush: bool = False,
 ) -> models.TestRepository:
     test_repository = (
@@ -226,6 +227,7 @@ async def create_repository(
         raise TestRepositoryError("Test Repository already exists")
 
     repository = models.TestRepository(**payload.model_dump())
+    repository.owner_id = owner_id
 
     team = await get_teams(session, team_id=payload.team_id)
     repository_roles = await create_test_repository_role_mapping(session, team.name)

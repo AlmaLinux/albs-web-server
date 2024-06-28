@@ -46,7 +46,6 @@ class TestRepositoryCreate(BaseModel):
     tests_dir: str
     tests_prefix: typing.Optional[str] = None
     team_id: int
-    owner_id: int
 
     @field_validator('tests_dir', mode="before")
     def tests_dir_validator(cls, tests_dir: str):

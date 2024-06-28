@@ -58,12 +58,11 @@ async def get_repository(
 @router.post('/create/', response_model=test_repository_schema.TestRepository)
 async def create_repository(
     payload: test_repository_schema.TestRepositoryCreate,
-    session: AsyncSession = Depends(
-        AsyncSessionDependency(key=get_async_db_key())
-    ),
+    session: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: models.User = Depends(get_current_user),
 ):
     try:
-        db_repo = await test_repository.create_repository(session, payload)
+        db_repo = await test_repository.create_repository(session, payload, user.id)
     except TestRepositoryError as exc:
         raise HTTPException(
             detail=str(exc),
