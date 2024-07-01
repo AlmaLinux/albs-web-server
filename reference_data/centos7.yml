@@ -39,7 +39,7 @@
     - arch: x86_64
       name: centos-7-baseos
       type: rpm
-      remote_url: http://mirror.centos.org/centos/7/os/x86_64/
+      remote_url: https://vault.centos.org/7.9.2009/os/x86_64/
       export_path: centos/7/os/x86_64/
       production: false
       debug: false
@@ -48,7 +48,7 @@
     - arch: x86_64
       name: centos-7-updates
       type: rpm
-      remote_url: http://mirror.centos.org/centos/7/updates/x86_64/
+      remote_url: https://vault.centos.org/7.9.2009/updates/x86_64/
       export_path: centos/7/updates/x86_64/
       production: false
       debug: false
@@ -57,7 +57,7 @@
     - arch: aarch64
       name: centos-7-baseos
       type: rpm
-      remote_url: http://mirror.centos.org/altarch/7/os/aarch64/
+      remote_url: https://vault.centos.org/altarch/7.9.2009/os/aarch64/
       export_path: altarch/7/os/aarch64/
       production: false
       debug: false
@@ -66,7 +66,7 @@
     - arch: aarch64
       name: centos-7-updates
       type: rpm
-      remote_url: http://mirror.centos.org/altarch/7/updates/aarch64/
+      remote_url: https://vault.centos.org/altarch/7.9.2009/updates/aarch64/
       export_path: altarch/7/updates/aarch64/
       production: false
       debug: false
