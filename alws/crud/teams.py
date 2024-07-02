@@ -226,6 +226,11 @@ async def update_members(
                 f'Cannot remove user={db_user.id} from team,'
                 ' user not in team members'
             )
+        if operation == 'remove' and db_team.owner.id == db_user.id:
+            raise TeamError(
+                f'Cannot remove user={db_user.id} from team,'
+                ' user is team owner'
+            )
         db_user_role_update_operation = getattr(db_user.roles, operation)
         db_team_members_update_operation(db_user)
         db_user_role_update_operation(db_contributor_team_role)
