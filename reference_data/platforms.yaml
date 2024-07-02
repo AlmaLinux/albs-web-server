@@ -3400,7 +3400,7 @@
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
       vendor: AlmaLinux
     mock:
-      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config centos-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core
       dnf_common_opts:
