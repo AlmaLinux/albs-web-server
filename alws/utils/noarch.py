@@ -49,6 +49,9 @@ async def save_noarch_packages(
     pulp_client: PulpClient,
     build_task: models.BuildTask,
 ):
+    if build_task.arch == 'src':
+        return []
+
     new_binary_rpms = []
     query = (
         select(models.BuildTask)
