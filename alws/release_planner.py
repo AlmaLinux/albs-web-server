@@ -1824,6 +1824,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         )
         albs_pkgs = albs_pkgs.scalars().all()
 
+        if not albs_pkgs:
+            return
+
         # We assume that a release involves only one errata.
         # If it is not the case, we need to check the errata record status
         # of every errata_to_albs_packages and taking them into account when
