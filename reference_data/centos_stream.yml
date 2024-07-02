@@ -29,3 +29,20 @@
     - aarch64
     - ppc64le
     - s390x
+
+- name: CentOSStream10
+  distr_type: rhel
+  distr_version: '10'
+  priority: 2
+  test_dist_name: CentOSStream10
+  modularity:
+      versions:
+  data: {}
+  is_reference: true
+  type: rpm
+  arch_list:
+    - x86_64
+    - x86_64_v2
+    - aarch64
+    - ppc64le
+    - s390x
