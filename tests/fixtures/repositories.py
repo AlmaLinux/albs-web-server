@@ -28,7 +28,6 @@ def create_test_repository_payload() -> Dict[str, Any]:
         'tests_dir': 'almalinux/',
         'tests_prefix': '8.',
         'team_id': 1,
-        'owner_id': 1,
     }
 
 
