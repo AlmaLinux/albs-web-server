@@ -5,7 +5,7 @@ aiohttp-retry==2.8.3
 aiohttp==3.9.5
 aioredis==2.0.1
 alembic-postgresql-enum==1.2.0
-alembic==1.13.1
+alembic==1.13.2
 asyncpg==0.29.0
 dramatiq[rabbitmq, watch]==1.17.0
 email-validator>=2.0
