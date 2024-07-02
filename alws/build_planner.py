@@ -192,6 +192,9 @@ class BuildPlanner:
                 platform.id,
             )
             for arch in self._request_platforms_arch_list[platform.name]:
+                if arch == 'src':
+                    continue
+
                 tasks.append(self.create_build_repo(platform, arch, 'rpm'))
                 tasks.append(
                     self.create_build_repo(
@@ -447,7 +450,13 @@ class BuildPlanner:
             mock_options['definitions'] = {}
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
-            for arch in self._request_platforms_arch_list[platform.name]:
+            arches = self._request_platforms_arch_list[platform.name]
+            if (
+                ref.ref_type != BuildTaskRefType.SRPM_URL
+                and 'src' not in arches
+            ):
+                arches.insert(0, 'src')
+            for arch in arches:
                 modules = self._modules_by_platform_arch.get(
                     (platform.name, arch), []
                 )
@@ -661,8 +670,8 @@ class BuildPlanner:
         #     between their own tasks to ensure correct build order.
         all_tasks = []
         for platform_task_cache in self._tasks_cache.values():
-            first_arch = 'i686'
-            first_arch_tasks = platform_task_cache.get('i686')
+            first_arch = 'src'
+            first_arch_tasks = platform_task_cache.get(first_arch)
             if not first_arch_tasks:
                 first_arch = next(iter(platform_task_cache))
                 first_arch_tasks = platform_task_cache.get(first_arch)

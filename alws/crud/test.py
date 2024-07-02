@@ -179,6 +179,7 @@ async def create_test_tasks_for_build_id(db: AsyncSession, build_id: int):
                 select(models.BuildTask.id).where(
                     models.BuildTask.build_id == build_id,
                     models.BuildTask.status == BuildTaskStatus.COMPLETED,
+                    models.BuildTask.arch != 'src',
                 )
             )
         )

@@ -338,13 +338,21 @@ async def __process_rpms(
             and build_repo.debug == is_debug
         )
 
-    arch_repo = get_repo(task_arch, False)
-    debug_repo = get_repo(task_arch, True)
+    arch_repo = None
+    debug_repo = None
+    if task_arch != 'src':
+        arch_repo = get_repo(task_arch, False)
+        debug_repo = get_repo(task_arch, True)
     src_repo = get_repo("src", False)
     arch_packages_tasks = []
     src_packages_tasks = []
     debug_packages_tasks = []
     for artifact in task_artifacts:
+        if task_arch == 'src':
+            if artifact.arch == "src":
+                src_packages_tasks.append(pulp_client.create_entity(artifact))
+                break
+            continue
         if artifact.arch == "src":
             if built_srpm_url is None:
                 src_packages_tasks.append(pulp_client.create_entity(artifact))
