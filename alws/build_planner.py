@@ -451,10 +451,7 @@ class BuildPlanner:
         dist_taken_by_user = mock_options['definitions'].get('dist', False)
         for platform in self._platforms:
             arches = self._request_platforms_arch_list[platform.name]
-            if (
-                ref.ref_type != BuildTaskRefType.SRPM_URL
-                and 'src' not in arches
-            ):
+            if 'src' not in arches:
                 arches.insert(0, 'src')
             for arch in arches:
                 modules = self._modules_by_platform_arch.get(
