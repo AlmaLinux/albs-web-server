@@ -32,6 +32,8 @@ __all__ = [
     'DeletePlatform',
     'ReadSignKeyInfo',
     'UseSignKey',
+    'UpdateTest',
+    'DeleteTest',
 ]
 
 
@@ -153,6 +155,16 @@ DeleteRelease = Action(
     name='delete_release',
     description='Ability to delete a release',
 )
+# Test actions
+UpdateTest = Action(
+    name='update_test',
+    description='Ability to update a test',
+)
+DeleteTest = Action(
+    name='delete_test',
+    description='Ability to delete a test',
+)
+
 
 ActionsList = [
     # build actions
@@ -187,6 +199,9 @@ ActionsList = [
     UseSignKey,
     # release actions
     DeleteRelease,
+    # test actions
+    UpdateTest,
+    DeleteTest,
 ]
 
 ActionsMaskMapping = {
@@ -222,4 +237,7 @@ ActionsMaskMapping = {
     UseSignKey.name: Permissions.WRITE,
     # release actions mask
     DeleteRelease.name: Permissions.DELETE,
+    # test actions mask
+    UpdateTest.name: Permissions.WRITE,
+    DeleteTest.name: Permissions.DELETE,
 }

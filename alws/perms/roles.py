@@ -43,6 +43,8 @@ Manager = Role(
         actions.UpdateProduct.name,
         actions.DeleteProduct.name,
         actions.ReadSignKeyInfo.name,
+        actions.UpdateTest.name,
+        actions.DeleteTest.name,
     ],
 )
 
@@ -57,6 +59,7 @@ Contributor = Role(
         actions.CreateProduct.name,
         actions.ReadProduct.name,
         actions.ReadPlatform.name,
+        actions.UpdateTest.name,
     ],
 )
 
