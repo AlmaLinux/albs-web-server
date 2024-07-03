@@ -91,7 +91,10 @@ async def save_noarch_packages(
     debug_hrefs_to_add = [href for href, _ in debug_noarch_packages.values()]
 
     for task in build_tasks:
-        if task.status in (BuildTaskStatus.FAILED, BuildTaskStatus.EXCLUDED):
+        if (
+            task.status in (BuildTaskStatus.FAILED, BuildTaskStatus.EXCLUDED)
+            or task.arch == 'src'
+        ):
             continue
         noarch = copy.deepcopy(noarch_packages)
         debug_noarch = copy.deepcopy(debug_noarch_packages)
