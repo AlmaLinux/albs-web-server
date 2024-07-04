@@ -150,7 +150,7 @@ async def move_issue_to_testing(
         build_ids=[build_id],
     )
     issues = await filter_issues(
-        issues=filter_issues,
+        issues=issues,
         valid_statuses=[
             GitHubIssueStatus.TODO.value,
             GitHubIssueStatus.DEVELOPMENT.value,
