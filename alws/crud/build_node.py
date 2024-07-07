@@ -154,7 +154,7 @@ async def update_failed_build_items_in_parallel(
 
         for key in sorted(
             list(index_dict.keys()),
-            key=lambda x: x[1] == "i686",
+            key=lambda x: x[1] == "src",
             reverse=True,
         ):
             task = index_dict[key]

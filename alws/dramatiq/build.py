@@ -7,7 +7,7 @@ from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
@@ -59,6 +59,7 @@ async def fetch_build(db: AsyncSession, build_id: int) -> models.Build:
                 models.BuildTask.rpm_modules
             ),
             joinedload(models.Build.repos),
+            joinedload(models.Build.linked_builds),
         )
     )
     result = await db.execute(query)
