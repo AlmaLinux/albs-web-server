@@ -59,7 +59,7 @@ services:
       context: ../alts
     environment:
       CELERY_CONFIG_PATH: "/celery_config.yaml"
-      EXTERNAL_NETWORK: "albs-web-server_default"
+      EXTERNAL_NETWORK: "${COMPOSE_PROJECT_NAME:-albs-web-server}_default"
     command:
       celery -A alts.worker.app worker
         --pool=threads --concurrency=20
