@@ -7,7 +7,7 @@ from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql.expression import func
 
 from alws import models
