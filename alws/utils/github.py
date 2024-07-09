@@ -13,7 +13,7 @@ async def get_user_github_token(
         'client_secret': client_secret
     }
     headers = {'accept': 'application/json'}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.post(
                 client_secrets_endpoint,
                 json=payload,
@@ -25,7 +25,7 @@ async def get_user_github_token(
 async def get_github_user_info(token: str):
     user_endpoint = 'https://api.github.com/user'
     headers = {'authorization': f'token {token}'}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(user_endpoint, headers=headers) as response:
             response.raise_for_status()
             response = await response.json()
@@ -40,7 +40,7 @@ async def get_github_user_info(token: str):
 async def get_github_user_emails(token: str):
     user_endpoint = 'https://api.github.com/user/emails'
     headers = {'authorization': f'token {token}'}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(user_endpoint, headers=headers) as response:
             response.raise_for_status()
             return await response.json()
@@ -49,7 +49,7 @@ async def get_github_user_emails(token: str):
 async def get_github_user_organizations(token: str):
     org_endpoint = 'https://api.github.com/user/memberships/orgs'
     headers = {'authorization': f'token {token}'}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(org_endpoint, headers=headers) as response:
             response.raise_for_status()
             return await response.json()

@@ -229,12 +229,18 @@ async def create_repository_remote(
             remote_href,
             payload.url,
             remote_policy=payload.policy,
+            proxy_url=payload.proxy_url,
+            proxy_username=payload.proxy_username,
+            proxy_password=payload.proxy_password,
         )
     else:
         remote_href = await pulp_client.create_rpm_remote(
             payload.name,
             payload.url,
             remote_policy=payload.policy,
+            proxy_url=payload.proxy_url,
+            proxy_username=payload.proxy_username,
+            proxy_password=payload.proxy_password,
         )
     if remote:
         return remote
