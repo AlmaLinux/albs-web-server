@@ -7,7 +7,7 @@ import typing
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.config import settings
@@ -107,7 +107,7 @@ class BuildPlanner:
                 await self._db.execute(
                     select(models.PlatformFlavour)
                     .where(models.PlatformFlavour.id.in_(flavors))
-                    .options(joinedload(models.PlatformFlavour.repos))
+                    .options(selectinload(models.PlatformFlavour.repos))
                 )
             )
             .scalars()

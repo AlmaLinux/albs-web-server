@@ -59,6 +59,7 @@ async def fetch_build(db: AsyncSession, build_id: int) -> models.Build:
                 models.BuildTask.rpm_modules
             ),
             joinedload(models.Build.repos),
+            joinedload(models.Build.linked_builds),
         )
     )
     result = await db.execute(query)

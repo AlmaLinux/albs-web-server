@@ -154,7 +154,7 @@ async def prepare_repo_modify_dict(
             if product_repo is None:
                 continue
             for module in task.rpm_modules:
-                if module.package not in module_cache[product_repo.pulp_href]:
+                if module.pulp_href not in module_cache[product_repo.pulp_href]:
                     module_cache[product_repo.pulp_href].add(module.pulp_href)
 
     for repo_href, modules in module_cache.items():
