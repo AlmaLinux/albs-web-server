@@ -12,6 +12,9 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import user_schema
 
+from alws.crud.teams import get_teams
+
+
 
 async def get_user(
     db: AsyncSession,
@@ -294,7 +297,7 @@ async def get_user_roles(db: AsyncSession, user_id: int):
 
 
 async def can_edit_teams_roles(
-    db: AsyncSession, roles_ids: typing.List[int], user_id: int
+    db: AsyncSession, roles_ids: typing.List[int], user_id: int, target_user_id: int,
 ):
     user = await get_user(db, user_id)
     teams_ids = (
@@ -328,6 +331,12 @@ async def can_edit_teams_roles(
 
         if not can_perform(team, user, actions.AssignTeamRole.name):
             return False
+
+        if team.owner.id == target_user_id:
+            raise PermissionDenied(
+                "Cannot modify owner roles"
+            )
+
     return True
 
 
@@ -339,7 +348,7 @@ async def add_roles(
 ):
     user = await get_user(db, user_id)
 
-    if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+    if not await can_edit_teams_roles(db, roles_ids, current_user_id, user_id):
         raise PermissionDenied(
             "The user has no permissions to edit teams user roles"
         )
@@ -365,7 +374,7 @@ async def remove_roles(
 ):
     user = await get_user(db, user_id)
 
-    if not await can_edit_teams_roles(db, roles_ids, current_user_id):
+    if not await can_edit_teams_roles(db, roles_ids, current_user_id, user_id):
         raise PermissionDenied(
             "The user has no permissions to edit teams user roles"
         )
