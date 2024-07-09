@@ -30,6 +30,30 @@ __all__ = [
 ]
 
 
+from alws.perms.authorization import can_perform
+from alws.errors import (
+    PermissionDenied,
+)
+from alws.perms import actions
+from alws.perms.actions import (
+    CreateTeam,
+    DeleteTeam,
+    InviteToTeam,
+    LeaveTeam,
+    ReadTeam,
+    RemoveFromTeam,
+    UpdateTeam,
+)
+from alws.models import (
+    Team,
+    User,
+    UserAction,
+    UserRole,
+)
+from alws.crud.actions import ensure_all_actions_exist
+from alws.crud.user import get_user
+
+
 def get_team_role_name(team_name: str, role_name: str):
     return f'{team_name}_{role_name}'
 
@@ -191,6 +215,7 @@ async def update_members(
     payload: team_schema.TeamMembersUpdate,
     team_id: int,
     modification: str,
+    user_id: int,
 ) -> Team:
     items_to_update = []
     db_team = (
@@ -210,6 +235,14 @@ async def update_members(
     )
     if not db_team:
         raise TeamError(f'Team={team_id} doesn`t exist')
+
+    db_user = await get_user(session, user_id=user_id)
+
+    if not can_perform(db_team, db_user, actions.UpdateTeam.name):
+        raise PermissionDenied(
+            f"User has no permissions to update the team {db_team.name}"
+        )
+
     db_users = await session.execute(
         select(User)
         .where(User.id.in_((user.id for user in payload.members_to_update)))
@@ -241,10 +274,22 @@ async def update_members(
     return db_team
 
 
-async def remove_team(db: AsyncSession, team_id: int):
+async def remove_team(
+        db: AsyncSession,
+        team_id: int,
+        user_id: int,
+):
     db_team = await get_teams(db, team_id=team_id)
+    db_user = await get_user(db, user_id=user_id)
+
     if not db_team:
         raise TeamError(f'Team={team_id} doesn`t exist')
+
+    if not can_perform(db_team, db_user, actions.DeleteTeam.name):
+        raise PermissionDenied(
+            f"User has no permissions to delete the team {db_team.name}"
+        )
+
     if db_team.products:
         raise TeamError(
             f"Cannot delete Team={team_id}, team contains undeleted products",

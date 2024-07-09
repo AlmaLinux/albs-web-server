@@ -284,7 +284,7 @@ async def modify_product(
     db_user = await get_user(db, user_id=user_id)
     if not db_user:
         raise DataNotFoundError(f"User={user_id} doesn't exist")
-    if not can_perform(db_product, db_user, actions.ReleaseToProduct.name):
+    if not can_perform(db_product, db_user, actions.UpdateProduct.name):
         raise PermissionDenied(
             'User has no permissions '
             f'to modify the product "{db_product.name}"'
