@@ -28,7 +28,7 @@ psycopg2-binary==2.9.9
 pydantic-settings==2.3.4
 pydantic==2.8.2
 python-multipart>=0.0.7
-sentry-sdk[fastapi]==2.8.0  # requires FastAPI>=0.79.0
+sentry-sdk[fastapi]==2.9.0  # requires FastAPI>=0.79.0
 syncer==2.0.3
 tap.py==3.1
 uvicorn==0.30.1
