@@ -12,7 +12,6 @@ from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import user_schema
 
-from alws.crud.teams import get_teams
 
 
 
