@@ -3382,7 +3382,6 @@
   arch_list:
     - x86_64
     - x86_64_v2
-    - x86_64_fp
     - aarch64
     - ppc64le
     - s390x
@@ -3393,7 +3392,6 @@
     - { name: s390x, depends_on: aarch64 }
     - { name: ppc64le, depends_on: aarch64 }
     - { name: x86_64_v2, depends_on: x86_64 }
-    - { name: x86_64_fp, depends_on: x86_64 }
   data:
     definitions:
       distribution: AlmaLinux
@@ -3467,16 +3465,6 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-devel
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/x86_64_fp/os/
-      export_path: vault/10/devel/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
     - arch: aarch64
       name: almalinux-10-devel
       type: rpm
@@ -3541,17 +3529,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-devel-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/x86_64_fp/
-      export_path: vault/10/devel/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: aarch64
       name: almalinux-10-devel-debuginfo
       type: rpm
@@ -3568,16 +3545,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/AppStream/x86_64_v2/os/
       export_path: vault/10/AppStream/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-appstream
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/x86_64_fp/os/
-      export_path: vault/10/AppStream/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3644,17 +3611,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-appstream-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/x86_64_fp/
-      export_path: vault/10/AppStream/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-appstream-debuginfo
       type: rpm
@@ -3704,16 +3660,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/BaseOS/x86_64_v2/os/
       export_path: vault/10/BaseOS/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-baseos
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/x86_64_fp/os/
-      export_path: vault/10/BaseOS/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3780,17 +3726,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-baseos-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/x86_64_fp/
-      export_path: vault/10/BaseOS/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-baseos-debuginfo
       type: rpm
@@ -3840,16 +3775,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/HighAvailability/x86_64_v2/os/
       export_path: vault/10/HighAvailability/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-highavailability
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/x86_64_fp/os/
-      export_path: vault/10/HighAvailability/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3916,17 +3841,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-highavailability-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/x86_64_fp/
-      export_path: vault/10/HighAvailability/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-highavailability-debuginfo
       type: rpm
@@ -3976,16 +3890,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/ResilientStorage/x86_64_v2/os/
       export_path: vault/10/ResilientStorage/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-resilientstorage
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/ResilientStorage/x86_64_fp/os/
-      export_path: vault/10/ResilientStorage/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4052,17 +3956,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-resilientstorage-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/ResilientStorage/debug/x86_64_fp/
-      export_path: vault/10/ResilientStorage/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-resilientstorage-debuginfo
       type: rpm
@@ -4112,16 +4005,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/extras/x86_64_v2/os/
       export_path: vault/10/extras/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-extras
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/x86_64_fp/os/
-      export_path: vault/10/extras/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4188,17 +4071,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-extras-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/x86_64_fp/
-      export_path: vault/10/extras/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-extras-debuginfo
       type: rpm
@@ -4248,16 +4120,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/CRB/x86_64_v2/os/
       export_path: vault/10/CRB/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-crb
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/x86_64_fp/os/
-      export_path: vault/10/CRB/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4318,17 +4180,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/CRB/debug/x86_64_v2/
       export_path: vault/10/CRB/debug/x86_64_v2/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-crb-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/x86_64_fp/
-      export_path: vault/10/CRB/debug/x86_64_fp/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4400,27 +4251,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-nfv
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/NFV/x86_64_fp/os/
-      export_path: vault/10/NFV/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-nfv-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/NFV/debug/x86_64_fp/
-      export_path: vault/10/NFV/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-nfv
       type: rpm
@@ -4473,27 +4303,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-rt
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/RT/x86_64_fp/os/
-      export_path: vault/10/RT/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-rt-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/RT/debug/x86_64_fp/
-      export_path: vault/10/RT/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-rt
       type: rpm
@@ -4530,16 +4339,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/SAP/x86_64_v2/os/
       export_path: vault/10/SAP/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-sap
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/x86_64_fp/os/
-      export_path: vault/10/SAP/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4606,17 +4405,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-sap-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/x86_64_fp/
-      export_path: vault/10/SAP/debug/x86_64_fp/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-sap-debuginfo
       type: rpm
@@ -4666,16 +4454,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/SAPHANA/x86_64_v2/os/
       export_path: vault/10/SAPHANA/x86_64_v2/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-saphana
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/x86_64_fp/os/
-      export_path: vault/10/SAPHANA/x86_64_fp/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4736,17 +4514,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/x86_64_v2/
       export_path: vault/10/SAPHANA/debug/x86_64_v2/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-saphana-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/x86_64_fp/
-      export_path: vault/10/SAPHANA/debug/x86_64_fp/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4847,16 +4614,6 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
-    - arch: x86_64_fp
-      name: almalinux-10-plus
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/x86_64_fp/os/
-      export_path: vault/10/plus/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
     - arch: src
       name: almalinux-10-plus
       type: rpm
@@ -4916,17 +4673,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/plus/debug/x86_64_v2/
       export_path: vault/10/plus/debug/x86_64_v2/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-plus-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/x86_64_fp/
-      export_path: vault/10/plus/debug/x86_64_fp/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -5032,17 +4778,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-testing
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/x86_64_fp/os/
-      export_path: vault/10/testing/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-testing
       type: rpm
@@ -5092,17 +4827,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/testing/debug/x86_64_v2/
       export_path: vault/10/testing/debug/x86_64_v2/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-testing-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/x86_64_fp/
-      export_path: vault/10/testing/debug/x86_64_fp/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -5175,17 +4899,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-synergy
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/x86_64_fp/os/
-      export_path: vault/10/synergy/x86_64_fp/os/
-      production: true
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
     - arch: x86_64
       name: almalinux-10-synergy
       type: rpm
@@ -5246,17 +4959,6 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/synergy/debug/x86_64_v2/
       export_path: vault/10/synergy/debug/x86_64_v2/
-      production: true
-      debug: true
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 10
-      mock_enabled: false
-    - arch: x86_64_fp
-      name: almalinux-10-synergy-debuginfo
-      type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/x86_64_fp/
-      export_path: vault/10/synergy/debug/x86_64_fp/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -5327,16 +5029,6 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 50
-    - arch: x86_64_fp
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
-      export_path: c10s-build/latest/x86_64/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
     - arch: aarch64
       name: centos-10-kojihub
       type: rpm
@@ -5378,13 +5070,6 @@
       arch: x86_64_v2
       type: rpm
       remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-x86_64_v2-dr/
-      production: false
-      debug: false
-      priority: 10
-    - name: almalinux-10-beta
-      arch: x86_64_fp
-      type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-x86_64_fp-dr/
       production: false
       debug: false
       priority: 10

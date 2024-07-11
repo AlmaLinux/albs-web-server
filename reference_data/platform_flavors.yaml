@@ -538,13 +538,6 @@
       debug: false
       priority: 11
     - name: c10s-build
-      arch: x86_64_fp
-      type: rpm
-      url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
-      production: true
-      debug: false
-      priority: 11
-    - name: c10s-build
       arch: aarch64
       type: rpm
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/aarch64/
@@ -675,13 +668,6 @@
       debug: false
       priority: 10
     - name: almalinux-10-beta
-      arch: x86_64_fp
-      type: rpm
-      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-x86_64_fp-dr/
-      production: false
-      debug: false
-      priority: 10
-    - name: almalinux-10-beta
       arch: aarch64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-aarch64-dr/
@@ -713,13 +699,6 @@
       arch: x86_64_v2
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-x86_64_v2-debug-dr/
-      production: false
-      debug: true
-      priority: 10
-    - name: almalinux-10-beta-debuginfo
-      arch: x86_64_fp
-      type: rpm
-      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-AlmaLinux-10-x86_64_fp-debug-dr/
       production: false
       debug: true
       priority: 10
