@@ -220,14 +220,14 @@
     - name: epel
       arch: x86_64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/x86_64/
+      url: https://el7.repo.almalinux.org/epel/7/x86_64/
       production: false
       debug: false
       priority: 10
     - name: epel
       arch: aarch64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/aarch64/
+      url: https://el7.repo.almalinux.org/epel/7/aarch64/
       production: false
       debug: false
       priority: 10
