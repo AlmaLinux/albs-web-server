@@ -18,16 +18,13 @@ public_router = APIRouter(
     dependencies=[Depends(RateLimiter(times=5, seconds=1))],
     response_model=List[package_info_shema.PackageInfo],
 )
-async def get_change_log(
+async def get_package_info(
     package_name: str,
-    major_version: Optional[int] = None,
+    release_version: Optional[int] = None,
 ):
     pulp_client = PulpClient(
         settings.pulp_host, settings.pulp_user, settings.pulp_password
     )
-    search_params = {"name": package_name}
-    if major_version:
-        search_params["version"] = 0
     packages = await pulp_client.get_rpm_packages(
         include_fields=[
             "name",
@@ -38,8 +35,8 @@ async def get_change_log(
         ],
         name=package_name,
     )
-    if major_version:
-        release_str = f"el{major_version}"
+    if release_version is not None:
+        release_str = f".el{release_version}"
         packages = [
             package for package in packages if release_str in package['release']
         ]
