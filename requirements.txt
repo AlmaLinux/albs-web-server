@@ -11,7 +11,7 @@ dramatiq[rabbitmq, watch]==1.17.0
 email-validator>=2.0
 # Can be updated only after migration to SQLAlchemy > 2.0
 # these 2 requirements are for fastapi-sqla
-fastapi-sqla==3.4.1
+fastapi-sqla==3.4.2
 structlog==24.4.0
 fastapi-users-db-sqlalchemy==6.0.1
 fastapi-users[all]==13.0.0
