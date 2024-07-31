@@ -211,3 +211,16 @@ async def reset_matched_packages(
 ):
     await errata_crud.reset_matched_errata_packages(record_id, session)
     return {'message': f'Packages for record {record_id} have been matched'}
+
+
+@router.post('/reset-matched-packages-multiple')
+async def reset_matched_packages_multiple(
+    issued_date,
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
+):
+    message = await errata_crud.reset_matched_errata_packages_threshold(
+        issued_date, session
+    )
+    return {'message': message}

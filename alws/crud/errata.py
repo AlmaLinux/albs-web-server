@@ -1715,3 +1715,66 @@ async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
         items_to_insert.extend(matching_packages)
     session.add_all(items_to_insert)
     await session.flush()
+
+
+async def reset_matched_errata_packages_threshold(
+    issued_date_str: str, session: AsyncSession
+):
+    issued_date = datetime.datetime.strptime(
+        issued_date_str, '%Y-%m-%d %H:%M:%S'
+    )
+
+    stmt = (
+        select(models.NewErrataRecord)
+        .where(models.NewErrataRecord.issued_date >= issued_date)
+        .where(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.NOT_RELEASED
+        )
+        .options(
+            selectinload(models.NewErrataRecord.platform).selectinload(
+                models.Platform.repos
+            ),
+            selectinload(models.NewErrataRecord.packages).selectinload(
+                models.NewErrataPackage.albs_packages
+            ),
+        )
+        .with_for_update()
+    )
+
+    result = await session.execute(stmt)
+    records = result.scalars().all()
+    print(records)
+    if not records:
+        return f"No unreleased records found after {issued_date_str} including"
+
+    for record in records:
+        items_to_insert = []
+        search_params = prepare_search_params(record)
+        prod_repos_cache = await load_platform_packages(
+            platform=record.platform,
+            search_params=search_params,
+            for_release=False,
+            module=record.module,
+        )
+        await session.execute(
+            delete(models.NewErrataToALBSPackage).where(
+                models.NewErrataToALBSPackage.errata_package_id.in_(
+                    (pkg.id for pkg in record.packages)
+                )
+            )
+        )
+        for package in record.packages:
+            matching_packages, _ = await get_matching_albs_packages(
+                session,
+                package,
+                prod_repos_cache,
+                record.module,
+            )
+            items_to_insert.extend(matching_packages)
+        session.add_all(items_to_insert)
+    await session.flush()
+    return (
+        f'Packages for records {[record.id for record in records]}'
+        f' have been matched if their date is later than {issued_date}'
+    )
