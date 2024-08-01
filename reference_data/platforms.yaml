@@ -3412,6 +3412,7 @@
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
+      rpmautospec_enable: true
       secure_boot_macros:
         "%pe_signing_cert": 'f4217b7b99a69128'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
