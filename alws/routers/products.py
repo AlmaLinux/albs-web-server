@@ -56,11 +56,11 @@ async def create_product(
     db_product = await products.create_product(db, product)
     await db.flush()
     await db.refresh(db_product)
-    # await sign_task.create_gen_key_task(
-    #     db=db,
-    #     product=db_product,
-    #     user=user,
-    # )
+    await sign_task.create_gen_key_task(
+        db=db,
+        product=db_product,
+        user=user,
+    )
     return await products.get_products(db, product_id=db_product.id)
 
 

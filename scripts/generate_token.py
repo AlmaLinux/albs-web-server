@@ -41,7 +41,7 @@ def parse_args():
 
 
 async def gen_token(secret: str, email: str = None, username: str = None):
-    await setup_all
+    await setup_all()
 
     strategy = JWTStrategy(secret, lifetime_seconds=1 * 31557600)
     get_async_session_context = open_async_session(key=get_async_db_key())
