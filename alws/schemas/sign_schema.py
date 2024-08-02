@@ -11,6 +11,8 @@ class SignKey(BaseModel):
     keyid: str
     public_url: str
     inserted: datetime
+    active: bool = True
+    archived: typing.Optional[datetime] = None
     platform_id: typing.Optional[int] = None
     product_id: typing.Optional[int] = None
 
