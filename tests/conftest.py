@@ -6,6 +6,7 @@ pytest_plugins = [
     "tests.fixtures.database",
     "tests.fixtures.dramatiq",
     "tests.fixtures.errata",
+    'tests.fixtures.limiter',
     "tests.fixtures.modularity",
     "tests.fixtures.platforms",
     "tests.fixtures.products",

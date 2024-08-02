@@ -3,6 +3,7 @@ import hashlib
 import re
 import uuid
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 
@@ -481,3 +482,40 @@ def get_empty_module_from_pulp_db(monkeypatch):
         return
 
     monkeypatch.setattr("alws.crud.build_node.get_module_from_pulp_db", func)
+
+
+@pytest.fixture
+def package_info() -> List[Dict[str, Any]]:
+    return [
+        {
+            "name": "example_package",
+            "version": "example_version",
+            "release": "example_release.el8",
+            "arch": "example_arch",
+            "changelogs": ["example_changelogs"],
+        },
+        {
+            "name": "example_package",
+            "version": "example_version_2",
+            "release": "example_release_2.el9",
+            "arch": "example_arch_2",
+            "changelogs": ["example_changelogs_2"],
+        },
+    ]
+
+
+@pytest.fixture
+def get_rpm_packages(monkeypatch, package_info):
+    async def func(*args, **kwargs):
+        res = []
+        for package in package_info:
+            if "name" in kwargs and package["name"] != kwargs["name"]:
+                continue
+            if "include_fields" in kwargs:
+                package = {
+                    field: package[field] for field in kwargs["include_fields"]
+                }
+            res.append(package)
+        return res
+
+    monkeypatch.setattr(PulpClient, "get_rpm_packages", func)

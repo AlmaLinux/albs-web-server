@@ -17,5 +17,6 @@ __all__ = [
     'users',
     'errata',
     'platform_flavors',
-    'test_repositories'
+    'test_repositories',
+    'package_info',
 ]

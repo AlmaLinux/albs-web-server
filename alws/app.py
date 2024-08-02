@@ -15,6 +15,7 @@ from alws.auth.oauth.github import get_github_oauth_client
 from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers
+from alws.utils.limiter import limiter_shutdown, limiter_startup
 
 logging.basicConfig(level=settings.logging_level)
 
@@ -39,6 +40,8 @@ if settings.sentry_dsn:
 
 
 app = FastAPI()
+app.add_event_handler("startup", limiter_startup)
+app.add_event_handler("shutdown", limiter_shutdown)
 app.add_middleware(ExceptionMiddleware, handlers=handlers)
 fastapi_sqla_setup(app)
 
