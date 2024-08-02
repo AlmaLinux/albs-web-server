@@ -6,6 +6,7 @@ from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud.errata import (
     bulk_errata_records_release,
     release_errata_record,
+    reset_matched_erratas_packages_threshold,
 )
 from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
@@ -23,6 +24,10 @@ async def _release_errata_record(record_id: str, platform_id: int, force: bool):
 
 async def _bulk_errata_records_release(records_ids: typing.List[str]):
     await bulk_errata_records_release(records_ids)
+
+
+async def _reset_matched_erratas_packages_threshold(issued_date: str):
+    await reset_matched_erratas_packages_threshold(issued_date)
 
 
 @dramatiq.actor(
@@ -51,3 +56,14 @@ def release_errata(record_id: str, platform_id: int, force: bool):
 def bulk_errata_release(records_ids: typing.List[str]):
     event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_bulk_errata_records_release(records_ids))
+
+
+@dramatiq.actor(
+    max_retries=0,
+    priority=0,
+    queue_name="errata",
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
+)
+def reset_records_threshold(issued_date: str):
+    event_loop.run_until_complete(setup_all())
+    event_loop.run_until_complete(_reset_matched_erratas_packages_threshold(issued_date))

@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.auth import get_current_user
 from alws.constants import ErrataReleaseStatus
 from alws.crud import errata as errata_crud
+from alws.crud.errata import get_errata_records_threshold
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import bulk_errata_release, release_errata
+from alws.dramatiq import bulk_errata_release, release_errata, reset_records_threshold
 from alws.schemas import errata_schema
 
 router = APIRouter(
@@ -214,13 +215,18 @@ async def reset_matched_packages(
 
 
 @router.post('/reset-matched-packages-multiple')
-async def reset_matched_packages_multiple(
-    issued_date,
-    session: AsyncSession = Depends(
-        AsyncSessionDependency(key=get_async_db_key())
-    ),
+async def reset_matched_erratas_packages_threshold(
+        issued_date,
+        session: AsyncSession = Depends(
+            AsyncSessionDependency(key=get_async_db_key())
+        ),
 ):
-    message = await errata_crud.reset_matched_errata_packages_threshold(
-        issued_date, session
-    )
+    records = await get_errata_records_threshold(issued_date, session)
+    if records:
+        reset_records_threshold.send(issued_date)
+
+    message = (f"Records issued after {issued_date} are scheduled for package resetting"
+               if records else
+               f"No unreleased records found after {issued_date} including")
+
     return {'message': message}
