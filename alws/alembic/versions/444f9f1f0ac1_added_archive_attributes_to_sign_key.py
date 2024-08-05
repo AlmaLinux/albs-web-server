@@ -1,4 +1,4 @@
-"""empty message
+"""Added archive attributes to sign key    
 
 Revision ID: 444f9f1f0ac1
 Revises: e952dc755f9d
