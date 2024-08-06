@@ -2,7 +2,9 @@ import typing
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import and_, update
 from sqlalchemy.orm import selectinload
+import datetime
 
 from alws import models
 from alws.crud.user import get_user
@@ -23,7 +25,7 @@ async def get_sign_keys(
 ) -> typing.List[models.SignKey]:
     limited_user = await get_user(db, user.id)
     result = await db.execute(
-        select(models.SignKey).options(
+        select(models.SignKey).where(models.SignKey.active).options(
             selectinload(models.SignKey.owner),
             selectinload(models.SignKey.roles).selectinload(
                 models.UserRole.actions
