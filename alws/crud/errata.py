@@ -1668,6 +1668,31 @@ async def get_updateinfo_xml_from_pulp(
     return cr_upd.xml_dump() if cr_upd.updates else None
 
 
+async def prepare_resetting(items_to_insert: List, record: models.NewErrataRecord, session: AsyncSession):
+    search_params = prepare_search_params(record)
+    prod_repos_cache = await load_platform_packages(
+        platform=record.platform,
+        search_params=search_params,
+        for_release=False,
+        module=record.module,
+    )
+    await session.execute(
+        delete(models.NewErrataToALBSPackage).where(
+            models.NewErrataToALBSPackage.errata_package_id.in_(
+                (pkg.id for pkg in record.packages)
+            )
+        )
+    )
+    for package in record.packages:
+        matching_packages, _ = await get_matching_albs_packages(
+            session,
+            package,
+            prod_repos_cache,
+            record.module,
+        )
+        items_to_insert.extend(matching_packages)
+
+
 async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
     record = (
         (
@@ -1691,27 +1716,46 @@ async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
     if not record:
         return
     items_to_insert = []
-    search_params = prepare_search_params(record)
-    prod_repos_cache = await load_platform_packages(
-        platform=record.platform,
-        search_params=search_params,
-        for_release=False,
-        module=record.module,
-    )
-    await session.execute(
-        delete(models.NewErrataToALBSPackage).where(
-            models.NewErrataToALBSPackage.errata_package_id.in_(
-                (pkg.id for pkg in record.packages)
-            )
-        )
-    )
-    for package in record.packages:
-        matching_packages, _ = await get_matching_albs_packages(
-            session,
-            package,
-            prod_repos_cache,
-            record.module,
-        )
-        items_to_insert.extend(matching_packages)
+    await prepare_resetting(items_to_insert, record, session)
     session.add_all(items_to_insert)
     await session.flush()
+
+
+async def get_errata_records_threshold(issued_date_str: str, session: AsyncSession):
+    issued_date = datetime.datetime.strptime(
+        issued_date_str, '%Y-%m-%d %H:%M:%S'
+    )
+    stmt = (
+        select(models.NewErrataRecord)
+        .where(models.NewErrataRecord.issued_date >= issued_date)
+        .where(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.NOT_RELEASED
+        )
+        .options(
+            selectinload(models.NewErrataRecord.platform).selectinload(
+                models.Platform.repos
+            ),
+            selectinload(models.NewErrataRecord.packages).selectinload(
+                models.NewErrataPackage.albs_packages
+            ),
+        )
+        .with_for_update()
+    )
+
+    records = (await session.execute(stmt)).scalars().all()
+    return records
+
+
+async def reset_matched_erratas_packages_threshold(
+        issued_date: str,
+):
+    async with open_async_session(key=get_async_db_key()) as session:
+        records = await get_errata_records_threshold(issued_date, session)
+        items_to_insert = []
+        for record in records:
+            await prepare_resetting(items_to_insert, record, session)
+        session.add_all(items_to_insert)
+        await session.flush()
+    logging.info(f'Packages for records {[record.id for record in records]}'
+                 f' have been matched if their date is later than {issued_date}')
