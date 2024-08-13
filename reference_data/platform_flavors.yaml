@@ -396,6 +396,13 @@
       debug: false
       priority: 10
     - name: java-portable
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-portable
       arch: aarch64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-8-aarch64-dr/
