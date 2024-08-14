@@ -57,7 +57,19 @@ def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
         if item.type == 'rpm' and item.arch == task.env_arch
     ]
 
-    for repo_arr in (build_repositories, linked_build_repos, flavor_repos):
+    # Repos used in build
+    platform_repos = [
+        {'name': item.name, 'baseurl': item.url}
+        for item in platform.repos
+        if item.arch == task.env_arch
+    ]
+
+    for repo_arr in (
+        build_repositories,
+        linked_build_repos,
+        flavor_repos,
+        platform_repos,
+    ):
         repos.extend(repo_arr)
 
     return repos
@@ -90,6 +102,9 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
             selectinload(models.TestTask.build_task).selectinload(
                 models.BuildTask.platform
             ),
+            selectinload(models.TestTask.build_task)
+            .selectinload(models.BuildTask.platform)
+            .selectinload(models.Platform.repos),
             selectinload(models.TestTask.build_task).selectinload(
                 models.BuildTask.rpm_modules
             ),

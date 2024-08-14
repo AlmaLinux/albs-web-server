@@ -104,12 +104,37 @@ platform_flavors = [
     },
 ]
 
-expected_build_repos = [
+platform_repos = [
     {
-        "name": "build_repo_0",
-        "baseurl": "http://example.com/build_repo_0",
-    }
+        "name": "platform_repo_0",
+        "type": "rpm",
+        "arch": "x86_64",
+        "url": "http://example.com/platform_repo_0",
+    },
+    {
+        "name": "platform_repo_1",
+        "type": "rpm",
+        "arch": "noarch",
+        "url": "http://example.com/platform_repo_1",
+    },
+    {
+        "name": "platform_repo_2",
+        "type": "rpm",
+        "arch": "s390x",
+        "url": "http://example.com/platform_repo_2",
+    },
+    {
+        "name": "platform_repo_3",
+        "type": "deb",
+        "arch": "x86_64",
+        "url": "http://example.com/platform_repo_3",
+    },
 ]
+
+expected_build_repos = [{
+    "name": "build_repo_0",
+    "baseurl": "http://example.com/build_repo_0",
+}]
 
 expected_linked_builds_repos = [
     {
@@ -130,6 +155,18 @@ expected_platform_flavors_repos = [
     {
         "name": "platform_flavor_repo_2",
         "baseurl": "http://example.com/8/platform_flavor_repo_2",
+    },
+]
+
+
+expected_platform_repos = [
+    {
+        "name": "platform_repo_0",
+        "baseurl": "http://example.com/platform_repo_0",
+    },
+    {
+        "name": "platform_repo_3",
+        "baseurl": "http://example.com/platform_repo_3",
     },
 ]
 
@@ -160,9 +197,7 @@ def create_test_task_with_repos_mock(
             task.build_task.build.linked_builds.append(Mock(repos=[]))
             for repo in linked_build['repos']:
                 mock_repo = _create_mock_repo(repo)
-                task.build_task.build.linked_builds[idx].repos.append(
-                    mock_repo
-                )
+                task.build_task.build.linked_builds[idx].repos.append(mock_repo)
 
     task.build_task.build.platform_flavors = []
     if platform_flavors:
@@ -173,6 +208,11 @@ def create_test_task_with_repos_mock(
                 task.build_task.build.platform_flavors[idx].repos.append(
                     mock_repo
                 )
+
+    task.build_task.platform.repos = []
+    for repo in platform_repos:
+        mock_repo = _create_mock_repo(repo)
+        task.build_task.platform.repos.append(mock_repo)
 
     return task
 
@@ -244,5 +284,6 @@ def create_test_task_with_build_and_flavor_repos():
     ],
 )
 def test_get_repos_for_test_task(task, expected_repos):
+    expected_repos.extend(expected_platform_repos)
     repos = get_repos_for_test_task(task)
     assert repos == expected_repos
