@@ -1175,15 +1175,17 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             key = generate_key(pkg["arch"])
             pkg["priority"] = priority
             pkg["matched"] = matched
-            for repo in pkg.get('repositories', []):
-                repo['name'] = re.sub(r'^\w+-\d-(beta-|)', '', repo['name'])
-                repo['priority'] = priority
-            prev_pkg = beholder_cache.get(key, {})
             pkg_repos = pkg.get('repositories', [])
+            prev_pkg = beholder_cache.get(key, {})
             if pkg_repos:
-                pkg['repositories'].extend(
-                    [repo for repo in prev_pkg.get('repositories', []) if repo not in pkg_repos]
-                )
+                for repo in pkg['repositories']:
+                    repo['name'] = re.sub(r'^\w+-\d-(beta-|)', '', repo['name'])
+                    repo['priority'] = priority
+                pkg['repositories'].extend([
+                    repo
+                    for repo in prev_pkg.get('repositories', [])
+                    if repo not in pkg_repos
+                ])
             beholder_cache[key] = pkg
             for weak_arch in strong_arches[pkg["arch"]]:
                 second_key = generate_key(weak_arch)
@@ -1451,7 +1453,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 for matched in BeholderMatchMethod.all():
                     if matched not in pkg_list['packages'].keys():
                         continue
-                    response_priority = self._beholder_matched_to_priority(matched)
+                    response_priority = self._beholder_matched_to_priority(
+                        matched,
+                    )
                     self.update_beholder_cache(
                         beholder_cache,
                         pkg_list["packages"][matched],
