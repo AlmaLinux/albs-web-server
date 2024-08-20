@@ -5010,56 +5010,6 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - arch: x86_64
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
-      export_path: c10s-build/latest/x86_64/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
-    - arch: x86_64_v2
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
-      export_path: c10s-build/latest/x86_64/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
-    - arch: aarch64
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/aarch64/
-      export_path: c10s-build/latest/aarch64/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
-    - arch: ppc64le
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/ppc64le/
-      export_path: c10s-build/latest/ppc64le/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
-    - arch: s390x
-      name: centos-10-kojihub
-      type: rpm
-      remote_url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/s390x/
-      export_path: c10s-build/latest/s390x/
-      production: false
-      debug: false
-      remote_sync_policy: on_demand
-      repository_sync_policy: additive
-      priority: 50
     - name: almalinux-10-beta
       arch: x86_64
       type: rpm
