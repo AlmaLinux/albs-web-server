@@ -22,7 +22,6 @@ from alws.constants import (
     BeholderMatchMethod,
     ErrataPackageStatus,
     ErrataReleaseStatus,
-    GitHubIssueStatus,
     PackageNevra,
     ReleasePackageTrustness,
     ReleaseStatus,
@@ -1176,6 +1175,17 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             key = generate_key(pkg["arch"])
             pkg["priority"] = priority
             pkg["matched"] = matched
+            pkg_repos = pkg.get('repositories', [])
+            prev_pkg = beholder_cache.get(key, {})
+            if pkg_repos:
+                for repo in pkg['repositories']:
+                    repo['name'] = re.sub(r'^\w+-\d-(beta-|)', '', repo['name'])
+                    repo['priority'] = priority
+                pkg['repositories'].extend([
+                    repo
+                    for repo in prev_pkg.get('repositories', [])
+                    if repo not in pkg_repos
+                ])
             beholder_cache[key] = pkg
             for weak_arch in strong_arches[pkg["arch"]]:
                 second_key = generate_key(weak_arch)
@@ -1251,12 +1261,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 {},
             )
         for repo in predicted_package.get("repositories", []):
-            ref_repo_name = repo["name"]
-            trustness: int = predicted_package["priority"]
+            trustness: int = repo["priority"]
             matched: str = predicted_package["matched"]
-            repo_name = self.repo_name_regex.search(ref_repo_name).groupdict()[
-                "name"
-            ]
+            repo_name = repo["name"]
             # in cases if we try to find debug repos by non debug name
             if is_debug and not repo_name.endswith("debuginfo"):
                 repo_name += "-debuginfo"
@@ -1440,17 +1447,14 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             is_beta = distr["version"].endswith("-beta")
             is_devel = False
             for pkg_list in beholder_response.get("packages", {}):
-                # we should apply matches in reversed order to overwrite less accurate results by more accurate
+                # we should apply matches in reversed order
+                # to overwrite less accurate results by more accurate
                 # name_only -> name_version -> closest -> exact
-                ordered_keys = [
-                    method
-                    for method in BeholderMatchMethod.all()[::-1]
-                    if method in pkg_list["packages"].keys()
-                ]
-
-                for matched in ordered_keys:
+                for matched in BeholderMatchMethod.all():
+                    if matched not in pkg_list['packages'].keys():
+                        continue
                     response_priority = self._beholder_matched_to_priority(
-                        matched
+                        matched,
                     )
                     self.update_beholder_cache(
                         beholder_cache,
@@ -1469,6 +1473,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 prod_repos=prod_repos,
             )
         logging.debug("beholder_cache: %s", str(beholder_cache))
+        logging.debug("pulp_packages: %s", str(pulp_packages))
+        logging.debug("repos_mapping: %s", str(repos_mapping))
         for package in pulp_packages:
             pkg_name = package["name"]
             pkg_version = package["version"]
@@ -1479,7 +1485,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             if full_name in added_packages:
                 continue
             release_repository_keys = set()
-            release_repositories = defaultdict(set)
+            release_repositories = set()
             for is_devel in (False, True):
                 repositories = self.find_release_repos(
                     pkg_name=pkg_name,
@@ -1530,6 +1536,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 added_packages.add(full_name)
                 continue
             noarch_repos = set()
+            arches_by_repo_name = defaultdict(set)
             for (
                 release_repo_key,
                 trustness,
@@ -1558,6 +1565,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         continue
                 release_repo["trustness"] = trustness
                 release_repo["matched"] = matched
+                repo_name = release_repo['name']
                 repo_arch_location = [release_repo["arch"]]
                 # we should add i686 arch for correct multilib showing in UI
                 if pkg_arch == "i686" and "x86_64" in repo_arch_location:
@@ -1567,20 +1575,24 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         continue
                     noarch_repos.add(release_repo["name"])
                     repo_arch_location = pulp_repo_arch_location
-                release_repositories[release_repo_key].update(
-                    repo_arch_location
-                )
+                arches_by_repo_name[repo_name].update(repo_arch_location)
+                release_repositories.add(release_repo_key)
             # for every repository we should add pkg_info
             # for correct package location in UI
-            for repo_key, repo_arches in release_repositories.items():
+            processed_repos = []
+            for repo_key in release_repositories:
                 repo = repos_mapping[repo_key]
+                repo_name = repo['name']
+                if repo_name in processed_repos:
+                    continue
                 copy_pkg_info = copy.deepcopy(pkg_info)
                 copy_pkg_info.update({
                     # TODO: need to send only one repo instead of list
                     "repositories": [repo],
-                    "repo_arch_location": list(repo_arches),
+                    "repo_arch_location": list(arches_by_repo_name[repo_name]),
                 })
                 packages.append(copy_pkg_info)
+                processed_repos.append(repo_name)
             added_packages.add(full_name)
 
         (

@@ -211,7 +211,12 @@ class BeholderMatchMethod(enum.Enum):
 
     @classmethod
     def all(cls):
-        return [member.value for member in cls]
+        return [
+            cls.NAME_ONLY.value,
+            cls.NAME_VERSION.value,
+            cls.CLOSEST.value,
+            cls.EXACT.value,
+        ]
 
     @classmethod
     def green(cls):
