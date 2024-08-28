@@ -113,11 +113,11 @@ class BuildCreatePlatforms(BaseModel):
         typing.Literal[
             'x86_64',
             'x86_64_v2',
-            'x86_64_fp',
             'i686',
             'aarch64',
             'ppc64le',
             's390x',
+            'riscv64',
         ]
     ]
     parallel_mode_enabled: bool
