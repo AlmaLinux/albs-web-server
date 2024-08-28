@@ -394,13 +394,13 @@
       debug: true
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi10:x86_64_v2"
-      arch: x86_64
+      arch: x86_64_v2
       type: rpm
       url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi10-almalinux-$releasever-x86_64_v2-dr/"
       debug: false
       production: false
     - name: "copr:build.almalinux.org:soksanichenko:Pungi10:x86_64_v2-debug"
-      arch: x86_64
+      arch: x86_64_v2
       type: rpm
       url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-Pungi10-almalinux-$releasever-x86_64_v2-debug-dr/"
       debug: true
