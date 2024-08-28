@@ -1280,6 +1280,11 @@ class SignKey(PermissionsMixin, Base):
         nullable=True,
         default=False,
     )
+    add_files_signature: Mapped[Optional[bool]] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=True,
+        default=False,
+    )
     description: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
