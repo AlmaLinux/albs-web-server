@@ -3385,10 +3385,12 @@
     - aarch64
     - ppc64le
     - s390x
+    - riscv64
   copy_priority_arches:
     - x86_64
     - aarch64
   weak_arch_list:
+    - { name: riscv64, depends_on: aarch64 }
     - { name: s390x, depends_on: aarch64 }
     - { name: ppc64le, depends_on: aarch64 }
     - { name: x86_64_v2, depends_on: x86_64 }
@@ -3431,6 +3433,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/devel/s390x/os/
       export_path: almalinux/10/devel/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-devel
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/devel/riscv64/os/
+      export_path: almalinux/10/devel/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3491,6 +3503,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/devel/debug/s390x/
       export_path: vault/10/devel/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-devel-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/devel/debug/riscv64/
+      export_path: vault/10/devel/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -3591,6 +3614,16 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: riscv64
+      name: almalinux-10-appstream
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/AppStream/riscv64/os/
+      export_path: almalinux/10/AppStream/riscv64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: src
       name: almalinux-10-appstream
       type: rpm
@@ -3656,6 +3689,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-appstream-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/riscv64/
+      export_path: vault/10/AppStream/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-baseos
       type: rpm
@@ -3701,6 +3745,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/BaseOS/s390x/os/
       export_path: almalinux/10/BaseOS/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-baseos
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/BaseOS/riscv64/os/
+      export_path: almalinux/10/BaseOS/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3771,6 +3825,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-baseos-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/riscv64/
+      export_path: vault/10/BaseOS/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-highavailability
       type: rpm
@@ -3816,6 +3881,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/HighAvailability/s390x/os/
       export_path: almalinux/10/HighAvailability/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-highavailability
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/HighAvailability/riscv64/os/
+      export_path: almalinux/10/HighAvailability/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3886,6 +3961,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-highavailability-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/riscv64/
+      export_path: vault/10/HighAvailability/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-resilientstorage
       type: rpm
@@ -3931,6 +4017,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/ResilientStorage/s390x/os/
       export_path: almalinux/10/ResilientStorage/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-resilientstorage
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/ResilientStorage/riscv64/os/
+      export_path: almalinux/10/ResilientStorage/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4001,6 +4097,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-resilientstorage-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/ResilientStorage/debug/riscv64/
+      export_path: vault/10/ResilientStorage/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-extras
       type: rpm
@@ -4046,6 +4153,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/extras/s390x/os/
       export_path: almalinux/10/extras/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-extras
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/extras/riscv64/os/
+      export_path: almalinux/10/extras/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4116,6 +4233,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-extras-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/extras/debug/riscv64/
+      export_path: vault/10/extras/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-crb
       type: rpm
@@ -4161,6 +4289,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/CRB/s390x/os/
       export_path: almalinux/10/CRB/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-crb
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/CRB/riscv64/os/
+      export_path: almalinux/10/CRB/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4225,6 +4363,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/CRB/debug/s390x/
       export_path: vault/10/CRB/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-crb-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/riscv64/
+      export_path: vault/10/CRB/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4385,6 +4534,16 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: riscv64
+      name: almalinux-10-sap
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/SAP/riscv64/os/
+      export_path: almalinux/10/SAP/riscv64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: src
       name: almalinux-10-sap
       type: rpm
@@ -4450,6 +4609,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-sap-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/riscv64/
+      export_path: vault/10/SAP/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-saphana
       type: rpm
@@ -4495,6 +4665,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/SAPHANA/s390x/os/
       export_path: almalinux/10/SAPHANA/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-saphana
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/SAPHANA/riscv64/os/
+      export_path: almalinux/10/SAPHANA/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4565,6 +4745,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-saphana-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/riscv64/
+      export_path: vault/10/SAPHANA/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: aarch64
       name: almalinux-10-plus
       type: rpm
@@ -4600,6 +4791,16 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/plus/s390x/os/
       export_path: almalinux/10/plus/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-10-plus
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/plus/riscv64/os/
+      export_path: vault/10/plus/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4663,6 +4864,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/vault/10/plus/debug/s390x/
       export_path: vault/10/plus/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-plus-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/plus/debug/riscv64/
+      export_path: vault/10/plus/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4889,6 +5101,28 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-testing
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/testing/riscv64/os/
+      export_path: vault/10/testing/riscv64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-testing-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/testing/debug/riscv64/
+      export_path: vault/10/testing/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-10-synergy
       type: rpm
@@ -4938,6 +5172,17 @@
       type: rpm
       remote_url: http://repo.almalinux.org/almalinux/10/synergy/s390x/os/
       export_path: almalinux/10/synergy/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-synergy
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/synergy/riscv64/os/
+      export_path: almalinux/10/synergy/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5010,6 +5255,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-10-synergy-debuginfo
+      type: rpm
+      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/riscv64/
+      export_path: vault/10/synergy/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - name: almalinux-10-beta
       arch: x86_64
       type: rpm
@@ -5045,6 +5301,13 @@
       production: false
       debug: false
       priority: 10
+    - name: almalinux-10-beta-riscv64
+      arch: riscv64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-riscv64-almalinux-10-riscv64-dr/
+      production: false
+      debug: false
+      priority: 10
     - name: almalinux-10-libsolv
       arch: x86_64_v2
       type: rpm
@@ -5068,10 +5331,12 @@
     - aarch64
     - ppc64le
     - s390x
+    - riscv64
   copy_priority_arches:
     - x86_64
     - aarch64
   weak_arch_list:
+    - { name: riscv64, depends_on: aarch64 }
     - { name: s390x, depends_on: aarch64 }
     - { name: ppc64le, depends_on: aarch64 }
     - { name: x86_64_v2, depends_on: x86_64 }
@@ -5114,6 +5379,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/devel/s390x/os/
       export_path: almalinux/10/devel/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-devel
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/devel/riscv64/os/
+      export_path: almalinux/10/devel/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5174,6 +5449,17 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/vault/10/devel/debug/s390x/
       export_path: vault/10/devel/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-devel-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/devel/debug/riscv64/
+      export_path: vault/10/devel/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -5274,6 +5560,16 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-appstream
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/AppStream/riscv64/os/
+      export_path: almalinux/10/AppStream/riscv64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: src
       name: almalinux-kitten-10-appstream
       type: rpm
@@ -5339,6 +5635,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-appstream-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/AppStream/debug/riscv64/
+      export_path: vault/10/AppStream/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-baseos
       type: rpm
@@ -5384,6 +5691,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/BaseOS/s390x/os/
       export_path: almalinux/10/BaseOS/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-baseos
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/BaseOS/riscv64/os/
+      export_path: almalinux/10/BaseOS/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5454,6 +5771,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-baseos-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/BaseOS/debug/riscv64/
+      export_path: vault/10/BaseOS/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-highavailability
       type: rpm
@@ -5499,6 +5827,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/HighAvailability/s390x/os/
       export_path: almalinux/10/HighAvailability/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-highavailability
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/HighAvailability/riscv64/os/
+      export_path: almalinux/10/HighAvailability/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5569,6 +5907,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-highavailability-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/HighAvailability/debug/riscv64/
+      export_path: vault/10/HighAvailability/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-resilientstorage
       type: rpm
@@ -5614,6 +5963,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/ResilientStorage/s390x/os/
       export_path: almalinux/10/ResilientStorage/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-resilientstorage
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/ResilientStorage/riscv64/os/
+      export_path: almalinux/10/ResilientStorage/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5684,6 +6043,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-resilientstorage-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/ResilientStorage/debug/riscv64/
+      export_path: vault/10/ResilientStorage/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-extras
       type: rpm
@@ -5729,6 +6099,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/extras/s390x/os/
       export_path: almalinux/10/extras/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-extras
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/extras/riscv64/os/
+      export_path: almalinux/10/extras/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5799,6 +6179,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-extras-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/extras/debug/riscv64/
+      export_path: vault/10/extras/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-crb
       type: rpm
@@ -5844,6 +6235,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/CRB/s390x/os/
       export_path: almalinux/10/CRB/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-crb
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/CRB/riscv64/os/
+      export_path: almalinux/10/CRB/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5908,6 +6309,17 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/vault/10/CRB/debug/s390x/
       export_path: vault/10/CRB/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-crb-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/CRB/debug/riscv64/
+      export_path: vault/10/CRB/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -6068,6 +6480,16 @@
       remote_sync_policy: on_demand
       repository_sync_policy: additive
       priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-sap
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/SAP/riscv64/os/
+      export_path: almalinux/10/SAP/riscv64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
     - arch: src
       name: almalinux-kitten-10-sap
       type: rpm
@@ -6133,6 +6555,17 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-sap-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/SAP/debug/riscv64/
+      export_path: vault/10/SAP/debug/riscv64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
     - arch: x86_64_v2
       name: almalinux-kitten-10-saphana
       type: rpm
@@ -6178,6 +6611,16 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/almalinux/10/SAPHANA/s390x/os/
       export_path: almalinux/10/SAPHANA/s390x/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+    - arch: riscv64
+      name: almalinux-kitten-10-saphana
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/almalinux/10/SAPHANA/riscv64/os/
+      export_path: almalinux/10/SAPHANA/riscv64/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6242,6 +6685,17 @@
       type: rpm
       remote_url: http://repo.kitten.almalinux.org/vault/10/SAPHANA/debug/s390x/
       export_path: vault/10/SAPHANA/debug/s390x/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - arch: riscv64
+      name: almalinux-kitten-10-saphana-debuginfo
+      type: rpm
+      remote_url: http://repo.kitten.almalinux.org/vault/10/SAPHANA/debug/riscv64/
+      export_path: vault/10/SAPHANA/debug/riscv64/
       production: true
       debug: true
       remote_sync_policy: on_demand

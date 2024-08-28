@@ -737,3 +737,37 @@
       production: false
       debug: false
       priority: 10
+
+- name: AlmaLinux-10-beta-riscv64
+  repositories:
+    - name: almalinux-10-beta-riscv64
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-riscv64-almalinux-10-riscv64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-10-beta-riscv64-debuginfo
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-riscv64-almalinux-10-riscv64-debug-dr/
+      production: false
+      debug: true
+      priority: 10
+    - name: almalinux-10-beta-riscv64
+      arch: src
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-riscv64-almalinux-10-src-dr/
+      production: false
+      debug: false
+      priority: 10
+
+- name: Fedora-40-riscv64
+  repositories:
+    - name: fedora-40-riscv64
+      arch: riscv64
+      type: rpm
+      url: http://fedora.riscv.rocks/kojifiles/repos/f40-build/latest/riscv64/
+      production: false
+      debug: false
+      priority: 20
