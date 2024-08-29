@@ -379,6 +379,39 @@
       debug: false
       production: false
 
+- name: "fedora-koji-epel10"
+  repositories:
+    - name: "fedora-koji-epel10:x86_64"
+      arch: x86_64
+      type: rpm
+      url: "https://kojipkgs.fedoraproject.org/repos/epel10.0-build/latest/$basearch/"
+      debug: false
+      production: false
+    - name: "fedora-koji-epel10:x86_64_v2"
+      arch: x86_64_v2
+      type: rpm
+      url: "https://kojipkgs.fedoraproject.org/repos/epel10.0-build/latest/x86_64/"
+      debug: false
+      production: false
+    - name: "fedora-koji-epel10:aarch64"
+      arch: aarch64
+      type: rpm
+      url: "https://kojipkgs.fedoraproject.org/repos/epel10.0-build/latest/$basearch/"
+      debug: false
+      production: false
+    - name: "fedora-koji-epel10:s390x"
+      arch: s390x
+      type: rpm
+      url: "https://kojipkgs.fedoraproject.org/repos/epel10.0-build/latest/$basearch/"
+      debug: false
+      production: false
+    - name: "fedora-koji-epel10:ppc64le"
+      arch: ppc64le
+      type: rpm
+      url: "https://kojipkgs.fedoraproject.org/repos/epel10.0-build/latest/$basearch/"
+      debug: false
+      production: false
+
 - name: "copr:build.almalinux.org:soksanichenko:Pungi10"
   repositories:
     - name: "copr:build.almalinux.org:soksanichenko:Pungi10:x86_64"
