@@ -45,12 +45,12 @@ async def create_sign_task(
 
 @router.post(
     '/get_sign_task/',
-    response_model=typing.Union[dict, sign_schema.AvailableSignTask],
+    response_model=typing.Union[sign_schema.AvailableSignTask, dict],
 )
 async def get_available_sign_task(
     payload: sign_schema.SignTaskGet,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
-):
+) -> typing.Union[sign_schema.AvailableSignTask, dict]:
     result = await sign_task.get_available_sign_task(db, payload.key_ids)
     if any([
         not result.get(item) for item in ['build_id', 'id', 'keyid', 'packages']

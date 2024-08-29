@@ -282,6 +282,7 @@ async def get_available_sign_task(
         "id": sign_task.id,
         "build_id": sign_task.build_id,
         "keyid": sign_task.sign_key.keyid,
+        "sign_files": bool(sign_task.sign_key.add_files_signature),
     }
     packages = []
 

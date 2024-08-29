@@ -88,6 +88,7 @@ class AvailableSignTask(BaseModel):
     id: typing.Optional[int] = None
     build_id: typing.Optional[int] = None
     keyid: typing.Optional[str] = None
+    sign_files: typing.Optional[bool] = None
     packages: typing.Optional[typing.List[SignRpmInfo]] = None
 
 
