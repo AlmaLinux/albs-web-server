@@ -54,8 +54,6 @@ async def create_product(
     user: User = Depends(get_current_user),
 ):
     db_product = await products.create_product(db, product)
-    await db.flush()
-    await db.refresh(db_product)
     await sign_task.create_gen_key_task(
         db=db,
         product=db_product,
