@@ -638,35 +638,35 @@
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
       production: true
       debug: false
-      priority: 11
+      priority: 10
     - name: c10s-build
       arch: x86_64_v2
       type: rpm
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/x86_64/
       production: true
       debug: false
-      priority: 11
+      priority: 10
     - name: c10s-build
       arch: aarch64
       type: rpm
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/aarch64/
       production: true
       debug: false
-      priority: 11
+      priority: 10
     - name: c10s-build
       arch: ppc64le
       type: rpm
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/ppc64le/
       production: true
       debug: false
-      priority: 11
+      priority: 10
     - name: c10s-build
       arch: s390x
       type: rpm
       url: https://kojihub.stream.centos.org/kojifiles/repos/c10s-build/latest/s390x/
       production: true
       debug: false
-      priority: 11
+      priority: 10
 
 - name: UBI
   repositories:
