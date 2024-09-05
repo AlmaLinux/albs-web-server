@@ -6,11 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from alws.crud.products import create_product
+from alws.crud.sign_task import create_gen_key_task
+from alws.crud.user import get_user
 from alws.models import Product, Repository
 from alws.schemas.product_schema import ProductCreate
-from alws.schemas.repository_schema import RepositoryCreate
 from tests.constants import ADMIN_USER_ID
-from tests.test_utils.pulp_utils import get_repo_href
 
 
 @pytest.fixture(
@@ -149,6 +149,11 @@ async def user_product(
         product = await create_product(
             async_session,
             ProductCreate(**user_product_create_payload),
+        )
+        await create_gen_key_task(
+            async_session,
+            product,
+            await get_user(async_session, user_id=user_product_create_payload['owner_id']),
         )
         await async_session.commit()
     yield product
