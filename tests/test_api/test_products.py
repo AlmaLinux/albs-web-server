@@ -53,19 +53,8 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         # the test will be reported as failed.
         await _perform_product_modification(build_id, product_id, "add")
         await async_session.commit()
-        db_product = (
-            (
-                await async_session.execute(
-                    select(Product)
-                    .where(Product.id == product_id)
-                    .options(selectinload(Product.builds))
-                )
-            )
-            .scalars()
-            .first()
-        )
-
-        assert db_product.builds[0].id == build_id, message
+        await async_session.refresh(user_product, attribute_names=['builds'])
+        assert user_product.builds[0].id == build_id, message
 
     async def test_remove_from_product(
         self,

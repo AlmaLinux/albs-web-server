@@ -142,7 +142,19 @@ async def create_product(
     db.add_all(items_to_insert)
     db.add(owner)
     await db.flush()
-    await db.refresh(product)
+    await db.refresh(
+        product,
+        attribute_names=[
+            'roles',
+            'repositories',
+            'platforms',
+            'builds',
+            'sign_keys',
+            'team',
+            'permissions',
+        ],
+    )
+    await db.refresh(product.team, attribute_names=['roles'])
     return product
 
 
