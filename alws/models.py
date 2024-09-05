@@ -1294,6 +1294,12 @@ class SignKey(PermissionsMixin, Base):
     inserted: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
     )
+    active: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean, default=True
+    )
+    archived: Mapped[datetime.datetime] = mapped_column(
+        sqlalchemy.DateTime, nullable=True,
+    )
     product_id: Mapped[Optional[int]] = mapped_column(
         sqlalchemy.Integer,
         sqlalchemy.ForeignKey(

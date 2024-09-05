@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from fastapi_sqla import open_async_session
-from sqlalchemy import or_, update
+from sqlalchemy import or_, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -185,6 +185,11 @@ async def create_sign_task(
     if not can_perform(sign_key, user, actions.UseSignKey.name):
         raise PermissionDenied(
             "User does not have permissions to use this sign key"
+        )
+
+    if not sign_key.active:
+        raise PermissionDenied(
+            "This sign key is inactive"
         )
 
     sign_task = models.SignTask(
@@ -403,6 +408,15 @@ async def complete_gen_key_task(
         payload.file_name,
     )
     roles = [r for r in gen_key_task.product.team.roles if 'signer' in r.name]
+
+    await db.execute(
+        update(models.SignKey).where(
+            and_(models.SignKey.product_id == gen_key_task.product.id,
+                 models.SignKey.active)
+        ).values(active=False, archived=datetime.datetime.utcnow())
+    )
+    await db.commit()
+
     sign_key = models.SignKey(
         name=payload.key_name,
         description=f'Community key "{payload.key_name}"',
