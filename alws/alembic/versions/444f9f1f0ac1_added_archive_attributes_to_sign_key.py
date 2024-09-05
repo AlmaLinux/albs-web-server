@@ -1,7 +1,7 @@
 """Added archive attributes to sign key    
 
 Revision ID: 444f9f1f0ac1
-Revises: e952dc755f9d
+Revises: 4da0f9b95929
 Create Date: 2024-08-01 17:12:24.775826
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '444f9f1f0ac1'
-down_revision = 'e952dc755f9d'
+down_revision = '4da0f9b95929'
 branch_labels = None
 depends_on = None
 
