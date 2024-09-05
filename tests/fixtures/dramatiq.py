@@ -23,7 +23,6 @@ def patch_dramatiq_actor_send(monkeypatch):
     monkeypatch.setattr("dramatiq.Actor.send", func)
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_modular_build(
     modular_build: Build,
@@ -36,7 +35,6 @@ async def start_modular_build(
     await _start_build(modular_build.id, BuildCreate(**modular_build_payload))
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_modular_virt_build(
     virt_modular_build: Build,
@@ -52,7 +50,6 @@ async def start_modular_virt_build(
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_modular_ruby_build(
     ruby_modular_build: Build,
@@ -68,7 +65,6 @@ async def start_modular_ruby_build(
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_modular_subversion_build(
     subversion_modular_build: Build,
@@ -84,7 +80,6 @@ async def start_modular_subversion_build(
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_modular_llvm_build(
     llvm_modular_build: Build,
@@ -100,7 +95,6 @@ async def start_modular_llvm_build(
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def start_build(
     regular_build: Build,
@@ -133,7 +127,6 @@ def prepare_build_done_payload(
     }
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def build_done(
     async_session: AsyncSession,
@@ -168,7 +161,6 @@ async def build_done(
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def modular_build_done(
     async_session: AsyncSession,
@@ -197,7 +189,6 @@ async def modular_build_done(
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def virt_build_done(
     async_session: AsyncSession,
@@ -259,7 +250,6 @@ async def virt_build_done(
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def ruby_build_done(
     async_session: AsyncSession,
@@ -298,7 +288,6 @@ async def ruby_build_done(
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def subversion_build_done(
     async_session: AsyncSession,
@@ -330,7 +319,6 @@ async def subversion_build_done(
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def llvm_build_done(
     async_session: AsyncSession,

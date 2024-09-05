@@ -75,7 +75,6 @@ def user_product_create_payload(request) -> dict:
     }
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def base_product(
     async_session: AsyncSession, product_create_payload: dict, create_repo
@@ -126,7 +125,6 @@ async def product_with_repo(
     yield product
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def user_product(
     async_session: AsyncSession,

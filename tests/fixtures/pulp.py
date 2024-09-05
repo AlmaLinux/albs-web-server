@@ -31,7 +31,6 @@ def semaphore_patch(monkeypatch):
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture(autouse=True)
 async def disable_pulp_requests(monkeypatch):
     async def func(*args, **kwargs):

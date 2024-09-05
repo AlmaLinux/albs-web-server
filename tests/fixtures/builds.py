@@ -947,7 +947,6 @@ def build_payload() -> typing.Dict[str, typing.Any]:
     }
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def modular_build(
     async_session: AsyncSession,
@@ -962,7 +961,6 @@ async def modular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def virt_modular_build(
     async_session: AsyncSession,
@@ -977,7 +975,6 @@ async def virt_modular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def ruby_modular_build(
     async_session: AsyncSession,
@@ -992,7 +989,6 @@ async def ruby_modular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def subversion_modular_build(
     async_session: AsyncSession,
@@ -1007,7 +1003,6 @@ async def subversion_modular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def llvm_modular_build(
     async_session: AsyncSession,
@@ -1022,7 +1017,6 @@ async def llvm_modular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def regular_build(
     base_platform,
@@ -1039,7 +1033,6 @@ async def regular_build(
     yield build
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def regular_build_with_user_product(
     async_session: AsyncSession,
@@ -1089,7 +1082,6 @@ def get_packages_info_from_pulp(monkeypatch):
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def build_for_release(
     async_session: AsyncSession,
@@ -1098,7 +1090,6 @@ async def build_for_release(
     yield await get_builds(async_session, build_id=regular_build.id)
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def modular_build_for_release(
     async_session: AsyncSession,

@@ -1,11 +1,8 @@
 import os
-import typing
-from contextlib import asynccontextmanager
-from unittest.mock import patch
 
 import pytest
 from fastapi_sqla import open_async_session
-from sqlalchemy import delete, insert, select
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -24,7 +21,6 @@ def async_session_factory():
     return sessionmaker(class_=AsyncSession, expire_on_commit=False)
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def async_session(
     async_sqla_connection,
@@ -74,7 +70,6 @@ async def create_user(async_session: AsyncSession, data: dict):
     await async_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.fixture(scope="module", autouse=True)
 async def create_tables():
     engine = create_async_engine(
