@@ -427,6 +427,7 @@ async def complete_gen_key_task(
         product_id=gen_key_task.product_id,
         product=gen_key_task.product,
         roles=roles,
+        owner=gen_key_task.product.owner,
     )
     db.add(sign_key)
     await db.flush()
