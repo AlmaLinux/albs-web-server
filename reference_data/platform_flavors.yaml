@@ -873,3 +873,13 @@
       production: false
       debug: false
       priority: 20
+
+- name: libsolv_for_v2
+  repositories:
+    - name: libsolv_for_v2
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-libsolv_for_v2-almalinux-10-x86_64_v2-dr/
+      production: true
+      debug: false
+      priority: 9
