@@ -1071,6 +1071,11 @@ class Product(PermissionsMixin, TeamMixin, Base):
         back_populates="product",
         cascade="all, delete-orphan",
     )
+    gen_key_tasks: Mapped[List["GenKeyTask"]] = relationship(
+        "GenKeyTask",
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def full_name(self) -> str:
