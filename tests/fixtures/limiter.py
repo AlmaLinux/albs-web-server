@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.fixture
 def patch_limiter(monkeypatch):
     async def func(*args, **kwargs):

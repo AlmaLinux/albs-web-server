@@ -102,7 +102,6 @@ def mock_get_packages_from_pulp_by_ids(monkeypatch):
     monkeypatch.setattr("alws.crud.errata.get_rpm_packages_by_ids", func)
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def create_errata(
     async_session: AsyncSession,

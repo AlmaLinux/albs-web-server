@@ -10,7 +10,6 @@ from alws.schemas import platform_schema, repository_schema
 from tests.test_utils.pulp_utils import get_repo_href
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def base_platform(
     async_session: AsyncSession,

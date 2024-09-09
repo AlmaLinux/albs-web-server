@@ -1,7 +1,6 @@
 import typing
 
 import pytest
-from fastapi_sqla import open_async_session
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +31,6 @@ async def __create_sign_key(
     return sign_key
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def sign_key(
     async_session: AsyncSession,

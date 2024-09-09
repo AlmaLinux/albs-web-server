@@ -1,10 +1,9 @@
 import pytest
 
-from alws.release_planner import AlmaLinuxReleasePlanner, BaseReleasePlanner
+from alws.release_planner import BaseReleasePlanner
 from tests.test_utils.pulp_utils import get_rpm_pkg_info
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def get_pulp_packages_info(monkeypatch):
     async def func(*args, **kwargs):
@@ -29,7 +28,6 @@ def disable_packages_check_in_prod_repos(monkeypatch):
     )
 
 
-@pytest.mark.anyio
 @pytest.fixture
 async def disable_sign_verify(monkeypatch):
     async def func(*args, **kwargs):

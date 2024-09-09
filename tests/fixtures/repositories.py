@@ -4,9 +4,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws.crud.repository import create_repository
 from alws.models import Repository
-from alws.schemas.repository_schema import RepositoryCreate
 
 
 @pytest.fixture

@@ -40,7 +40,7 @@ class BaseAsyncTestCase:
             files=files,
         )
         async with httpx.AsyncClient(
-            app=app,
+            transport=httpx.ASGITransport(app=app)
         ) as client:
             return await client.send(request)
 
