@@ -19,6 +19,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Checkout albs-sign-file repository
+        uses: actions/checkout@v4
+        with:
+          repository: AlmaLinux/albs-sign-file
+          path: albs-sign-file
+
       - name: Set up Docker Buildx
         # https://github.com/marketplace/actions/docker-setup-buildx
         uses: docker/setup-buildx-action@v3
@@ -33,15 +39,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Prepare GPG key
+        run: |
+          mv albs-sign-file ../
+          bash tests/prepare_gpg_key.sh
+
       - name: Prepare working directory
         run: |
           mkdir -p $REPORTS_DIR
-          mkdir -p ../{alts,albs-frontend,albs-node,albs-sign-file,albs-sign-node,alma-tests-cacher}
-          touch ../albs-sign-file/.env
+          mkdir -p ../{alts,albs-frontend,albs-node,albs-sign-node,alma-tests-cacher}
           ln -sf tests/test-vars.env vars.env
 
       - name: Start services
-        run: docker compose up -d test_db
+        run: docker compose up -d test_db sign_file
 
       - name: Run pytest
         id: pytest
