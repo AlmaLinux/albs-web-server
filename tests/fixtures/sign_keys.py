@@ -12,6 +12,11 @@ from alws.schemas.sign_schema import SignKeyCreate
 
 @pytest.fixture
 def basic_sign_key_payload() -> dict:
+    keyid = (
+        settings.test_sign_key_id
+        if settings.test_sign_key_id
+        else "1234567890ABCDEF"
+    )
     return {
         "name": "Test key",
         "description": "Test sign key",

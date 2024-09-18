@@ -18,11 +18,18 @@
    ```bash
    ln -sf tests/test-vars.env vars.env
    ```
-3. Start the `test_db` service
+2. Start the `test_db` service
     ```bash
     docker compose up -d test_db
     ```
-3. Run `pytest` within `web_server_tests` container
+
+3. To run packages_exporter tests start `sign-file` service and prepare GPG keys
+    ```bash
+    . tests/prepare_gpg_key.sh
+    docker compose up -d sign_file
+    ```
+
+4. Run `pytest` within `web_server_tests` container
     ```bash
     docker compose run --rm web_server_tests pytest -v
     ```
