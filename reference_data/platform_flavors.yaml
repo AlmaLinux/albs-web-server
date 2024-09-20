@@ -234,28 +234,28 @@
 
 - name: EPEL-10
   repositories:
-    - name: epel
+    - name: epel-10
       arch: x86_64
       type: rpm
       url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/x86_64/os/
       production: false
       debug: false
       priority: 10
-    - name: epel
+    - name: epel-10
       arch: aarch64
       type: rpm
       url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/os/
       production: false
       debug: false
       priority: 10
-    - name: epel
+    - name: epel-10
       arch: ppc64le
       type: rpm
       url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/ppc64le/os/
       production: false
       debug: false
       priority: 10
-    - name: epel
+    - name: epel-10
       arch: s390x
       type: rpm
       url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/s390x/os/
