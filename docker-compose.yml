@@ -426,7 +426,6 @@ services:
     volumes:
       - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
       - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
-      - "../alma-tests-cacher/vars.yaml:/code/vars.yaml"
     command: |
       bash -c "
         set -ex
