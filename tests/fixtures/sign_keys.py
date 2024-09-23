@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alws.config import settings
 from alws.crud.sign_key import create_sign_key
 from alws.models import SignKey
 from alws.schemas.sign_schema import SignKeyCreate
@@ -11,10 +12,15 @@ from alws.schemas.sign_schema import SignKeyCreate
 
 @pytest.fixture
 def basic_sign_key_payload() -> dict:
+    keyid = (
+        settings.test_sign_key_id
+        if settings.test_sign_key_id
+        else "1234567890ABCDEF"
+    )
     return {
         "name": "Test key",
         "description": "Test sign key",
-        "keyid": "1234567890ABCDEF",
+        "keyid": settings.test_sign_key_id,
         "fingerprint": "1234567890ABCDEF1234567890ABCDEF12345678",
         "public_url": "no_url",
     }

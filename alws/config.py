@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
-    pulp_database_url: str = 'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
+    pulp_database_url: str = (
+        'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
+    )
     pulp_async_database_url: str = (
         'postgresql+asyncpg://postgres:password@pulp:5432/pulp'
     )
@@ -29,7 +31,9 @@ class Settings(BaseSettings):
     test_database_url: str = (
         'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
     )
-    sync_database_url: str = 'postgresql+psycopg2://postgres:password@db/almalinux-bs'
+    sync_database_url: str = (
+        'postgresql+psycopg2://postgres:password@db/almalinux-bs'
+    )
 
     fastapi_sqla__async__sqlalchemy_url: str = (
         'postgresql+asyncpg://postgres:password@db/almalinux-bs'
@@ -79,12 +83,15 @@ class Settings(BaseSettings):
     sign_server_api_url: Optional[str] = 'http://sign_file:8000/'
     sign_server_username: Optional[str] = None
     sign_server_password: Optional[str] = None
+    test_sign_key_id: Optional[str] = None
 
     documentation_path: str = 'alws/documentation/'
 
     logging_level: Optional[str] = 'INFO'
 
-    frontend_baseurl: Annotated[str, Field(validate_default=True)] = 'http://localhost:8080'
+    frontend_baseurl: Annotated[str, Field(validate_default=True)] = (
+        'http://localhost:8080'
+    )
     github_callback_endpoint: str = 'api/v1/auth/github/callback'
     almalinux_callback_endpoint: str = 'api/v1/auth/almalinux/callback'
 
