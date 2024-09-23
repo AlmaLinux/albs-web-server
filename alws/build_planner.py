@@ -416,12 +416,13 @@ class BuildPlanner:
                     if parsed_artifact.arch in allowed_arches:
                         module.add_rpm_artifact(parsed_artifact.as_dict())
 
-                if multilib_artifacts:
+                multilib_pkgs = multilib_artifacts.get(project_name, [])
+                if multilib_pkgs:
                     await MultilibProcessor.update_module_index(
                         index,
                         task.module_name,
                         task.module_stream,
-                        multilib_artifacts[project_name],
+                        multilib_pkgs,
                         src_name=project_name,
                     )
 
