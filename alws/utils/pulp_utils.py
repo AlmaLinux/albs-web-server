@@ -13,6 +13,7 @@ from alws.pulp_models import (
     CoreContentArtifact,
     CoreRepository,
     CoreRepositoryContent,
+    CoreRepositoryVersion,
     RpmModulemd,
     RpmPackage,
 )
@@ -60,9 +61,7 @@ def get_rpm_module_packages_from_repository(
         return result
 
     module_name, module_stream = module.split(":")
-    devel_module_name = (
-        f"{module_name}-devel" if not module_name.endswith("-devel") else ""
-    )
+    devel_module_name = f"{module_name}-devel" if not module_name.endswith("-devel") else ""
     repo_modules = []
     try:
         repo_index = IndexWrapper.from_template(repo_modules_yaml)
@@ -123,6 +122,38 @@ def get_rpm_module_packages_from_repository(
     return result
 
 
+def get_removed_rpm_packages_from_latest_repo_version(
+    repo_id: uuid.UUID,
+) -> typing.List[RpmPackage]:
+    subq = (
+        select(CoreRepositoryVersion.pulp_id)
+        .where(CoreRepositoryVersion.repository_id == repo_id)
+        .order_by(CoreRepositoryVersion.number.desc())
+        .limit(1)
+    )
+    query = (
+        select(RpmPackage)
+        .join(CoreContent)
+        .join(CoreRepositoryContent)
+        .join(CoreRepository)
+        .join(CoreRepositoryVersion)
+        .where(
+            CoreRepository.pulp_id == repo_id,
+            CoreRepositoryContent.version_removed_id == subq,
+        )
+        .options(
+            joinedload(RpmPackage.content).joinedload(
+                CoreContent.core_repositorycontent.and_(
+                    CoreRepositoryContent.repository_id == repo_id
+                )
+            )
+        )
+    )
+    with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
+        return pulp_db.execute(query).scalars().unique().all()
+
+
 def get_rpm_packages_from_repositories(
     repo_ids: typing.List[uuid.UUID],
     pkg_names: typing.Optional[typing.List[str]] = None,
@@ -172,9 +203,7 @@ def get_rpm_packages_from_repository(
     pkg_arches: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
     first_subq = (
-        select(CoreRepository.pulp_id)
-        .where(CoreRepository.pulp_id == repo_id)
-        .scalar_subquery()
+        select(CoreRepository.pulp_id).where(CoreRepository.pulp_id == repo_id).scalar_subquery()
     )
     second_subq = (
         select(CoreRepositoryContent.content_id)

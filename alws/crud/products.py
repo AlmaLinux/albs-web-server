@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, selectinload
@@ -57,7 +57,7 @@ async def create_product(
     team_name = f'{payload.name}_team'
     teams = await get_teams(db, name=team_name)
     if teams:
-        team = teams[0]
+        team, *_ = teams
     else:
         team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
         team = await create_team(db, team_payload, flush=True)
@@ -71,9 +71,7 @@ async def create_product(
         (
             await db.execute(
                 select(models.Platform).where(
-                    models.Platform.name.in_(
-                        [platform.name for platform in payload.platforms]
-                    ),
+                    models.Platform.name.in_([platform.name for platform in payload.platforms]),
                 ),
             )
         )
@@ -181,9 +179,7 @@ async def get_products(
                 selectinload(models.Product.owner),
                 selectinload(models.Product.platforms),
                 selectinload(models.Product.repositories),
-                selectinload(models.Product.roles).selectinload(
-                    models.UserRole.actions
-                ),
+                selectinload(models.Product.roles).selectinload(models.UserRole.actions),
                 selectinload(models.Product.team).selectinload(models.Team.owner),
                 selectinload(models.Product.team)
                 .selectinload(models.Team.roles)
@@ -230,9 +226,7 @@ async def remove_product(
     db_product = await get_products(db, product_id=product_id)
     db_user = await get_user(db, user_id=user_id)
     if not can_perform(db_product, db_user, actions.DeleteProduct.name):
-        raise PermissionDenied(
-            f"User has no permissions to delete the product {db_product.name}"
-        )
+        raise PermissionDenied(f"User has no permissions to delete the product {db_product.name}")
     if not db_product:
         raise DataNotFoundError(f"Product={product_id} doesn't exist")
     active_builds_by_team_id = (
@@ -271,8 +265,7 @@ async def remove_product(
         # some repos from db can be absent in pulp
         # in case if you reset pulp db, but didn't reset non-pulp db
         if all(
-            product_repo.name != product_distro['name']
-            for product_distro in all_product_distros
+            product_repo.name != product_distro['name'] for product_distro in all_product_distros
         ):
             continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
@@ -298,8 +291,7 @@ async def modify_product(
         raise DataNotFoundError(f"User={user_id} doesn't exist")
     if not can_perform(db_product, db_user, actions.UpdateProduct.name):
         raise PermissionDenied(
-            'User has no permissions '
-            f'to modify the product "{db_product.name}"'
+            f'User has no permissions to modify the product "{db_product.name}"'
         )
 
     db_build = await db.execute(
@@ -309,12 +301,8 @@ async def modify_product(
         )
         .options(
             selectinload(models.Build.repos),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_modules
-            ),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.platform
-            ),
+            selectinload(models.Build.tasks).selectinload(models.BuildTask.rpm_modules),
+            selectinload(models.Build.tasks).selectinload(models.BuildTask.platform),
         ),
     )
 
@@ -325,12 +313,8 @@ async def modify_product(
         )
         .options(
             selectinload(models.Build.repos),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.rpm_modules
-            ),
-            selectinload(models.Build.tasks).selectinload(
-                models.BuildTask.platform
-            ),
+            selectinload(models.Build.tasks).selectinload(models.BuildTask.rpm_modules),
+            selectinload(models.Build.tasks).selectinload(models.BuildTask.platform),
         ),
     )
     db_build = db_build.scalars().first()
@@ -338,8 +322,7 @@ async def modify_product(
     if modification == 'add':
         if db_build in db_product.builds:
             error_msg = (
-                f"Can't add build {build_id} to {product} "
-                "as it's already part of the product"
+                f"Can't add build {build_id} to {product} as it's already part of the product"
             )
             raise ProductError(error_msg)
     if modification == 'remove':
@@ -355,19 +338,14 @@ async def modify_product(
     perform_product_modification.send(db_build.id, db_product.id, modification)
 
 
-async def get_repo_product(
-    session: AsyncSession,
-    repository: str,
-):
+async def get_repo_product(session: AsyncSession, repository: str) -> Optional[Product]:
     product_relationships = (
         selectinload(Product.owner),
         selectinload(Product.roles).selectinload(UserRole.actions),
-        selectinload(Product.team)
-        .selectinload(Team.roles)
-        .selectinload(UserRole.actions),
+        selectinload(Product.team).selectinload(Team.roles).selectinload(UserRole.actions),
     )
     if repository.endswith("br"):
-        build = (
+        result = (
             (
                 await session.execute(
                     select(Build)
@@ -382,19 +360,22 @@ async def get_repo_product(
             .scalars()
             .first()
         )
-        if build:
-            return build.team.products[0]
-        return None
-    return (
-        (
-            await session.execute(
-                select(Product)
-                .filter(
-                    Product.repositories.any(Repository.name.ilike(f'%{repository}'))
+        if result:
+            result, *_ = result.team.products
+        return result
+    splitted_repo = repository.split('-')
+    repo_name = '-'.join(splitted_repo[:-1])
+    repo_arch = splitted_repo[-1]
+    query = (
+        select(Product)
+        .filter(
+            Product.repositories.any(
+                and_(
+                    Repository.name.ilike(f'%{repo_name}'),
+                    Repository.arch == repo_arch,
                 )
-                .options(*product_relationships)
             )
         )
-        .scalars()
-        .first()
+        .options(*product_relationships)
     )
+    return (await session.execute(query)).scalars().first()

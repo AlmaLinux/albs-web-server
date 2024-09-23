@@ -4,7 +4,6 @@ import io
 import logging
 import re
 import typing
-import urllib.parse
 
 from aiohttp.client_exceptions import ClientResponseError
 from fastapi import UploadFile, status
@@ -19,32 +18,21 @@ from alws.errors import UploadError
 from alws.pulp_models import CoreContent, RpmModulemd, RpmModulemdDefaults
 from alws.utils.modularity import IndexWrapper
 from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import (
+    get_removed_rpm_packages_from_latest_repo_version,
+    get_uuid_from_pulp_href,
+)
 
 
 class MetadataUploader:
     def __init__(self, session: AsyncSession, repo_name: str):
         self.pulp = PulpClient(
-            settings.pulp_host, settings.pulp_user, settings.pulp_password
+            settings.pulp_host,
+            settings.pulp_user,
+            settings.pulp_password,
         )
         self.session = session
         self.repo_name = repo_name
-
-    async def iter_repo(self, repo_href: str) -> typing.AsyncIterator[dict]:
-        next_page = repo_href
-        while True:
-            if (
-                "limit" in next_page
-                and re.search(r"limit=(\d+)", next_page).groups()[0] == "100"
-            ):
-                next_page = next_page.replace("limit=100", "limit=1000")
-            parsed_url = urllib.parse.urlsplit(next_page)
-            path = parsed_url.path + "?" + parsed_url.query
-            page = await self.pulp.get_by_href(path)
-            for pkg in page["results"]:
-                yield pkg
-            next_page = page.get("next")
-            if not next_page:
-                break
 
     async def upload_comps(
         self,
@@ -77,9 +65,7 @@ class MetadataUploader:
         with open_session('pulp') as pulp_session:
             for module in _index.iter_modules():
                 defaults_snippet = _index.get_module_defaults_as_str(module.name)
-                defaults_checksum = hashlib.sha256(
-                    defaults_snippet.encode('utf-8')
-                ).hexdigest()
+                defaults_checksum = hashlib.sha256(defaults_snippet.encode('utf-8')).hexdigest()
                 pulp_module = (
                     pulp_session.execute(
                         select(RpmModulemd).where(
@@ -159,16 +145,11 @@ class MetadataUploader:
                         .where(CoreContent.pulp_id == pulp_module.content_ptr_id)
                         .values(pulp_last_updated=datetime.datetime.now())
                     )
-                    pulp_href = (
-                        f'/pulp/api/v3/content/rpm/modulemds/'
-                        f'{pulp_module.content_ptr_id}/'
-                    )
+                    pulp_href = f'/pulp/api/v3/content/rpm/modulemds/{pulp_module.content_ptr_id}/'
                 module_hrefs.append(pulp_href)
 
                 href = None
-                default_profiles = _index.get_module_default_profiles(
-                    module.name, module.stream
-                )
+                default_profiles = _index.get_module_default_profiles(module.name, module.stream)
                 if not pulp_defaults and defaults_snippet and default_profiles:
                     href = await self.pulp.create_module_defaults(
                         module.name,
@@ -179,10 +160,7 @@ class MetadataUploader:
                 elif pulp_defaults and defaults_snippet and default_profiles:
                     pulp_session.execute(
                         update(RpmModulemdDefaults)
-                        .where(
-                            RpmModulemdDefaults.content_ptr_id
-                            == pulp_defaults.content_ptr_id
-                        )
+                        .where(RpmModulemdDefaults.content_ptr_id == pulp_defaults.content_ptr_id)
                         .values(
                             profiles=default_profiles,
                             snippet=defaults_snippet,
@@ -255,6 +233,15 @@ class MetadataUploader:
                 repo_href,
                 add=final_additions,
                 remove=modules_in_version,
+            )
+        removed_pkgs = get_removed_rpm_packages_from_latest_repo_version(
+            get_uuid_from_pulp_href(repo_href),
+        )
+        if removed_pkgs:
+            logging.info('Adding removed packages to repository')
+            await self.pulp.modify_repository(
+                repo_href,
+                add=[pkg.pulp_href for pkg in removed_pkgs],
             )
         if not dry_run:
             logging.info("Publishing new repository version")

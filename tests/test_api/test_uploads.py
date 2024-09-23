@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from alws.models import BuildTask, RpmModule
+from alws.models import BuildTask
 from alws.utils.modularity import IndexWrapper
 from tests.mock_classes import BaseAsyncTestCase
 
@@ -16,6 +16,7 @@ from tests.mock_classes import BaseAsyncTestCase
     "get_latest_version",
     "get_latest_repo_present_content",
     "get_latest_repo_removed_content",
+    "get_removed_rpm_packages_from_latest_repo_version",
     "get_repo_modules",
     "get_by_href",
     "modify_repository",
