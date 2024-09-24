@@ -25,6 +25,18 @@ public_router = APIRouter(
 )
 
 
+@router.post("/new/", response_model=errata_schema.CreateErrataResponse)
+async def create_new_errata_record(
+    errata: errata_schema.BaseErrataRecord,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    record = await errata_crud.create_new_errata_record(
+        db,
+        errata,
+    )
+    return {"ok": bool(record)}
+
+
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
 async def create_errata_record(
     errata: errata_schema.BaseErrataRecord,

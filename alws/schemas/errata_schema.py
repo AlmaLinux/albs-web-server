@@ -82,6 +82,7 @@ class BaseErrataRecord(BaseModel):
     updated_date: datetime.date
     title: str
     description: str
+    module: Optional[str] = None
     status: str
     version: str
     severity: str

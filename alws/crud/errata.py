@@ -628,6 +628,192 @@ async def get_matching_albs_packages(
     return items_to_insert, package_type
 
 
+async def process_new_errata_references(
+    db: AsyncSession, errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord, platform: models.Platform
+):
+    references = []
+    self_ref_exists = False
+    for ref in errata.references:
+        db_cve = None
+        if ref.cve:
+            db_cve = await db.execute(
+                select(models.ErrataCVE).where(
+                    models.ErrataCVE.id == ref.cve.id
+                )
+            )
+            db_cve = db_cve.scalars().first()
+            if db_cve is None:
+                db_cve = models.ErrataCVE(
+                    id=ref.cve.id,
+                    cvss3=ref.cve.cvss3,
+                    cwe=ref.cve.cwe,
+                    impact=ref.cve.impact,
+                    public=ref.cve.public,
+                )
+                references.append(db_cve)
+        ref_title = ""
+        if ref.ref_type in (
+            ErrataReferenceType.cve.value,
+            ErrataReferenceType.rhsa.value,
+        ):
+            ref_title = ref.ref_id
+        db_reference = models.NewErrataReference(
+            href=ref.href,
+            ref_id=ref.ref_id,
+            ref_type=ref.ref_type,
+            title=ref_title,
+            cve=db_cve,
+        )
+        if ref.ref_type == ErrataReferenceType.self_ref.value:
+            self_ref_exists = True
+        db_errata.references.append(db_reference)
+        references.append(db_reference)
+    if not self_ref_exists:
+        html_id = db_errata.id.replace(":", "-")
+        self_ref = models.NewErrataReference(
+            href=(
+                "https://errata.almalinux.org/"
+                f"{platform.distr_version}/{html_id}.html"
+            ),
+            ref_id=db_errata.id,
+            ref_type=ErrataReferenceType.self_ref,
+            title=db_errata.id,
+        )
+        db_errata.references.append(self_ref)
+        references.append(self_ref)
+    return references
+
+
+async def process_new_errata_packages(
+    db: AsyncSession, errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord, platform: models.Platform
+):
+    packages = []
+    search_params = prepare_search_params(errata)
+    prod_repos_cache = await load_platform_packages(
+        platform,
+        search_params,
+        False,
+        db_errata.module,
+    )
+    for package in errata.packages:
+        # Just in case
+        if package.arch == "src":
+            continue
+        db_package = models.NewErrataPackage(
+            name=package.name,
+            version=package.version,
+            release=package.release,
+            epoch=package.epoch,
+            arch=package.arch,
+            # TODO: We can provide source_srpm, need to check if it can be helpful
+            source_srpm=None,
+            reboot_suggested=False,
+        )
+        db_errata.packages.append(db_package)
+        packages.append(db_package)
+        # Create ErrataToAlbsPackages
+        matching_packages, _ = await get_matching_albs_packages(
+            db, db_package, prod_repos_cache, db_errata.module
+        )
+        packages.extend(matching_packages)
+    return packages
+
+
+async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
+    platform = await db.execute(
+        select(models.Platform)
+        .where(models.Platform.id == errata.platform_id)
+        .options(selectinload(models.Platform.repos))
+    )
+    platform = platform.scalars().first()
+    items_to_insert = []
+    original_id = errata.id
+
+    # Errata db record
+    db_errata = models.NewErrataRecord(
+        id=errata.id,
+        freezed=errata.freezed,
+        platform_id=errata.platform_id,
+        module=errata.module,
+        release_status=ErrataReleaseStatus.NOT_RELEASED,
+        # TODO: Not sure it's used, check and if not, remove from data model
+        summary=None,
+        # TODO: Not used AFAIK, maybe can be removed from data model
+        solution=None,
+        issued_date=errata.issued_date,
+        updated_date=errata.updated_date,
+        description=None,
+        original_description=errata.description,
+        title=None,
+        oval_title=f"{errata.id}: {errata.title} ({errata.severity.capitalize()})",
+        # TODO: I'd prefer to keep the title without severity, and then present
+        # the severity differently in UI
+        original_title=f"{errata.severity.capitalize()}: {errata.title}",
+        contact_mail=platform.contact_mail,
+        status=errata.status,
+        version=errata.version,
+        severity=errata.severity,
+        rights=jinja2.Template(platform.copyright).render(
+            year=datetime.datetime.utcnow().year
+        ),
+        definition_id=errata.definition_id,
+        definition_version=errata.definition_version,
+        definition_class=errata.definition_class,
+        # TODO: Right now we're adding all repos cpes
+        # Ideally, we should generate affected cpes based on the repos
+        # where the affected packages live.
+        affected_cpe=errata.affected_cpe,
+        criteria=None,
+        original_criteria=errata.criteria,
+        tests=None,
+        original_tests=errata.tests,
+        objects=None,
+        original_objects=errata.objects,
+        states=None,
+        original_states=errata.states,
+        variables=None,
+        original_variables=errata.variables,
+    )
+    items_to_insert.append(db_errata)
+
+    # References
+    items_to_insert.extend(
+        await process_new_errata_references(db, errata, db_errata, platform)
+    )
+    # Errata Packages
+    items_to_insert.extend(
+        await process_new_errata_packages(db, errata, db_errata, platform)
+    )
+    db.add_all(items_to_insert)
+    await db.flush()
+    await db.refresh(db_errata)
+    if not settings.github_integration_enabled:
+        return db_errata
+
+    try:
+        github_client = await get_github_client()
+        await create_github_issue(
+            client=github_client,
+            title=errata.title,
+            description=errata.description,
+            advisory_id=errata.id,
+            original_id=original_id,
+            platform_name=platform.name,
+            severity=errata.severity,
+            packages=errata.packages,
+            platform_id=errata.platform_id,
+            find_packages_types=pkg_types,
+        )
+    except Exception as err:
+        logging.exception(
+            "Cannot create GitHub issue: %s",
+            err,
+        )
+    return db_errata
+
+
 async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     platform = await db.execute(
         select(models.Platform)
