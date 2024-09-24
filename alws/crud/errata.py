@@ -1,6 +1,7 @@
 import asyncio
 import collections
 import datetime
+import json
 import logging
 import re
 import uuid
@@ -15,6 +16,7 @@ from typing import (
     Union,
 )
 
+import aioredis
 import createrepo_c as cr
 import jinja2
 from fastapi_sqla import open_async_session, open_session
@@ -83,6 +85,9 @@ try:
     from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
     from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
     from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
+    from almalinux.liboval.data_generation import (
+        Module, OvalDataGenerator, Platform
+    )
 except ImportError:
     pass
 
@@ -1570,6 +1575,208 @@ async def get_release_logs(
     return "".join(release_log)
 
 
+async def get_packages_for_oval(
+    packages: List[models.NewErrataPackage]
+) -> List[dict]:
+    oval_pkgs = []
+    albs_pkgs_by_name = collections.defaultdict(list)
+    for pkg in packages:
+        if pkg.arch == 'src':
+            continue
+        albs_pkgs = [
+            albs_pkg
+            for albs_pkg in pkg.albs_packages
+            if albs_pkg.status == ErrataPackageStatus.released
+        ]
+        # This situation should only happen when some packages are missing
+        # because the 'force' flag has been enabled
+        if not albs_pkgs:
+            continue
+        for albs_pkg in albs_pkgs:
+            albs_pkg_dict = {
+                "name": pkg.name,
+                "epoch": albs_pkg.epoch,
+                "version": albs_pkg.version,
+                "release": albs_pkg.release,
+                "arch": albs_pkg.arch,
+                "reboot_suggested": pkg.reboot_suggested
+            }
+            albs_pkgs_by_name[pkg.name].append(albs_pkg_dict)
+
+    # Choose the one with the smallest evr among different versions of the same
+    # package but in different arches. This situation happens very often, for
+    # example, when not all the architectures of a module have been built
+    # in the same build.
+    smallest_evrs_by_name = {}
+    for name, pkgs in albs_pkgs_by_name.items():
+        # yes, this could look a bit wild, but we're comparing similar evrs,
+        # yell at me if I'm wrong
+        smallest_evrs_by_name[name] = min(
+            pkgs,
+            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}'
+        )
+
+    noarch_pkgs = [
+        pkg for pkg in smallest_evrs_by_name.values()
+        if pkg["arch"] == "noarch"
+    ]
+
+    for name, pkgs in albs_pkgs_by_name.items():
+        for pkg in pkgs:
+            if pkg["arch"] == "noarch":
+                continue
+            pkg["epoch"] = smallest_evrs_by_name[name]["epoch"]
+            pkg["version"] = smallest_evrs_by_name[name]["version"]
+            pkg["release"] = smallest_evrs_by_name[name]["release"]
+            oval_pkgs.append(pkg)
+
+    arches = {pkg["arch"] for pkg in oval_pkgs}
+    for pkg in noarch_pkgs:
+        for _ in arches:
+            oval_pkgs.append(pkg)
+
+    return oval_pkgs
+
+
+# At this moment we need this cache, but if we finally migrate old records to
+# new approach, we can get rid of this redis cache and directly retrieve this
+# info from db without passing through get_oval_xml method
+async def get_albs_oval_cache(session: AsyncSession, platform_name: str) -> dict:
+    redis = aioredis.from_url(settings.redis_url)
+    cache_name = f"albs-oval-cache_{platform_name}"
+    cached_oval = await redis.get(cache_name)
+    if not cached_oval:
+        logging.info("Retrieving OVAL cache for %s", platform_name)
+        # TODO: uncomment only after production oval data is stored in db
+        # as described in https://github.com/AlmaLinux/build-system/issues/350
+        # Right now we're using a file for testing
+        #xml_string = await get_new_oval_xml(session, platform_name, True)
+        #xml_string = json.loads(xml_string)
+        #oval = Composer.load_from_string(xml_string.encode())
+        oval = Composer.load_from_file("/tmp/org.almalinux.alsa-8.xml")
+        cached_oval = oval.as_dict()
+        del cached_oval["definitions"]
+        cached_oval = json.dumps(cached_oval)
+        await redis.set(cache_name, cached_oval, ex=3600)
+    return json.loads(cached_oval)
+
+
+async def add_oval_data_to_errata_record(
+    session: AsyncSession, db_record: models.NewErrataRecord
+):
+    oval_packages = await get_packages_for_oval(db_record.packages)
+
+    # check if errata includes a devel module
+    module = None
+    devel_module = None
+    if db_record.module:
+        module = Module(db_record.module)
+        dev_module = f"{module.name}-devel:{module.stream}"
+        if dev_module in db_record.original_title:
+            devel_module = Module(dev_module)
+
+    data_generator = OvalDataGenerator(
+        db_record.id,
+        Platform(db_record.platform.name),
+        oval_packages,
+        # TODO: Make the logger optional in liboval
+        logging.getLogger(),
+        settings.beholder_host,
+        module=module,
+        devel_module=devel_module,
+    )
+
+    albs_oval_cache = await get_albs_oval_cache(session, db_record.platform.name)
+
+    # Right now, variables are not being generated, so it's a no-op
+    #errata.variables = data_generator.generate_variables()
+    db_record.objects = data_generator.generate_objects(
+        albs_oval_cache["objects"]
+    )
+    db_record.states = data_generator.generate_states(
+        albs_oval_cache["states"]
+    )
+    db_record.tests = data_generator.generate_tests(
+        albs_oval_cache["tests"]
+    )
+    db_record.criteria = data_generator.generate_criteria()
+
+
+
+async def release_new_errata_record(
+    record_id: str, platform_id: int, force: bool
+):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    async with open_async_session(key=get_async_db_key()) as session:
+        session: AsyncSession
+        query = generate_query_for_release([record_id])
+        query = query.filter(models.NewErrataRecord.platform_id == platform_id)
+        db_record = await session.execute(query)
+        db_record: Optional[models.NewErrataRecord] = (
+            db_record.scalars().first()
+        )
+        if not db_record:
+            logging.info("Record with %s id doesn't exists", record_id)
+            return
+
+        logging.info("Record release %s has been started", record_id)
+        search_params = prepare_search_params(db_record)
+        logging.info("Retrieving platform packages from pulp")
+        pulp_packages = await load_platform_packages(
+            db_record.platform,
+            search_params,
+            for_release=True,
+        )
+        try:
+            repo_mapping, missing_pkg_names = get_albs_packages_from_record(
+                db_record,
+                pulp_packages,
+                force,
+            )
+        except Exception as exc:
+            db_record.release_status = ErrataReleaseStatus.FAILED
+            db_record.last_release_log = str(exc)
+            logging.exception("Cannot release %s record:", record_id)
+            await session.flush()
+            return
+
+        logging.info("Creating update record in pulp")
+        await process_errata_release_for_repos(
+            db_record,
+            repo_mapping,
+            session,
+            pulp,
+        )
+
+        logging.info("Generating OVAL data")
+        await add_oval_data_to_errata_record(session, db_record)
+
+        db_record.release_status = ErrataReleaseStatus.RELEASED
+        db_record.last_release_log = await get_release_logs(
+            record_id=record_id,
+            pulp_packages=pulp_packages,
+            session=session,
+            repo_mapping=repo_mapping,
+            db_record=db_record,
+            force_flag=force,
+            missing_pkg_names=missing_pkg_names,
+        )
+        await session.flush()
+        if settings.github_integration_enabled:
+            try:
+                await close_issues(record_ids=[db_record.id])
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
+                )
+    logging.info("Record %s successfully released", record_id)
+
+
 async def release_errata_record(record_id: str, platform_id: int, force: bool):
     pulp = PulpClient(
         settings.pulp_host,
@@ -1637,6 +1844,99 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
                 )
     logging.info("Record %s successfully released", record_id)
 
+
+async def bulk_new_errata_records_release(
+    records_ids: List[str], force: bool = False
+):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    release_tasks = []
+    repos_to_publish = []
+    async with open_async_session(key=get_async_db_key()) as session:
+        session: AsyncSession
+        await session.execute(
+            update(models.NewErrataRecord)
+            .where(models.NewErrataRecord.id.in_(records_ids))
+            .values(
+                release_status=ErrataReleaseStatus.IN_PROGRESS,
+                last_release_log=None,
+            )
+        )
+        await session.flush()
+
+        db_records = await session.execute(
+            generate_query_for_release(records_ids),
+        )
+        db_records: List[models.NewErrataRecord] = db_records.scalars().all()
+        if not db_records:
+            logging.info(
+                "Cannot find records with the following ids: %s",
+                records_ids,
+            )
+            return
+
+        logging.info(
+            "Starting bulk errata release, the following records are"
+            " locked: %s",
+            [rec.id for rec in db_records],
+        )
+        for db_record in db_records:
+            search_params = prepare_search_params(db_record)
+            logging.info("Retrieving platform packages from pulp")
+            pulp_packages = await load_platform_packages(
+                db_record.platform,
+                search_params,
+                for_release=True,
+            )
+            try:
+                repo_mapping, missing_pkg_names = get_albs_packages_from_record(
+                    db_record,
+                    pulp_packages,
+                    force,
+                )
+            except Exception as exc:
+                db_record.release_status = ErrataReleaseStatus.FAILED
+                db_record.last_release_log = str(exc)
+                logging.exception("Cannot release %s record:", record_id)
+
+            logging.info("Creating update record in pulp")
+            await process_errata_release_for_repos(
+                db_record,
+                repo_mapping,
+                session,
+                pulp,
+            )
+
+            logging.info("Generating OVAL data")
+            await add_oval_data_to_errata_record(session, db_record)
+
+            db_record.release_status = ErrataReleaseStatus.RELEASED
+            db_record.last_release_log = await get_release_logs(
+                record_id=record_id,
+                pulp_packages=pulp_packages,
+                session=session,
+                repo_mapping=repo_mapping,
+                db_record=db_record,
+                force_flag=force,
+                missing_pkg_names=missing_pkg_names,
+            )
+            logging.info("Record %s successfully released", record_id)
+
+        await session.flush()
+        if settings.github_integration_enabled:
+            try:
+                await close_issues(record_ids=[db_record.id])
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
+                )
+
+        # TODO: Maybe check whether all ids were released
+        logging.info("All records successfully released: %s", records_ids)
 
 async def bulk_errata_records_release(records_ids: List[str]):
     pulp = PulpClient(
