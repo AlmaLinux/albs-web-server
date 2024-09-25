@@ -161,6 +161,143 @@ async def get_oval_xml(
     return errata_records_to_oval(records, platform_name)
 
 
+async def get_new_oval_xml(
+    db: AsyncSession, platform_name: str, only_released: bool = False
+):
+    query = select(models.NewErrataRecord).options(
+        selectinload(models.NewErrataRecord.packages)
+        .selectinload(models.NewErrataPackage.albs_packages)
+        .selectinload(models.NewErrataToALBSPackage.build_artifact)
+        .selectinload(models.BuildTaskArtifact.build_task),
+        selectinload(models.NewErrataRecord.references).selectinload(
+            models.NewErrataReference.cve
+        ),
+    )
+
+    platform = await db.execute(
+        select(models.Platform).where(models.Platform.name == platform_name)
+    )
+    platform: models.Platform = platform.scalars().first()
+
+    if not platform:
+        return
+
+    query = query.filter(models.NewErrataRecord.platform_id == platform.id)
+
+    if only_released:
+        query = query.filter(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.RELEASED
+        )
+
+    records = (await db.execute(query)).scalars().all()
+    return new_errata_records_to_oval(records)
+
+
+def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
+    oval = Composer()
+    generator = Generator(
+        product_name="AlmaLinux OS Errata System",
+        product_version="0.0.1",
+        schema_version="5.10",
+        timestamp=datetime.datetime.utcnow(),
+    )
+    oval.generator = generator
+    objects = set()
+    for record in records:
+        title = record.oval_title
+        definition = Definition.from_dict({
+            "id": record.definition_id,
+            "version": record.definition_version,
+            "class": record.definition_class,
+            "metadata": {
+                "title": title,
+                "description": (
+                    record.description
+                    if record.description
+                    else record.original_description
+                ),
+                "advisory": {
+                    "from": record.contact_mail,
+                    "severity": record.severity.capitalize(),
+                    "rights": record.rights,
+                    "issued_date": record.issued_date,
+                    "updated_date": record.updated_date,
+                    "affected_cpe_list": record.affected_cpe,
+                    "bugzilla": [
+                        {
+                            "id": ref.ref_id,
+                            "href": ref.href,
+                            "title": ref.title,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.bugzilla
+                    ],
+                    "cves": [
+                        {
+                            "name": ref.ref_id,
+                            "public": datetime.datetime.strptime(
+                                # year-month-day
+                                ref.cve.public[:10],
+                                "%Y-%m-%d",
+                            ).date(),
+                            "href": ref.href,
+                            "impact": ref.cve.impact.capitalize(),
+                            "cwe": ref.cve.cwe,
+                            "cvss3": ref.cve.cvss3,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.cve and ref.cve
+                    ],
+                },
+                "references": [
+                    {
+                        "id": ref.ref_id,
+                        "url": ref.href,
+                        "source": (
+                            "RHSA"
+                            if ref.ref_type == ErrataReferenceType.rhsa
+                            else "ALSA"
+                        )
+                    }
+                    for ref in record.references
+                    if ref.ref_type in [
+                        ErrataReferenceType.self_ref, ErrataReferenceType.rhsa
+                    ]
+                ],
+            },
+            "criteria": record.criteria,
+        })
+        oval.append_object(definition)
+        if record.variables is not None:
+            for var in record.variables:
+                if var["id"] not in objects:
+                    objects.add(var["id"])
+                    oval.append_object(
+                        get_variable_cls_by_tag(var["type"]).from_dict(var)
+                )
+        for obj in record.objects:
+            if obj["id"] not in objects:
+                objects.add(obj["id"])
+                oval.append_object(
+                    get_object_cls_by_tag(obj["type"]).from_dict(obj)
+                )
+        for state in record.states:
+            if state["id"] not in objects:
+                objects.add(state["id"])
+                oval.append_object(
+                    get_state_cls_by_tag(state["type"]).from_dict(state)
+                )
+        for test in record.tests:
+            if test["id"] not in objects:
+                objects.add(test["id"])
+                oval.append_object(
+                    get_test_cls_by_tag(test["type"]).from_dict(test)
+                )
+    return oval.dump_to_string()
+
+
+
 def errata_records_to_oval(
     records: List[models.NewErrataRecord], platform_name: str
 ):

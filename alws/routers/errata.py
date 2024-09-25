@@ -71,6 +71,21 @@ async def get_errata_record(
     return errata_record
 
 
+@router.get("/get_new_oval_xml/", response_model=str)
+async def get_new_oval_xml(
+    platform_name: str,
+    only_released: bool = False,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    records = await errata_crud.get_new_oval_xml(db, platform_name, only_released)
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{platform_name} is not a valid platform",
+        )
+    return records
+
+
 @router.get("/get_oval_xml/", response_model=str)
 async def get_oval_xml(
     platform_name: str,
