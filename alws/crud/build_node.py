@@ -896,8 +896,9 @@ async def __update_built_srpm_url(
     # if SRPM built we need to download them
     # from pulp repos in next tasks
     if srpm_artifact and build_task.built_srpm_url is None:
+        platform_name = (await build_task.awaitable_attrs.platform).name
         srpm_url = "{}-src-{}-br/Packages/{}/{}".format(
-            build_task.platform.name,
+            platform_name,
             build_task.build_id,
             srpm_artifact.name[0].lower(),
             srpm_artifact.name,
@@ -1121,14 +1122,15 @@ async def build_done(
         # SourceRpm and BinaryRpm records, because it breaks package releases
         if status in (BuildTaskStatus.EXCLUDED, BuildTaskStatus.FAILED):
             continue
+        build = await build_task.awaitable_attrs.build
         if rpm.name.endswith(".src.rpm") and srpm is None:
             srpm = models.SourceRpm()
             srpm.artifact = rpm
-            srpm.build = build_task.build
+            srpm.build = build
         if not rpm.name.endswith(".src.rpm"):
             binary_rpm = models.BinaryRpm()
             binary_rpm.artifact = rpm
-            binary_rpm.build = build_task.build
+            binary_rpm.build = build
             binary_rpms.append(binary_rpm)
 
     # TODO: ALBS-705: Temporary solution that fixes integrity error with missing srpm,
