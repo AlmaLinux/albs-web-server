@@ -157,6 +157,17 @@ async def _start_build(build_id: int, build_request: build_schema.BuildCreate):
 
 async def _build_done(request: build_node_schema.BuildDone):
     async with open_async_session(key=get_async_db_key()) as db:
+        build_task = (
+            (
+                await db.execute(
+                    select(models.BuildTask).where(
+                        models.BuildTask.id == request.task_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
         try:
             await build_node_crud.safe_build_done(db, request)
         except Exception as e:
@@ -166,22 +177,13 @@ async def _build_done(request: build_node_schema.BuildDone):
                 request.task_id,
                 str(e),
             )
-            build_task = (
-                (
-                    await db.execute(
-                        select(models.BuildTask).where(
-                            models.BuildTask.id == request.task_id
-                        )
-                    )
-                )
-                .scalars()
-                .first()
-            )
             build_task.ts = datetime.datetime.utcnow()
             build_task.error = str(e)
             build_task.status = BuildTaskStatus.FAILED
             await build_node_crud.fast_fail_other_tasks_by_ref(db, build_task)
             await db.flush()
+
+        build_id = build_task.id
 
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
@@ -191,30 +193,44 @@ async def _build_done(request: build_node_schema.BuildDone):
             db, request.task_id
         )
 
-        if all_build_tasks_completed:
-            build_id = await _get_build_id(db, request.task_id)
-            cancel_testing = (
-                await db.execute(
-                    select(models.Build.cancel_testing).where(
-                        models.Build.id == build_id
-                    )
-                )
-            ).scalar()
-            if not cancel_testing:
-                try:
-                    await test.create_test_tasks_for_build_id(db, build_id)
-                except Exception as e:
-                    logger.exception(
-                        'Unable to create test tasks for build "%d". Error: %s',
-                        build_id,
-                        str(e),
-                    )
-            build_id = await _get_build_id(db, request.task_id)
-            await db.execute(
-                update(models.Build)
-                .where(models.Build.id == build_id)
-                .values(finished_at=datetime.datetime.utcnow())
+        if not all_build_tasks_completed:
+            return
+
+        # We need to unset srpm_url if all tasks failed
+        build_tasks = (await db.execute(
+            select(models.BuildTask).where(
+                models.BuildTask.build_id == build_id,
+                models.BuildTask.ref_id == build_task.ref_id,
+                models.BuildTask.arch != 'src',
             )
+        )).scalars().all()
+
+        failed_tasks = [task for task in build_tasks if task.status == BuildTaskStatus.FAILED]
+        if len(failed_tasks) == len(build_tasks):
+            for task in build_tasks:
+                task.build_srpm_url = None
+
+        cancel_testing = (
+            await db.execute(
+                select(models.Build.cancel_testing).where(
+                    models.Build.id == build_id
+                )
+            )
+        ).scalar()
+        if not cancel_testing:
+            try:
+                await test.create_test_tasks_for_build_id(db, build_id)
+            except Exception as e:
+                logger.exception(
+                    'Unable to create test tasks for build "%d". Error: %s',
+                    build_id,
+                    str(e),
+                )
+        await db.execute(
+            update(models.Build)
+            .where(models.Build.id == build_id)
+            .values(finished_at=datetime.datetime.utcnow())
+        )
 
 
 async def _get_build_id(db: AsyncSession, build_task_id: int) -> int:
