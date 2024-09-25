@@ -608,8 +608,6 @@ async def load_platform_packages(
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg.arch]
-            if pkg.arch == "noarch":
-                arch_list = platform.arch_list
             for arch in arch_list:
                 if not cache[short_pkg_name].get(arch):
                     cache[short_pkg_name][arch] = []
