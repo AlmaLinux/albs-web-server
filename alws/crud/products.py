@@ -105,7 +105,7 @@ async def create_product(
         )
     task_results = await asyncio.gather(*repo_tasks)
 
-    for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
+    for repo_name, repo_url, arch, pulp_href, export_path, is_debug in task_results:
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -114,6 +114,7 @@ async def create_product(
             type=arch,
             debug=is_debug,
             production=True,
+            export_path=export_path,
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)

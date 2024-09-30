@@ -11,6 +11,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Optional,
 )
 
 import aiohttp
@@ -18,6 +19,7 @@ from aiohttp.client_exceptions import ClientResponseError
 from aiohttp_retry import ExponentialRetry, RetryClient
 from fastapi import status
 
+from alws.config import settings
 from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
@@ -31,7 +33,7 @@ class PulpClient:
         host: str,
         username: str,
         password: str,
-        semaphore: asyncio.Semaphore = None,
+        semaphore: Optional[asyncio.Semaphore] = None,
     ):
         self.semaphore = semaphore
         self._host = host
@@ -875,8 +877,7 @@ class PulpClient:
         result = await self.request("GET", endpoint)
         if result["count"] > 0:
             return result["results"]
-        else:
-            return []
+        return []
 
     async def get_filesystem_exporter(self, fse_pulp_href: str):
         return await self.request("GET", fse_pulp_href)
@@ -1050,3 +1051,12 @@ class PulpClient:
                     exc.message += f": {str(response_json)}"
                 raise exc
             return response_json
+
+
+def get_pulp_client(semaphore: Optional[asyncio.Semaphore] = None) -> PulpClient:
+    return PulpClient(
+        host=settings.pulp_host,
+        username=settings.pulp_user,
+        password=settings.pulp_password,
+        semaphore=semaphore,
+    )

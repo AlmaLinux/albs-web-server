@@ -92,7 +92,7 @@ async def create_product_repo(
     platform_name: str,
     arch: str,
     is_debug: bool,
-) -> typing.Tuple[str, str, str, str, bool]:
+) -> typing.Tuple[str, str, str, str, str, bool]:
 
     debug_suffix = '-debug' if is_debug else ''
     repo_name = (
@@ -104,7 +104,8 @@ async def create_product_repo(
         create_publication=True,
         base_path_start='copr',
     )
-    return repo_name, repo_url, arch, repo_href, is_debug
+    export_path = f"{product_name}/{platform_name}/{'debug/' if is_debug else ''}{arch}/"
+    return repo_name, repo_url, arch, repo_href, export_path, is_debug
 
 
 async def create_product_sign_key_repo(
