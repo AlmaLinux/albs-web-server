@@ -19,7 +19,10 @@ def main():
             session.execute(
                 select(Product)
                 .where(Product.is_community.is_(True))
-                .options(joinedload(Product.repositories), joinedload(Product.platforms))
+                .options(
+                    joinedload(Product.repositories),
+                    joinedload(Product.platforms),
+                )
             )
             .scalars()
             .unique()
@@ -27,7 +30,9 @@ def main():
         ):
             if not product.repositories:
                 continue
-            platform_names = '|'.join((platform.name for platform in product.platforms))
+            platform_names = '|'.join(
+                (platform.name for platform in product.platforms)
+            )
             platform_pattern = re.compile(
                 rf'-({platform_names})-(\w+)(-debug|)-dr$',
                 flags=re.IGNORECASE,
@@ -39,9 +44,7 @@ def main():
                 if not regex_result:
                     continue
                 platform, *_ = regex_result.groups()
-                repo.export_path = (
-                    f"{product.name}/{platform}/{'debug/' if repo.debug else ''}{repo.arch}/"
-                )
+                repo.export_path = f"{product.name}/{platform}/{'debug/' if repo.debug else ''}{repo.arch}/"
 
 
 if __name__ == '__main__':

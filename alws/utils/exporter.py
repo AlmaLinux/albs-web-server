@@ -15,8 +15,14 @@ async def fs_export_repository(
     repository_ids: List[int],
     session: AsyncSession,
 ):
-    export_task = await repo_exporter.create_pulp_exporters_to_fs(session, repository_ids)
-    export_data = await repo_exporter.execute_pulp_exporters_to_fs(session, export_task)
+    export_task = await repo_exporter.create_pulp_exporters_to_fs(
+        session,
+        repository_ids,
+    )
+    export_data = await repo_exporter.execute_pulp_exporters_to_fs(
+        session,
+        export_task,
+    )
     export_paths = list(export_data.keys())
     for repo_elem, repo_data in export_data.items():
         repo_url = urllib.parse.urljoin(repo_data, 'repodata/')

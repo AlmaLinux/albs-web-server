@@ -48,7 +48,9 @@ from alws.utils.errata import (
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.osv import export_errata_to_osv
 
-KNOWN_SUBKEYS_CONFIG = os.path.abspath(os.path.expanduser("~/config/known_subkeys.json"))
+KNOWN_SUBKEYS_CONFIG = os.path.abspath(
+    os.path.expanduser("~/config/known_subkeys.json")
+)
 LOG_DIR = Path.home() / "exporter_logs"
 LOGGER_NAME = "packages-exporter"
 LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
@@ -142,7 +144,7 @@ class PackagesExporter(BasePulpExporter):
         self,
         repodata_cache_dir: str,
         logger_name: str = '',
-        log_file_path: Path = Path('/tmp/exporter.log'),
+        log_file_path: Path = Path('/srv/exporter.log'),
         verbose: bool = False,
         export_method: Literal['write', 'hardlink', 'symlink'] = "hardlink",
         export_path: str = settings.pulp_export_path,
@@ -162,7 +164,9 @@ class PackagesExporter(BasePulpExporter):
         }
         self.osv_dir = osv_dir
         self.current_user = self.get_current_username()
-        self.export_error_file = os.path.abspath(os.path.expanduser("~/export.err"))
+        self.export_error_file = os.path.abspath(
+            os.path.expanduser("~/export.err")
+        )
         if os.path.exists(self.export_error_file):
             os.remove(self.export_error_file)
         self.known_subkeys = {}
@@ -213,14 +217,22 @@ class PackagesExporter(BasePulpExporter):
             full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
         elif send_to == 'sign_server':
             headers = {}
-            full_url = urllib.parse.urljoin(settings.sign_server_api_url, endpoint)
+            full_url = urllib.parse.urljoin(
+                settings.sign_server_api_url,
+                endpoint,
+            )
         else:
-            raise ValueError("send_to parameter must be either web_server or sign_server")
+            raise ValueError(
+                "send_to parameter must be either web_server or sign_server"
+            )
 
         if user_headers:
             headers.update(user_headers)
 
-        async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
+        async with aiohttp.ClientSession(
+            headers=headers,
+            raise_for_status=True,
+        ) as session:
             async with session.request(
                 method,
                 full_url,
@@ -254,7 +266,11 @@ class PackagesExporter(BasePulpExporter):
         return await self.make_request("GET", endpoint)
 
     # TODO: Use direct function call to alws.crud.errata_get_oval_xml
-    async def get_oval_xml(self, platform_name: str, only_released: bool = False):
+    async def get_oval_xml(
+        self,
+        platform_name: str,
+        only_released: bool = False,
+    ):
         endpoint = "errata/get_oval_xml/"
         return await self.make_request(
             "GET",
@@ -271,7 +287,11 @@ class PackagesExporter(BasePulpExporter):
         dist_version = platform.split('-')[-1]
 
         errata_data = modern_cache['data']
-        sorted_errata_data = sorted(errata_data, key=lambda k: k['updated_date'], reverse=True)
+        sorted_errata_data = sorted(
+            errata_data,
+            key=lambda k: k['updated_date'],
+            reverse=True,
+        )
 
         feed = FeedGenerator()
         feed.title(f'Errata Feed for {dist_name}')
@@ -283,7 +303,10 @@ class PackagesExporter(BasePulpExporter):
             html_erratum_id = erratum['id'].replace(':', '-')
             title = f"[{erratum['id']}] {erratum['title']}"
             link = f"https://errata.almalinux.org/{dist_version}/{html_erratum_id}.html"
-            pub_date = datetime.fromtimestamp(erratum['updated_date'], timezone.utc)
+            pub_date = datetime.fromtimestamp(
+                erratum['updated_date'],
+                timezone.utc,
+            )
             content = f"<pre>{erratum['description']}</pre>"
 
             entry = feed.add_entry()
@@ -378,7 +401,11 @@ class PackagesExporter(BasePulpExporter):
                 elif result == SignStatusEnum.WRONG_SIGNATURE:
                     wrong_signature_packages.add(f"{package_path} {pkg_sig}")
 
-        if errored_packages or no_signature_packages or wrong_signature_packages:
+        if (
+            errored_packages
+            or no_signature_packages
+            or wrong_signature_packages
+        ):
             if not os.path.exists(self.export_error_file):
                 mode = "wt"
             else:
@@ -450,7 +477,9 @@ class PackagesExporter(BasePulpExporter):
                 else:
                     platforms_dict[db_platform.id].append(repo.export_path)
                     repo_ids_to_export.append(repo.id)
-            exported_paths = await self.export_repositories(list(set(repo_ids_to_export)))
+            exported_paths = await self.export_repositories(
+                list(set(repo_ids_to_export))
+            )
             final_export_paths.extend(exported_paths)
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = {}
@@ -467,7 +496,9 @@ class PackagesExporter(BasePulpExporter):
                     ] = repo_path
                 for future in as_completed(futures):
                     repo_path = futures[future]
-                    self.logger.info('%s packages signatures are checked', repo_path)
+                    self.logger.info(
+                        '%s packages signatures are checked', repo_path
+                    )
             self.logger.debug(
                 "All repositories exported in following paths:\n%s",
                 "\n".join((str(path) for path in exported_paths)),
@@ -478,14 +509,20 @@ class PackagesExporter(BasePulpExporter):
         self,
         release_id: int,
     ) -> Tuple[List[str], int]:
-        self.logger.info("Start exporting packages from release id=%s", release_id)
+        self.logger.info(
+            "Start exporting packages from release id=%s",
+            release_id,
+        )
         async with open_async_session(key=get_async_db_key()) as db:
             db_release = await db.execute(
                 select(models.Release).where(models.Release.id == release_id)
             )
         db_release = db_release.scalars().first()
 
-        repo_ids = jmespath.search("packages[].repositories[].id", db_release.plan)
+        repo_ids = jmespath.search(
+            "packages[].repositories[].id",
+            db_release.plan,
+        )
         repo_ids = list(set(repo_ids))
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
@@ -563,7 +600,9 @@ def extract_errata(repo_path: str) -> Tuple[List[dict], List[dict]]:
 
     for record in iter_updateinfo(errata_file):
         errata_records.append(extract_errata_metadata(record))
-        modern_errata_records.extend(extract_errata_metadata_modern(record)["data"])
+        modern_errata_records.extend(
+            extract_errata_metadata_modern(record)["data"]
+        )
     return errata_records, modern_errata_records
 
 
@@ -587,7 +626,10 @@ def export_errata_and_oval(
     exporter.logger.info("Starting export errata.json and oval.xml")
     errata_export_base_path = None
     try:
-        errata_export_base_path = os.path.join(settings.pulp_export_path, "errata")
+        errata_export_base_path = os.path.join(
+            settings.pulp_export_path,
+            "errata",
+        )
         if not os.path.exists(errata_export_base_path):
             os.mkdir(errata_export_base_path)
         for platform in platform_names:
@@ -604,12 +646,18 @@ def export_errata_and_oval(
                 generate_errata_page(record, html_path)
             exporter.logger.debug("HTML pages are generated")
             for item in errata_cache:
-                item["issued_date"] = {"$date": int(item["issued_date"].timestamp() * 1000)}
-                item["updated_date"] = {"$date": int(item["updated_date"].timestamp() * 1000)}
+                item["issued_date"] = {
+                    "$date": int(item["issued_date"].timestamp() * 1000)
+                }
+                item["updated_date"] = {
+                    "$date": int(item["updated_date"].timestamp() * 1000)
+                }
             exporter.logger.debug("Dumping errata data into JSON")
             with open(os.path.join(platform_path, "errata.json"), "w") as fd:
                 json.dump(errata_cache, fd)
-            with open(os.path.join(platform_path, "errata.full.json"), "w") as fd:
+            with open(
+                os.path.join(platform_path, "errata.full.json"), "w"
+            ) as fd:
                 json.dump(platform_errata_cache[platform]["modern_cache"], fd)
             exporter.logger.debug("JSON dump is done")
             exporter.logger.debug("Generating OVAL data")
@@ -646,7 +694,8 @@ def extract_errata_from_exported_paths(
     platform_errata_cache = {}
     with ThreadPoolExecutor(max_workers=4) as executor:
         errata_futures = {
-            executor.submit(extract_errata, exp_path): exp_path for exp_path in exported_paths
+            executor.submit(extract_errata, exp_path): exp_path
+            for exp_path in exported_paths
         }
 
         exporter.logger.debug("Starting errata extraction")
@@ -699,7 +748,9 @@ def main():
 
     db_sign_keys = sync(exporter.get_sign_keys())
     if args.release_id:
-        exported_paths, platform_id = sync(exporter.export_repos_from_release(args.release_id))
+        exported_paths, platform_id = sync(
+            exporter.export_repos_from_release(args.release_id)
+        )
         key_id_by_platform = next(
             (
                 sign_key["keyid"]
@@ -720,16 +771,26 @@ def main():
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         post_processing_futures = {
-            executor.submit(repo_post_processing, exporter, repo_path): repo_path
+            executor.submit(
+                repo_post_processing,
+                exporter,
+                repo_path,
+            ): repo_path
             for repo_path in exported_paths
         }
         for future in as_completed(post_processing_futures):
             repo_path = post_processing_futures[future]
             result = future.result()
             if result:
-                exporter.logger.info("%s post-processing is successful", repo_path)
+                exporter.logger.info(
+                    "%s post-processing is successful",
+                    repo_path,
+                )
             else:
-                exporter.logger.error("%s post-processing has failed", repo_path)
+                exporter.logger.error(
+                    "%s post-processing has failed",
+                    repo_path,
+                )
 
     platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
     platform_errata_cache = extract_errata_from_exported_paths(

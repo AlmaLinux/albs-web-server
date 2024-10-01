@@ -104,7 +104,9 @@ async def create_product_repo(
         create_publication=True,
         base_path_start='copr',
     )
-    export_path = f"{product_name}/{platform_name}/{'debug/' if is_debug else ''}{arch}/"
+    export_path = (
+        f"{product_name}/{platform_name}/{'debug/' if is_debug else ''}{arch}/"
+    )
     return repo_name, repo_url, arch, repo_href, export_path, is_debug
 
 

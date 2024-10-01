@@ -11,7 +11,10 @@ IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") is not None
 
 
 class TestPackagesExporter(BaseAsyncTestCase):
-    @pytest.mark.skipif(not settings.test_sign_key_id, reason="Testing sign key is not provided")
+    @pytest.mark.skipif(
+        not settings.test_sign_key_id,
+        reason="Testing sign key is not provided",
+    )
     async def test_repomd_signer(self, sign_key: SignKey, tmp_path):
         exporter = PackagesExporter(repodata_cache_dir='~/.cache/pulp_exporter')
         key_id = sign_key.keyid

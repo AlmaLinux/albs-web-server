@@ -80,7 +80,7 @@ class ProductExporter(BasePulpExporter):
         self,
         repodata_cache_dir: str,
         logger_name: str = 'product-exporter',
-        log_file_path: Path = Path('/tmp/product-exporter.log'),
+        log_file_path: Path = Path('/srv/product-exporter.log'),
         verbose: bool = False,
         export_method: Literal['write', 'hardlink', 'symlink'] = 'hardlink',
         export_path: str = settings.pulp_export_path,
@@ -100,7 +100,10 @@ class ProductExporter(BasePulpExporter):
         distr_name,
         arches: List[str],
     ):
-        self.logger.info('Start exporting packages from product: %s', product_name)
+        self.logger.info(
+            'Start exporting packages from product: %s',
+            product_name,
+        )
         query = (
             select(Product)
             .where(
@@ -110,17 +113,23 @@ class ProductExporter(BasePulpExporter):
             .options(
                 joinedload(
                     Product.repositories.and_(
-                        Repository.name.ilike(f'%{distr_name}%'), Repository.arch.in_(arches)
+                        Repository.name.ilike(f'%{distr_name}%'),
+                        Repository.arch.in_(arches),
                     )
                 )
             )
         )
         async with get_async_db_session() as session:
             product = (await session.execute(query)).scalars().first()
-        return await self.export_repositories(list({repo.id for repo in product.repositories}))
+        return await self.export_repositories(
+            list({repo.id for repo in product.repositories})
+        )
 
 
-async def repo_post_processing(exporter: ProductExporter, repo_path: str) -> bool:
+async def repo_post_processing(
+    exporter: ProductExporter,
+    repo_path: str,
+) -> bool:
     async with SEMAPHORE:
         result = False
         try:
@@ -144,7 +153,9 @@ async def main():
         distr_name=args.distribution,
         arches=args.arches,
     )
-    await asyncio.gather(*(repo_post_processing(exporter, path) for path in exported_paths))
+    await asyncio.gather(
+        *(repo_post_processing(exporter, path) for path in exported_paths)
+    )
 
 
 if __name__ == '__main__':

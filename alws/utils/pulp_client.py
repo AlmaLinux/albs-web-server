@@ -368,9 +368,7 @@ class PulpClient:
             with open(file_path, "rb") as f:
                 for i in range(chunks):
                     chunk = io.BytesIO(f.read(chunk_size))
-                    chunk.name = (
-                        f'{file_path.strip("/").replace("/", "_")}_{i}'
-                    )
+                    chunk.name = f'{file_path.strip("/").replace("/", "_")}_{i}'
                     payload = {"file": chunk}
                     if chunk_size >= file_size:
                         stop = file_size - 1
@@ -386,9 +384,7 @@ class PulpClient:
                     )
                     start += chunk_size
         except Exception:
-            logging.exception(
-                "Exception during the file upload", exc_info=True
-            )
+            logging.exception("Exception during the file upload", exc_info=True)
             await self.request("DELETE", upload_href, raw=True)
         else:
             task = await self.request(
@@ -1053,7 +1049,9 @@ class PulpClient:
             return response_json
 
 
-def get_pulp_client(semaphore: Optional[asyncio.Semaphore] = None) -> PulpClient:
+def get_pulp_client(
+    semaphore: Optional[asyncio.Semaphore] = None,
+) -> PulpClient:
     return PulpClient(
         host=settings.pulp_host,
         username=settings.pulp_user,

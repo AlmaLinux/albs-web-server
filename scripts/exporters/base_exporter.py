@@ -22,7 +22,7 @@ class BasePulpExporter:
         self,
         repodata_cache_dir: str,
         logger_name: str = '',
-        log_file_path: Path = Path('/tmp/exporter.log'),
+        log_file_path: Path = Path('/srv/exporter.log'),
         verbose: bool = False,
         export_method: Literal['write', 'hardlink', 'symlink'] = 'hardlink',
         export_path: str = settings.pulp_export_path,
@@ -32,7 +32,9 @@ class BasePulpExporter:
         self.export_path = export_path
         self.createrepo_c = local["createrepo_c"]
 
-        self.repodata_cache_dir = Path(repodata_cache_dir).expanduser().absolute()
+        self.repodata_cache_dir = (
+            Path(repodata_cache_dir).expanduser().absolute()
+        )
         self.checksums_cache_dir = self.repodata_cache_dir.joinpath('checksums')
         for dir_path in (self.repodata_cache_dir, self.checksums_cache_dir):
             if dir_path.exists():
@@ -52,7 +54,9 @@ class BasePulpExporter:
         )
 
     def regenerate_repo_metadata(self, repo_path: str):
-        partial_path = re.sub(str(settings.pulp_export_path), "", str(repo_path)).strip("/")
+        partial_path = re.sub(
+            str(settings.pulp_export_path), "", str(repo_path)
+        ).strip("/")
         repodata_path = Path(repo_path, "repodata")
         repo_repodata_cache = self.repodata_cache_dir.joinpath(partial_path)
         cache_repodata_dir = repo_repodata_cache.joinpath("repodata")
@@ -86,20 +90,26 @@ class BasePulpExporter:
         get_publications: bool = False,
     ):
         async def get_exporter_data(repository: Repository) -> Tuple[str, dict]:
-            export_path = str(Path(self.export_path, repository.export_path, "Packages"))
+            export_path = str(
+                Path(self.export_path, repository.export_path, "Packages")
+            )
             exporter_name = (
                 f"{repository.name}-{repository.arch}-debug"
                 if repository.debug
                 else f"{repository.name}-{repository.arch}"
             )
-            fs_exporter_href = await self.pulp_client.create_filesystem_exporter(
-                exporter_name,
-                export_path,
-                export_method=self.export_method,
+            fs_exporter_href = (
+                await self.pulp_client.create_filesystem_exporter(
+                    exporter_name,
+                    export_path,
+                    export_method=self.export_method,
+                )
             )
 
-            repo_latest_version = await self.pulp_client.get_repo_latest_version(
-                repository.pulp_href
+            repo_latest_version = (
+                await self.pulp_client.get_repo_latest_version(
+                    repository.pulp_href
+                )
             )
             if not repo_latest_version:
                 raise ValueError('cannot find latest repo version')
@@ -126,7 +136,9 @@ class BasePulpExporter:
             result = await session.execute(query)
             repositories = list(result.scalars().all())
 
-        results = await asyncio.gather(*(get_exporter_data(repo) for repo in repositories))
+        results = await asyncio.gather(
+            *(get_exporter_data(repo) for repo in repositories)
+        )
 
         return list(dict(results).values())
 
@@ -148,7 +160,9 @@ class BasePulpExporter:
         href = exporter["exporter_href"]
         repository_version = exporter["repo_latest_version"]
         try:
-            await self.pulp_client.export_to_filesystem(href, repository_version)
+            await self.pulp_client.export_to_filesystem(
+                href, repository_version
+            )
         except Exception:
             self.logger.exception(
                 "Cannot export repository via %s",
@@ -178,5 +192,7 @@ class BasePulpExporter:
 
     async def export_repositories(self, repo_ids: List[int]) -> List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
-        results = await asyncio.gather(*(self._export_repository(e) for e in exporters))
+        results = await asyncio.gather(
+            *(self._export_repository(e) for e in exporters)
+        )
         return [path for path in results if path]
