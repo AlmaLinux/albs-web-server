@@ -31,7 +31,7 @@ def main():
             if not product.repositories:
                 continue
             platform_names = '|'.join(
-                (platform.name for platform in product.platforms)
+                platform.name for platform in product.platforms
             )
             platform_pattern = re.compile(
                 rf'-({platform_names})-(\w+)(-debug|)-dr$',
