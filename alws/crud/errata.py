@@ -205,6 +205,12 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
     oval.generator = generator
     objects = set()
     for record in records:
+        if not record.criteria:
+            logging.warning(
+                "Skipping OVAL XML generation of %s. Reason: Missing OVAL data",
+                record.id
+            )
+            continue
         title = record.oval_title
         definition = Definition.from_dict({
             "id": record.definition_id,
@@ -269,12 +275,11 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
             "criteria": record.criteria,
         })
         oval.append_object(definition)
-        if record.variables is not None:
-            for var in record.variables:
-                if var["id"] not in objects:
-                    objects.add(var["id"])
-                    oval.append_object(
-                        get_variable_cls_by_tag(var["type"]).from_dict(var)
+        for test in record.tests:
+            if test["id"] not in objects:
+                objects.add(test["id"])
+                oval.append_object(
+                    get_test_cls_by_tag(test["type"]).from_dict(test)
                 )
         for obj in record.objects:
             if obj["id"] not in objects:
@@ -288,11 +293,12 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                 oval.append_object(
                     get_state_cls_by_tag(state["type"]).from_dict(state)
                 )
-        for test in record.tests:
-            if test["id"] not in objects:
-                objects.add(test["id"])
-                oval.append_object(
-                    get_test_cls_by_tag(test["type"]).from_dict(test)
+        if record.variables is not None:
+            for var in record.variables:
+                if var["id"] not in objects:
+                    objects.add(var["id"])
+                    oval.append_object(
+                        get_variable_cls_by_tag(var["type"]).from_dict(var)
                 )
     return oval.dump_to_string()
 
@@ -1810,6 +1816,15 @@ async def add_oval_data_to_errata_record(
         if dev_module in db_record.original_title:
             devel_module = Module(dev_module)
 
+    # TODO: Receive oval cache as argument in order for bulk_errata_release
+    # to update it with generated oval refs
+    albs_oval_cache = await get_albs_oval_cache(session, db_record.platform.name)
+    oval_ref_ids = {
+        "object": [ref["id"] for ref in albs_oval_cache["objects"]],
+        "state": [ref["id"] for ref in albs_oval_cache["states"]],
+        "test": [ref["id"] for ref in albs_oval_cache["tests"]],
+    }
+
     data_generator = OvalDataGenerator(
         db_record.id,
         Platform(db_record.platform.name),
@@ -1817,24 +1832,31 @@ async def add_oval_data_to_errata_record(
         # TODO: Make the logger optional in liboval
         logging.getLogger(),
         settings.beholder_host,
+        oval_ref_ids,
         module=module,
         devel_module=devel_module,
     )
 
-    albs_oval_cache = await get_albs_oval_cache(session, db_record.platform.name)
-
     # Right now, variables are not being generated, so it's a no-op
     #errata.variables = data_generator.generate_variables()
-    db_record.objects = data_generator.generate_objects(
+    objects = data_generator.generate_objects(
         albs_oval_cache["objects"]
     )
-    db_record.states = data_generator.generate_states(
+    db_record.objects = objects
+
+    states = data_generator.generate_states(
         albs_oval_cache["states"]
     )
-    db_record.tests = data_generator.generate_tests(
+    db_record.states = states
+
+    tests = data_generator.generate_tests(
         albs_oval_cache["tests"]
     )
+    db_record.tests = tests
+
     db_record.criteria = data_generator.generate_criteria()
+
+    return (objects, states, tests)
 
 
 
