@@ -5,15 +5,13 @@ import logging
 import os
 import pwd
 import re
-import shutil
 import sys
-import tempfile
-import typing
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from time import time
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import aiohttp
 import jmespath
@@ -25,10 +23,11 @@ from fastapi_sqla import open_async_session
 
 # Required for generating RSS
 from feedgen.feed import FeedGenerator
-from plumbum import local
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from syncer import sync
+
+from scripts.exporters.base_exporter import BasePulpExporter
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -46,10 +45,8 @@ from alws.utils.errata import (
     merge_errata_records,
     merge_errata_records_modern,
 )
-from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.osv import export_errata_to_osv
-from alws.utils.pulp_client import PulpClient
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(
     os.path.expanduser("~/config/known_subkeys.json")
@@ -142,34 +139,29 @@ def init_sentry():
     )
 
 
-class Exporter:
+class PackagesExporter(BasePulpExporter):
     def __init__(
         self,
-        pulp_client: PulpClient,
         repodata_cache_dir: str,
+        logger_name: str = '',
+        log_file_path: Path = Path('/srv/exporter.log'),
         verbose: bool = False,
-        export_method: str = "hardlink",
+        export_method: Literal['write', 'hardlink', 'symlink'] = "hardlink",
+        export_path: str = settings.pulp_export_path,
         osv_dir: str = settings.pulp_export_path,
     ):
-        os.makedirs(LOG_DIR, exist_ok=True)
-        logging.basicConfig(
-            format="%(asctime)s %(levelname)-8s %(message)s",
-            level=logging.DEBUG if verbose else logging.INFO,
-            datefmt="%Y-%m-%d %H:%M:%S",
-            handlers=[
-                logging.FileHandler(filename=LOG_FILE, mode="a"),
-                logging.StreamHandler(stream=sys.stdout),
-            ],
+        super().__init__(
+            repodata_cache_dir=repodata_cache_dir,
+            logger_name=logger_name,
+            log_file_path=log_file_path,
+            verbose=verbose,
+            export_method=export_method,
+            export_path=export_path,
         )
 
-        self._temp_dir = tempfile.gettempdir()
-        self.logger = logging.getLogger(LOGGER_NAME)
-        self.pulp_client = pulp_client
-        self.createrepo_c = local["createrepo_c"]
         self.web_server_headers = {
             "Authorization": f"Bearer {settings.albs_jwt_token}",
         }
-        self.export_method = export_method
         self.osv_dir = osv_dir
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
@@ -177,16 +169,6 @@ class Exporter:
         )
         if os.path.exists(self.export_error_file):
             os.remove(self.export_error_file)
-        self.repodata_cache_dir = os.path.abspath(
-            os.path.expanduser(repodata_cache_dir)
-        )
-        self.checksums_cache_dir = os.path.join(
-            self.repodata_cache_dir, "checksums"
-        )
-        if not os.path.exists(self.repodata_cache_dir):
-            os.makedirs(self.repodata_cache_dir)
-        if not os.path.exists(self.checksums_cache_dir):
-            os.makedirs(self.checksums_cache_dir)
         self.known_subkeys = {}
         if os.path.exists(KNOWN_SUBKEYS_CONFIG):
             with open(KNOWN_SUBKEYS_CONFIG, "rt") as f:
@@ -198,7 +180,7 @@ class Exporter:
 
     def process_osv_data(
         self,
-        errata_cache: typing.List[typing.Dict[str, typing.Any]],
+        errata_cache: List[Dict[str, Any]],
         platform: str,
     ):
         osv_distr_mapping = {
@@ -224,19 +206,20 @@ class Exporter:
         self,
         method: str,
         endpoint: str,
-        params: dict = None,
-        body: dict = None,
-        user_headers: dict = None,
-        data: typing.Optional[list] = None,
-        send_to: typing.Literal['web_server', 'sign_server'] = 'web_server',
-    ):
+        params: Optional[dict] = None,
+        body: Optional[dict] = None,
+        user_headers: Optional[dict] = None,
+        data: Optional[list] = None,
+        send_to: Literal['web_server', 'sign_server'] = 'web_server',
+    ) -> Union[dict, str]:
         if send_to == 'web_server':
             headers = {**self.web_server_headers}
             full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
         elif send_to == 'sign_server':
             headers = {}
             full_url = urllib.parse.urljoin(
-                settings.sign_server_api_url, endpoint
+                settings.sign_server_api_url,
+                endpoint,
             )
         else:
             raise ValueError(
@@ -247,78 +230,19 @@ class Exporter:
             headers.update(user_headers)
 
         async with aiohttp.ClientSession(
-            headers=headers, raise_for_status=True
+            headers=headers,
+            raise_for_status=True,
         ) as session:
             async with session.request(
-                method, full_url, json=body, params=params, data=data
+                method,
+                full_url,
+                json=body,
+                params=params,
+                data=data,
             ) as response:
                 if response.headers['Content-Type'] == 'application/json':
                     return await response.json()
                 return await response.text()
-
-    async def create_filesystem_exporters(
-        self,
-        repository_ids: typing.List[int],
-        get_publications: bool = False,
-    ):
-        async def get_exporter_data(
-            repository: models.Repository,
-        ) -> typing.Tuple[str, dict]:
-            export_path = str(
-                Path(
-                    settings.pulp_export_path,
-                    repository.export_path,
-                    "Packages",
-                )
-            )
-            exporter_name = (
-                f"{repository.name}-{repository.arch}-debug"
-                if repository.debug
-                else f"{repository.name}-{repository.arch}"
-            )
-            fs_exporter_href = (
-                await self.pulp_client.create_filesystem_exporter(
-                    exporter_name,
-                    export_path,
-                    export_method=self.export_method,
-                )
-            )
-
-            repo_latest_version = (
-                await self.pulp_client.get_repo_latest_version(
-                    repository.pulp_href
-                )
-            )
-            repo_exporter_dict = {
-                "repo_id": repository.id,
-                "repo_url": repository.url,
-                "repo_latest_version": repo_latest_version,
-                "exporter_name": exporter_name,
-                "export_path": export_path,
-                "exporter_href": fs_exporter_href,
-            }
-            if get_publications:
-                publications = await self.pulp_client.get_rpm_publications(
-                    repository_version_href=repo_latest_version,
-                    include_fields=["pulp_href"],
-                )
-                if publications:
-                    publication_href = publications[0].get("pulp_href")
-                    repo_exporter_dict["publication_href"] = publication_href
-            return fs_exporter_href, repo_exporter_dict
-
-        async with open_async_session(key=get_async_db_key()) as db:
-            query = select(models.Repository).where(
-                models.Repository.id.in_(repository_ids)
-            )
-            result = await db.execute(query)
-            repositories = list(result.scalars().all())
-
-        results = await asyncio.gather(
-            *(get_exporter_data(repo) for repo in repositories)
-        )
-
-        return list(dict(results).values())
 
     async def sign_repomd_xml(self, path_to_file: str, key_id: str, token: str):
         endpoint = "sign"
@@ -343,7 +267,9 @@ class Exporter:
 
     # TODO: Use direct function call to alws.crud.errata_get_oval_xml
     async def get_oval_xml(
-        self, platform_name: str, only_released: bool = False
+        self,
+        platform_name: str,
+        only_released: bool = False,
     ):
         endpoint = "errata/get_oval_xml/"
         return await self.make_request(
@@ -362,7 +288,9 @@ class Exporter:
 
         errata_data = modern_cache['data']
         sorted_errata_data = sorted(
-            errata_data, key=lambda k: k['updated_date'], reverse=True
+            errata_data,
+            key=lambda k: k['updated_date'],
+            reverse=True,
         )
 
         feed = FeedGenerator()
@@ -375,8 +303,9 @@ class Exporter:
             html_erratum_id = erratum['id'].replace(':', '-')
             title = f"[{erratum['id']}] {erratum['title']}"
             link = f"https://errata.almalinux.org/{dist_version}/{html_erratum_id}.html"
-            pubDate = datetime.fromtimestamp(
-                erratum['updated_date'], timezone.utc
+            pub_date = datetime.fromtimestamp(
+                erratum['updated_date'],
+                timezone.utc,
             )
             content = f"<pre>{erratum['description']}</pre>"
 
@@ -384,65 +313,9 @@ class Exporter:
             entry.title(title)
             entry.link(href=link)
             entry.content(content, type='CDATA')
-            entry.pubDate(pubDate)
+            entry.pubDate(pub_date)
 
         return feed.rss_str(pretty=True).decode('utf-8')
-
-    async def download_repodata(self, repodata_path, repodata_url):
-        file_links = await get_repodata_file_links(repodata_url)
-        for link in file_links:
-            file_name = os.path.basename(link)
-            self.logger.info("Downloading repodata from %s", link)
-            await download_file(link, os.path.join(repodata_path, file_name))
-
-    async def _export_repository(self, exporter: dict) -> typing.Optional[str]:
-        self.logger.info(
-            "Exporting repository using following data: %s",
-            str(exporter),
-        )
-        export_path = exporter["export_path"]
-        href = exporter["exporter_href"]
-        repository_version = exporter["repo_latest_version"]
-        try:
-            await self.pulp_client.export_to_filesystem(
-                href, repository_version
-            )
-        except Exception:
-            self.logger.exception(
-                "Cannot export repository via %s",
-                str(exporter),
-            )
-            return
-        parent_dir = str(Path(export_path).parent)
-        if not os.path.exists(parent_dir):
-            self.logger.info(
-                "Repository %s directory is absent",
-                exporter["exporter_name"],
-            )
-            return
-
-        repodata_path = os.path.abspath(os.path.join(parent_dir, "repodata"))
-        repodata_url = urllib.parse.urljoin(exporter["repo_url"], "repodata/")
-        if not os.path.exists(repodata_path):
-            os.makedirs(repodata_path)
-        else:
-            shutil.rmtree(repodata_path)
-            os.makedirs(repodata_path)
-        self.logger.info('Downloading repodata from %s', repodata_url)
-        try:
-            await self.download_repodata(repodata_path, repodata_url)
-        except Exception as e:
-            self.logger.exception("Cannot download repodata file: %s", str(e))
-
-        return export_path
-
-    async def export_repositories(self, repo_ids: list) -> typing.List[str]:
-        exporters = await self.create_filesystem_exporters(repo_ids)
-        results = await asyncio.gather(
-            *(self._export_repository(e) for e in exporters)
-        )
-        exported_paths = [i for i in results if i]
-        return exported_paths
 
     async def repomd_signer(self, repodata_path, key_id, token):
         string_repodata_path = str(repodata_path)
@@ -476,13 +349,14 @@ class Exporter:
         ts = rpm.TransactionSet()
         ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
 
-        def check(pkg_path: str) -> typing.Tuple[SignStatusEnum, str]:
+        def check(pkg_path: str) -> Tuple[SignStatusEnum, str]:
             if not os.path.exists(pkg_path):
                 return SignStatusEnum.READ_ERROR, ""
 
             with open(pkg_path, "rb") as fd:
                 header = ts.hdrFromFdno(fd)
                 signature = header[rpm.RPMTAG_SIGGPG]
+                sig = ""
                 if not signature:
                     signature = header[rpm.RPMTAG_SIGPGP]
                 if not signature:
@@ -554,10 +428,10 @@ class Exporter:
 
     async def export_repos_from_pulp(
         self,
-        platform_names: typing.List[str] = None,
-        repo_ids: typing.List[int] = None,
-        arches: typing.List[str] = None,
-    ) -> typing.Tuple[typing.List[str], typing.Dict[int, str]]:
+        platform_names: Optional[List[str]] = None,
+        repo_ids: Optional[List[int]] = None,
+        arches: Optional[List[str]] = None,
+    ) -> Tuple[List[str], Dict[int, str]]:
         platforms_dict = {}
         msg, msg_values = (
             "Start exporting packages for following platforms:\n%s",
@@ -634,9 +508,10 @@ class Exporter:
     async def export_repos_from_release(
         self,
         release_id: int,
-    ) -> typing.Tuple[typing.List[str], int]:
+    ) -> Tuple[List[str], int]:
         self.logger.info(
-            "Start exporting packages from release id=%s", release_id
+            "Start exporting packages from release id=%s",
+            release_id,
         )
         async with open_async_session(key=get_async_db_key()) as db:
             db_release = await db.execute(
@@ -645,44 +520,12 @@ class Exporter:
         db_release = db_release.scalars().first()
 
         repo_ids = jmespath.search(
-            "packages[].repositories[].id", db_release.plan
+            "packages[].repositories[].id",
+            db_release.plan,
         )
         repo_ids = list(set(repo_ids))
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
-
-    def regenerate_repo_metadata(self, repo_path):
-        partial_path = re.sub(
-            str(settings.pulp_export_path), "", str(repo_path)
-        ).strip("/")
-        repodata_path = os.path.join(repo_path, "repodata")
-        repo_repodata_cache = os.path.join(
-            self.repodata_cache_dir, partial_path
-        )
-        cache_repodata_dir = os.path.join(repo_repodata_cache, "repodata")
-        self.logger.info('Repodata cache dir: %s', cache_repodata_dir)
-        args = [
-            "--update",
-            "--keep-all-metadata",
-            "--cachedir",
-            self.checksums_cache_dir,
-        ]
-        if os.path.exists(repo_repodata_cache):
-            args.extend(["--update-md-path", cache_repodata_dir])
-        args.append(repo_path)
-        self.logger.info('Starting createrepo_c')
-        _, stdout, _ = self.createrepo_c.run(args=args)
-        self.logger.info(stdout)
-        self.logger.info('createrepo_c is finished')
-        # Cache newly generated repodata into folder for future re-use
-        if not os.path.exists(repo_repodata_cache):
-            os.makedirs(repo_repodata_cache)
-        else:
-            # Remove previous repodata before copying new ones
-            if os.path.exists(cache_repodata_dir):
-                shutil.rmtree(cache_repodata_dir)
-
-        shutil.copytree(repodata_path, cache_repodata_dir)
 
     async def get_sign_server_token(self) -> str:
         body = {
@@ -692,17 +535,20 @@ class Exporter:
         endpoint = 'token'
         method = 'POST'
         response = await self.make_request(
-            method=method, endpoint=endpoint, body=body, send_to='sign_server'
+            method=method,
+            endpoint=endpoint,
+            body=body,
+            send_to='sign_server',
         )
         return response['token']
 
 
 async def sign_repodata(
-    exporter: Exporter,
-    exported_paths: typing.List[str],
+    exporter: PackagesExporter,
+    exported_paths: List[str],
     platforms_dict: dict,
     db_sign_keys: list,
-    key_id_by_platform: str = None,
+    key_id_by_platform: Optional[str] = None,
 ):
     repodata_paths = []
 
@@ -737,9 +583,9 @@ async def sign_repodata(
     await asyncio.gather(*tasks)
 
 
-def extract_errata(repo_path: str):
-    errata_records = []
-    modern_errata_records = []
+def extract_errata(repo_path: str) -> Tuple[List[dict], List[dict]]:
+    errata_records: List[dict] = []
+    modern_errata_records: List[dict] = []
     if not os.path.exists(repo_path):
         logging.debug("%s is missing, skipping", repo_path)
         return errata_records, modern_errata_records
@@ -760,91 +606,92 @@ def extract_errata(repo_path: str):
     return errata_records, modern_errata_records
 
 
-def repo_post_processing(exporter: Exporter, repo_path: str):
-    path = Path(repo_path)
-    parent_dir = path.parent
-
+def repo_post_processing(exporter: PackagesExporter, repo_path: str) -> bool:
     result = True
     try:
-        exporter.regenerate_repo_metadata(parent_dir)
+        exporter.regenerate_repo_metadata(str(Path(repo_path).parent))
     except Exception as e:
         exporter.logger.exception("Post-processing failed: %s", str(e))
         result = False
-
     return result
 
 
-def main():
-    args = parse_args()
-    init_sentry()
-    sync(setup_all())
-
-    platforms_dict = {}
-    key_id_by_platform = None
-    exported_paths = []
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    exporter = Exporter(
-        pulp_client,
-        args.cache_dir,
-        verbose=args.verbose,
-        export_method=args.export_method,
-        pulp_user=args.pulp_user,
-        pulp_group=args.pulp_group,
-        osv_dir=args.osv_dir,
-    )
-
-    db_sign_keys = sync(exporter.get_sign_keys())
-    if args.release_id:
-        release_id = args.release_id
-        exported_paths, platform_id = sync(
-            exporter.export_repos_from_release(release_id)
+def export_errata_and_oval(
+    exporter: PackagesExporter,
+    platform_errata_cache: dict,
+    platform_names: Optional[List[str]] = None,
+):
+    if not platform_names:
+        return
+    exporter.logger.info("Starting export errata.json and oval.xml")
+    errata_export_base_path = None
+    try:
+        errata_export_base_path = os.path.join(
+            settings.pulp_export_path,
+            "errata",
         )
-        key_id_by_platform = next(
-            (
-                sign_key["keyid"]
-                for sign_key in db_sign_keys
-                if sign_key["platform_id"] == platform_id
-            ),
-            None,
-        )
-
-    if args.platform_names or args.repo_ids:
-        platform_names = args.platform_names
-        repo_ids = args.repo_ids
-        exported_paths, platforms_dict = sync(
-            exporter.export_repos_from_pulp(
-                platform_names=platform_names,
-                arches=args.arches,
-                repo_ids=repo_ids,
+        if not os.path.exists(errata_export_base_path):
+            os.mkdir(errata_export_base_path)
+        for platform in platform_names:
+            platform_path = os.path.join(errata_export_base_path, platform)
+            if not os.path.exists(platform_path):
+                os.mkdir(platform_path)
+            html_path = os.path.join(platform_path, "html")
+            if not os.path.exists(html_path):
+                os.mkdir(html_path)
+            errata_cache = platform_errata_cache[platform]["cache"]
+            exporter.process_osv_data(errata_cache, platform)
+            exporter.logger.debug("Generating HTML errata pages")
+            for record in errata_cache:
+                generate_errata_page(record, html_path)
+            exporter.logger.debug("HTML pages are generated")
+            for item in errata_cache:
+                item["issued_date"] = {
+                    "$date": int(item["issued_date"].timestamp() * 1000)
+                }
+                item["updated_date"] = {
+                    "$date": int(item["updated_date"].timestamp() * 1000)
+                }
+            exporter.logger.debug("Dumping errata data into JSON")
+            with open(os.path.join(platform_path, "errata.json"), "w") as fd:
+                json.dump(errata_cache, fd)
+            with open(
+                os.path.join(platform_path, "errata.full.json"), "w"
+            ) as fd:
+                json.dump(platform_errata_cache[platform]["modern_cache"], fd)
+            exporter.logger.debug("JSON dump is done")
+            exporter.logger.debug("Generating OVAL data")
+            oval = sync(
+                # aiohttp is not able to send booleans in params.
+                # For this reason, we're passing only_released as a string,
+                # which in turn will be converted into boolean on backend
+                # side by fastapi/pydantic.
+                exporter.get_oval_xml(platform, only_released=True)
             )
-        )
+            with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
+                fd.write(oval)
+            exporter.logger.debug("OVAL is generated")
 
+            exporter.logger.debug("Generating RSS feed for %s", platform)
+            rss = sync(
+                exporter.generate_rss(
+                    platform,
+                    platform_errata_cache[platform]["modern_cache"],
+                )
+            )
+            with open(os.path.join(platform_path, "errata.rss"), "w") as fd:
+                fd.write(rss)
+            exporter.logger.debug("RSS generation for %s is done", platform)
+    except Exception:
+        exporter.logger.exception("Error happened:\n")
+
+
+def extract_errata_from_exported_paths(
+    exporter: PackagesExporter,
+    exported_paths: List[str],
+    platform_regex: re.Pattern,
+) -> dict:
     platform_errata_cache = {}
-    platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        post_processing_futures = {
-            executor.submit(
-                repo_post_processing, exporter, repo_path
-            ): repo_path
-            for repo_path in exported_paths
-        }
-        for future in as_completed(post_processing_futures):
-            repo_path = post_processing_futures[future]
-            result = future.result()
-            if result:
-                exporter.logger.info(
-                    "%s post-processing is successful", repo_path
-                )
-            else:
-                exporter.logger.error(
-                    "%s post-processing has failed", repo_path
-                )
-
     with ThreadPoolExecutor(max_workers=4) as executor:
         errata_futures = {
             executor.submit(extract_errata, exp_path): exp_path
@@ -879,6 +726,78 @@ def main():
                     {"data": modern_errata_records},
                 )
         exporter.logger.debug("Errata extraction completed")
+    return platform_errata_cache
+
+
+def main():
+    args = parse_args()
+    init_sentry()
+    sync(setup_all())
+
+    platforms_dict = {}
+    key_id_by_platform = None
+    exported_paths = []
+    exporter = PackagesExporter(
+        repodata_cache_dir=args.cache_dir,
+        logger_name=LOGGER_NAME,
+        log_file_path=LOG_FILE,
+        verbose=args.verbose,
+        export_method=args.export_method,
+        osv_dir=args.osv_dir,
+    )
+
+    db_sign_keys = sync(exporter.get_sign_keys())
+    if args.release_id:
+        exported_paths, platform_id = sync(
+            exporter.export_repos_from_release(args.release_id)
+        )
+        key_id_by_platform = next(
+            (
+                sign_key["keyid"]
+                for sign_key in db_sign_keys
+                if sign_key["platform_id"] == platform_id
+            ),
+            None,
+        )
+
+    if args.platform_names or args.repo_ids:
+        exported_paths, platforms_dict = sync(
+            exporter.export_repos_from_pulp(
+                platform_names=args.platform_names,
+                arches=args.arches,
+                repo_ids=args.repo_ids,
+            )
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        post_processing_futures = {
+            executor.submit(
+                repo_post_processing,
+                exporter,
+                repo_path,
+            ): repo_path
+            for repo_path in exported_paths
+        }
+        for future in as_completed(post_processing_futures):
+            repo_path = post_processing_futures[future]
+            result = future.result()
+            if result:
+                exporter.logger.info(
+                    "%s post-processing is successful",
+                    repo_path,
+                )
+            else:
+                exporter.logger.error(
+                    "%s post-processing has failed",
+                    repo_path,
+                )
+
+    platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
+    platform_errata_cache = extract_errata_from_exported_paths(
+        exporter=exporter,
+        exported_paths=exported_paths,
+        platform_regex=platform_regex,
+    )
 
     sync(
         sign_repodata(
@@ -890,71 +809,11 @@ def main():
         )
     )
 
-    if args.platform_names:
-        exporter.logger.info("Starting export errata.json and oval.xml")
-        errata_export_base_path = None
-        try:
-            errata_export_base_path = os.path.join(
-                settings.pulp_export_path, "errata"
-            )
-            if not os.path.exists(errata_export_base_path):
-                os.mkdir(errata_export_base_path)
-            for platform in args.platform_names:
-                platform_path = os.path.join(errata_export_base_path, platform)
-                if not os.path.exists(platform_path):
-                    os.mkdir(platform_path)
-                html_path = os.path.join(platform_path, "html")
-                if not os.path.exists(html_path):
-                    os.mkdir(html_path)
-                errata_cache = platform_errata_cache[platform]["cache"]
-                exporter.process_osv_data(errata_cache, platform)
-                exporter.logger.debug("Generating HTML errata pages")
-                for record in errata_cache:
-                    generate_errata_page(record, html_path)
-                exporter.logger.debug("HTML pages are generated")
-                for item in errata_cache:
-                    item["issued_date"] = {
-                        "$date": int(item["issued_date"].timestamp() * 1000)
-                    }
-                    item["updated_date"] = {
-                        "$date": int(item["updated_date"].timestamp() * 1000)
-                    }
-                exporter.logger.debug("Dumping errata data into JSON")
-                with open(
-                    os.path.join(platform_path, "errata.json"), "w"
-                ) as fd:
-                    json.dump(errata_cache, fd)
-                with open(
-                    os.path.join(platform_path, "errata.full.json"), "w"
-                ) as fd:
-                    json.dump(
-                        platform_errata_cache[platform]["modern_cache"], fd
-                    )
-                exporter.logger.debug("JSON dump is done")
-                exporter.logger.debug("Generating OVAL data")
-                oval = sync(
-                    # aiohttp is not able to send booleans in params.
-                    # For this reason, we're passing only_released as a string,
-                    # which in turn will be converted into boolean on backend
-                    # side by fastapi/pydantic.
-                    exporter.get_oval_xml(platform, only_released=True)
-                )
-                with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
-                    fd.write(oval)
-                exporter.logger.debug("OVAL is generated")
-
-                exporter.logger.debug(f"Generating RSS feed for {platform}")
-                rss = sync(
-                    exporter.generate_rss(
-                        platform,
-                        platform_errata_cache[platform]["modern_cache"],
-                    )
-                )
-                with open(os.path.join(platform_path, "errata.rss"), "w") as fd:
-                    fd.write(rss)
-                exporter.logger.debug(f"RSS generation for {platform} is done")
-        except Exception:
-            exporter.logger.exception("Error happened:\n")
+    export_errata_and_oval(
+        exporter=exporter,
+        platform_errata_cache=platform_errata_cache,
+        platform_names=args.platform_names,
+    )
 
 
 if __name__ == "__main__":

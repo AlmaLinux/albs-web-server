@@ -71,7 +71,9 @@ async def create_product(
         (
             await db.execute(
                 select(models.Platform).where(
-                    models.Platform.name.in_([platform.name for platform in payload.platforms]),
+                    models.Platform.name.in_(
+                        [platform.name for platform in payload.platforms]
+                    ),
                 ),
             )
         )
@@ -105,7 +107,14 @@ async def create_product(
         )
     task_results = await asyncio.gather(*repo_tasks)
 
-    for repo_name, repo_url, arch, pulp_href, is_debug in task_results:
+    for (
+        repo_name,
+        repo_url,
+        arch,
+        pulp_href,
+        export_path,
+        is_debug,
+    ) in task_results:
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -114,6 +123,7 @@ async def create_product(
             type=arch,
             debug=is_debug,
             production=True,
+            export_path=export_path,
         )
         product.repositories.append(repo)
         items_to_insert.append(repo)
@@ -179,13 +189,21 @@ async def get_products(
                 selectinload(models.Product.owner),
                 selectinload(models.Product.platforms),
                 selectinload(models.Product.repositories),
-                selectinload(models.Product.roles).selectinload(models.UserRole.actions),
-                selectinload(models.Product.team).selectinload(models.Team.owner),
+                selectinload(models.Product.roles).selectinload(
+                    models.UserRole.actions
+                ),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.owner
+                ),
                 selectinload(models.Product.team)
                 .selectinload(models.Team.roles)
                 .selectinload(models.UserRole.actions),
-                selectinload(models.Product.team).selectinload(models.Team.members),
-                selectinload(models.Product.team).selectinload(models.Team.products),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.members
+                ),
+                selectinload(models.Product.team).selectinload(
+                    models.Team.products
+                ),
             )
         )
         if count:
@@ -204,7 +222,9 @@ async def get_products(
     if page_number:
         return {
             'products': (await db.execute(generate_query())).scalars().all(),
-            'total_products': (await db.execute(generate_query(count=True))).scalar(),
+            'total_products': (
+                await db.execute(generate_query(count=True))
+            ).scalar(),
             'current_page': page_number,
         }
     if product_id or product_name:
@@ -226,7 +246,9 @@ async def remove_product(
     db_product = await get_products(db, product_id=product_id)
     db_user = await get_user(db, user_id=user_id)
     if not can_perform(db_product, db_user, actions.DeleteProduct.name):
-        raise PermissionDenied(f"User has no permissions to delete the product {db_product.name}")
+        raise PermissionDenied(
+            f"User has no permissions to delete the product {db_product.name}"
+        )
     if not db_product:
         raise DataNotFoundError(f"Product={product_id} doesn't exist")
     active_builds_by_team_id = (
@@ -265,7 +287,8 @@ async def remove_product(
         # some repos from db can be absent in pulp
         # in case if you reset pulp db, but didn't reset non-pulp db
         if all(
-            product_repo.name != product_distro['name'] for product_distro in all_product_distros
+            product_repo.name != product_distro['name']
+            for product_distro in all_product_distros
         ):
             continue
         delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
@@ -301,8 +324,12 @@ async def modify_product(
         )
         .options(
             selectinload(models.Build.repos),
-            selectinload(models.Build.tasks).selectinload(models.BuildTask.rpm_modules),
-            selectinload(models.Build.tasks).selectinload(models.BuildTask.platform),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.platform
+            ),
         ),
     )
 
@@ -313,17 +340,19 @@ async def modify_product(
         )
         .options(
             selectinload(models.Build.repos),
-            selectinload(models.Build.tasks).selectinload(models.BuildTask.rpm_modules),
-            selectinload(models.Build.tasks).selectinload(models.BuildTask.platform),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.platform
+            ),
         ),
     )
     db_build = db_build.scalars().first()
 
     if modification == 'add':
         if db_build in db_product.builds:
-            error_msg = (
-                f"Can't add build {build_id} to {product} as it's already part of the product"
-            )
+            error_msg = f"Can't add build {build_id} to {product} as it's already part of the product"
             raise ProductError(error_msg)
     if modification == 'remove':
         if db_build not in db_product.builds:
@@ -338,18 +367,24 @@ async def modify_product(
     perform_product_modification.send(db_build.id, db_product.id, modification)
 
 
-async def get_repo_product(session: AsyncSession, repository: str) -> Optional[Product]:
+async def get_repo_product(
+    session: AsyncSession, repository: str
+) -> Optional[Product]:
     product_relationships = (
         selectinload(Product.owner),
         selectinload(Product.roles).selectinload(UserRole.actions),
-        selectinload(Product.team).selectinload(Team.roles).selectinload(UserRole.actions),
+        selectinload(Product.team)
+        .selectinload(Team.roles)
+        .selectinload(UserRole.actions),
     )
     if repository.endswith("br"):
         result = (
             (
                 await session.execute(
                     select(Build)
-                    .filter(Build.repos.any(Repository.name.ilike(f'%{repository}')))
+                    .filter(
+                        Build.repos.any(Repository.name.ilike(f'%{repository}'))
+                    )
                     .options(
                         joinedload(Build.team)
                         .joinedload(Team.products)
