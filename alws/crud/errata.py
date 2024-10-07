@@ -1803,7 +1803,8 @@ async def get_albs_oval_cache(session: AsyncSession, platform_name: str) -> dict
 
 
 async def add_oval_data_to_errata_record(
-    session: AsyncSession, db_record: models.NewErrataRecord
+    session: AsyncSession, db_record: models.NewErrataRecord,
+    albs_oval_cache: dict
 ):
     oval_packages = await get_packages_for_oval(db_record.packages)
 
@@ -1818,7 +1819,6 @@ async def add_oval_data_to_errata_record(
 
     # TODO: Receive oval cache as argument in order for bulk_errata_release
     # to update it with generated oval refs
-    albs_oval_cache = await get_albs_oval_cache(session, db_record.platform.name)
     oval_ref_ids = {
         "object": [ref["id"] for ref in albs_oval_cache["objects"]],
         "state": [ref["id"] for ref in albs_oval_cache["states"]],
@@ -1910,7 +1910,12 @@ async def release_new_errata_record(
         )
 
         logging.info("Generating OVAL data")
-        await add_oval_data_to_errata_record(session, db_record)
+        albs_oval_cache = await get_albs_oval_cache(
+            session, db_record.platform.name
+        )
+        await add_oval_data_to_errata_record(
+            session, db_record, albs_oval_cache
+        )
 
         db_record.release_status = ErrataReleaseStatus.RELEASED
         db_record.last_release_log = await get_release_logs(
@@ -2040,6 +2045,13 @@ async def bulk_new_errata_records_release(
             " locked: %s",
             [rec.id for rec in db_records],
         )
+
+        platforms = set([rec.platform.name for rec in db_records])
+        albs_oval_cache = collections.defaultdict()
+        for platform in platforms:
+            albs_oval_cache[platform] = await get_albs_oval_cache(
+                session, platform
+            )
         for db_record in db_records:
             search_params = prepare_search_params(db_record)
             logging.info("Retrieving platform packages from pulp")
@@ -2068,7 +2080,21 @@ async def bulk_new_errata_records_release(
             )
 
             logging.info("Generating OVAL data")
-            await add_oval_data_to_errata_record(session, db_record)
+            objects, states, tests = await add_oval_data_to_errata_record(
+                session, db_record, albs_oval_cache[db_record.platform.name]
+            )
+
+            # This way we take into account already generated references
+            # during bulk errata release
+            for obj in objects:
+                if obj not in albs_oval_cache[db_record.platform.name]["objects"]:
+                    albs_oval_cache[db_record.platform.name]["objects"].append(obj)
+            for ste in states:
+                if ste not in albs_oval_cache[db_record.platform.name]["states"]:
+                    albs_oval_cache[db_record.platform.name]["states"].append(ste)
+            for tst in tests:
+                if tst not in albs_oval_cache[db_record.platform.name]["tests"]:
+                    albs_oval_cache[db_record.platform.name]["tests"].append(tst)
 
             db_record.release_status = ErrataReleaseStatus.RELEASED
             db_record.last_release_log = await get_release_logs(
