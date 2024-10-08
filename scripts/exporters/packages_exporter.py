@@ -27,10 +27,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from syncer import sync
 
-from scripts.exporters.base_exporter import BasePulpExporter
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from alws import models
 from alws.config import settings
@@ -47,6 +44,7 @@ from alws.utils.errata import (
 )
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.osv import export_errata_to_osv
+from scripts.exporters.base_exporter import BasePulpExporter
 
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(
     os.path.expanduser("~/config/known_subkeys.json")

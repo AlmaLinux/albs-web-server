@@ -7,7 +7,7 @@ from typing import List, Literal
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from alws.config import settings
 from alws.dependencies import get_async_db_session
