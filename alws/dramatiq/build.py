@@ -183,6 +183,31 @@ async def _build_done(request: build_node_schema.BuildDone):
             await build_node_crud.fast_fail_other_tasks_by_ref(db, build_task)
             await db.flush()
 
+            build_id = await _get_build_id(db, request.task_id)
+
+            # We need to unset srpm_url if all tasks failed
+            build_tasks = await db.execute(
+                select(models.BuildTask).where(
+                    models.BuildTask.build_id == build_id,
+                    models.BuildTask.ref_id == build_task.ref_id,
+                )
+            )
+            for tasks_dicts in build_tasks.values():
+                failed_tasks = [
+                    task
+                    for task in tasks_dicts.values()
+                    if task.status == BuildTaskStatus.FAILED
+                ]
+                drop_srpm = False
+                if len(failed_tasks) == len(tasks_dicts):
+                    drop_srpm = True
+
+                for task in failed_tasks:
+                    if task.built_srpm_url and drop_srpm:
+                        task.built_srpm_url = None
+
+            await db.flush()
+
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
         # The last completed task will trigger the creation of the test tasks
@@ -192,7 +217,6 @@ async def _build_done(request: build_node_schema.BuildDone):
         )
 
         if all_build_tasks_completed:
-            build_id = await _get_build_id(db, request.task_id)
             cancel_testing = (
                 await db.execute(
                     select(models.Build.cancel_testing).where(
