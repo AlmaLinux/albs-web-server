@@ -164,25 +164,24 @@ async def get_oval_xml(
 async def get_new_oval_xml(
     db: AsyncSession, platform_name: str, only_released: bool = False
 ):
-    query = select(models.NewErrataRecord).options(
-        selectinload(models.NewErrataRecord.packages)
-        .selectinload(models.NewErrataPackage.albs_packages)
-        .selectinload(models.NewErrataToALBSPackage.build_artifact)
-        .selectinload(models.BuildTaskArtifact.build_task),
-        selectinload(models.NewErrataRecord.references).selectinload(
-            models.NewErrataReference.cve
-        ),
+    platform_subq = (
+        select(models.Platform.id)
+        .where(models.Platform.name == platform_name)
     )
 
-    platform = await db.execute(
-        select(models.Platform).where(models.Platform.name == platform_name)
+    query = (
+        select(models.NewErrataRecord)
+        .where(models.NewErrataRecord.platform_id == platform_subq)
+        .options(
+            selectinload(models.NewErrataRecord.packages)
+            .selectinload(models.NewErrataPackage.albs_packages)
+            .selectinload(models.NewErrataToALBSPackage.build_artifact)
+            .selectinload(models.BuildTaskArtifact.build_task),
+            selectinload(models.NewErrataRecord.references).selectinload(
+                models.NewErrataReference.cve
+            )
+        )
     )
-    platform: models.Platform = platform.scalars().first()
-
-    if not platform:
-        return
-
-    query = query.filter(models.NewErrataRecord.platform_id == platform.id)
 
     if only_released:
         query = query.filter(
@@ -780,15 +779,24 @@ async def process_new_errata_references(
 ):
     references = []
     self_ref_exists = False
+
+    db_cves = collections.defaultdict()
+    cve_ids = [ref.cve.id for ref in errata.references if ref.cve]
+    if cve_ids:
+        db_cves = {
+            cve.id: cve for cve
+            in (
+                await db.execute(
+                    select(models.ErrataCVE)
+                    .where(models.ErrataCVE.id.in_(cve_ids))
+                )
+            ).scalars().all()
+        }
+
     for ref in errata.references:
         db_cve = None
         if ref.cve:
-            db_cve = await db.execute(
-                select(models.ErrataCVE).where(
-                    models.ErrataCVE.id == ref.cve.id
-                )
-            )
-            db_cve = db_cve.scalars().first()
+            db_cve = db_cves.get(ref.cve.id)
             if db_cve is None:
                 db_cve = models.ErrataCVE(
                     id=ref.cve.id,
@@ -815,6 +823,7 @@ async def process_new_errata_references(
             self_ref_exists = True
         db_errata.references.append(db_reference)
         references.append(db_reference)
+
     if not self_ref_exists:
         html_id = db_errata.id.replace(":", "-")
         self_ref = models.NewErrataReference(
