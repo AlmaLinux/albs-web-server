@@ -231,6 +231,13 @@
       production: false
       debug: false
       priority: 10
+    - name: epel
+      arch: ppc64le
+      type: rpm
+      url: https://el7.repo.almalinux.org/epel/7/ppc64le/
+      production: false
+      debug: false
+      priority: 10
 
 - name: EPEL-10
   repositories:
