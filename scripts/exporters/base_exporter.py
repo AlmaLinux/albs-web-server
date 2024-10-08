@@ -10,6 +10,8 @@ from typing import List, Literal, Optional, Tuple
 from plumbum import local
 from sqlalchemy import select
 
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from alws.config import settings
 from alws.dependencies import get_async_db_session
 from alws.models import Repository
