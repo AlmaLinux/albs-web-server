@@ -10,7 +10,10 @@ from alws.constants import ErrataReleaseStatus
 from alws.crud import errata as errata_crud
 from alws.crud.errata import get_errata_records_threshold
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import bulk_errata_release, release_errata, reset_records_threshold
+from alws.dramatiq import (
+    bulk_errata_release, bulk_new_errata_release,
+    release_errata, release_new_errata, reset_records_threshold
+)
 from alws.schemas import errata_schema
 
 router = APIRouter(
@@ -23,6 +26,18 @@ public_router = APIRouter(
     prefix="/errata",
     tags=["errata"],
 )
+
+
+@router.post("/new/", response_model=errata_schema.CreateErrataResponse)
+async def create_new_errata_record(
+    errata: errata_schema.BaseErrataRecord,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    record = await errata_crud.create_new_errata_record(
+        db,
+        errata,
+    )
+    return {"ok": bool(record)}
 
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
@@ -54,6 +69,21 @@ async def get_errata_record(
             detail=f"Unable to find errata record with {errata_id=}",
         )
     return errata_record
+
+
+@router.get("/get_new_oval_xml/", response_model=str)
+async def get_new_oval_xml(
+    platform_name: str,
+    only_released: bool = False,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    records = await errata_crud.get_new_oval_xml(db, platform_name, only_released)
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{platform_name} is not a valid platform",
+        )
+    return records
 
 
 @router.get("/get_oval_xml/", response_model=str)
@@ -163,6 +193,36 @@ async def update_package_status(
 
 
 @router.post(
+    "/release_new_record/{record_id}/",
+    response_model=errata_schema.ReleaseErrataRecordResponse,
+)
+async def release_new_errata_record(
+    record_id: str,
+    platform_id: int,
+    force: bool = False,
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
+):
+    db_record = await errata_crud.get_errata_record(
+        session,
+        record_id,
+        platform_id,
+    )
+    if not db_record:
+        return {"message": f"Record {record_id} doesn't exists"}
+    if db_record.release_status == ErrataReleaseStatus.IN_PROGRESS:
+        return {"message": f"Record {record_id} already in progress"}
+    db_record.release_status = ErrataReleaseStatus.IN_PROGRESS
+    db_record.last_release_log = None
+    await session.flush()
+    release_new_errata.send(record_id, platform_id, force)
+    return {
+        "message": f"Release updateinfo record {record_id} has been started"
+    }
+
+
+@router.post(
     "/release_record/{record_id}/",
     response_model=errata_schema.ReleaseErrataRecordResponse,
 )
@@ -189,6 +249,25 @@ async def release_errata_record(
     release_errata.send(record_id, platform_id, force)
     return {
         "message": f"Release updateinfo record {record_id} has been started"
+    }
+
+
+@router.post(
+    "/bulk_release_new_records/",
+)
+async def bulk_release_new_errata_records(
+    records_ids: List[str],
+    force: bool = False,
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
+):
+    bulk_new_errata_release.send(records_ids, force)
+    return {
+        "message": (
+            "Following records scheduled for release:"
+            f" {', '.join(records_ids)}"
+        )
     }
 
 
