@@ -11,7 +11,9 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from alws.config import settings
 from alws.dependencies import get_async_db_session
+from alws.errors import DataNotFoundError
 from alws.models import Platform, Product, Repository
+from alws.utils import pulp_client
 from alws.utils.fastapi_sqla_setup import setup_all
 from scripts.exporters.base_exporter import BasePulpExporter
 
@@ -57,20 +59,28 @@ def parse_args():
         help="Repodata cache directory",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        required=False,
-        help="Verbose output",
-    )
-    parser.add_argument(
         "-method",
         "--export-method",
         type=str,
         default="hardlink",
         required=False,
         help="Method of exporting (choices: write, hardlink, symlink)",
+    )
+    parser.add_argument(
+        "-l",
+        "--log",
+        type=str,
+        default='/srv/product-exporter.log',
+        required=False,
+        help="Path to export log",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        required=False,
+        help="Verbose output",
     )
     return parser.parse_args()
 
@@ -80,7 +90,7 @@ class ProductExporter(BasePulpExporter):
         self,
         repodata_cache_dir: str,
         logger_name: str = 'product-exporter',
-        log_file_path: Path = Path('/srv/product-exporter.log'),
+        log_file_path: str = '/srv/product-exporter.log',
         verbose: bool = False,
         export_method: Literal['write', 'hardlink', 'symlink'] = 'hardlink',
         export_path: str = settings.pulp_export_path,
@@ -97,7 +107,7 @@ class ProductExporter(BasePulpExporter):
     async def export_product_repos(
         self,
         product_name: str,
-        distr_name,
+        distr_name: str,
         arches: List[str],
     ):
         self.logger.info(
@@ -121,6 +131,8 @@ class ProductExporter(BasePulpExporter):
         )
         async with get_async_db_session() as session:
             product = (await session.execute(query)).scalars().first()
+        if not product:
+            raise DataNotFoundError(f'Cannot find product: {product_name}')
         return await self.export_repositories(
             list({repo.id for repo in product.repositories})
         )
@@ -133,7 +145,7 @@ async def repo_post_processing(
     async with SEMAPHORE:
         result = False
         try:
-            exporter.regenerate_repo_metadata(repo_path)
+            exporter.regenerate_repo_metadata(str(Path(repo_path).parent))
         except Exception as exc:
             result = False
             exporter.logger.exception("Post-processing failed: %s", str(exc))
@@ -147,7 +159,9 @@ async def main():
         repodata_cache_dir=args.cache_dir,
         verbose=args.verbose,
         export_method=args.export_method,
+        log_file_path=args.log,
     )
+    pulp_client.PULP_SEMAPHORE = asyncio.Semaphore(10)
     exported_paths = await exporter.export_product_repos(
         product_name=args.product,
         distr_name=args.distribution,
