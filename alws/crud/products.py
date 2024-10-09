@@ -18,7 +18,7 @@ from alws.errors import DataNotFoundError, PermissionDenied, ProductError
 from alws.models import Build, Product, Repository, Team, UserRole
 from alws.perms import actions
 from alws.perms.authorization import can_perform
-from alws.schemas.product_schema import ProductCreate
+from alws.schemas.product_schema import ProductCreate, Platform
 from alws.schemas.team_schema import TeamCreate
 from alws.utils.copr import create_product_repo, create_product_sign_key_repo
 from alws.utils.pulp_client import PulpClient
@@ -34,54 +34,15 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-async def create_product(
-    db: AsyncSession,
-    payload: ProductCreate,
-) -> models.Product:
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    items_to_insert = []
+async def add_repos_to_product(
+    pulp_client: PulpClient,
+    product: models.Product,
+    owner: models.User,
+    platforms: List[models.Platform]
+):
+    repos_to_insert = []
     repo_tasks = []
-
-    owner = await get_user(db, user_id=payload.owner_id)
-    if not owner:
-        raise ProductError(f'Incorrect owner ID: {payload.owner_id}')
-
-    product = await get_products(db, product_name=payload.name)
-    if product:
-        raise ProductError(f'Product with name={payload.name} already exist')
-
-    team_name = f'{payload.name}_team'
-    teams = await get_teams(db, name=team_name)
-    if teams:
-        team, *_ = teams
-    else:
-        team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
-        team = await create_team(db, team_payload, flush=True)
-    team_roles = await create_team_roles(db, team_name)
-
-    product_payload = payload.model_dump()
-    product_payload['team_id'] = team.id
-
-    product = models.Product(**product_payload)
-    product.platforms = (
-        (
-            await db.execute(
-                select(models.Platform).where(
-                    models.Platform.name.in_(
-                        [platform.name for platform in payload.platforms]
-                    ),
-                ),
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    for platform in product.platforms:
+    for platform in platforms:
         platform_name = platform.name.lower()
         repo_tasks.extend((
             create_product_repo(
@@ -125,8 +86,66 @@ async def create_product(
             production=True,
             export_path=export_path,
         )
-        product.repositories.append(repo)
-        items_to_insert.append(repo)
+        
+        repos_to_insert.append(repo)
+    return repos_to_insert
+
+
+async def create_product(
+    db: AsyncSession,
+    payload: ProductCreate,
+) -> models.Product:
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    items_to_insert = []
+
+    owner = await get_user(db, user_id=payload.owner_id)
+    if not owner:
+        raise ProductError(f'Incorrect owner ID: {payload.owner_id}')
+
+    product = await get_products(db, product_name=payload.name)
+    if product:
+        raise ProductError(f'Product with name={payload.name} already exist')
+
+    team_name = f'{payload.name}_team'
+    teams = await get_teams(db, name=team_name)
+    if teams:
+        team, *_ = teams
+    else:
+        team_payload = TeamCreate(team_name=team_name, user_id=payload.owner_id)
+        team = await create_team(db, team_payload, flush=True)
+    team_roles = await create_team_roles(db, team_name)
+
+    product_payload = payload.model_dump()
+    product_payload['team_id'] = team.id
+
+    product = models.Product(**product_payload)
+    product.platforms = (
+        (
+            await db.execute(
+                select(models.Platform).where(
+                    models.Platform.name.in_(
+                        [platform.name for platform in payload.platforms]
+                    ),
+                ),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    repos = await add_repos_to_product(
+        pulp_client=pulp_client,
+        product=product,
+        owner=owner,
+        platforms=product.platforms,
+    )
+    items_to_insert.extend(repos)
+    product.repositories.extend(repos)
+
     # Create sign key repository if a product is community
     if payload.is_community:
         repo_name, repo_url, repo_href = await create_product_sign_key_repo(
@@ -367,8 +386,44 @@ async def modify_product(
     perform_product_modification.send(db_build.id, db_product.id, modification)
 
 
+async def add_platform_to_product(
+    session: AsyncSession,
+    product_id: int,
+    platforms: List[Platform],
+):
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    db_product = await get_products(session, product_id=product_id)
+    db_platforms = (
+        (
+            await session.execute(
+                select(models.Platform).where(
+                    models.Platform.name.in_(
+                        [platform.name for platform in platforms]
+                    ),
+                ),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    db_product.platforms.extend(db_platforms)
+    repos = await add_repos_to_product(
+        pulp_client=pulp_client,
+        owner=db_product.owner,
+        product=db_product,
+        platforms=db_platforms
+    )
+    db_product.repositories.extend(repos)
+    session.add_all(repos)
+
+
 async def get_repo_product(
-    session: AsyncSession, repository: str
+    session: AsyncSession,
+    repository: str,
 ) -> Optional[Product]:
     product_relationships = (
         selectinload(Product.owner),
@@ -383,7 +438,9 @@ async def get_repo_product(
                 await session.execute(
                     select(Build)
                     .filter(
-                        Build.repos.any(Repository.name.ilike(f'%{repository}'))
+                        Build.repos.any(
+                            Repository.name.ilike(f'%{repository}')
+                        )
                     )
                     .options(
                         joinedload(Build.team)
