@@ -255,6 +255,12 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                         if ref.ref_type == ErrataReferenceType.cve and ref.cve
                     ],
                 },
+                # TODO: It would be great if we update the ErrataReferenceTypes
+                # in a way that we use the same way through all the involved
+                # code. We only need to take care of those using "self_ref",
+                # which I propose to move its value to "alsa". Then, here we
+                # can use the ErrataReferenceType value in capital letters and
+                # get rid of this.
                 "references": [
                     {
                         "id": ref.ref_id,
@@ -262,12 +268,17 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                         "source": (
                             "RHSA"
                             if ref.ref_type == ErrataReferenceType.rhsa
-                            else "ALSA"
+                            else (
+                                "CVE" if ref.ref_type == ErrataReferenceType.cve
+                                else "ALSA"
+                            )
                         )
                     }
                     for ref in record.references
                     if ref.ref_type in [
-                        ErrataReferenceType.self_ref, ErrataReferenceType.rhsa
+                        ErrataReferenceType.self_ref,
+                        ErrataReferenceType.rhsa,
+                        ErrataReferenceType.cve,
                     ]
                 ],
             },
