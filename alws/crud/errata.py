@@ -610,6 +610,10 @@ async def load_platform_packages(
             continue
 
         for pkg in pkgs:
+            # We do not need to map src pkgs
+            if pkg.arch == "src":
+                continue
+
             if for_release:
                 key = pkg.pulp_href
                 if not cache.get(key):
@@ -684,6 +688,16 @@ async def get_matching_albs_packages(
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
         errata_package.arch, []
     ):
+        # src and some noarch packages are coming with an empty rpm_sourcerpm,
+        # field which makes parse_rpm_nevra(prod_package.rpm_sourcerpm) below
+        # to fail.
+        if not prod_package.rpm_sourcerpm:
+            logging.warning(
+                "Skipping '%s' with empty sourcerpm field in pulp href '%s'",
+                prod_package.name,
+                prod_package.pulp_href,
+            )
+            continue
         mapping = models.NewErrataToALBSPackage(
             pulp_href=prod_package.pulp_href,
             status=ErrataPackageStatus.released,
