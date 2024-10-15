@@ -22,8 +22,10 @@ async def _release_errata_record(record_id: str, platform_id: int, force: bool):
     )
 
 
-async def _bulk_errata_records_release(records_ids: typing.List[str]):
-    await bulk_errata_records_release(records_ids)
+async def _bulk_errata_records_release(
+    records_ids: typing.List[str], force: bool = False
+):
+    await bulk_errata_records_release(records_ids, force)
 
 
 async def _reset_matched_erratas_packages_threshold(issued_date: str):
@@ -53,9 +55,11 @@ def release_errata(record_id: str, platform_id: int, force: bool):
     queue_name="errata",
     time_limit=DRAMATIQ_TASK_TIMEOUT,
 )
-def bulk_errata_release(records_ids: typing.List[str]):
+def bulk_errata_release(records_ids: typing.List[str], force: bool = False):
     event_loop.run_until_complete(setup_all())
-    event_loop.run_until_complete(_bulk_errata_records_release(records_ids))
+    event_loop.run_until_complete(
+        _bulk_errata_records_release(records_ids, force)
+    )
 
 
 @dramatiq.actor(
@@ -66,4 +70,6 @@ def bulk_errata_release(records_ids: typing.List[str]):
 )
 def reset_records_threshold(issued_date: str):
     event_loop.run_until_complete(setup_all())
-    event_loop.run_until_complete(_reset_matched_erratas_packages_threshold(issued_date))
+    event_loop.run_until_complete(
+        _reset_matched_erratas_packages_threshold(issued_date)
+    )
