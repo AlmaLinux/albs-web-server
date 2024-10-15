@@ -167,7 +167,7 @@ async def get_new_oval_xml(
     platform_subq = (
         select(models.Platform.id)
         .where(models.Platform.name == platform_name)
-    )
+    ).scalar_subquery()
 
     query = (
         select(models.NewErrataRecord)
