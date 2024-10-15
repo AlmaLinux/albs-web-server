@@ -1805,7 +1805,8 @@ async def get_packages_for_oval(
             pkg["release"] = smallest_evrs_by_name[name]["release"]
             oval_pkgs.append(pkg)
 
-    arches = {pkg["arch"] for pkg in oval_pkgs}
+    # TODO: Consider only adding noarch packages once
+    arches = {pkg["arch"] for pkg in oval_pkgs} or [0]
     for pkg in noarch_pkgs:
         for _ in arches:
             oval_pkgs.append(pkg)
@@ -1825,10 +1826,8 @@ async def get_albs_oval_cache(session: AsyncSession, platform_name: str) -> dict
         # TODO: uncomment only after production oval data is stored in db
         # as described in https://github.com/AlmaLinux/build-system/issues/350
         # Right now we're using a file for testing
-        #xml_string = await get_new_oval_xml(session, platform_name, True)
-        #xml_string = json.loads(xml_string)
-        #oval = Composer.load_from_string(xml_string.encode())
-        oval = Composer.load_from_file("/tmp/org.almalinux.alsa-8.xml")
+        xml_string = await get_new_oval_xml(session, platform_name, True)
+        oval = Composer.load_from_string(xml_string)
         cached_oval = oval.as_dict()
         del cached_oval["definitions"]
         cached_oval = json.dumps(cached_oval)
