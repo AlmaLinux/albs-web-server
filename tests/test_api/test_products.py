@@ -29,6 +29,20 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
+    async def test_add_platfroms_to_product(
+        self,
+        user_product: Product,
+        add_platfroms_to_product_payload,
+    ):
+        endpoint = f"/api/v1/products/{user_product.id}/add_platforms/"
+        response = await self.make_request(
+            "post",
+            endpoint,
+            json=add_platfroms_to_product_payload,
+        )
+
+        assert response.status_code == self.status_codes.HTTP_201_CREATED
+
     async def test_add_to_product(
         self,
         regular_build: Build,
