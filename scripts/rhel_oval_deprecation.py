@@ -24,7 +24,7 @@ from almalinux.liboval.data_generation import (
 from alws import models
 from alws.config import settings
 from alws.constants import ErrataReleaseStatus
-from alws.crud.errata import get_new_oval_xml, get_packages_for_oval
+from alws.crud.errata import get_oval_xml
 from alws.dependencies import get_async_db_key
 from alws.utils.fastapi_sqla_setup import setup_all
 
@@ -39,7 +39,7 @@ logger.setLevel('DEBUG')
 async def get_platform_oval_data(
     session: AsyncSession, platform_name: str
 ) -> dict:
-    xml_string = await get_new_oval_xml(session, platform_name, True)
+    xml_string = await get_oval_xml(session, platform_name, True)
     oval = Composer.load_from_string(xml_string)
     oval_dict = oval.as_dict()
     return oval_dict
