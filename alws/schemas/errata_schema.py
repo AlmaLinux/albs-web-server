@@ -31,7 +31,7 @@ class BaseErrataReference(BaseModel):
 
 
 class ErrataReference(BaseErrataReference):
-    id: int
+    id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -82,19 +82,20 @@ class BaseErrataRecord(BaseModel):
     updated_date: datetime.date
     title: str
     description: str
+    module: Optional[str] = None
     status: str
     version: str
     severity: str
-    rights: str
-    definition_id: str
-    definition_version: str
-    definition_class: str
-    affected_cpe: List[str]
-    criteria: Any
-    tests: Any
-    objects: Any
-    states: Any
-    variables: Any
+    rights: Optional[str] = None
+    definition_id: Optional[str] = None
+    definition_version: Optional[str] = None
+    definition_class: Optional[str] = None
+    affected_cpe: Optional[List[str]] = None
+    criteria: Optional[Any] = None
+    tests: Optional[Any] = None
+    objects: Optional[Any] = None
+    states: Optional[Any] = None
+    variables: Optional[Any] = None
     references: List[BaseErrataReference]
     packages: List[BaseErrataPackage]
 
