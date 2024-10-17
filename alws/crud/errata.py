@@ -193,6 +193,14 @@ async def get_new_oval_xml(
     return new_errata_records_to_oval(records)
 
 
+def add_oval_objects(new_objects, objects, oval, get_cls_by_tag_func):
+    for new_obj in new_objects:
+        if new_obj["id"] not in objects:
+            objects.add(new_obj["id"])
+            oval.append_object(
+                get_cls_by_tag_func(new_obj["type"]).from_dict(new_obj)
+            )
+
 def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
     oval = Composer()
     generator = Generator(
@@ -285,31 +293,17 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
             "criteria": record.criteria,
         })
         oval.append_object(definition)
-        for test in record.tests:
-            if test["id"] not in objects:
-                objects.add(test["id"])
-                oval.append_object(
-                    get_test_cls_by_tag(test["type"]).from_dict(test)
-                )
-        for obj in record.objects:
-            if obj["id"] not in objects:
-                objects.add(obj["id"])
-                oval.append_object(
-                    get_object_cls_by_tag(obj["type"]).from_dict(obj)
-                )
-        for state in record.states:
-            if state["id"] not in objects:
-                objects.add(state["id"])
-                oval.append_object(
-                    get_state_cls_by_tag(state["type"]).from_dict(state)
-                )
-        if record.variables is not None:
-            for var in record.variables:
-                if var["id"] not in objects:
-                    objects.add(var["id"])
-                    oval.append_object(
-                        get_variable_cls_by_tag(var["type"]).from_dict(var)
-                )
+
+        for new_oval_objects, func in (
+            (record.tests, get_test_cls_by_tag),
+            (record.objects, get_object_cls_by_tag),
+            (record.states, get_state_cls_by_tag),
+            (record.variables, get_variable_cls_by_tag)
+        ):
+            if new_oval_objects is None:
+                continue
+            add_oval_objects(new_oval_objects, objects, oval, func)
+
     return oval.dump_to_string()
 
 
@@ -1850,8 +1844,6 @@ async def add_oval_data_to_errata_record(
         if dev_module in db_record.original_title:
             devel_module = Module(dev_module)
 
-    # TODO: Receive oval cache as argument in order for bulk_errata_release
-    # to update it with generated oval refs
     oval_ref_ids = {
         "object": [ref["id"] for ref in albs_oval_cache["objects"]],
         "state": [ref["id"] for ref in albs_oval_cache["states"]],
