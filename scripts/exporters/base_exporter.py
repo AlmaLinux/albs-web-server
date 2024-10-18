@@ -24,7 +24,7 @@ class BasePulpExporter:
         self,
         repodata_cache_dir: str,
         logger_name: str = '',
-        log_file_path: Path = Path('/srv/exporter.log'),
+        log_file_path: str = '/srv/exporter.log',
         verbose: bool = False,
         export_method: Literal['write', 'hardlink', 'symlink'] = 'hardlink',
         export_path: str = settings.pulp_export_path,
