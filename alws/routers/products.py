@@ -185,9 +185,12 @@ async def add_platforms(
     product_id: int,
     platforms: List[product_schema.Platform],
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: User = Depends(get_current_user),
 ):
     try:
-        await products.add_platform_to_product(db, product_id, platforms)
+        await products.add_platform_to_product(
+            db, product_id, platforms, user.id
+        )
     except Exception as exc:
         raise HTTPException(
             detail=str(exc),
