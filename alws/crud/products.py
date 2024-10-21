@@ -38,7 +38,7 @@ async def add_repos_to_product(
     pulp_client: PulpClient,
     product: models.Product,
     owner: models.User,
-    platforms: List[models.Platform]
+    platforms: List[models.Platform],
 ):
     repos_to_insert = []
     repo_tasks = []
@@ -86,7 +86,7 @@ async def add_repos_to_product(
             production=True,
             export_path=export_path,
         )
-        
+
         repos_to_insert.append(repo)
     return repos_to_insert
 
@@ -390,6 +390,7 @@ async def add_platform_to_product(
     session: AsyncSession,
     product_id: int,
     platforms: List[Platform],
+    user_id: int,
 ):
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -397,6 +398,13 @@ async def add_platform_to_product(
         settings.pulp_password,
     )
     db_product = await get_products(session, product_id=product_id)
+    db_user = await get_user(session, user_id=user_id)
+    if not db_user:
+        raise DataNotFoundError(f"User={user_id} doesn't exist")
+    if not can_perform(db_product, db_user, actions.UpdateProduct.name):
+        raise PermissionDenied(
+            f'User has no permissions to modify the product "{db_product.name}"'
+        )
     db_platforms = (
         (
             await session.execute(
@@ -415,7 +423,7 @@ async def add_platform_to_product(
         pulp_client=pulp_client,
         owner=db_product.owner,
         product=db_product,
-        platforms=db_platforms
+        platforms=db_platforms,
     )
     db_product.repositories.extend(repos)
     session.add_all(repos)
@@ -438,9 +446,7 @@ async def get_repo_product(
                 await session.execute(
                     select(Build)
                     .filter(
-                        Build.repos.any(
-                            Repository.name.ilike(f'%{repository}')
-                        )
+                        Build.repos.any(Repository.name.ilike(f'%{repository}'))
                     )
                     .options(
                         joinedload(Build.team)
