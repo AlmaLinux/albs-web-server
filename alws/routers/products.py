@@ -175,3 +175,21 @@ async def create_gen_key_task(
         'user_email': user.email,
         'product_name': product.name,
     }
+
+
+@router.post(
+    '/{product_id}/add_platforms/',
+    status_code=201,
+)
+async def add_platforms(
+    product_id: int,
+    platforms: List[product_schema.Platform],
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    try:
+        await products.add_platform_to_product(db, product_id, platforms)
+    except Exception as exc:
+        raise HTTPException(
+            detail=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )

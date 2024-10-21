@@ -44,6 +44,26 @@ def product_create_payload(request) -> dict:
     }
 
 
+@pytest.fixture
+def add_platfroms_to_product_payload() -> list:
+    return [
+        {
+            "id": 1,
+            "name": "AlmaLinux-9",
+            "distr_type": "rhel",
+            "distr_version": "9",
+            "arch_list": [
+                "i686",
+                "x86_64",
+                "ppc64le",
+                "aarch64",
+                "s390x",
+            ],
+            "modularity": {},
+        }
+    ]
+
+
 @pytest.fixture(
     params=[
         ADMIN_USER_ID,

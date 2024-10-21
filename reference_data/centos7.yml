@@ -9,9 +9,11 @@
   arch_list:
     - x86_64
     - aarch64
+    - ppc64le
   copy_priority_arches:
     - x86_64
     - aarch64
+    - ppc64le
   weak_arch_list:
   data:
     definitions:
@@ -68,6 +70,24 @@
       type: rpm
       remote_url: https://vault.centos.org/altarch/7.9.2009/updates/aarch64/
       export_path: altarch/7/updates/aarch64/
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: centos-7-baseos
+      type: rpm
+      remote_url: https://vault.centos.org/altarch/7.9.2009/os/ppc64le/
+      export_path: altarch/7/os/ppc64le/
+      production: false
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+    - arch: ppc64le
+      name: centos-7-updates
+      type: rpm
+      remote_url: https://vault.centos.org/altarch/7.9.2009/updates/ppc64le/
+      export_path: altarch/7/updates/ppc64le/
       production: false
       debug: false
       remote_sync_policy: on_demand
