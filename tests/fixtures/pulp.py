@@ -25,10 +25,14 @@ from tests.test_utils.pulp_utils import (
 
 @pytest.fixture(autouse=True)
 def semaphore_patch(monkeypatch):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     monkeypatch.setattr(
         "alws.utils.pulp_client.PULP_SEMAPHORE",
         asyncio.Semaphore(5),
     )
+    yield
+    loop.close()
 
 
 @pytest.fixture(autouse=True)
