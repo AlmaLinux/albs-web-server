@@ -5410,8 +5410,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-devel
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/x86_64_v2/os/
-      export_path: vault/10-kitten/devel/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/devel/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/devel/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5506,8 +5506,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-appstream
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/x86_64_v2/os/
-      export_path: vault/10-kitten/AppStream/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/AppStream/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/AppStream/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5642,8 +5642,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-baseos
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/x86_64_v2/os/
-      export_path: vault/10-kitten/BaseOS/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/BaseOS/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/BaseOS/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5778,8 +5778,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-highavailability
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/x86_64_v2/os/
-      export_path: vault/10-kitten/HighAvailability/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/HighAvailability/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/HighAvailability/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5914,8 +5914,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-resilientstorage
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/x86_64_v2/os/
-      export_path: vault/10-kitten/ResilientStorage/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/ResilientStorage/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/ResilientStorage/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6050,8 +6050,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-extras-common
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/x86_64_v2/os/
-      export_path: vault/10-kitten/extras-common/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/extras-common/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/extras-common/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6186,8 +6186,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-crb
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/x86_64_v2/os/
-      export_path: vault/10-kitten/CRB/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/CRB/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/CRB/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6322,8 +6322,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-nfv
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/NFV/x86_64_v2/os/
-      export_path: vault/10-kitten/NFV/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/NFV/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/NFV/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6374,8 +6374,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-rt
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/RT/x86_64_v2/os/
-      export_path: vault/10-kitten/RT/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/RT/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/RT/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6426,8 +6426,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-sap
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/x86_64_v2/os/
-      export_path: vault/10-kitten/SAP/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/SAP/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/SAP/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6562,8 +6562,8 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-saphana
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/x86_64_v2/os/
-      export_path: vault/10-kitten/SAPHANA/x86_64_v2/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/SAPHANA/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/SAPHANA/x86_64_v2/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
