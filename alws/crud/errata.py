@@ -1452,7 +1452,9 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
     logging.info("Record %s successfully released", record_id)
 
 
-async def bulk_errata_records_release(records_ids: List[str]):
+async def bulk_errata_records_release(
+    records_ids: List[str], force: bool = False
+):
     pulp = PulpClient(
         settings.pulp_host,
         settings.pulp_user,
@@ -1460,16 +1462,6 @@ async def bulk_errata_records_release(records_ids: List[str]):
     )
     release_tasks = []
     repos_to_publish = []
-    async with open_async_session(key=get_async_db_key()) as session:
-        await session.execute(
-            update(models.NewErrataRecord)
-            .where(models.NewErrataRecord.id.in_(records_ids))
-            .values(
-                release_status=ErrataReleaseStatus.IN_PROGRESS,
-                last_release_log=None,
-            )
-        )
-
     async with open_async_session(key=get_async_db_key()) as session:
         session: AsyncSession
         db_records = await session.execute(
@@ -1500,7 +1492,9 @@ async def bulk_errata_records_release(records_ids: List[str]):
                 (
                     repo_mapping,
                     missing_pkg_names,
-                ) = get_albs_packages_from_record(db_record, pulp_packages)
+                ) = get_albs_packages_from_record(
+                    db_record, pulp_packages, force
+                )
             except Exception as exc:
                 db_record.release_status = ErrataReleaseStatus.FAILED
                 db_record.last_release_log = str(exc)
@@ -1668,7 +1662,9 @@ async def get_updateinfo_xml_from_pulp(
     return cr_upd.xml_dump() if cr_upd.updates else None
 
 
-async def prepare_resetting(items_to_insert: List, record: models.NewErrataRecord, session: AsyncSession):
+async def prepare_resetting(
+    items_to_insert: List, record: models.NewErrataRecord, session: AsyncSession
+):
     search_params = prepare_search_params(record)
     prod_repos_cache = await load_platform_packages(
         platform=record.platform,
@@ -1721,7 +1717,9 @@ async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
     await session.flush()
 
 
-async def get_errata_records_threshold(issued_date_str: str, session: AsyncSession):
+async def get_errata_records_threshold(
+    issued_date_str: str, session: AsyncSession
+):
     issued_date = datetime.datetime.strptime(
         issued_date_str, '%Y-%m-%d %H:%M:%S'
     )
@@ -1748,7 +1746,7 @@ async def get_errata_records_threshold(issued_date_str: str, session: AsyncSessi
 
 
 async def reset_matched_erratas_packages_threshold(
-        issued_date: str,
+    issued_date: str,
 ):
     async with open_async_session(key=get_async_db_key()) as session:
         records = await get_errata_records_threshold(issued_date, session)
@@ -1757,5 +1755,39 @@ async def reset_matched_erratas_packages_threshold(
             await prepare_resetting(items_to_insert, record, session)
         session.add_all(items_to_insert)
         await session.flush()
-    logging.info(f'Packages for records {[record.id for record in records]}'
-                 f' have been matched if their date is later than {issued_date}')
+    logging.info(
+        f'Packages for records {[record.id for record in records]}'
+        f' have been matched if their date is later than {issued_date}'
+    )
+
+
+async def set_errata_packages_in_progress(
+    records_ids: List[str],
+    session: AsyncSession,
+):
+    db_records = await session.execute(
+        select(models.NewErrataRecord).where(
+            models.NewErrataRecord.id.in_(records_ids)
+        )
+    )
+    records = db_records.scalars().all()
+    records_to_update = [
+        record.id
+        for record in records
+        if record.release_status != ErrataReleaseStatus.IN_PROGRESS
+    ]
+    skipped_records = [
+        record.id
+        for record in records
+        if record.release_status == ErrataReleaseStatus.IN_PROGRESS
+    ]
+    if records_to_update:
+        await session.execute(
+            update(models.NewErrataRecord)
+            .where(models.NewErrataRecord.id.in_(records_to_update))
+            .values(
+                release_status=ErrataReleaseStatus.IN_PROGRESS,
+                last_release_log=None,
+            )
+        )
+    return records_to_update, skipped_records
