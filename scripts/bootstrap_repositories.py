@@ -153,9 +153,12 @@ async def get_remote(repo_info: dict, remote_sync_policy: str):
         remote_payload.pop("production", False)
         remote_payload["url"] = remote_payload["remote_url"]
         remote_payload["policy"] = remote_sync_policy
-        remote_payload["proxy_url"] = os.getenv("PULP_PROXY_URL")
-        remote_payload["proxy_username"] = os.getenv("PULP_PROXY_USERNAME")
-        remote_payload["proxy_password"] = os.getenv("PULP_PROXY_PASSWORD")
+        if os.getenv("PULP_PROXY_URL"):
+            remote_payload["proxy_url"] = os.getenv("PULP_PROXY_URL")
+        if os.getenv("PULP_PROXY_USERNAME"):
+            remote_payload["proxy_username"] = os.getenv("PULP_PROXY_USERNAME")
+        if os.getenv("PULP_PROXY_PASSWORD"):
+            remote_payload["proxy_password"] = os.getenv("PULP_PROXY_PASSWORD")
         remote = await repo_crud.create_repository_remote(
             db, remote_schema.RemoteCreate(**remote_payload)
         )

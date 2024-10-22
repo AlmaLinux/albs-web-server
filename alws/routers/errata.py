@@ -8,11 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.auth import get_current_user
 from alws.constants import ErrataReleaseStatus
 from alws.crud import errata as errata_crud
-from alws.crud.errata import get_errata_records_threshold
+from alws.crud.errata import (
+    get_errata_records_threshold,
+    set_errata_packages_in_progress,
+)
 from alws.dependencies import get_async_db_key
 from alws.dramatiq import (
-    bulk_errata_release, bulk_new_errata_release,
-    release_errata, release_new_errata, reset_records_threshold
+    bulk_errata_release,
+    bulk_new_errata_release,
+    release_errata,
+    release_new_errata,
+    reset_records_threshold,
 )
 from alws.schemas import errata_schema
 
@@ -272,14 +278,26 @@ async def bulk_release_new_errata_records(
 
 
 @router.post("/bulk_release_records/")
-async def bulk_release_errata_records(records_ids: List[str]):
-    bulk_errata_release.send(records_ids)
-    return {
-        "message": (
-            "Following records scheduled for release:"
-            f" {', '.join(records_ids)}"
-        )
-    }
+async def bulk_release_errata_records(
+    records_ids: List[str],
+    force: bool = False,
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
+):
+    records_to_update, skipped_records = await set_errata_packages_in_progress(
+        records_ids, session
+    )
+    if not records_to_update:
+        return {"message": "No records to update, all in progress"}
+    bulk_errata_release.send(records_ids, force)
+    message = (
+        "Following records scheduled for release:"
+        f" {', '.join(records_to_update)}"
+    )
+    if skipped_records:
+        message = f"{message}. Skipped: {', '.join(skipped_records)}"
+    return {"message": message}
 
 
 @router.post('/reset-matched-packages')
@@ -295,17 +313,19 @@ async def reset_matched_packages(
 
 @router.post('/reset-matched-packages-multiple')
 async def reset_matched_erratas_packages_threshold(
-        issued_date,
-        session: AsyncSession = Depends(
-            AsyncSessionDependency(key=get_async_db_key())
-        ),
+    issued_date,
+    session: AsyncSession = Depends(
+        AsyncSessionDependency(key=get_async_db_key())
+    ),
 ):
     records = await get_errata_records_threshold(issued_date, session)
     if records:
         reset_records_threshold.send(issued_date)
 
-    message = (f"Records issued after {issued_date} are scheduled for package resetting"
-               if records else
-               f"No unreleased records found after {issued_date} including")
+    message = (
+        f"Records issued after {issued_date} are scheduled for package resetting"
+        if records
+        else f"No unreleased records found after {issued_date} including"
+    )
 
     return {'message': message}

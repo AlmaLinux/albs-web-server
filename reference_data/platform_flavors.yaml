@@ -94,12 +94,12 @@
 - name: AlmaLinux-9-beta
   modularity:
     git_tag_prefix:
-      modified: a9
-      non_modified: c9
+      modified: a9-beta
+      non_modified: c9-beta
     versions:
-      - name: '9.4'
-        version_prefix: '90400'
-        dist_prefix: 'el9.4.0'
+      - name: '9.5'
+        version_prefix: '90500'
+        dist_prefix: 'el9.5.0'
   data:
      mock:
        secure_boot_macros:
@@ -228,6 +228,13 @@
       arch: aarch64
       type: rpm
       url: https://el7.repo.almalinux.org/epel/7/aarch64/
+      production: false
+      debug: false
+      priority: 10
+    - name: epel
+      arch: ppc64le
+      type: rpm
+      url: https://el7.repo.almalinux.org/epel/7/ppc64le/
       production: false
       debug: false
       priority: 10

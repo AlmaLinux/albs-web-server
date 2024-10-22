@@ -1,9 +1,9 @@
-pytest==8.3.2
+pytest==8.3.3
 pytest-cov==5.0.0
-pyfakefs==5.6.0
+pyfakefs==5.7.1
 
 # Linters
 isort[colors]==5.13.2
-black==24.8.0
-pylint==3.2.7
-bandit[toml]==1.7.9
+black==24.10.0
+pylint==3.3.1
+bandit[toml]==1.7.10
