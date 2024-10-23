@@ -298,7 +298,7 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
         })
         oval.append_object(definition)
 
-        for new_oval_objects, func in (
+        for new_oval_objects, get_cls_by_tag_func in (
             (record.tests, get_test_cls_by_tag),
             (record.objects, get_object_cls_by_tag),
             (record.states, get_state_cls_by_tag),
@@ -306,7 +306,12 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
         ):
             if new_oval_objects is None:
                 continue
-            add_oval_objects(new_oval_objects, objects, oval, func)
+            add_oval_objects(
+                new_oval_objects,
+                objects,
+                oval,
+                get_cls_by_tag_func,
+            )
 
     return oval.dump_to_string()
 
@@ -874,6 +879,7 @@ async def process_new_errata_packages(
     platform: models.Platform,
 ):
     packages = []
+    pkg_types = []
     search_params = prepare_search_params(errata)
     prod_repos_cache = await load_platform_packages(
         platform,
@@ -891,18 +897,19 @@ async def process_new_errata_packages(
             release=package.release,
             epoch=package.epoch,
             arch=package.arch,
-            # TODO: We can provide source_srpm, need to check if it can be helpful
+            # TODO: Consider providing source_srpm, if can be of any help
             source_srpm=None,
             reboot_suggested=False,
         )
         db_errata.packages.append(db_package)
         packages.append(db_package)
         # Create ErrataToAlbsPackages
-        matching_packages, _ = await get_matching_albs_packages(
+        matching_packages, pkg_type = await get_matching_albs_packages(
             db, db_package, prod_repos_cache, db_errata.module
         )
         packages.extend(matching_packages)
-    return packages
+        pkg_types.append(pkg_type)
+    return packages, pkg_types
 
 
 async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
@@ -914,6 +921,7 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     platform = platform.scalars().first()
     items_to_insert = []
     original_id = errata.id
+    oval_title = f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
 
     # Errata db record
     db_errata = models.NewErrataRecord(
@@ -931,7 +939,7 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         description=None,
         original_description=errata.description,
         title=None,
-        oval_title=f"{errata.id}: {errata.title} ({errata.severity.capitalize()})",
+        oval_title=oval_title,
         # TODO: I'd prefer to keep the title without severity, and then present
         # the severity differently in UI
         original_title=f"{errata.severity.capitalize()}: {errata.title}",
@@ -967,9 +975,11 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         await process_new_errata_references(db, errata, db_errata, platform)
     )
     # Errata Packages
-    items_to_insert.extend(
+    new_errata_packages, pkg_types = (
         await process_new_errata_packages(db, errata, db_errata, platform)
     )
+    items_to_insert.extend(new_errata_packages)
+
     db.add_all(items_to_insert)
     await db.flush()
     await db.refresh(db_errata)
@@ -1018,7 +1028,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
 
     # Check if errata refers to a module
-    r = re.compile("Module ([\d\w\-\_]+:[\d\.\w]+) is enabled")
+    r = re.compile(r"Module ([\d\w\-\_]+:[\d\.\w]+) is enabled")
     match = r.findall(str(errata.criteria))
     # Ensure we get a module and is not the -devel one
     errata_module = None if not match else match[0].replace("-devel:", ":")
@@ -1841,7 +1851,6 @@ async def get_albs_oval_cache(
 
 
 async def add_oval_data_to_errata_record(
-    session: AsyncSession,
     db_record: models.NewErrataRecord,
     albs_oval_cache: dict,
 ):
@@ -1943,9 +1952,7 @@ async def release_new_errata_record(
         albs_oval_cache = await get_albs_oval_cache(
             session, db_record.platform.name
         )
-        await add_oval_data_to_errata_record(
-            session, db_record, albs_oval_cache
-        )
+        await add_oval_data_to_errata_record(db_record, albs_oval_cache)
 
         db_record.release_status = ErrataReleaseStatus.RELEASED
         db_record.last_release_log = await get_release_logs(
@@ -2045,6 +2052,7 @@ async def bulk_new_errata_records_release(
         settings.pulp_user,
         settings.pulp_password,
     )
+    released_record_ids = []
     release_tasks = []
     repos_to_publish = []
     async with open_async_session(key=get_async_db_key()) as session:
@@ -2076,7 +2084,7 @@ async def bulk_new_errata_records_release(
             [rec.id for rec in db_records],
         )
 
-        platforms = set([rec.platform.name for rec in db_records])
+        platforms = { rec.platform.name for rec in db_records }
         albs_oval_cache = collections.defaultdict()
         for platform in platforms:
             albs_oval_cache[platform] = await get_albs_oval_cache(
@@ -2099,10 +2107,11 @@ async def bulk_new_errata_records_release(
             except Exception as exc:
                 db_record.release_status = ErrataReleaseStatus.FAILED
                 db_record.last_release_log = str(exc)
-                logging.exception("Cannot release %s record:", record_id)
+                logging.exception("Cannot release %s record:", db_record.id)
+                continue
 
             logging.info("Creating update record in pulp")
-            await process_errata_release_for_repos(
+            tasks = await process_errata_release_for_repos(
                 db_record,
                 repo_mapping,
                 session,
@@ -2111,7 +2120,7 @@ async def bulk_new_errata_records_release(
 
             logging.info("Generating OVAL data")
             objects, states, tests = await add_oval_data_to_errata_record(
-                session, db_record, albs_oval_cache[db_record.platform.name]
+                db_record, albs_oval_cache[db_record.platform.name]
             )
 
             # This way we take into account already generated references
@@ -2140,7 +2149,7 @@ async def bulk_new_errata_records_release(
 
             db_record.release_status = ErrataReleaseStatus.RELEASED
             db_record.last_release_log = await get_release_logs(
-                record_id=record_id,
+                record_id=db_record.id,
                 pulp_packages=pulp_packages,
                 session=session,
                 repo_mapping=repo_mapping,
@@ -2148,20 +2157,32 @@ async def bulk_new_errata_records_release(
                 force_flag=force,
                 missing_pkg_names=missing_pkg_names,
             )
-            logging.info("Record %s successfully released", record_id)
 
-        await session.flush()
-        if settings.github_integration_enabled:
-            try:
-                await close_issues(record_ids=[db_record.id])
-            except Exception as err:
-                logging.exception(
-                    "Cannot move issue to the Released section: %s",
-                    err,
-                )
+            released_record_ids.append(db_record.id)
 
-        # TODO: Maybe check whether all ids were released
-        logging.info("All records successfully released: %s", records_ids)
+            if not tasks:
+                continue
+            repos_to_publish.extend(repo_mapping.keys())
+            release_tasks.extend(tasks)
+
+    logging.info("Executing release tasks")
+    await asyncio.gather(*release_tasks)
+    logging.info("Executing publication tasks")
+    await asyncio.gather(
+        *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
+    )
+
+    if settings.github_integration_enabled:
+        try:
+            await close_issues(record_ids=[released_record_ids])
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Released section: %s",
+                err,
+            )
+
+    # TODO: Maybe check whether all ids were released
+    logging.info("Successfully released the following erratas: %s", records_ids)
 
 
 async def bulk_errata_records_release(
@@ -2291,9 +2312,10 @@ async def get_updateinfo_xml_from_pulp(
             repo_name = errata_record.get("pkglist", [{}])[0].get("name")
             if not repo_name:
                 logging.warning(
-                    "Unable to filter results by platform_name %s, error: ",
+                    "Unable to filter results by platform '%s' "
+                    "while processing '%s'",
                     platform_name,
-                    str(exc),
+                    errata_record["id"],
                 )
                 return
             if not repo_name.startswith(platform_name.lower()):
