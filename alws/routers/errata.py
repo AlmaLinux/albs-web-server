@@ -83,7 +83,9 @@ async def get_new_oval_xml(
     only_released: bool = False,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
-    records = await errata_crud.get_new_oval_xml(db, platform_name, only_released)
+    records = await errata_crud.get_new_oval_xml(
+        db, platform_name, only_released
+    )
     if not records:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -78,6 +78,11 @@ try:
         get_test_cls_by_tag,
         get_variable_cls_by_tag,
     )
+    from almalinux.liboval.data_generation import (
+        Module,
+        OvalDataGenerator,
+        Platform,
+    )
     from almalinux.liboval.definition import Definition
     from almalinux.liboval.generator import Generator
     from almalinux.liboval.rpminfo_state import RpminfoState
@@ -85,9 +90,6 @@ try:
     from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
     from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
     from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
-    from almalinux.liboval.data_generation import (
-        Module, OvalDataGenerator, Platform
-    )
 except ImportError:
     pass
 
@@ -165,8 +167,7 @@ async def get_new_oval_xml(
     db: AsyncSession, platform_name: str, only_released: bool = False
 ):
     platform_subq = (
-        select(models.Platform.id)
-        .where(models.Platform.name == platform_name)
+        select(models.Platform.id).where(models.Platform.name == platform_name)
     ).scalar_subquery()
 
     query = (
@@ -179,7 +180,7 @@ async def get_new_oval_xml(
             .selectinload(models.BuildTaskArtifact.build_task),
             selectinload(models.NewErrataRecord.references).selectinload(
                 models.NewErrataReference.cve
-            )
+            ),
         )
     )
 
@@ -201,6 +202,7 @@ def add_oval_objects(new_objects, objects, oval, get_cls_by_tag_func):
                 get_cls_by_tag_func(new_obj["type"]).from_dict(new_obj)
             )
 
+
 def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
     oval = Composer()
     generator = Generator(
@@ -215,7 +217,7 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
         if not record.criteria:
             logging.warning(
                 "Skipping OVAL XML generation of %s. Reason: Missing OVAL data",
-                record.id
+                record.id,
             )
             continue
         title = record.oval_title
@@ -277,13 +279,15 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                             "RHSA"
                             if ref.ref_type == ErrataReferenceType.rhsa
                             else (
-                                "CVE" if ref.ref_type == ErrataReferenceType.cve
+                                "CVE"
+                                if ref.ref_type == ErrataReferenceType.cve
                                 else "ALSA"
                             )
-                        )
+                        ),
                     }
                     for ref in record.references
-                    if ref.ref_type in [
+                    if ref.ref_type
+                    in [
                         ErrataReferenceType.self_ref,
                         ErrataReferenceType.rhsa,
                         ErrataReferenceType.cve,
@@ -298,14 +302,13 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
             (record.tests, get_test_cls_by_tag),
             (record.objects, get_object_cls_by_tag),
             (record.states, get_state_cls_by_tag),
-            (record.variables, get_variable_cls_by_tag)
+            (record.variables, get_variable_cls_by_tag),
         ):
             if new_oval_objects is None:
                 continue
             add_oval_objects(new_oval_objects, objects, oval, func)
 
     return oval.dump_to_string()
-
 
 
 def errata_records_to_oval(
@@ -793,8 +796,10 @@ async def get_matching_albs_packages(
 
 
 async def process_new_errata_references(
-    db: AsyncSession, errata: BaseErrataRecord,
-    db_errata: models.NewErrataRecord, platform: models.Platform
+    db: AsyncSession,
+    errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord,
+    platform: models.Platform,
 ):
     references = []
     self_ref_exists = False
@@ -803,13 +808,16 @@ async def process_new_errata_references(
     cve_ids = [ref.cve.id for ref in errata.references if ref.cve]
     if cve_ids:
         db_cves = {
-            cve.id: cve for cve
-            in (
+            cve.id: cve
+            for cve in (
                 await db.execute(
-                    select(models.ErrataCVE)
-                    .where(models.ErrataCVE.id.in_(cve_ids))
+                    select(models.ErrataCVE).where(
+                        models.ErrataCVE.id.in_(cve_ids)
+                    )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         }
 
     for ref in errata.references:
@@ -860,8 +868,10 @@ async def process_new_errata_references(
 
 
 async def process_new_errata_packages(
-    db: AsyncSession, errata: BaseErrataRecord,
-    db_errata: models.NewErrataRecord, platform: models.Platform
+    db: AsyncSession,
+    errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord,
+    platform: models.Platform,
 ):
     packages = []
     search_params = prepare_search_params(errata)
@@ -1745,7 +1755,7 @@ async def get_release_logs(
 
 
 async def get_packages_for_oval(
-    packages: List[models.NewErrataPackage]
+    packages: List[models.NewErrataPackage],
 ) -> List[dict]:
     oval_pkgs = []
     albs_pkgs_by_name = collections.defaultdict(list)
@@ -1768,7 +1778,7 @@ async def get_packages_for_oval(
                 "version": albs_pkg.version,
                 "release": albs_pkg.release,
                 "arch": albs_pkg.arch,
-                "reboot_suggested": pkg.reboot_suggested
+                "reboot_suggested": pkg.reboot_suggested,
             }
             albs_pkgs_by_name[pkg.name].append(albs_pkg_dict)
 
@@ -1782,12 +1792,11 @@ async def get_packages_for_oval(
         # yell at me if I'm wrong
         smallest_evrs_by_name[name] = min(
             pkgs,
-            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}'
+            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}',
         )
 
     noarch_pkgs = [
-        pkg for pkg in smallest_evrs_by_name.values()
-        if pkg["arch"] == "noarch"
+        pkg for pkg in smallest_evrs_by_name.values() if pkg["arch"] == "noarch"
     ]
 
     for name, pkgs in albs_pkgs_by_name.items():
@@ -1811,7 +1820,9 @@ async def get_packages_for_oval(
 # At this moment we need this cache, but if we finally migrate old records to
 # new approach, we can get rid of this redis cache and directly retrieve this
 # info from db without passing through get_oval_xml method
-async def get_albs_oval_cache(session: AsyncSession, platform_name: str) -> dict:
+async def get_albs_oval_cache(
+    session: AsyncSession, platform_name: str
+) -> dict:
     redis = aioredis.from_url(settings.redis_url)
     cache_name = f"albs-oval-cache_{platform_name}"
     cached_oval = await redis.get(cache_name)
@@ -1830,8 +1841,9 @@ async def get_albs_oval_cache(session: AsyncSession, platform_name: str) -> dict
 
 
 async def add_oval_data_to_errata_record(
-    session: AsyncSession, db_record: models.NewErrataRecord,
-    albs_oval_cache: dict
+    session: AsyncSession,
+    db_record: models.NewErrataRecord,
+    albs_oval_cache: dict,
 ):
     oval_packages = await get_packages_for_oval(db_record.packages)
 
@@ -1863,26 +1875,19 @@ async def add_oval_data_to_errata_record(
     )
 
     # Right now, variables are not being generated, so it's a no-op
-    #errata.variables = data_generator.generate_variables()
-    objects = data_generator.generate_objects(
-        albs_oval_cache["objects"]
-    )
+    # errata.variables = data_generator.generate_variables()
+    objects = data_generator.generate_objects(albs_oval_cache["objects"])
     db_record.objects = objects
 
-    states = data_generator.generate_states(
-        albs_oval_cache["states"]
-    )
+    states = data_generator.generate_states(albs_oval_cache["states"])
     db_record.states = states
 
-    tests = data_generator.generate_tests(
-        albs_oval_cache["tests"]
-    )
+    tests = data_generator.generate_tests(albs_oval_cache["tests"])
     db_record.tests = tests
 
     db_record.criteria = data_generator.generate_criteria()
 
     return (objects, states, tests)
-
 
 
 async def release_new_errata_record(
@@ -2112,14 +2117,26 @@ async def bulk_new_errata_records_release(
             # This way we take into account already generated references
             # during bulk errata release
             for obj in objects:
-                if obj not in albs_oval_cache[db_record.platform.name]["objects"]:
-                    albs_oval_cache[db_record.platform.name]["objects"].append(obj)
+                if (
+                    obj
+                    not in albs_oval_cache[db_record.platform.name]["objects"]
+                ):
+                    albs_oval_cache[db_record.platform.name]["objects"].append(
+                        obj
+                    )
             for ste in states:
-                if ste not in albs_oval_cache[db_record.platform.name]["states"]:
-                    albs_oval_cache[db_record.platform.name]["states"].append(ste)
+                if (
+                    ste
+                    not in albs_oval_cache[db_record.platform.name]["states"]
+                ):
+                    albs_oval_cache[db_record.platform.name]["states"].append(
+                        ste
+                    )
             for tst in tests:
                 if tst not in albs_oval_cache[db_record.platform.name]["tests"]:
-                    albs_oval_cache[db_record.platform.name]["tests"].append(tst)
+                    albs_oval_cache[db_record.platform.name]["tests"].append(
+                        tst
+                    )
 
             db_record.release_status = ErrataReleaseStatus.RELEASED
             db_record.last_release_log = await get_release_logs(

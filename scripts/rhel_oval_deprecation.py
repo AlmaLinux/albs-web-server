@@ -1,25 +1,24 @@
-import os
-import sys
-
 import argparse
 import json
 import logging
+import os
 import re
-
+import sys
 from collections import defaultdict
 from typing import List
 
+from almalinux.liboval.composer import Composer
+from almalinux.liboval.data_generation import (
+    Module,
+    OvalDataGenerator,
+    Platform,
+)
 from fastapi_sqla import open_async_session
 from hawkey import split_nevra
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from syncer import sync
-
-from almalinux.liboval.composer import Composer
-from almalinux.liboval.data_generation import (
-    Module, OvalDataGenerator, Platform
-)
 
 from alws import models
 from alws.config import settings
@@ -36,6 +35,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel('DEBUG')
 
+
 async def get_platform_oval_data(
     session: AsyncSession, platform_name: str
 ) -> dict:
@@ -48,14 +48,21 @@ async def get_platform_oval_data(
 async def get_platform_erratas(
     session: AsyncSession, platform_name: str
 ) -> List[models.NewErrataRecord]:
-    query = select(models.NewErrataRecord).where(
-        models.NewErrataRecord.release_status == ErrataReleaseStatus.RELEASED
-    ).options(
-        selectinload(models.NewErrataRecord.platform),
-        selectinload(models.NewErrataRecord.packages)
-        .selectinload(models.NewErrataPackage.albs_packages),
-        selectinload(models.NewErrataRecord.references)
-        .selectinload(models.NewErrataReference.cve),
+    query = (
+        select(models.NewErrataRecord)
+        .where(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.RELEASED
+        )
+        .options(
+            selectinload(models.NewErrataRecord.platform),
+            selectinload(models.NewErrataRecord.packages).selectinload(
+                models.NewErrataPackage.albs_packages
+            ),
+            selectinload(models.NewErrataRecord.references).selectinload(
+                models.NewErrataReference.cve
+            ),
+        )
     )
     platform = await session.execute(
         select(models.Platform).where(models.Platform.name == platform_name)
@@ -72,7 +79,9 @@ async def update_debranded_fields(
     errata.definition_id = oval_definition["id"]
     errata.oval_title = oval_definition["metadata"]["title"]
     errata.description = oval_definition["metadata"]["description"]
-    errata.affected_cpe = oval_definition["metadata"]["advisory"]["affected_cpe_list"]
+    errata.affected_cpe = oval_definition["metadata"]["advisory"][
+        "affected_cpe_list"
+    ]
 
 
 def find_pkg_criteria_tests(obj):
@@ -92,20 +101,13 @@ def find_pkg_criteria_tests(obj):
 
 def get_pkg_arches(tst_id: str, albs_oval_cache: dict) -> List[str]:
     evr_tst = next(
-        (
-            tst
-            for tst in albs_oval_cache["tests"]
-            if tst.get("id") == tst_id
-        )
+        (tst for tst in albs_oval_cache["tests"] if tst.get("id") == tst_id)
     )
-    ste = next(
-        (
-            ste
-            for ste in albs_oval_cache["states"]
-            if ste["id"] == evr_tst["state_ref"]
-
-        )
-    )
+    ste = next((
+        ste
+        for ste in albs_oval_cache["states"]
+        if ste["id"] == evr_tst["state_ref"]
+    ))
     if ste.get("arch"):
         arches = ste["arch"].split("|")
     else:
@@ -128,16 +130,14 @@ def prepare_pkgs_for_oval(
         arches = get_pkg_arches(pkg_test["ref"], albs_oval_cache)
         for arch in arches:
             nevra = split_nevra(f"{pkg_name}-{pkg_evr}.{arch}")
-            oval_pkgs_by_name[nevra.name].append(
-                {
-                    "name": nevra.name,
-                    "epoch": nevra.epoch,
-                    "version": nevra.version,
-                    "release": nevra.release,
-                    "arch": nevra.arch,
-                    "reboot_suggested": False
-                }
-            )
+            oval_pkgs_by_name[nevra.name].append({
+                "name": nevra.name,
+                "epoch": nevra.epoch,
+                "version": nevra.version,
+                "release": nevra.release,
+                "arch": nevra.arch,
+                "reboot_suggested": False,
+            })
 
     # Choose the one with the smallest evr among different versions of the same
     # package but in different arches. This situation happens very often, for
@@ -149,12 +149,11 @@ def prepare_pkgs_for_oval(
         # yell at me if I'm wrong
         smallest_evrs_by_name[name] = min(
             pkgs,
-            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}'
+            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}',
         )
 
     noarch_pkgs = [
-        pkg for pkg in smallest_evrs_by_name.values()
-        if pkg["arch"] == "noarch"
+        pkg for pkg in smallest_evrs_by_name.values() if pkg["arch"] == "noarch"
     ]
 
     for name, pkgs in oval_pkgs_by_name.items():
@@ -210,25 +209,19 @@ async def add_oval_data(
         devel_module=devel_module,
     )
 
-    objects = data_generator.generate_objects(
-        albs_oval_cache["objects"]
-    )
+    objects = data_generator.generate_objects(albs_oval_cache["objects"])
     for obj in objects:
         if obj not in albs_oval_cache["objects"]:
             albs_oval_cache["objects"].append(obj)
     errata.objects = objects
 
-    states = data_generator.generate_states(
-        albs_oval_cache["states"]
-    )
+    states = data_generator.generate_states(albs_oval_cache["states"])
     for ste in states:
         if ste not in albs_oval_cache["states"]:
             albs_oval_cache["states"].append(ste)
     errata.states = states
 
-    tests = data_generator.generate_tests(
-        albs_oval_cache["tests"]
-    )
+    tests = data_generator.generate_tests(albs_oval_cache["tests"])
     for tst in tests:
         if tst not in albs_oval_cache["tests"]:
             albs_oval_cache["tests"].append(tst)
@@ -247,13 +240,11 @@ async def main(args):
             erratas = await get_platform_erratas(session, platform)
             for errata in erratas:
                 try:
-                    oval_defn = next(
-                        (
-                            defn
-                            for defn in albs_oval_cache["definitions"]
-                            if defn["metadata"]["title"].startswith(errata.id)
-                        )
-                    )
+                    oval_defn = next((
+                        defn
+                        for defn in albs_oval_cache["definitions"]
+                        if defn["metadata"]["title"].startswith(errata.id)
+                    ))
                 except StopIteration:
                     logger.info(
                         "Skipping '%s' as couldn't be found in OVAL", errata.id
@@ -272,7 +263,7 @@ async def main(args):
 def parse_args():
     parser = argparse.ArgumentParser(
         "rhel_oval_migration",
-        description="Add production errata OVAL data into db"
+        description="Add production errata OVAL data into db",
     )
     parser.add_argument(
         "-s",
@@ -283,6 +274,7 @@ def parse_args():
         help="Perform changes in database",
     )
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()

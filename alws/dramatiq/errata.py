@@ -16,7 +16,9 @@ from alws.utils.fastapi_sqla_setup import setup_all
 __all__ = ["release_errata"]
 
 
-async def _release_new_errata_record(record_id: str, platform_id: int, force: bool):
+async def _release_new_errata_record(
+    record_id: str, platform_id: int, force: bool
+):
     await release_new_errata_record(
         record_id,
         platform_id,
@@ -64,6 +66,7 @@ def release_new_errata(record_id: str, platform_id: int, force: bool = False):
         )
     )
 
+
 @dramatiq.actor(
     max_retries=0,
     priority=0,
@@ -102,7 +105,9 @@ def bulk_errata_release(records_ids: typing.List[str], force: bool = False):
 )
 def bulk_new_errata_release(records_ids: typing.List[str], force: bool = False):
     event_loop.run_until_complete(setup_all())
-    event_loop.run_until_complete(_bulk_new_errata_records_release(records_ids, force))
+    event_loop.run_until_complete(
+        _bulk_new_errata_records_release(records_ids, force)
+    )
 
 
 @dramatiq.actor(
