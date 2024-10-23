@@ -975,8 +975,8 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         await process_new_errata_references(db, errata, db_errata, platform)
     )
     # Errata Packages
-    new_errata_packages, pkg_types = (
-        await process_new_errata_packages(db, errata, db_errata, platform)
+    new_errata_packages, pkg_types = await process_new_errata_packages(
+        db, errata, db_errata, platform
     )
     items_to_insert.extend(new_errata_packages)
 
@@ -2057,16 +2057,6 @@ async def bulk_new_errata_records_release(
     repos_to_publish = []
     async with open_async_session(key=get_async_db_key()) as session:
         session: AsyncSession
-        await session.execute(
-            update(models.NewErrataRecord)
-            .where(models.NewErrataRecord.id.in_(records_ids))
-            .values(
-                release_status=ErrataReleaseStatus.IN_PROGRESS,
-                last_release_log=None,
-            )
-        )
-        await session.flush()
-
         db_records = await session.execute(
             generate_query_for_release(records_ids),
         )
@@ -2084,7 +2074,7 @@ async def bulk_new_errata_records_release(
             [rec.id for rec in db_records],
         )
 
-        platforms = { rec.platform.name for rec in db_records }
+        platforms = {rec.platform.name for rec in db_records}
         albs_oval_cache = collections.defaultdict()
         for platform in platforms:
             albs_oval_cache[platform] = await get_albs_oval_cache(

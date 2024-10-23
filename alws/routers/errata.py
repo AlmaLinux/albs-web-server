@@ -197,7 +197,7 @@ async def update_package_status(
             "ok": bool(await errata_crud.update_package_status(db, packages))
         }
     except ValueError as e:
-        return {"ok": False, "error": e.message}
+        return {"ok": False, "error": str(e)}
 
 
 @router.post(
@@ -270,13 +270,19 @@ async def bulk_release_new_errata_records(
         AsyncSessionDependency(key=get_async_db_key())
     ),
 ):
+    records_to_update, skipped_records = await set_errata_packages_in_progress(
+        records_ids, session
+    )
+    if not records_to_update:
+        return {"message": "No records to update, all in progress"}
     bulk_new_errata_release.send(records_ids, force)
-    return {
-        "message": (
-            "Following records scheduled for release:"
-            f" {', '.join(records_ids)}"
-        )
-    }
+    message = (
+        "The following records were scheduled for release:"
+        f" {', '.join(records_to_update)}"
+    )
+    if skipped_records:
+        message = f"{message}. Skipped: {', '.join(skipped_records)}"
+    return {"message": message}
 
 
 @router.post("/bulk_release_records/")
@@ -294,7 +300,7 @@ async def bulk_release_errata_records(
         return {"message": "No records to update, all in progress"}
     bulk_errata_release.send(records_ids, force)
     message = (
-        "Following records scheduled for release:"
+        "The following records were scheduled for release:"
         f" {', '.join(records_to_update)}"
     )
     if skipped_records:
