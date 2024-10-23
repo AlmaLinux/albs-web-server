@@ -49,7 +49,7 @@ class Platform(BaseModel):
     name: str
     distr_type: str
     distr_version: str
-
+    pgp_key: typing.Optional[str] = None
     arch_list: typing.List[str]
     modularity: typing.Optional[typing.Dict] = None
 
