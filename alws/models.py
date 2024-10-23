@@ -254,6 +254,7 @@ class Platform(PermissionsMixin, Base):
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True, index=True
     )
+    pgp_key: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     priority: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Integer, nullable=True
     )
