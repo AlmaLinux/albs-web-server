@@ -42,9 +42,9 @@ def clean_release(release: str) -> str:
 
 def get_clean_distr_name(distr_name: str) -> str:
     clean_distr_name = re.search(
-        r'^(?P<dist_name>[a-z]+)', distr_name, re.IGNORECASE,
+        r'^(?P<dist_name>[^\d]*)', distr_name, re.IGNORECASE,
     ).groupdict().get('dist_name', '')
-    return clean_distr_name
+    return clean_distr_name.strip('-')
 
 
 def parse_git_ref(pattern: str, git_ref: str):
