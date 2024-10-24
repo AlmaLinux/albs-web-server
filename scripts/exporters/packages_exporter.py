@@ -269,7 +269,7 @@ class PackagesExporter(BasePulpExporter):
         platform_name: str,
         only_released: bool = False,
     ):
-        endpoint = "errata/get_oval_xml/"
+        endpoint = "errata/get_new_oval_xml/"
         return await self.make_request(
             "GET",
             endpoint,
