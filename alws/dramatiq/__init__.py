@@ -11,6 +11,7 @@ Dramatiq new tasks how-to:
        loop from this __init__.py, since creating multiple loops for tasks
        will break your tasks.
 """
+
 import asyncio
 
 import dramatiq
@@ -29,12 +30,18 @@ dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
 
 # Tasks import started from here
-from alws.dramatiq.build import start_build, build_done
+from alws.dramatiq.build import build_done, start_build
+from alws.dramatiq.errata import (
+    bulk_errata_release,
+    bulk_new_errata_release,
+    release_errata,
+    release_new_errata,
+    reset_records_threshold,
+)
 
 # dramatiq.user and dramatiq.products need to go before dramatiq.releases
 from alws.dramatiq.products import perform_product_modification
-from alws.dramatiq.user import perform_user_removal
 from alws.dramatiq.releases import execute_release_plan, revert_release
-from alws.dramatiq.errata import bulk_errata_release, release_errata, reset_records_threshold
 from alws.dramatiq.sign_task import complete_sign_task
 from alws.dramatiq.tests import complete_test_task
+from alws.dramatiq.user import perform_user_removal

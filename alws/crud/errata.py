@@ -1,6 +1,7 @@
 import asyncio
 import collections
 import datetime
+import json
 import logging
 import re
 import uuid
@@ -15,6 +16,7 @@ from typing import (
     Union,
 )
 
+import aioredis
 import createrepo_c as cr
 import jinja2
 from fastapi_sqla import open_async_session, open_session
@@ -75,6 +77,11 @@ try:
         get_state_cls_by_tag,
         get_test_cls_by_tag,
         get_variable_cls_by_tag,
+    )
+    from almalinux.liboval.data_generation import (
+        Module,
+        OvalDataGenerator,
+        Platform,
     )
     from almalinux.liboval.definition import Definition
     from almalinux.liboval.generator import Generator
@@ -154,6 +161,159 @@ async def get_oval_xml(
 
     records = (await db.execute(query)).scalars().all()
     return errata_records_to_oval(records, platform_name)
+
+
+async def get_new_oval_xml(
+    db: AsyncSession, platform_name: str, only_released: bool = False
+):
+    platform_subq = (
+        select(models.Platform.id).where(models.Platform.name == platform_name)
+    ).scalar_subquery()
+
+    query = (
+        select(models.NewErrataRecord)
+        .where(models.NewErrataRecord.platform_id == platform_subq)
+        .options(
+            selectinload(models.NewErrataRecord.packages)
+            .selectinload(models.NewErrataPackage.albs_packages)
+            .selectinload(models.NewErrataToALBSPackage.build_artifact)
+            .selectinload(models.BuildTaskArtifact.build_task),
+            selectinload(models.NewErrataRecord.references).selectinload(
+                models.NewErrataReference.cve
+            ),
+        )
+    )
+
+    if only_released:
+        query = query.filter(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.RELEASED
+        )
+
+    records = (await db.execute(query)).scalars().all()
+    return new_errata_records_to_oval(records)
+
+
+def add_oval_objects(new_objects, objects, oval, get_cls_by_tag_func):
+    for new_obj in new_objects:
+        if new_obj["id"] not in objects:
+            objects.add(new_obj["id"])
+            oval.append_object(
+                get_cls_by_tag_func(new_obj["type"]).from_dict(new_obj)
+            )
+
+
+def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
+    oval = Composer()
+    generator = Generator(
+        product_name="AlmaLinux OS Errata System",
+        product_version="0.0.1",
+        schema_version="5.10",
+        timestamp=datetime.datetime.utcnow(),
+    )
+    oval.generator = generator
+    objects = set()
+    for record in records:
+        if not record.criteria:
+            logging.warning(
+                "Skipping OVAL XML generation of %s. Reason: Missing OVAL data",
+                record.id,
+            )
+            continue
+        title = record.oval_title
+        definition = Definition.from_dict({
+            "id": record.definition_id,
+            "version": record.definition_version,
+            "class": record.definition_class,
+            "metadata": {
+                "title": title,
+                "description": (
+                    record.description
+                    if record.description
+                    else record.original_description
+                ),
+                "advisory": {
+                    "from": record.contact_mail,
+                    "severity": record.severity.capitalize(),
+                    "rights": record.rights,
+                    "issued_date": record.issued_date,
+                    "updated_date": record.updated_date,
+                    "affected_cpe_list": record.affected_cpe,
+                    "bugzilla": [
+                        {
+                            "id": ref.ref_id,
+                            "href": ref.href,
+                            "title": ref.title,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.bugzilla
+                    ],
+                    "cves": [
+                        {
+                            "name": ref.ref_id,
+                            "public": datetime.datetime.strptime(
+                                # year-month-day
+                                ref.cve.public[:10],
+                                "%Y-%m-%d",
+                            ).date(),
+                            "href": ref.href,
+                            "impact": ref.cve.impact.capitalize(),
+                            "cwe": ref.cve.cwe,
+                            "cvss3": ref.cve.cvss3,
+                        }
+                        for ref in record.references
+                        if ref.ref_type == ErrataReferenceType.cve and ref.cve
+                    ],
+                },
+                # TODO: It would be great if we update the ErrataReferenceTypes
+                # in a way that we use the same way through all the involved
+                # code. We only need to take care of those using "self_ref",
+                # which I propose to move its value to "alsa". Then, here we
+                # can use the ErrataReferenceType value in capital letters and
+                # get rid of this.
+                "references": [
+                    {
+                        "id": ref.ref_id,
+                        "url": ref.href,
+                        "source": (
+                            "RHSA"
+                            if ref.ref_type == ErrataReferenceType.rhsa
+                            else (
+                                "CVE"
+                                if ref.ref_type == ErrataReferenceType.cve
+                                else "ALSA"
+                            )
+                        ),
+                    }
+                    for ref in record.references
+                    if ref.ref_type
+                    in [
+                        ErrataReferenceType.self_ref,
+                        ErrataReferenceType.rhsa,
+                        ErrataReferenceType.cve,
+                    ]
+                ],
+            },
+            "criteria": record.criteria,
+        })
+        oval.append_object(definition)
+
+        for new_oval_objects, get_cls_by_tag_func in (
+            (record.tests, get_test_cls_by_tag),
+            (record.objects, get_object_cls_by_tag),
+            (record.states, get_state_cls_by_tag),
+            (record.variables, get_variable_cls_by_tag),
+        ):
+            if new_oval_objects is None:
+                continue
+            add_oval_objects(
+                new_oval_objects,
+                objects,
+                oval,
+                get_cls_by_tag_func,
+            )
+
+    return oval.dump_to_string()
 
 
 def errata_records_to_oval(
@@ -452,6 +612,10 @@ async def load_platform_packages(
             continue
 
         for pkg in pkgs:
+            # We do not need to map src pkgs
+            if pkg.arch == "src":
+                continue
+
             if for_release:
                 key = pkg.pulp_href
                 if not cache.get(key):
@@ -466,8 +630,6 @@ async def load_platform_packages(
             if not cache.get(short_pkg_name):
                 cache[short_pkg_name] = {}
             arch_list = [pkg.arch]
-            if pkg.arch == "noarch":
-                arch_list = platform.arch_list
             for arch in arch_list:
                 if not cache[short_pkg_name].get(arch):
                     cache[short_pkg_name][arch] = []
@@ -528,6 +690,16 @@ async def get_matching_albs_packages(
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
         errata_package.arch, []
     ):
+        # src and some noarch packages are coming with an empty rpm_sourcerpm,
+        # field which makes parse_rpm_nevra(prod_package.rpm_sourcerpm) below
+        # to fail.
+        if not prod_package.rpm_sourcerpm:
+            logging.warning(
+                "Skipping '%s' with empty sourcerpm field in pulp href '%s'",
+                prod_package.name,
+                prod_package.pulp_href,
+            )
+            continue
         mapping = models.NewErrataToALBSPackage(
             pulp_href=prod_package.pulp_href,
             status=ErrataPackageStatus.released,
@@ -628,6 +800,214 @@ async def get_matching_albs_packages(
     return items_to_insert, package_type
 
 
+async def process_new_errata_references(
+    db: AsyncSession,
+    errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord,
+    platform: models.Platform,
+):
+    references = []
+    self_ref_exists = False
+
+    db_cves = collections.defaultdict()
+    cve_ids = [ref.cve.id for ref in errata.references if ref.cve]
+    if cve_ids:
+        db_cves = {
+            cve.id: cve
+            for cve in (
+                await db.execute(
+                    select(models.ErrataCVE).where(
+                        models.ErrataCVE.id.in_(cve_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+
+    for ref in errata.references:
+        db_cve = None
+        if ref.cve:
+            db_cve = db_cves.get(ref.cve.id)
+            if db_cve is None:
+                db_cve = models.ErrataCVE(
+                    id=ref.cve.id,
+                    cvss3=ref.cve.cvss3,
+                    cwe=ref.cve.cwe,
+                    impact=ref.cve.impact,
+                    public=ref.cve.public,
+                )
+                references.append(db_cve)
+        ref_title = ""
+        if ref.ref_type in (
+            ErrataReferenceType.cve.value,
+            ErrataReferenceType.rhsa.value,
+        ):
+            ref_title = ref.ref_id
+        db_reference = models.NewErrataReference(
+            href=ref.href,
+            ref_id=ref.ref_id,
+            ref_type=ref.ref_type,
+            title=ref_title,
+            cve=db_cve,
+        )
+        if ref.ref_type == ErrataReferenceType.self_ref.value:
+            self_ref_exists = True
+        db_errata.references.append(db_reference)
+        references.append(db_reference)
+
+    if not self_ref_exists:
+        html_id = db_errata.id.replace(":", "-")
+        self_ref = models.NewErrataReference(
+            href=(
+                "https://errata.almalinux.org/"
+                f"{platform.distr_version}/{html_id}.html"
+            ),
+            ref_id=db_errata.id,
+            ref_type=ErrataReferenceType.self_ref,
+            title=db_errata.id,
+        )
+        db_errata.references.append(self_ref)
+        references.append(self_ref)
+    return references
+
+
+async def process_new_errata_packages(
+    db: AsyncSession,
+    errata: BaseErrataRecord,
+    db_errata: models.NewErrataRecord,
+    platform: models.Platform,
+):
+    packages = []
+    pkg_types = []
+    search_params = prepare_search_params(errata)
+    prod_repos_cache = await load_platform_packages(
+        platform,
+        search_params,
+        False,
+        db_errata.module,
+    )
+    for package in errata.packages:
+        # Just in case
+        if package.arch == "src":
+            continue
+        db_package = models.NewErrataPackage(
+            name=package.name,
+            version=package.version,
+            release=package.release,
+            epoch=package.epoch,
+            arch=package.arch,
+            # TODO: Consider providing source_srpm, if can be of any help
+            source_srpm=None,
+            reboot_suggested=False,
+        )
+        db_errata.packages.append(db_package)
+        packages.append(db_package)
+        # Create ErrataToAlbsPackages
+        matching_packages, pkg_type = await get_matching_albs_packages(
+            db, db_package, prod_repos_cache, db_errata.module
+        )
+        packages.extend(matching_packages)
+        pkg_types.append(pkg_type)
+    return packages, pkg_types
+
+
+async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
+    platform = await db.execute(
+        select(models.Platform)
+        .where(models.Platform.id == errata.platform_id)
+        .options(selectinload(models.Platform.repos))
+    )
+    platform = platform.scalars().first()
+    items_to_insert = []
+    original_id = errata.id
+    oval_title = f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
+
+    # Errata db record
+    db_errata = models.NewErrataRecord(
+        id=errata.id,
+        freezed=errata.freezed,
+        platform_id=errata.platform_id,
+        module=errata.module,
+        release_status=ErrataReleaseStatus.NOT_RELEASED,
+        # TODO: Not sure it's used, check and if not, remove from data model
+        summary=None,
+        # TODO: Not used AFAIK, maybe can be removed from data model
+        solution=None,
+        issued_date=errata.issued_date,
+        updated_date=errata.updated_date,
+        description=None,
+        original_description=errata.description,
+        title=None,
+        oval_title=oval_title,
+        # TODO: I'd prefer to keep the title without severity, and then present
+        # the severity differently in UI
+        original_title=f"{errata.severity.capitalize()}: {errata.title}",
+        contact_mail=platform.contact_mail,
+        status=errata.status,
+        version=errata.version,
+        severity=errata.severity,
+        rights=jinja2.Template(platform.copyright).render(
+            year=datetime.datetime.utcnow().year
+        ),
+        definition_id=errata.definition_id,
+        definition_version=errata.definition_version,
+        definition_class=errata.definition_class,
+        # TODO: Right now we're adding all repos cpes
+        # Ideally, we should generate affected cpes based on the repos
+        # where the affected packages live.
+        affected_cpe=errata.affected_cpe,
+        criteria=None,
+        original_criteria=errata.criteria,
+        tests=None,
+        original_tests=errata.tests,
+        objects=None,
+        original_objects=errata.objects,
+        states=None,
+        original_states=errata.states,
+        variables=None,
+        original_variables=errata.variables,
+    )
+    items_to_insert.append(db_errata)
+
+    # References
+    items_to_insert.extend(
+        await process_new_errata_references(db, errata, db_errata, platform)
+    )
+    # Errata Packages
+    new_errata_packages, pkg_types = await process_new_errata_packages(
+        db, errata, db_errata, platform
+    )
+    items_to_insert.extend(new_errata_packages)
+
+    db.add_all(items_to_insert)
+    await db.flush()
+    await db.refresh(db_errata)
+    if not settings.github_integration_enabled:
+        return db_errata
+
+    try:
+        github_client = await get_github_client()
+        await create_github_issue(
+            client=github_client,
+            title=errata.title,
+            description=errata.description,
+            advisory_id=errata.id,
+            original_id=original_id,
+            platform_name=platform.name,
+            severity=errata.severity,
+            packages=errata.packages,
+            platform_id=errata.platform_id,
+            find_packages_types=pkg_types,
+        )
+    except Exception as err:
+        logging.exception(
+            "Cannot create GitHub issue: %s",
+            err,
+        )
+    return db_errata
+
+
 async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     platform = await db.execute(
         select(models.Platform)
@@ -648,7 +1028,7 @@ async def create_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     alma_errata_id = re.sub(r"^RH", "AL", errata.id)
 
     # Check if errata refers to a module
-    r = re.compile("Module ([\d\w\-\_]+:[\d\.\w]+) is enabled")
+    r = re.compile(r"Module ([\d\w\-\_]+:[\d\.\w]+) is enabled")
     match = r.findall(str(errata.criteria))
     # Ensure we get a module and is not the -devel one
     errata_module = None if not match else match[0].replace("-devel:", ":")
@@ -1384,6 +1764,218 @@ async def get_release_logs(
     return "".join(release_log)
 
 
+async def get_packages_for_oval(
+    packages: List[models.NewErrataPackage],
+) -> List[dict]:
+    oval_pkgs = []
+    albs_pkgs_by_name = collections.defaultdict(list)
+    for pkg in packages:
+        if pkg.arch == 'src':
+            continue
+        albs_pkgs = [
+            albs_pkg
+            for albs_pkg in pkg.albs_packages
+            if albs_pkg.status == ErrataPackageStatus.released
+        ]
+        # This situation should only happen when some packages are missing
+        # because the 'force' flag has been enabled
+        if not albs_pkgs:
+            continue
+        for albs_pkg in albs_pkgs:
+            albs_pkg_dict = {
+                "name": pkg.name,
+                "epoch": albs_pkg.epoch,
+                "version": albs_pkg.version,
+                "release": albs_pkg.release,
+                "arch": albs_pkg.arch,
+                "reboot_suggested": pkg.reboot_suggested,
+            }
+            albs_pkgs_by_name[pkg.name].append(albs_pkg_dict)
+
+    # Choose the one with the smallest evr among different versions of the same
+    # package but in different arches. This situation happens very often, for
+    # example, when not all the architectures of a module have been built
+    # in the same build.
+    smallest_evrs_by_name = {}
+    for name, pkgs in albs_pkgs_by_name.items():
+        # yes, this could look a bit wild, but we're comparing similar evrs,
+        # yell at me if I'm wrong
+        smallest_evrs_by_name[name] = min(
+            pkgs,
+            key=lambda pkg: f'{pkg["epoch"]}:{pkg["version"]}-{pkg["release"]}',
+        )
+
+    noarch_pkgs = [
+        pkg for pkg in smallest_evrs_by_name.values() if pkg["arch"] == "noarch"
+    ]
+
+    for name, pkgs in albs_pkgs_by_name.items():
+        for pkg in pkgs:
+            if pkg["arch"] == "noarch":
+                continue
+            pkg["epoch"] = smallest_evrs_by_name[name]["epoch"]
+            pkg["version"] = smallest_evrs_by_name[name]["version"]
+            pkg["release"] = smallest_evrs_by_name[name]["release"]
+            oval_pkgs.append(pkg)
+
+    # TODO: Consider only adding noarch packages once
+    arches = {pkg["arch"] for pkg in oval_pkgs} or [0]
+    for pkg in noarch_pkgs:
+        for _ in arches:
+            oval_pkgs.append(pkg)
+
+    return oval_pkgs
+
+
+# At this moment we need this cache, but if we finally migrate old records to
+# new approach, we can get rid of this redis cache and directly retrieve this
+# info from db without passing through get_oval_xml method
+async def get_albs_oval_cache(
+    session: AsyncSession, platform_name: str
+) -> dict:
+    redis = aioredis.from_url(settings.redis_url)
+    cache_name = f"albs-oval-cache_{platform_name}"
+    cached_oval = await redis.get(cache_name)
+    if not cached_oval:
+        logging.info("Retrieving OVAL cache for %s", platform_name)
+        # TODO: uncomment only after production oval data is stored in db
+        # as described in https://github.com/AlmaLinux/build-system/issues/350
+        # Right now we're using a file for testing
+        xml_string = await get_new_oval_xml(session, platform_name, True)
+        oval = Composer.load_from_string(xml_string)
+        cached_oval = oval.as_dict()
+        del cached_oval["definitions"]
+        cached_oval = json.dumps(cached_oval)
+        await redis.set(cache_name, cached_oval, ex=3600)
+    return json.loads(cached_oval)
+
+
+async def add_oval_data_to_errata_record(
+    db_record: models.NewErrataRecord,
+    albs_oval_cache: dict,
+):
+    oval_packages = await get_packages_for_oval(db_record.packages)
+
+    # check if errata includes a devel module
+    module = None
+    devel_module = None
+    if db_record.module:
+        module = Module(db_record.module)
+        dev_module = f"{module.name}-devel:{module.stream}"
+        if dev_module in db_record.original_title:
+            devel_module = Module(dev_module)
+
+    oval_ref_ids = {
+        "object": [ref["id"] for ref in albs_oval_cache["objects"]],
+        "state": [ref["id"] for ref in albs_oval_cache["states"]],
+        "test": [ref["id"] for ref in albs_oval_cache["tests"]],
+    }
+
+    data_generator = OvalDataGenerator(
+        db_record.id,
+        Platform(db_record.platform.name),
+        oval_packages,
+        # TODO: Make the logger optional in liboval
+        logging.getLogger(),
+        settings.beholder_host,
+        oval_ref_ids,
+        module=module,
+        devel_module=devel_module,
+    )
+
+    # Right now, variables are not being generated, so it's a no-op
+    # errata.variables = data_generator.generate_variables()
+    objects = data_generator.generate_objects(albs_oval_cache["objects"])
+    db_record.objects = objects
+
+    states = data_generator.generate_states(albs_oval_cache["states"])
+    db_record.states = states
+
+    tests = data_generator.generate_tests(albs_oval_cache["tests"])
+    db_record.tests = tests
+
+    db_record.criteria = data_generator.generate_criteria()
+
+    return (objects, states, tests)
+
+
+async def release_new_errata_record(
+    record_id: str, platform_id: int, force: bool
+):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    async with open_async_session(key=get_async_db_key()) as session:
+        session: AsyncSession
+        query = generate_query_for_release([record_id])
+        query = query.filter(models.NewErrataRecord.platform_id == platform_id)
+        db_record = await session.execute(query)
+        db_record: Optional[models.NewErrataRecord] = (
+            db_record.scalars().first()
+        )
+        if not db_record:
+            logging.info("Record with %s id doesn't exists", record_id)
+            return
+
+        logging.info("Record release %s has been started", record_id)
+        search_params = prepare_search_params(db_record)
+        logging.info("Retrieving platform packages from pulp")
+        pulp_packages = await load_platform_packages(
+            db_record.platform,
+            search_params,
+            for_release=True,
+        )
+        try:
+            repo_mapping, missing_pkg_names = get_albs_packages_from_record(
+                db_record,
+                pulp_packages,
+                force,
+            )
+        except Exception as exc:
+            db_record.release_status = ErrataReleaseStatus.FAILED
+            db_record.last_release_log = str(exc)
+            logging.exception("Cannot release %s record:", record_id)
+            await session.flush()
+            return
+
+        logging.info("Creating update record in pulp")
+        await process_errata_release_for_repos(
+            db_record,
+            repo_mapping,
+            session,
+            pulp,
+        )
+
+        logging.info("Generating OVAL data")
+        albs_oval_cache = await get_albs_oval_cache(
+            session, db_record.platform.name
+        )
+        await add_oval_data_to_errata_record(db_record, albs_oval_cache)
+
+        db_record.release_status = ErrataReleaseStatus.RELEASED
+        db_record.last_release_log = await get_release_logs(
+            record_id=record_id,
+            pulp_packages=pulp_packages,
+            session=session,
+            repo_mapping=repo_mapping,
+            db_record=db_record,
+            force_flag=force,
+            missing_pkg_names=missing_pkg_names,
+        )
+        await session.flush()
+        if settings.github_integration_enabled:
+            try:
+                await close_issues(record_ids=[db_record.id])
+            except Exception as err:
+                logging.exception(
+                    "Cannot move issue to the Released section: %s",
+                    err,
+                )
+    logging.info("Record %s successfully released", record_id)
+
+
 async def release_errata_record(record_id: str, platform_id: int, force: bool):
     pulp = PulpClient(
         settings.pulp_host,
@@ -1450,6 +2042,137 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
                     err,
                 )
     logging.info("Record %s successfully released", record_id)
+
+
+async def bulk_new_errata_records_release(
+    records_ids: List[str], force: bool = False
+):
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    released_record_ids = []
+    release_tasks = []
+    repos_to_publish = []
+    async with open_async_session(key=get_async_db_key()) as session:
+        session: AsyncSession
+        db_records = await session.execute(
+            generate_query_for_release(records_ids),
+        )
+        db_records: List[models.NewErrataRecord] = db_records.scalars().all()
+        if not db_records:
+            logging.info(
+                "Cannot find records with the following ids: %s",
+                records_ids,
+            )
+            return
+
+        logging.info(
+            "Starting bulk errata release, the following records are"
+            " locked: %s",
+            [rec.id for rec in db_records],
+        )
+
+        platforms = {rec.platform.name for rec in db_records}
+        albs_oval_cache = collections.defaultdict()
+        for platform in platforms:
+            albs_oval_cache[platform] = await get_albs_oval_cache(
+                session, platform
+            )
+        for db_record in db_records:
+            search_params = prepare_search_params(db_record)
+            logging.info("Retrieving platform packages from pulp")
+            pulp_packages = await load_platform_packages(
+                db_record.platform,
+                search_params,
+                for_release=True,
+            )
+            try:
+                repo_mapping, missing_pkg_names = get_albs_packages_from_record(
+                    db_record,
+                    pulp_packages,
+                    force,
+                )
+            except Exception as exc:
+                db_record.release_status = ErrataReleaseStatus.FAILED
+                db_record.last_release_log = str(exc)
+                logging.exception("Cannot release %s record:", db_record.id)
+                continue
+
+            logging.info("Creating update record in pulp")
+            tasks = await process_errata_release_for_repos(
+                db_record,
+                repo_mapping,
+                session,
+                pulp,
+            )
+
+            logging.info("Generating OVAL data")
+            objects, states, tests = await add_oval_data_to_errata_record(
+                db_record, albs_oval_cache[db_record.platform.name]
+            )
+
+            # This way we take into account already generated references
+            # during bulk errata release
+            for obj in objects:
+                if (
+                    obj
+                    not in albs_oval_cache[db_record.platform.name]["objects"]
+                ):
+                    albs_oval_cache[db_record.platform.name]["objects"].append(
+                        obj
+                    )
+            for ste in states:
+                if (
+                    ste
+                    not in albs_oval_cache[db_record.platform.name]["states"]
+                ):
+                    albs_oval_cache[db_record.platform.name]["states"].append(
+                        ste
+                    )
+            for tst in tests:
+                if tst not in albs_oval_cache[db_record.platform.name]["tests"]:
+                    albs_oval_cache[db_record.platform.name]["tests"].append(
+                        tst
+                    )
+
+            db_record.release_status = ErrataReleaseStatus.RELEASED
+            db_record.last_release_log = await get_release_logs(
+                record_id=db_record.id,
+                pulp_packages=pulp_packages,
+                session=session,
+                repo_mapping=repo_mapping,
+                db_record=db_record,
+                force_flag=force,
+                missing_pkg_names=missing_pkg_names,
+            )
+
+            released_record_ids.append(db_record.id)
+
+            if not tasks:
+                continue
+            repos_to_publish.extend(repo_mapping.keys())
+            release_tasks.extend(tasks)
+
+    logging.info("Executing release tasks")
+    await asyncio.gather(*release_tasks)
+    logging.info("Executing publication tasks")
+    await asyncio.gather(
+        *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
+    )
+
+    if settings.github_integration_enabled:
+        try:
+            await close_issues(record_ids=[released_record_ids])
+        except Exception as err:
+            logging.exception(
+                "Cannot move issue to the Released section: %s",
+                err,
+            )
+
+    # TODO: Maybe check whether all ids were released
+    logging.info("Successfully released the following erratas: %s", records_ids)
 
 
 async def bulk_errata_records_release(
@@ -1579,9 +2302,10 @@ async def get_updateinfo_xml_from_pulp(
             repo_name = errata_record.get("pkglist", [{}])[0].get("name")
             if not repo_name:
                 logging.warning(
-                    "Unable to filter results by platform_name %s, error: ",
+                    "Unable to filter results by platform '%s' "
+                    "while processing '%s'",
                     platform_name,
-                    str(exc),
+                    errata_record["id"],
                 )
                 return
             if not repo_name.startswith(platform_name.lower()):
