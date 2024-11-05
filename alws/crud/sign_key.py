@@ -1,10 +1,10 @@
+import datetime
 import typing
 
+from sqlalchemy import and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, update
 from sqlalchemy.orm import selectinload
-import datetime
 
 from alws import models
 from alws.crud.user import get_user
@@ -25,7 +25,9 @@ async def get_sign_keys(
 ) -> typing.List[models.SignKey]:
     limited_user = await get_user(db, user.id)
     result = await db.execute(
-        select(models.SignKey).where(models.SignKey.active).options(
+        select(models.SignKey)
+        .where(models.SignKey.active)
+        .options(
             selectinload(models.SignKey.owner),
             selectinload(models.SignKey.roles).selectinload(
                 models.UserRole.actions
@@ -50,18 +52,20 @@ async def create_sign_key(
         raise SignKeyAlreadyExistsError(
             f"Key with keyid {payload.keyid} already exists"
         )
-    if payload.platform_id:
+    model = payload.model_dump()
+    platform_id = model.pop('platform_id', None)
+    sign_key = models.SignKey(**model)
+
+    if platform_id:
         check_platform = await db.execute(
-            select(models.Platform.id).where(
-                models.Platform.id == payload.platform_id
-            )
+            select(models.Platform).where(models.Platform.id == platform_id)
         )
-        if not check_platform.scalars().first():
+        platform_instance = check_platform.scalars().first()
+        if not platform_instance:
             raise PlatformMissingError(
-                f"No platform with id '{payload.platform_id}' "
-                "exists in the system"
+                f"No platform with id '{platform_id}' exists in the system"
             )
-    sign_key = models.SignKey(**payload.model_dump())
+        sign_key.platforms.append(platform_instance)
     db.add(sign_key)
     await db.flush()
     await db.refresh(sign_key)

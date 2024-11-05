@@ -32,3 +32,17 @@ class TestSignKeys(BaseAsyncTestCase):
             "post", f"/api/v1/sign-keys/new/", json=payload
         )
         assert response.status_code == self.status_codes.HTTP_201_CREATED
+
+    async def test_create_second_key_for_platform(
+        self,
+        base_platform,
+        additional_sign_key_payload,
+    ):
+        payload = additional_sign_key_payload.copy()
+        payload["platform_id"] = base_platform.id
+        response = await self.make_request(
+            "post", f"/api/v1/sign-keys/new/", json=payload
+        )
+        assert (
+            response.status_code == self.status_codes.HTTP_201_CREATED
+        ), response.json()["detail"]
