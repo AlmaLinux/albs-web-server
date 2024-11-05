@@ -31,6 +31,7 @@ async def modify_platform(
         'type',
         'distr_type',
         'distr_version',
+        'pgp_key',
         'arch_list',
         'data',
         'modularity',

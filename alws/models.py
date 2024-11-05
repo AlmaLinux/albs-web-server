@@ -244,6 +244,7 @@ class Platform(PermissionsMixin, Base):
     type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
+    pgp_key: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     module_build_index: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=1
     )
@@ -254,7 +255,6 @@ class Platform(PermissionsMixin, Base):
     name: Mapped[str] = mapped_column(
         sqlalchemy.Text, nullable=False, unique=True, index=True
     )
-    pgp_key: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     priority: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Integer, nullable=True
     )
