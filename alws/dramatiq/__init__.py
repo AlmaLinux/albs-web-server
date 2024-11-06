@@ -34,6 +34,7 @@ from alws.dramatiq.build import build_done, start_build
 from alws.dramatiq.errata import (
     bulk_errata_release,
     bulk_new_errata_release,
+    create_new_errata,
     release_errata,
     release_new_errata,
     reset_records_threshold,
