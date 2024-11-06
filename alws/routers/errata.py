@@ -16,6 +16,7 @@ from alws.dependencies import get_async_db_key
 from alws.dramatiq import (
     bulk_errata_release,
     bulk_new_errata_release,
+    create_new_errata,
     release_errata,
     release_new_errata,
     reset_records_threshold,
@@ -36,14 +37,12 @@ public_router = APIRouter(
 
 @router.post("/new/", response_model=errata_schema.CreateErrataResponse)
 async def create_new_errata_record(
-    errata: errata_schema.BaseErrataRecord,
-    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    errata: errata_schema.BaseErrataRecord
 ):
-    record = await errata_crud.create_new_errata_record(
-        db,
-        errata,
-    )
-    return {"ok": bool(record)}
+    create_new_errata.send(errata)
+
+    message = f"Record {errata.id} is scheduled for creation"
+    return {"ok": message}
 
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
