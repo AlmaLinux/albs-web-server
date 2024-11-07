@@ -17,6 +17,7 @@ from alws.dramatiq import (
     bulk_errata_release,
     bulk_new_errata_release,
     create_new_errata,
+    create_errata,
     release_errata,
     release_new_errata,
     reset_records_threshold,
@@ -39,22 +40,35 @@ public_router = APIRouter(
 async def create_new_errata_record(
     errata: errata_schema.BaseErrataRecord
 ):
-    create_new_errata.send(errata)
+    try:
+        errata_data = errata.model_dump()
 
-    message = f"Record {errata.id} is scheduled for creation"
-    return {"ok": message}
+        # Convert date fields to strings
+        errata_data["issued_date"] = errata_data["issued_date"].isoformat()
+        errata_data["updated_date"] = errata_data["updated_date"].isoformat()
+
+        create_new_errata.send(errata_data)
+
+        return {"ok": True}
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
 
 
 @router.post("/", response_model=errata_schema.CreateErrataResponse)
 async def create_errata_record(
-    errata: errata_schema.BaseErrataRecord,
-    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    errata: errata_schema.BaseErrataRecord
 ):
-    record = await errata_crud.create_errata_record(
-        db,
-        errata,
-    )
-    return {"ok": bool(record)}
+    try:
+        errata_data = errata.model_dump()
+
+        errata_data["issued_date"] = errata_data["issued_date"].isoformat()
+        errata_data["updated_date"] = errata_data["updated_date"].isoformat()
+
+        create_errata.send(errata_data)
+
+        return {"ok": True}
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
 
 
 @public_router.get("/", response_model=errata_schema.ErrataRecord)
