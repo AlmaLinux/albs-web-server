@@ -907,7 +907,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         self.base_platform = None
         self.clean_base_dist_name_lower = None
         self.repo_name_regex = re.compile(
-            r"\w+-\d-(beta-|)(?P<name>\w+(-\w+)?)"
+            r"\w+-(\w+-|)+\d+-(beta-|)(?P<name>\w+(-\w+)?)",
         )
         self._beholder_client = BeholderClient(settings.beholder_host)
 
@@ -1179,7 +1179,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             prev_pkg = beholder_cache.get(key, {})
             if pkg_repos:
                 for repo in pkg['repositories']:
-                    repo['name'] = re.sub(r'^\w+-\d-(beta-|)', '', repo['name'])
+                    repo['name'] = re.sub(
+                        r'^\w+-(\w+-|)+\d+-(beta-|)',
+                        '',
+                        repo['name'],
+                    )
                     repo['priority'] = priority
                 pkg['repositories'].extend([
                     repo
