@@ -4,7 +4,8 @@ import typing
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws.crud.errata import create_errata_record
+from alws.crud.errata import create_errata_record, create_new_errata_record
+from alws.dramatiq.errata import create_new_errata
 from alws.schemas.errata_schema import BaseErrataRecord
 
 
@@ -107,14 +108,25 @@ async def create_errata(
     async_session: AsyncSession,
     errata_create_payload: typing.Dict[str, typing.Any],
 ):
-    await create_errata_record(
-        async_session,
-        BaseErrataRecord(**errata_create_payload),
-    )
+    await create_errata_record(errata_create_payload)
     await async_session.commit()
     yield
     await async_session.rollback()
 
+
+@pytest.fixture
+async def create_errata_dramatiq(
+    async_session: AsyncSession,
+    errata_create_payload: typing.Dict[str, typing.Any],
+    monkeypatch,
+):
+    async def func(*args, **kwargs):
+        await create_new_errata_record(errata_create_payload)
+
+    monkeypatch.setattr(create_new_errata, "send", func)
+    await create_new_errata.send(errata_create_payload)
+    await async_session.commit()
+    yield
 
 @pytest.fixture
 def pulp_updateinfos():

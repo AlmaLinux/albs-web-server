@@ -1,7 +1,4 @@
-from datetime import datetime
-
 import pytest
-
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -35,7 +32,9 @@ class TestErrataEndpoints(BaseAsyncTestCase):
     async def test_list_errata_all_records(
         self,
         errata_create_payload,
+        create_errata_dramatiq
     ):
+
         response = await self.make_request("get", "/api/v1/errata/all/")
         errata = response.json()
         assert (
