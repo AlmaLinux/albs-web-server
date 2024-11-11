@@ -7,7 +7,7 @@ aioredis==2.0.1
 alembic-postgresql-enum==1.3.0
 alembic==1.13.3
 asyncpg==0.30.0
-dramatiq[rabbitmq, watch]==1.17.0
+dramatiq[rabbitmq, watch]==1.17.1
 email-validator>=2.0
 # Can be updated only after migration to SQLAlchemy > 2.0
 # these 2 requirements are for fastapi-sqla
