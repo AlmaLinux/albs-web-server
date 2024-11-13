@@ -33,7 +33,7 @@ sentry-sdk[fastapi]==2.18.0  # requires FastAPI>=0.79.0
 syncer==2.0.3
 tap.py==3.1
 uvicorn==0.32.0
-websockets==14.0
+websockets==14.1
 git+https://github.com/AlmaLinux/immudb-wrapper.git@0.1.2#egg=immudb_wrapper
 git+https://github.com/AlmaLinux/errata2osv.git@0.0.4#egg=errata2osv
 git+https://github.com/AlmaLinux/albs-github-integration.git@0.4.1#egg=albs_github
