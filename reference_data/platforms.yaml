@@ -2,6 +2,7 @@
 - name: AlmaLinux-8
   distr_type: rhel
   distr_version: '8'
+  pgp_key: 2AE81E8ACED7258B
   contact_mail: packager@almalinux.org
   copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux
@@ -1711,6 +1712,7 @@
 - name: AlmaLinux-9
   distr_type: rhel
   distr_version: '9'
+  pgp_key: D36CB86CB86B3716
   contact_mail: packager@almalinux.org
   copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux
@@ -3373,6 +3375,7 @@
 - name: AlmaLinux-10
   distr_type: rhel
   distr_version: '10'
+  pgp_key: DEE5C11CC2A1E572
   contact_mail: packager@almalinux.org
   copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux
@@ -5303,6 +5306,7 @@
 - name: AlmaLinux-Kitten-10
   distr_type: rhel
   distr_version: '10'
+  pgp_key: DEE5C11CC2A1E572
   contact_mail: packager@almalinux.org
   copyright: Copyright {{ year }} AlmaLinux OS
   test_dist_name: almalinux

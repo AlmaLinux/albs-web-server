@@ -14,6 +14,7 @@ class PlatformModify(BaseModel):
     type: typing.Optional[typing.Literal['rpm', 'deb']] = None
     distr_type: typing.Optional[str] = None
     distr_version: typing.Optional[str] = None
+    pgp_key: typing.Optional[str] = None
     priority: typing.Optional[int] = None
     arch_list: typing.Optional[typing.List[str]] = None
     copy_priority_arches: typing.Optional[typing.List[str]] = None
@@ -32,6 +33,7 @@ class PlatformCreate(BaseModel):
     type: typing.Literal['rpm', 'deb']
     distr_type: str
     distr_version: str
+    pgp_key: typing.Optional[str] = None
     priority: typing.Optional[int] = None
     test_dist_name: typing.Optional[str] = None
     arch_list: typing.List[str]
@@ -49,7 +51,7 @@ class Platform(BaseModel):
     name: str
     distr_type: str
     distr_version: str
-
+    pgp_key: typing.Optional[str] = None
     arch_list: typing.List[str]
     modularity: typing.Optional[typing.Dict] = None
 
