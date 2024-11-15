@@ -42,7 +42,10 @@ async def create_sign_key(
 ):
     try:
         payload.owner_id = user.id
-        return await sign_key.create_sign_key(db, payload)
+        key = await sign_key.create_sign_key(db, payload)
+        if payload.platform_ids:
+            key.platform_ids = [pl.id for pl in key.platforms]
+        return key
     except (PlatformMissingError, SignKeyAlreadyExistsError) as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 

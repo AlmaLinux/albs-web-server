@@ -6,12 +6,12 @@ class TestSignKeys(BaseAsyncTestCase):
         self, basic_sign_key_payload
     ):
         payload = basic_sign_key_payload.copy()
-        payload["platform_id"] = 9999
+        payload["platform_ids"] = [9999]
         response = await self.make_request(
             "post", f"/api/v1/sign-keys/new/", json=payload
         )
         assert response.status_code == self.status_codes.HTTP_400_BAD_REQUEST
-        assert response.json()["detail"].startswith('No platform with id')
+        assert response.json()["detail"].startswith('No platforms with ids')
 
     async def test_create_new_key_already_exists(
         self, sign_key, basic_sign_key_payload
@@ -27,7 +27,7 @@ class TestSignKeys(BaseAsyncTestCase):
         self, base_platform, basic_sign_key_payload
     ):
         payload = basic_sign_key_payload.copy()
-        payload["platform_id"] = base_platform.id
+        payload["platform_ids"] = [base_platform.id]
         response = await self.make_request(
             "post", f"/api/v1/sign-keys/new/", json=payload
         )
@@ -39,7 +39,7 @@ class TestSignKeys(BaseAsyncTestCase):
         additional_sign_key_payload,
     ):
         payload = additional_sign_key_payload.copy()
-        payload["platform_id"] = base_platform.id
+        payload["platform_ids"] = [base_platform.id]
         response = await self.make_request(
             "post", f"/api/v1/sign-keys/new/", json=payload
         )

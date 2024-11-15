@@ -1,7 +1,7 @@
 """Add many to many relationship between platforms and sign_keys
 
 Revision ID: 63bc4e0b699f
-Revises: 444f9f1f0ac1
+Revises: 764a67b23038
 Create Date: 2024-11-01 12:26:26.326314
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.engine import reflection
 
 # revision identifiers, used by Alembic.
 revision = '63bc4e0b699f'
-down_revision = '444f9f1f0ac1'
+down_revision = '764a67b23038'
 branch_labels = None
 depends_on = None
 
@@ -119,6 +119,22 @@ def downgrade():
 
     restore_from_backup("platforms")
     restore_from_backup("sign_keys")
+
+    # Neccessary to preserve id sequences
+    op.execute(
+        sa.text(
+            """
+            SELECT setval('platforms_id_seq', MAX(id)) FROM platforms;
+            """
+        )
+    )
+    op.execute(
+        sa.text(
+            """
+            SELECT setval('sign_keys_id_seq', MAX(id)) FROM sign_keys;
+            """
+        )
+    )
 
     drop_backup_table("platforms_backup")
     drop_backup_table("sign_keys_backup")
