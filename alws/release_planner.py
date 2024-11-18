@@ -242,7 +242,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
-        platform_id: int,
+        reference_platforms: list[models.Platform],
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
@@ -255,17 +255,21 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Build.platform_flavors),
                 selectinload(models.Build.source_rpms)
                 .selectinload(models.SourceRpm.artifact)
-                .selectinload(models.BuildTaskArtifact.build_task),
+                .selectinload(models.BuildTaskArtifact.build_task)
+                .selectinload(models.BuildTask.platform)
+                .selectinload(models.Platform.reference_platforms),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.artifact)
-                .selectinload(models.BuildTaskArtifact.build_task),
+                .selectinload(models.BuildTaskArtifact.build_task)
+                .selectinload(models.BuildTask.platform)
+                .selectinload(models.Platform.reference_platforms),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
-                ),
-                selectinload(models.Build.repos),
+                selectinload(models.Build.tasks)
+                .selectinload(models.BuildTask.rpm_modules),
+                selectinload(models.Build.repos)
+                .selectinload(models.Repository.platform)
             )
         )
         build_result = await self.db.execute(builds_q)
@@ -278,7 +282,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     build.binary_rpms,
                 ]
                 for build_rpm in rpms_list
-                if build_rpm.artifact.build_task.platform_id == platform_id
+                if any(
+                    rp in reference_platforms for rp in
+                    build_rpm.artifact.build_task.platform.reference_platforms
+                )
             ]
             logging.info('Build RPMs "%s"', build_rpms)
             pulp_artifacts = await self.get_pulp_packages_info(
@@ -337,7 +344,10 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
-                        and build_repo.platform_id == platform_id
+                        and any(
+                            rp in reference_platforms for rp in
+                            build_repo.platform.reference_platforms
+                        )
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url
@@ -361,7 +371,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                             # Module version needs to be converted into
                             # string because it's going to be involved later
                             # in release plan. When interacting with API
-                            # via Swagger or albs-frontend, we'll loose
+                            # via Swagger or albs-frontend, we'll lose
                             # precision as described here:
                             # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
                             "version": str(module.version),
@@ -719,7 +729,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
-            platform_id=base_platform.id,
+            reference_platforms=base_platform.reference_platforms,
             build_tasks=build_tasks,
         )
 
@@ -1312,7 +1322,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
-            platform_id=base_platform.id,
+            reference_platforms=base_platform.reference_platforms,
             build_tasks=build_tasks,
         )
 
@@ -1500,7 +1510,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     is_devel=is_devel,
                     beholder_cache=beholder_cache,
                 )
-                # if we doesn't found repos for debug package, we can try to
+                # if we don't found repos for debug package, we can try to
                 # find repos by same package name but without debug suffix
                 if not repositories and is_debug:
                     repositories = self.find_release_repos(
