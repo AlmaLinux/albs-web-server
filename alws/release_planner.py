@@ -269,7 +269,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Build.tasks)
                 .selectinload(models.BuildTask.rpm_modules),
                 selectinload(models.Build.repos)
-                .selectinload(models.Repository.platform)
+                .selectinload(models.Repository.platform),
             )
         )
         build_result = await self.db.execute(builds_q)
@@ -283,8 +283,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 ]
                 for build_rpm in rpms_list
                 if any(
-                    rp in reference_platforms for rp in
-                    build_rpm.artifact.build_task.platform.reference_platforms
+                    rp in reference_platforms
+                    for rp in build_rpm.artifact
+                    .build_task.platform.reference_platforms
                 )
             ]
             logging.info('Build RPMs "%s"', build_rpms)
@@ -345,8 +346,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         and not build_repo.debug
                         and build_repo.type == "rpm"
                         and any(
-                            rp in reference_platforms for rp in
-                            build_repo.platform.reference_platforms
+                            rp in reference_platforms
+                            for rp in build_repo.platform.reference_platforms
                         )
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(

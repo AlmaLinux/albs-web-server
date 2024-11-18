@@ -4,6 +4,7 @@ import pytest
 import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from alws import models
 from alws.schemas import platform_schema, repository_schema
@@ -24,6 +25,9 @@ async def base_platform(
             await async_session.execute(
                 select(models.Platform).where(
                     models.Platform.name == schema["name"],
+                )
+                .options(
+                    selectinload(models.Platform.reference_platforms),
                 )
             )
         )
