@@ -1519,7 +1519,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     is_devel=is_devel,
                     beholder_cache=beholder_cache,
                 )
-                # if we don't found repos for debug package, we can try to
+                # if we didn't find the repos for debug package, we can try to
                 # find repos by same package name but without debug suffix
                 if not repositories and is_debug:
                     repositories = self.find_release_repos(
