@@ -67,6 +67,7 @@ __all__ = [
 
 class BaseReleasePlanner(metaclass=ABCMeta):
     def __init__(self, db: AsyncSession):
+        self.base_platform = None  # type: typing.Optional[models.Platform]
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
@@ -238,11 +239,22 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             for _, package in pulp_packages.items()
         ]
 
+    @staticmethod
+    def __get_platforms(platform: models.Platform) -> list[models.Platform]:
+        return [platform] + platform.reference_platforms
+
+    def _can_be_released_to_target_platform(
+        self,
+        artifact_platform: models.Platform,
+    ) -> bool:
+        target_platforms = self.__get_platforms(self.base_platform)
+        source_platforms = self.__get_platforms(artifact_platform)
+        return any(sp in target_platforms for sp in source_platforms)
+
     @class_measure_work_time_async("get_packages_info_pulp_and_db")
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
-        reference_platforms: list[models.Platform],
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
@@ -282,10 +294,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     build.binary_rpms,
                 ]
                 for build_rpm in rpms_list
-                if any(
-                    rp in reference_platforms
-                    for rp in build_rpm.artifact
-                    .build_task.platform.reference_platforms
+                if self._can_be_released_to_target_platform(
+                    artifact_platform=build_rpm.artifact.build_task.platform,
                 )
             ]
             logging.info('Build RPMs "%s"', build_rpms)
@@ -345,9 +355,8 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
-                        and any(
-                            rp in reference_platforms
-                            for rp in build_repo.platform.reference_platforms
+                        and self._can_be_released_to_target_platform(
+                            artifact_platform=build_repo.platform,
                         )
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
@@ -730,7 +739,6 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
-            reference_platforms=base_platform.reference_platforms,
             build_tasks=build_tasks,
         )
 
@@ -1323,7 +1331,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
-            reference_platforms=base_platform.reference_platforms,
             build_tasks=build_tasks,
         )
 
@@ -1448,7 +1455,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
-        platforms_list = base_platform.reference_platforms + [base_platform]
+        platforms_list = self.__get_platforms(base_platform)
         beholder_responses = await self._beholder_client.retrieve_responses(
             platforms_list,
             data={
