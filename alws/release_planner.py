@@ -723,6 +723,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         build_tasks: typing.Optional[typing.List[int]] = None,
         product: typing.Optional[models.Product] = None,
     ) -> dict:
+        self.base_platform = base_platform
         release_plan = {"modules": {}}
         added_packages = set()
 
