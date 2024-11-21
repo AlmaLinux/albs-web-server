@@ -17,11 +17,11 @@ branch_labels = None
 depends_on = None
 
 
-platforms_dump_path = "/path/to/backups/platforms_backup.sql"
-sign_keys_dump_path = "/path/to/backups/sign_keys_backup.sql"
-db_name = 'db'
-db_user = 'postgres'
+def disable_fk_checks():
+    op.execute(sa.text("SET session_replication_role = 'replica'"))
 
+def enable_fk_checks():
+    op.execute(sa.text("SET session_replication_role = 'origin'"))
 
 def get_columns(table_name):
     # Use SQLAlchemy's Inspector to retrieve the columns of the specified table
@@ -46,12 +46,14 @@ def restore_from_backup(table_name):
     backup_table = f'{table_name}_backup'
     columns = get_columns(table_name)
     column_list = ', '.join(columns)
-    op.execute(sa.text(f"TRUNCATE TABLE {table_name} RESTART IDENTITY CASCADE"))
+    disable_fk_checks()
+    op.execute(sa.text(f"DELETE FROM {table_name}"))
     op.execute(
         sa.text(
             f"INSERT INTO {table_name} ({column_list}) SELECT {column_list} FROM {backup_table}"
         )
     )
+    enable_fk_checks()
 
 
 def create_association_table():
