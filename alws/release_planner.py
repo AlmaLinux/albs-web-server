@@ -67,7 +67,7 @@ __all__ = [
 
 class BaseReleasePlanner(metaclass=ABCMeta):
     def __init__(self, db: AsyncSession):
-        self.base_platform = None  # type: typing.Optional[models.Platform]
+        self.base_platform: typing.Optional[models.Platform] = None
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
