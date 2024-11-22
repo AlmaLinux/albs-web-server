@@ -90,6 +90,7 @@ try:
     from almalinux.liboval.rpmverifyfile_object import RpmverifyfileObject
     from almalinux.liboval.rpmverifyfile_state import RpmverifyfileState
     from almalinux.liboval.rpmverifyfile_test import RpmverifyfileTest
+    from almalinux.liboval.utils import generate_cpe_list
 except ImportError:
     pass
 
@@ -926,13 +927,16 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
     # Errata db record
     db_errata = models.NewErrataRecord(
         id=errata.id,
+        # TODO: BS-376
         freezed=errata.freezed,
         platform_id=errata.platform_id,
         module=errata.module,
         release_status=ErrataReleaseStatus.NOT_RELEASED,
-        # TODO: Not sure it's used, check and if not, remove from data model
+        # TODO: BS-376
+        # Not sure it's used, check and if not, remove it from data model
         summary=None,
-        # TODO: Not used AFAIK, maybe can be removed from data model
+        # TODO: BS-376
+        # Not used AFAIK, maybe can be removed from data model
         solution=None,
         issued_date=errata.issued_date,
         updated_date=errata.updated_date,
@@ -950,13 +954,14 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         rights=jinja2.Template(platform.copyright).render(
             year=datetime.datetime.utcnow().year
         ),
-        definition_id=errata.definition_id,
+        # All values set to None below will be set upon errata release
+        definition_id=None,
         definition_version=errata.definition_version,
         definition_class=errata.definition_class,
         # TODO: Right now we're adding all repos cpes
         # Ideally, we should generate affected cpes based on the repos
         # where the affected packages live.
-        affected_cpe=errata.affected_cpe,
+        affected_cpe=None,
         criteria=None,
         original_criteria=errata.criteria,
         tests=None,
@@ -1882,6 +1887,11 @@ async def add_oval_data_to_errata_record(
         module=module,
         devel_module=devel_module,
     )
+    db_record.definition_id = data_generator.definition_id
+    # TODO: Right now we're adding all repos cpes.
+    # Ideally, we should generate affected cpes based on the repos
+    # where the affected packages live.
+    db_record.affected_cpe = generate_cpe_list(db_record.platform.distr_version)
 
     # Right now, variables are not being generated, so it's a no-op
     # errata.variables = data_generator.generate_variables()

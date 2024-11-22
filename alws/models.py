@@ -1473,6 +1473,9 @@ class NewErrataRecord(Base):
         sqlalchemy.Text, nullable=True
     )
 
+    # TODO: freezed is no longer in use with new errata workflow.
+    # Remove it when we get rid of the old errata implementation (BS-376) and
+    # if we don't find a good reason to keep it.
     freezed: Mapped[Optional[bool]] = mapped_column(
         sqlalchemy.Boolean, nullable=True
     )
@@ -1495,21 +1498,29 @@ class NewErrataRecord(Base):
     )
     original_title: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     contact_mail: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    status: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
+    status: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=True)
+    version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=True)
     severity: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     rights: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     # OVAL-only fields
-    definition_id: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
+    definition_id: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=True)
     definition_version: Mapped[str] = mapped_column(
-        sqlalchemy.Text, nullable=False
+        sqlalchemy.Text, nullable=True
     )
     definition_class: Mapped[str] = mapped_column(
-        sqlalchemy.Text, nullable=False
+        sqlalchemy.Text, nullable=True
     )
     affected_cpe: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, default=[]
+        JSONB, nullable=True, default=[]
     )
+    # TODO: None of the original_* are in use with the new errata workflow.
+    # Right now, we have data in original_* columns of records before the new
+    # errata workflow [1], that were added using the deprectated oval cacher:
+    #
+    # Remove it when we get rid of the old errata implementation (BS-376) and if
+    # we don't find a good reason to keep them.
+    #
+    # [1] https://github.com/AlmaLinux/albs-web-server/commit/df50659559474274b38733e5f039fec6fdd53421
     criteria: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSONB, nullable=True
     )

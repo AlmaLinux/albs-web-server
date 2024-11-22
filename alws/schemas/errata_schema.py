@@ -76,20 +76,22 @@ class ErrataPackage(BaseErrataPackage):
 
 class BaseErrataRecord(BaseModel):
     id: str
-    freezed: bool
+    # TODO: freezed is no longer in use, see the note in models.py
+    # Needs to be removed as part of BS-376
+    freezed: Optional[bool] = False
     platform_id: int
     issued_date: datetime.date
     updated_date: datetime.date
     title: str
     description: str
     module: Optional[str] = None
-    status: str
-    version: str
+    status: Optional[str] = "final"
+    version: Optional[str] = "3"
     severity: str
     rights: Optional[str] = None
     definition_id: Optional[str] = None
-    definition_version: Optional[str] = None
-    definition_class: Optional[str] = None
+    definition_version: Optional[str] = "635"
+    definition_class: Optional[str] = "patch"
     affected_cpe: Optional[List[str]] = None
     criteria: Optional[Any] = None
     tests: Optional[Any] = None
