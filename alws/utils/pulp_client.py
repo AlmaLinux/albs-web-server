@@ -796,7 +796,7 @@ class PulpClient:
             "proxy_password": proxy_password,
         }
 
-        await self.request("PATCH", remote_href, data=payload)
+        await self.request("PATCH", remote_href, json=payload)
         return remote_href
 
     async def sync_rpm_repo_from_remote(
