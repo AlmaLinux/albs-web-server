@@ -833,7 +833,7 @@ async def __process_build_task_artifacts(
         db.add_all(rpm_entries)
     db.add(build_task)
     await db.flush()
-    await db.refresh(build_task)
+    await db.refresh(build_task, attribute_names=['build'])
     return build_task, processing_stats
 
 
