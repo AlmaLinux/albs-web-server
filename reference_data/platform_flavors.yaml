@@ -10,8 +10,8 @@
   data:
      mock:
        secure_boot_macros:
-         "%pe_signing_cert": "'f4217b7b99a69128'"
-         "%pe_signing_token": "'AlmaLinux OS Foundation'"
+         "%pe_signing_cert": "f4217b7b99a69128"
+         "%pe_signing_token": "AlmaLinux OS Foundation"
   repositories:
     - name: almalinux-8-beta
       arch: i686
@@ -217,21 +217,21 @@
 
 - name: EPEL-7
   repositories:
-    - name: epel
+    - name: epel-7
       arch: x86_64
       type: rpm
       url: https://el7.repo.almalinux.org/epel/7/x86_64/
       production: false
       debug: false
       priority: 10
-    - name: epel
+    - name: epel-7
       arch: aarch64
       type: rpm
       url: https://el7.repo.almalinux.org/epel/7/aarch64/
       production: false
       debug: false
       priority: 10
-    - name: epel
+    - name: epel-7
       arch: ppc64le
       type: rpm
       url: https://el7.repo.almalinux.org/epel/7/ppc64le/
@@ -797,8 +797,8 @@
   data:
      mock:
        secure_boot_macros:
-         "%pe_signing_cert": "'f4217b7b99a69128'"
-         "%pe_signing_token": "'AlmaLinux OS Foundation'"
+         "%pe_signing_cert": "f4217b7b99a69128"
+         "%pe_signing_token": "AlmaLinux OS Foundation"
   repositories:
     - name: almalinux-10-beta
       arch: x86_64
