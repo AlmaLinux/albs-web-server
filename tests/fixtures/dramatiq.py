@@ -8,7 +8,7 @@ from alws.constants import BuildTaskStatus
 from alws.crud import test
 from alws.crud.build import get_builds
 from alws.crud.build_node import safe_build_done
-from alws.dramatiq.build import _start_build
+from alws.dramatiq.build import _start_build, _build_done
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate
@@ -140,9 +140,7 @@ async def build_done(
     build = await get_builds(db=async_session, build_id=regular_build.id)
     await async_session.close()
     for build_task in build.tasks:
-        await safe_build_done(
-            async_session,
-            BuildDone(
+        payload = BuildDone(
                 **prepare_build_done_payload(
                     build_task.id,
                     [
@@ -150,8 +148,8 @@ async def build_done(
                         f"chan-0.0.4-3.el8.{build_task.arch}.rpm",
                     ],
                 )
-            ),
-        )
+            )
+        await _build_done(payload)
         await async_session.commit()
     build = await get_builds(db=async_session, build_id=regular_build.id)
     for build_task in build.tasks:
