@@ -1249,7 +1249,6 @@ async def list_errata_records(
         query = select(func.count(models.NewErrataRecord.id))
         if not count:
             query = select(models.NewErrataRecord).options(*options)
-            query = query.order_by(models.NewErrataRecord.id.desc())
         if errata_id:
             query = query.filter(
                 models.NewErrataRecord.id.like(f"%{errata_id}%")
@@ -1272,6 +1271,11 @@ async def list_errata_records(
         if status:
             query = query.filter(
                 models.NewErrataRecord.release_status == status
+            )
+        if not count:
+            query = query.order_by(
+                models.NewErrataRecord.issued_date.desc(),
+                models.NewErrataRecord.id.desc(),
             )
         if page and not count:
             query = query.slice(10 * page - 10, 10 * page)
