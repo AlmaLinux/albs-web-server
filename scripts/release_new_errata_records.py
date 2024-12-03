@@ -99,7 +99,7 @@ class AlbsAPI:
         self,
         record_id: str,
     ):
-        endpoint = f"errata/release_record/{record_id}/"
+        endpoint = f"errata/release_new_record/{record_id}/"
         request = aiohttp.request(
             "post",
             urllib.parse.urljoin(self.base_url, endpoint),
@@ -111,7 +111,7 @@ class AlbsAPI:
         self,
         records_ids: list,
     ):
-        endpoint = "errata/bulk_release_records/"
+        endpoint = "errata/bulk_release_new_records/"
         request = aiohttp.request(
             "post",
             urllib.parse.urljoin(self.base_url, endpoint),

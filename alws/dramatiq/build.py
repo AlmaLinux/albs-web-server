@@ -183,7 +183,7 @@ async def _build_done(request: build_node_schema.BuildDone):
             await build_node_crud.fast_fail_other_tasks_by_ref(db, build_task)
             await db.flush()
 
-        build_id = build_task.id
+        build_id = build_task.build_id
 
         # We don't want to create the test tasks until all build tasks
         # of the same build_id are completed.
