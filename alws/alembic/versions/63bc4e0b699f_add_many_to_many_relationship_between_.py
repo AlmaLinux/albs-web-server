@@ -1,7 +1,7 @@
 """Add many to many relationship between platforms and sign_keys
 
 Revision ID: 63bc4e0b699f
-Revises: 764a67b23038
+Revises: 9977cc722e24
 Create Date: 2024-11-01 12:26:26.326314
 
 """

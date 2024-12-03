@@ -68,6 +68,7 @@ __all__ = [
 class BaseReleasePlanner(metaclass=ABCMeta):
     def __init__(self, db: AsyncSession):
         self.base_platform: typing.Optional[models.Platform] = None
+        self.compatible_release_platforms: typing.List[models.Platform] = []
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
@@ -239,17 +240,11 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             for _, package in pulp_packages.items()
         ]
 
-    @staticmethod
-    def __get_platforms(platform: models.Platform) -> list[models.Platform]:
-        return [platform] + platform.reference_platforms
-
-    def _can_be_released_to_target_platform(
+    def can_be_released_to_target_platform(
         self,
         artifact_platform: models.Platform,
     ) -> bool:
-        target_platforms = self.__get_platforms(self.base_platform)
-        source_platforms = self.__get_platforms(artifact_platform)
-        return any(sp in target_platforms for sp in source_platforms)
+        return artifact_platform in self.compatible_release_platforms
 
     @class_measure_work_time_async("get_packages_info_pulp_and_db")
     async def get_pulp_packages(
@@ -294,7 +289,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     build.binary_rpms,
                 ]
                 for build_rpm in rpms_list
-                if self._can_be_released_to_target_platform(
+                if self.can_be_released_to_target_platform(
                     artifact_platform=build_rpm.artifact.build_task.platform,
                 )
             ]
@@ -355,7 +350,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
-                        and self._can_be_released_to_target_platform(
+                        and self.can_be_released_to_target_platform(
                             artifact_platform=build_repo.platform,
                         )
                     )
@@ -724,6 +719,9 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         product: typing.Optional[models.Product] = None,
     ) -> dict:
         self.base_platform = base_platform
+        self.compatible_release_platforms = (
+            await base_platform.get_compatible_release_platforms(self._db)
+        )
         release_plan = {"modules": {}}
         added_packages = set()
 
@@ -1325,6 +1323,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         added_packages = set()
         prod_repos = []
         self.base_platform = base_platform
+        self.compatible_release_platforms = (
+            await base_platform.get_compatible_release_platforms(self._db)
+        )
 
         (
             pulp_packages,
@@ -1380,9 +1381,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            platforms_list = base_platform.reference_platforms + [base_platform]
             module_responses = await self._beholder_client.retrieve_responses(
-                platforms_list,
+                self.base_platform.platforms_list_for_beholder,
                 module_name=module_name,
                 module_stream=module_stream,
                 module_arch_list=module_arch_list,
@@ -1456,9 +1456,8 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
-        platforms_list = self.__get_platforms(base_platform)
         beholder_responses = await self._beholder_client.retrieve_responses(
-            platforms_list,
+            self.base_platform.platforms_list_for_beholder,
             data={
                 "source_rpms": src_rpm_names,
                 "match": BeholderMatchMethod.all(),

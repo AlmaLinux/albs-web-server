@@ -3401,6 +3401,8 @@
     - { name: ppc64le, depends_on: aarch64 }
     - { name: x86_64_v2, depends_on: x86_64 }
   data:
+    compatible_release_platforms:
+      - AlmaLinux-Kitten-10
     definitions:
       distribution: AlmaLinux
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
@@ -5332,6 +5334,8 @@
     - { name: ppc64le, depends_on: aarch64 }
     - { name: x86_64_v2, depends_on: x86_64 }
   data:
+    compatible_release_platforms:
+      - AlmaLinux-10
     definitions:
       distribution: AlmaLinux
       packager: AlmaLinux Packaging Team <packager@almalinux.org>
