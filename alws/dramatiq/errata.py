@@ -10,7 +10,7 @@ from alws.crud.errata import (
     release_new_errata_record,
     reset_matched_erratas_packages_threshold,
 )
-from alws.dramatiq.tasks import event_loop
+from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 
 __all__ = ["release_errata"]

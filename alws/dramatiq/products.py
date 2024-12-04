@@ -13,7 +13,7 @@ from alws import models
 from alws.config import settings
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, BuildTaskStatus
 from alws.dependencies import get_async_db_key
-from alws.dramatiq.tasks import event_loop
+from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.log_utils import setup_logger
 from alws.utils.pulp_client import PulpClient
