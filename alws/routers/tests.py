@@ -27,7 +27,7 @@ async def update_test_task_result(
     test_task_id: int,
     result: test_schema.TestTaskResult,
 ):
-    dramatiq.tests.complete_test_task.send(test_task_id, result.model_dump())
+    dramatiq.tasks.tests.complete_test_task.send(test_task_id, result.model_dump())
     return {'ok': True}
 
 

@@ -1,12 +1,10 @@
-from contextlib import asynccontextmanager
-
 import dramatiq
 from fastapi_sqla import open_async_session
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import release as r_crud
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import event_loop
+from alws.dramatiq.tasks import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 
 __all__ = ["execute_release_plan"]
