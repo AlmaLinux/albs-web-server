@@ -4,7 +4,7 @@ import dramatiq
 
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import sign_task
-from alws.dramatiq.tasks import event_loop
+from alws.dramatiq import event_loop
 from alws.schemas import sign_schema
 from alws.utils.fastapi_sqla_setup import setup_all
 

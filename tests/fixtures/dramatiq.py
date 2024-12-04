@@ -8,7 +8,7 @@ from alws.constants import BuildTaskStatus
 from alws.crud import test
 from alws.crud.build import get_builds
 from alws.crud.build_node import safe_build_done
-from alws.dramatiq.tasks.build import _start_build, _build_done
+from alws.dramatiq.build import _start_build, _build_done
 from alws.models import Build
 from alws.schemas.build_node_schema import BuildDone
 from alws.schemas.build_schema import BuildCreate

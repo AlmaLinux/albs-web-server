@@ -21,7 +21,7 @@ from alws.constants import (
 from alws.crud import build_node as build_node_crud
 from alws.crud import test
 from alws.dependencies import get_async_db_key
-from alws.dramatiq.tasks import event_loop
+from alws.dramatiq import event_loop
 from alws.errors import (
     ArtifactConversionError,
     ModuleUpdateError,
