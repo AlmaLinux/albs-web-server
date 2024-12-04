@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.session import Session
 
 from alws.crud.build import create_build, get_builds
-from alws.dramatiq.build import _start_build
+from alws.dramatiq.tasks.build import _start_build
 from alws.models import Build, Product
 from alws.schemas.build_schema import BuildCreate
 from tests.constants import ADMIN_USER_ID

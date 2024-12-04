@@ -7,7 +7,7 @@ from alws import models
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import build as build_crud
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import event_loop
+from alws.dramatiq.tasks import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 
 __all__ = ['perform_user_removal']

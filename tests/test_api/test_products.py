@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from alws.dramatiq.products import _perform_product_modification
+from alws.dramatiq.tasks.products import _perform_product_modification
 from alws.models import Build, Product
 from tests.mock_classes import BaseAsyncTestCase
 

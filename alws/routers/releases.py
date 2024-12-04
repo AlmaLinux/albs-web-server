@@ -5,12 +5,12 @@ from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alws import dramatiq
 from alws import models
 from alws.auth import get_current_user
 from alws.constants import ReleaseStatus
 from alws.crud import release as r_crud
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import execute_release_plan, revert_release
 from alws.schemas import release_schema
 
 router = APIRouter(
@@ -102,7 +102,7 @@ async def commit_release(
         .values(status=ReleaseStatus.IN_PROGRESS)
     )
     await db.flush()
-    execute_release_plan.send(release_id, user.id)
+    dramatiq.tasks.releases.execute_release_plan.send(release_id, user.id)
     return {"message": "Release plan execution has been started"}
 
 
@@ -124,7 +124,7 @@ async def revert_db_release(
         .values(status=ReleaseStatus.IN_PROGRESS)
     )
     await db.flush()
-    revert_release.send(release_id, user.id)
+    dramatiq.tasks.releases.revert_release.send(release_id, user.id)
     return {"message": "Release plan revert has been started"}
 
 

@@ -71,7 +71,7 @@ async def complete_sign_task(
     task = await sign_task.get_sign_task(db, sign_task_id)
     task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
     await db.flush()
-    dramatiq.sign_task.complete_sign_task.send(
+    dramatiq.tasks.sign_task.complete_sign_task.send(
         sign_task_id, payload.model_dump()
     )
     return {'success': True}

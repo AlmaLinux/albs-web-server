@@ -8,8 +8,8 @@ from sqlalchemy.orm import selectinload
 
 from alws.constants import BuildTaskStatus
 from alws.crud.build import create_build
-from alws.dramatiq.build import _start_build
-from alws.dramatiq.products import (
+from alws.dramatiq.tasks.build import _start_build
+from alws.dramatiq.tasks.products import (
     get_packages_to_blacklist,
     group_tasks_by_ref_id,
 )
