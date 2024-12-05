@@ -1,6 +1,6 @@
 pytest==8.3.4
 pytest-cov==6.0.0
-pyfakefs==5.7.1
+pyfakefs==5.7.2
 
 # Linters
 isort[colors]==5.13.2
