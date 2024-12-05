@@ -2,7 +2,7 @@ PyYAML==6.0.2
 SQLAlchemy==2.0.36
 aiofiles==24.1.0
 aiohttp-retry==2.9.1
-aiohttp==3.11.7
+aiohttp==3.11.9
 aioredis==2.0.1
 alembic-postgresql-enum==1.4.0
 alembic==1.14.0
