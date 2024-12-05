@@ -18,7 +18,7 @@ jobs:
 
       - name: Download Preflight artifacts
         # https://github.com/marketplace/actions/download-workflow-artifact
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: preflight-reports
           run_id: ${{ github.event.workflow_run.id }}
