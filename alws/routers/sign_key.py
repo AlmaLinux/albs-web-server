@@ -27,7 +27,11 @@ async def get_sign_keys(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user=Depends(get_current_user),
 ):
-    return await sign_key.get_sign_keys(db, user)
+    keys = await sign_key.get_sign_keys(db, user)
+    for key in keys:
+        if key.platforms:
+            key.platform_ids = [pl.id for pl in key.platforms]
+    return keys
 
 
 @router.post(
@@ -42,7 +46,10 @@ async def create_sign_key(
 ):
     try:
         payload.owner_id = user.id
-        return await sign_key.create_sign_key(db, payload)
+        key = await sign_key.create_sign_key(db, payload)
+        if payload.platform_ids:
+            key.platform_ids = [pl.id for pl in key.platforms]
+        return key
     except (PlatformMissingError, SignKeyAlreadyExistsError) as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 

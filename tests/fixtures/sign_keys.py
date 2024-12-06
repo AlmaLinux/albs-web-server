@@ -26,6 +26,18 @@ def basic_sign_key_payload() -> dict:
     }
 
 
+@pytest.fixture
+def additional_sign_key_payload() -> dict:
+    keyid = "01234567890ABCDE"
+    return {
+        "name": "Test key",
+        "description": "Test sign key",
+        "keyid": keyid,
+        "fingerprint": "01234567890ABCDEF1234567890ABCDEF1234567",
+        "public_url": "no_url",
+    }
+
+
 async def __create_sign_key(
     async_session: AsyncSession, payload: dict
 ) -> SignKey:

@@ -230,6 +230,23 @@ PlatformRoleMapping = sqlalchemy.Table(
     ),
 )
 
+platforms_sign_keys = sqlalchemy.Table(
+    "platforms_sign_keys",
+    Base.metadata,
+    sqlalchemy.Column(
+        "platform_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("platforms.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sqlalchemy.Column(
+        "sign_key_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("sign_keys.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
 
 class Platform(PermissionsMixin, Base):
     __tablename__ = "platforms"
@@ -244,7 +261,9 @@ class Platform(PermissionsMixin, Base):
     type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    pgp_key: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
+    pgp_key: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text, nullable=True
+    )
     module_build_index: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=1
     )
@@ -281,7 +300,7 @@ class Platform(PermissionsMixin, Base):
         "Repository", secondary=PlatformRepo
     )
     sign_keys: Mapped[List["SignKey"]] = relationship(
-        "SignKey", back_populates="platform"
+        "SignKey", secondary=platforms_sign_keys, back_populates="platforms"
     )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole", secondary=PlatformRoleMapping
@@ -953,7 +972,7 @@ class Team(PermissionsMixin, Base):
         "Product", back_populates="team"
     )
     test_repositories: Mapped[List["TestRepository"]] = relationship(
-         "TestRepository", back_populates="team"
+        "TestRepository", back_populates="team"
     )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole",
@@ -1199,7 +1218,9 @@ class TestRepository(PermissionsMixin, TeamMixin, Base):
         back_populates="test_repository",
         cascade="all, delete",
     )
-    team: Mapped["Team"] = relationship("Team", back_populates="test_repositories")
+    team: Mapped["Team"] = relationship(
+        "Team", back_populates="test_repositories"
+    )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole", secondary=TestRepositoryRoleMapping
     )
@@ -1300,11 +1321,10 @@ class SignKey(PermissionsMixin, Base):
     inserted: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
     )
-    active: Mapped[bool] = mapped_column(
-        sqlalchemy.Boolean, default=True
-    )
+    active: Mapped[bool] = mapped_column(sqlalchemy.Boolean, default=True)
     archived: Mapped[datetime.datetime] = mapped_column(
-        sqlalchemy.DateTime, nullable=True,
+        sqlalchemy.DateTime,
+        nullable=True,
     )
     product_id: Mapped[Optional[int]] = mapped_column(
         sqlalchemy.Integer,
@@ -1317,16 +1337,8 @@ class SignKey(PermissionsMixin, Base):
     product: Mapped["Product"] = relationship(
         'Product', back_populates='sign_keys'
     )
-    platform_id: Mapped[Optional[int]] = mapped_column(
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey(
-            "platforms.id",
-            name="sign_keys_platform_id_fkey",
-        ),
-        nullable=True,
-    )
-    platform: Mapped["Platform"] = relationship(
-        "Platform", back_populates="sign_keys"
+    platforms: Mapped[List["Platform"]] = relationship(
+        "Platform", secondary=platforms_sign_keys, back_populates="sign_keys"
     )
     build_task_artifacts: Mapped[List["BuildTaskArtifact"]] = relationship(
         "BuildTaskArtifact",
