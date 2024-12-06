@@ -694,12 +694,12 @@ async def verify_signed_build(
         select(models.Build)
         .where(models.Build.id == build_id)
         .options(
-            selectinload(models.Build.source_rpms).selectinload(
-                models.SourceRpm.artifact
-            ),
-            selectinload(models.Build.binary_rpms).selectinload(
-                models.BinaryRpm.artifact
-            ),
+            selectinload(models.Build.source_rpms)
+            .selectinload(models.SourceRpm.artifact)
+            .selectinload(models.BuildTaskArtifact.sign_key),
+            selectinload(models.Build.binary_rpms)
+            .selectinload(models.BinaryRpm.artifact)
+            .selectinload(models.BuildTaskArtifact.sign_key),
         )
     )
     build = build.scalars().first()
@@ -709,31 +709,40 @@ async def verify_signed_build(
         raise SignError(f"Build with ID {build_id} has not already signed")
     if not build.source_rpms or not build.binary_rpms:
         raise ValueError(f"No built packages in build with ID {build_id}")
-    platforms = await db.execute(
+    platform = await db.execute(
         select(models.Platform)
         .where(models.Platform.id == platform_id)
-        .options(selectinload(models.Platform.sign_keys))
+        .options(
+            selectinload(models.Platform.sign_keys),
+            selectinload(models.Platform.reference_platforms)
+            .selectinload(models.Platform.sign_keys),
+        )
     )
-    platform = platforms.scalars().first()
+    platform = platform.scalars().first()
     if not platform:
-        raise DataNotFoundError(
-            f"platform with ID {platform_id} does not exist"
-        )
+        raise DataNotFoundError(f"{platform_id=} doesn't exist")
     if not platform.sign_keys:
-        raise DataNotFoundError(
-            f"platform with ID {platform_id} connects with no keys"
-        )
-    sign_key = platform.sign_keys[0]
-    if not sign_key:
-        raise DataNotFoundError(
-            f"Sign key for Platform ID {platform_id} does not exist"
-        )
+        raise DataNotFoundError(f"{platform_id=} has no sign keys")
+    first_sign_key, *_ = platform.sign_keys
+    if not first_sign_key:
+        raise DataNotFoundError(f"Sign key for {platform_id=} doesn't exist")
 
     all_rpms = build.source_rpms + build.binary_rpms
+    compatible_platforms = await platform.get_compatible_release_platforms(db)
+    platform_names = set()
+    all_sign_keys = set()
+    for platform in compatible_platforms:
+        if not platform.sign_keys:
+            continue
+        all_sign_keys.update(platform.sign_keys)
+        platform_names.add(platform.name)
+
     for rpm in all_rpms:
-        if rpm.artifact.sign_key != sign_key:
+        if rpm.artifact.sign_key not in all_sign_keys:
             raise SignError(
-                f"Sign key with for pkg ID {rpm.id} is not matched "
-                f"by sign key for platform ID {platform_id}"
+                f'Sign key "{rpm.artifact.sign_key}" '
+                f'for "{rpm.artifact.name}" package '
+                "doesn't match with sign keys "
+                f'from "{platform_names}" platform(s)'
             )
     return True

@@ -4,6 +4,8 @@ import re
 from typing import Any, Dict, List, Literal, Optional
 
 import sqlalchemy
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import (
     SQLAlchemyBaseOAuthAccountTable,
     SQLAlchemyBaseUserTable,
@@ -305,6 +307,25 @@ class Platform(PermissionsMixin, Base):
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole", secondary=PlatformRoleMapping
     )
+
+    @property
+    def platforms_list_for_beholder(self) -> List["Platform"]:
+        return [self] + self.reference_platforms
+
+    async def get_compatible_release_platforms(
+        self,
+        session: AsyncSession,
+    ) -> List["Platform"]:
+        result = [self]
+        release_platforms = self.data.get('compatible_release_platforms', [])
+        if release_platforms:
+            platforms = await session.execute(
+                sqlalchemy.select(Platform)
+                .where(Platform.name.in_(release_platforms))
+                .options(selectinload(Platform.sign_keys))
+            )
+            result.extend(platforms.scalars().all())
+        return result
 
 
 class CustomRepoRepr(Base):

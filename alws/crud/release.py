@@ -8,7 +8,12 @@ from sqlalchemy.sql.expression import func
 
 from alws import models
 from alws.constants import ReleaseStatus
-from alws.errors import DataNotFoundError, PermissionDenied, ProductError
+from alws.errors import (
+    DataNotFoundError,
+    PermissionDenied,
+    PlatformMissingError,
+    ProductError,
+)
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.release_planner import get_releaser_class
@@ -98,6 +103,45 @@ async def __get_product(db: AsyncSession, product_id: int) -> models.Product:
     if not product:
         raise ProductError(f"Product with ID {product_id} not found")
     return product
+
+
+async def check_compatible_platforms(
+    session: AsyncSession,
+    build_ids: typing.List[int],
+    target_platform_id: int,
+):
+    build_tasks = (
+        (
+            await session.execute(
+                select(models.BuildTask)
+                .where(models.BuildTask.build_id.in_(build_ids))
+                .options(selectinload(models.BuildTask.platform))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    platform = (
+        (
+            await session.execute(
+                select(models.Platform).where(
+                    models.Platform.id == target_platform_id
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    compatible_release_platforms = set(
+        await platform.get_compatible_release_platforms(session)
+    )
+    build_platforms = {build_task.platform for build_task in build_tasks}
+    missing_ref_platforms = build_platforms - compatible_release_platforms
+    if missing_ref_platforms:
+        raise PlatformMissingError(
+            f'Cannot release packages for platform(s): "{missing_ref_platforms}", '
+            f'check reference platforms for platform: {platform}'
+        )
 
 
 async def create_release(
