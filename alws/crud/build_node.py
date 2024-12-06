@@ -412,7 +412,28 @@ async def __process_rpms(
         )
         for href, _, artifact in processed_packages
     ]
+
     rpms_info = get_rpm_packages_info(rpms)
+    for rpm in rpms:
+        rpm_info = rpms_info[rpm.href]
+        meta = {
+            "name": rpm_info["name"],
+            "epoch": rpm_info["epoch"],
+            "version": rpm_info["version"],
+            "release": rpm_info["release"],
+            "arch": rpm_info["arch"],
+            "sha256": rpm_info["sha256"],
+        }
+        rpm.meta = meta
+
+    # TODO: Consider whether we really need or want to add
+    # ErrataToAlbsPackages proposals here, see:
+    # https://github.com/AlmaLinux/build-system/issues/402
+    #
+    # If so, I think that maybe we should add them if the errata that the
+    # packages match with is not released, and avoid adding unnecessary data
+    # to db and its processing here.
+    #
     errata_record_ids = set()
     for build_task_artifact in rpms:
         rpm_info = rpms_info[build_task_artifact.href]

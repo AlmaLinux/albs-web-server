@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from alws.schemas.build_node_schema import BuildDoneArtifact
@@ -51,5 +52,6 @@ def get_rpm_pkg_info(artifact: BuildDoneArtifact):
         "release": nevra.release,
         "arch": nevra.arch,
         "rpm_sourcerpm": rpm_sourcerpm,
+        "sha256": hashlib.sha256().hexdigest(),
     }
     return pkg_info
