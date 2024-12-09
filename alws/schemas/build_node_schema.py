@@ -121,4 +121,3 @@ class BuildDone(BaseModel):
 
 class RequestTask(BaseModel):
     supported_arches: typing.List[str]
-    excluded_packages: typing.Optional[typing.List[str]] = []
