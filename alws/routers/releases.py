@@ -64,11 +64,6 @@ async def create_new_release(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: models.User = Depends(get_current_user),
 ):
-    await r_crud.check_compatible_platforms(
-        db,
-        payload.builds,
-        payload.platform_id,
-    )
     release = await r_crud.create_release(db, user.id, payload)
     return release
 

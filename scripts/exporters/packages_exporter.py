@@ -570,7 +570,7 @@ async def sign_repodata(
                         (
                             sign_key["keyid"]
                             for sign_key in db_sign_keys
-                            if platform_id in sign_key["platform_ids"]
+                            if sign_key["platform_id"] == platform_id
                         ),
                         None,
                     )
@@ -753,7 +753,7 @@ def main():
             (
                 sign_key["keyid"]
                 for sign_key in db_sign_keys
-                if platform_id in sign_key["platform_ids"]
+                if sign_key["platform_id"] == platform_id
             ),
             None,
         )
