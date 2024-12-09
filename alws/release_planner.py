@@ -67,8 +67,6 @@ __all__ = [
 
 class BaseReleasePlanner(metaclass=ABCMeta):
     def __init__(self, db: AsyncSession):
-        self.base_platform: typing.Optional[models.Platform] = None
-        self.compatible_release_platforms: typing.List[models.Platform] = []
         self._db = db
         self.pulp_client = PulpClient(
             settings.pulp_host,
@@ -240,16 +238,11 @@ class BaseReleasePlanner(metaclass=ABCMeta):
             for _, package in pulp_packages.items()
         ]
 
-    def can_be_released_to_target_platform(
-        self,
-        artifact_platform: models.Platform,
-    ) -> bool:
-        return artifact_platform in self.compatible_release_platforms
-
     @class_measure_work_time_async("get_packages_info_pulp_and_db")
     async def get_pulp_packages(
         self,
         build_ids: typing.List[int],
+        platform_id: int,
         build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> typing.Tuple[typing.List[dict], typing.List[str], typing.List[dict]]:
         src_rpm_names = []
@@ -262,21 +255,17 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 selectinload(models.Build.platform_flavors),
                 selectinload(models.Build.source_rpms)
                 .selectinload(models.SourceRpm.artifact)
-                .selectinload(models.BuildTaskArtifact.build_task)
-                .selectinload(models.BuildTask.platform)
-                .selectinload(models.Platform.reference_platforms),
+                .selectinload(models.BuildTaskArtifact.build_task),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.artifact)
-                .selectinload(models.BuildTaskArtifact.build_task)
-                .selectinload(models.BuildTask.platform)
-                .selectinload(models.Platform.reference_platforms),
+                .selectinload(models.BuildTaskArtifact.build_task),
                 selectinload(models.Build.binary_rpms)
                 .selectinload(models.BinaryRpm.source_rpm)
                 .selectinload(models.SourceRpm.artifact),
-                selectinload(models.Build.tasks)
-                .selectinload(models.BuildTask.rpm_modules),
-                selectinload(models.Build.repos)
-                .selectinload(models.Repository.platform),
+                selectinload(models.Build.tasks).selectinload(
+                    models.BuildTask.rpm_modules
+                ),
+                selectinload(models.Build.repos),
             )
         )
         build_result = await self.db.execute(builds_q)
@@ -289,9 +278,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     build.binary_rpms,
                 ]
                 for build_rpm in rpms_list
-                if self.can_be_released_to_target_platform(
-                    artifact_platform=build_rpm.artifact.build_task.platform,
-                )
+                if build_rpm.artifact.build_task.platform_id == platform_id
             ]
             logging.info('Build RPMs "%s"', build_rpms)
             pulp_artifacts = await self.get_pulp_packages_info(
@@ -350,9 +337,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                         if build_repo.arch == task.arch
                         and not build_repo.debug
                         and build_repo.type == "rpm"
-                        and self.can_be_released_to_target_platform(
-                            artifact_platform=build_repo.platform,
-                        )
+                        and build_repo.platform_id == platform_id
                     )
                     template = await self.pulp_client.get_repo_modules_yaml(
                         module_repo.url
@@ -376,7 +361,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                             # Module version needs to be converted into
                             # string because it's going to be involved later
                             # in release plan. When interacting with API
-                            # via Swagger or albs-frontend, we'll lose
+                            # via Swagger or albs-frontend, we'll loose
                             # precision as described here:
                             # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
                             "version": str(module.version),
@@ -718,10 +703,6 @@ class CommunityReleasePlanner(BaseReleasePlanner):
         build_tasks: typing.Optional[typing.List[int]] = None,
         product: typing.Optional[models.Product] = None,
     ) -> dict:
-        self.base_platform = base_platform
-        self.compatible_release_platforms = (
-            await base_platform.get_compatible_release_platforms(self._db)
-        )
         release_plan = {"modules": {}}
         added_packages = set()
 
@@ -738,6 +719,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
+            platform_id=base_platform.id,
             build_tasks=build_tasks,
         )
 
@@ -1323,9 +1305,6 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         added_packages = set()
         prod_repos = []
         self.base_platform = base_platform
-        self.compatible_release_platforms = (
-            await base_platform.get_compatible_release_platforms(self._db)
-        )
 
         (
             pulp_packages,
@@ -1333,6 +1312,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             pulp_rpm_modules,
         ) = await self.get_pulp_packages(
             build_ids,
+            platform_id=base_platform.id,
             build_tasks=build_tasks,
         )
 
@@ -1381,8 +1361,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
+            platforms_list = base_platform.reference_platforms + [base_platform]
             module_responses = await self._beholder_client.retrieve_responses(
-                self.base_platform.platforms_list_for_beholder,
+                platforms_list,
                 module_name=module_name,
                 module_stream=module_stream,
                 module_arch_list=module_arch_list,
@@ -1456,8 +1437,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
+        platforms_list = base_platform.reference_platforms + [base_platform]
         beholder_responses = await self._beholder_client.retrieve_responses(
-            self.base_platform.platforms_list_for_beholder,
+            platforms_list,
             data={
                 "source_rpms": src_rpm_names,
                 "match": BeholderMatchMethod.all(),
@@ -1518,7 +1500,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     is_devel=is_devel,
                     beholder_cache=beholder_cache,
                 )
-                # if we didn't find the repos for debug package, we can try to
+                # if we doesn't found repos for debug package, we can try to
                 # find repos by same package name but without debug suffix
                 if not repositories and is_debug:
                     repositories = self.find_release_repos(

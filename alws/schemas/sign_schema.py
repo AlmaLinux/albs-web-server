@@ -13,7 +13,7 @@ class SignKey(BaseModel):
     inserted: datetime
     active: bool = True
     archived: typing.Optional[datetime] = None
-    platform_ids: typing.Optional[typing.List[int]] = None
+    platform_id: typing.Optional[int] = None
     product_id: typing.Optional[int] = None
 
     class Config:
@@ -26,7 +26,7 @@ class SignKeyCreate(BaseModel):
     keyid: str
     fingerprint: str
     public_url: str
-    platform_ids: typing.Optional[typing.List[int]] = None
+    platform_id: typing.Optional[int] = None
     owner_id: typing.Optional[int] = None
 
 

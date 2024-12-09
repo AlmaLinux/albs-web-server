@@ -4,8 +4,6 @@ import re
 from typing import Any, Dict, List, Literal, Optional
 
 import sqlalchemy
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import (
     SQLAlchemyBaseOAuthAccountTable,
     SQLAlchemyBaseUserTable,
@@ -232,23 +230,6 @@ PlatformRoleMapping = sqlalchemy.Table(
     ),
 )
 
-platforms_sign_keys = sqlalchemy.Table(
-    "platforms_sign_keys",
-    Base.metadata,
-    sqlalchemy.Column(
-        "platform_id",
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("platforms.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    sqlalchemy.Column(
-        "sign_key_id",
-        sqlalchemy.Integer,
-        sqlalchemy.ForeignKey("sign_keys.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-)
-
 
 class Platform(PermissionsMixin, Base):
     __tablename__ = "platforms"
@@ -263,9 +244,7 @@ class Platform(PermissionsMixin, Base):
     type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     distr_version: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    pgp_key: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, nullable=True
-    )
+    pgp_key: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     module_build_index: Mapped[int] = mapped_column(
         sqlalchemy.Integer, default=1
     )
@@ -302,30 +281,11 @@ class Platform(PermissionsMixin, Base):
         "Repository", secondary=PlatformRepo
     )
     sign_keys: Mapped[List["SignKey"]] = relationship(
-        "SignKey", secondary=platforms_sign_keys, back_populates="platforms"
+        "SignKey", back_populates="platform"
     )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole", secondary=PlatformRoleMapping
     )
-
-    @property
-    def platforms_list_for_beholder(self) -> List["Platform"]:
-        return [self] + self.reference_platforms
-
-    async def get_compatible_release_platforms(
-        self,
-        session: AsyncSession,
-    ) -> List["Platform"]:
-        result = [self]
-        release_platforms = self.data.get('compatible_release_platforms', [])
-        if release_platforms:
-            platforms = await session.execute(
-                sqlalchemy.select(Platform)
-                .where(Platform.name.in_(release_platforms))
-                .options(selectinload(Platform.sign_keys))
-            )
-            result.extend(platforms.scalars().all())
-        return result
 
 
 class CustomRepoRepr(Base):
@@ -663,9 +623,6 @@ class BuildTaskArtifact(Base):
     name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     href: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    meta: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
     build_task: Mapped["BuildTask"] = relationship(
         "BuildTask", back_populates="artifacts"
     )
@@ -996,7 +953,7 @@ class Team(PermissionsMixin, Base):
         "Product", back_populates="team"
     )
     test_repositories: Mapped[List["TestRepository"]] = relationship(
-        "TestRepository", back_populates="team"
+         "TestRepository", back_populates="team"
     )
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole",
@@ -1242,9 +1199,7 @@ class TestRepository(PermissionsMixin, TeamMixin, Base):
         back_populates="test_repository",
         cascade="all, delete",
     )
-    team: Mapped["Team"] = relationship(
-        "Team", back_populates="test_repositories"
-    )
+    team: Mapped["Team"] = relationship("Team", back_populates="test_repositories")
     roles: Mapped[List["UserRole"]] = relationship(
         "UserRole", secondary=TestRepositoryRoleMapping
     )
@@ -1345,10 +1300,11 @@ class SignKey(PermissionsMixin, Base):
     inserted: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DateTime, default=datetime.datetime.utcnow()
     )
-    active: Mapped[bool] = mapped_column(sqlalchemy.Boolean, default=True)
+    active: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean, default=True
+    )
     archived: Mapped[datetime.datetime] = mapped_column(
-        sqlalchemy.DateTime,
-        nullable=True,
+        sqlalchemy.DateTime, nullable=True,
     )
     product_id: Mapped[Optional[int]] = mapped_column(
         sqlalchemy.Integer,
@@ -1361,8 +1317,16 @@ class SignKey(PermissionsMixin, Base):
     product: Mapped["Product"] = relationship(
         'Product', back_populates='sign_keys'
     )
-    platforms: Mapped[List["Platform"]] = relationship(
-        "Platform", secondary=platforms_sign_keys, back_populates="sign_keys"
+    platform_id: Mapped[Optional[int]] = mapped_column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "platforms.id",
+            name="sign_keys_platform_id_fkey",
+        ),
+        nullable=True,
+    )
+    platform: Mapped["Platform"] = relationship(
+        "Platform", back_populates="sign_keys"
     )
     build_task_artifacts: Mapped[List["BuildTaskArtifact"]] = relationship(
         "BuildTaskArtifact",

@@ -151,7 +151,6 @@ class BuildTaskArtifact(BaseModel):
     type: str
     href: str
     cas_hash: typing.Optional[str] = None
-    meta: typing.Optional[dict] = None
 
     class Config:
         from_attributes = True
