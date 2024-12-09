@@ -34,7 +34,6 @@ def get_rpm_packages_info(
             "release": pkg.release,
             "arch": pkg.arch,
             "rpm_sourcerpm": pkg.rpm_sourcerpm,
-            "sha256": pkg.sha256,
         }
         for _, pkg in pulp_packages.items()
     }
