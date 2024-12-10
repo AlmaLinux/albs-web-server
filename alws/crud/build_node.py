@@ -405,19 +405,6 @@ async def __process_rpms(
                 f"Cannot add RPM packages to the repository {str(repo)}"
             )
 
-    def append_errata_package(_, errata_package, artifact, rpm_info):
-        model = models.NewErrataToALBSPackage(
-            status=ErrataPackageStatus.proposal,
-            name=rpm_info["name"],
-            version=rpm_info["version"],
-            release=rpm_info["release"],
-            epoch=int(rpm_info["epoch"]),
-            arch=rpm_info["arch"],
-        )
-        model.errata_package = errata_package
-        model.build_artifact = artifact
-        errata_package.albs_packages.append(model)
-
     rpms = [
         models.BuildTaskArtifact(
             build_task_id=task_id,
@@ -441,72 +428,6 @@ async def __process_rpms(
             "sha256": rpm_info["sha256"],
         }
         rpm.meta = meta
-
-    # TODO: Consider whether we really need or want to add
-    # ErrataToAlbsPackages proposals here, see:
-    # https://github.com/AlmaLinux/build-system/issues/402
-    #
-    # If so, I think that maybe we should add them if the errata that the
-    # packages match with is not released, and avoid adding unnecessary data
-    # to db and its processing here.
-    #
-    errata_record_ids = set()
-    for build_task_artifact in rpms:
-        rpm_info = rpms_info[build_task_artifact.href]
-        if rpm_info["arch"] != "src":
-            src_name = parse_rpm_nevra(rpm_info["rpm_sourcerpm"]).name
-        else:
-            src_name = rpm_info["name"]
-        clean_rpm_release = clean_release(rpm_info["release"])
-        conditions = [
-            models.NewErrataPackage.name == rpm_info["name"],
-            models.NewErrataPackage.version == rpm_info["version"],
-        ]
-        if rpm_info["arch"] != "noarch":
-            conditions.append(models.NewErrataPackage.arch == rpm_info["arch"])
-
-        query = select(models.NewErrataPackage).where(
-            sqlalchemy.and_(*conditions)
-        )
-
-        if module_index:
-            module = None
-            for mod in module_index.iter_modules():
-                if mod.name.endswith("-devel"):
-                    continue
-                module = mod
-            build_task_module = f"{module.name}:{module.stream}"
-            query = query.join(models.NewErrataRecord).filter(
-                models.NewErrataRecord.module == build_task_module
-            )
-
-        errata_packages = (await db.execute(query)).scalars().all()
-
-        # We add ErrataToALBSPackage proposals for every matching package.
-        # In case of an errata that involves a module, we only add those
-        # packages that belong to the right module:stream
-        for errata_package in errata_packages:
-            if clean_rpm_release != clean_release(errata_package.release):
-                continue
-            errata_package.source_srpm = src_name
-            await db.run_sync(
-                append_errata_package,
-                errata_package,
-                build_task_artifact,
-                rpm_info,
-            )
-            errata_record_ids.add(errata_package.errata_record_id)
-    if settings.github_integration_enabled and errata_record_ids:
-        try:
-            await move_issue_to_testing(
-                record_ids=list(errata_record_ids),
-                build_id=build_id,
-            )
-        except Exception as err:
-            logging.exception(
-                "Cannot move issue to the Testing section: %s",
-                err,
-            )
 
     # we need to put source RPM in module as well, but it can be skipped
     # because it's built before
