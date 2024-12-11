@@ -85,6 +85,7 @@ class BaseErrataRecord(BaseModel):
     title: str
     description: str
     module: Optional[str] = None
+    devel_module: Optional[bool] = False
     status: Optional[str] = "final"
     version: Optional[str] = "3"
     severity: str

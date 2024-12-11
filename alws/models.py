@@ -1486,6 +1486,9 @@ class NewErrataRecord(Base):
     module: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
+    devel_module: Mapped[Optional[bool]] = mapped_column(
+        sqlalchemy.Boolean, nullable=True, default=False
+    )
     release_status: Mapped[
         Optional[
             Literal[
