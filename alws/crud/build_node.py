@@ -16,7 +16,6 @@ from alws import models
 from alws.config import settings
 from alws.constants import (
     BuildTaskStatus,
-    ErrataPackageStatus,
     GitHubIssueStatus,
 )
 from alws.errors import (
@@ -405,19 +404,6 @@ async def __process_rpms(
                 f"Cannot add RPM packages to the repository {str(repo)}"
             )
 
-    def append_errata_package(_, errata_package, artifact, rpm_info):
-        model = models.NewErrataToALBSPackage(
-            status=ErrataPackageStatus.proposal,
-            name=rpm_info["name"],
-            version=rpm_info["version"],
-            release=rpm_info["release"],
-            epoch=int(rpm_info["epoch"]),
-            arch=rpm_info["arch"],
-        )
-        model.errata_package = errata_package
-        model.build_artifact = artifact
-        errata_package.albs_packages.append(model)
-
     rpms = [
         models.BuildTaskArtifact(
             build_task_id=task_id,
@@ -442,14 +428,6 @@ async def __process_rpms(
         }
         rpm.meta = meta
 
-    # TODO: Consider whether we really need or want to add
-    # ErrataToAlbsPackages proposals here, see:
-    # https://github.com/AlmaLinux/build-system/issues/402
-    #
-    # If so, I think that maybe we should add them if the errata that the
-    # packages match with is not released, and avoid adding unnecessary data
-    # to db and its processing here.
-    #
     errata_record_ids = set()
     for build_task_artifact in rpms:
         rpm_info = rpms_info[build_task_artifact.href]
@@ -482,20 +460,11 @@ async def __process_rpms(
 
         errata_packages = (await db.execute(query)).scalars().all()
 
-        # We add ErrataToALBSPackage proposals for every matching package.
-        # In case of an errata that involves a module, we only add those
-        # packages that belong to the right module:stream
         for errata_package in errata_packages:
             if clean_rpm_release != clean_release(errata_package.release):
                 continue
-            errata_package.source_srpm = src_name
-            await db.run_sync(
-                append_errata_package,
-                errata_package,
-                build_task_artifact,
-                rpm_info,
-            )
             errata_record_ids.add(errata_package.errata_record_id)
+
     if settings.github_integration_enabled and errata_record_ids:
         try:
             await move_issue_to_testing(
