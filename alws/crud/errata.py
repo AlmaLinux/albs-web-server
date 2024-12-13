@@ -931,6 +931,7 @@ async def create_new_errata_record(db: AsyncSession, errata: BaseErrataRecord):
         freezed=errata.freezed,
         platform_id=errata.platform_id,
         module=errata.module,
+        devel_module=errata.devel_module,
         release_status=ErrataReleaseStatus.NOT_RELEASED,
         # TODO: BS-376
         # Not sure it's used, check and if not, remove it from data model
@@ -1870,9 +1871,8 @@ async def add_oval_data_to_errata_record(
     devel_module = None
     if db_record.module:
         module = Module(db_record.module)
-        dev_module = f"{module.name}-devel:{module.stream}"
-        if dev_module in db_record.original_title:
-            devel_module = Module(dev_module)
+        if db_record.devel_module:
+            devel_module = Module(f"{module.name}-devel:{module.stream}")
 
     oval_ref_ids = {
         "object": [ref["id"] for ref in albs_oval_cache["objects"]],
