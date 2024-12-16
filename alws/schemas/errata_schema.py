@@ -3,8 +3,7 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, field_validator
 
-from alws.constants import ErrataReleaseStatus
-from alws.models import ErrataPackageStatus
+from alws.constants import ErrataReleaseStatus, ErrataPackageStatus
 
 
 class BaseErrataCVE(BaseModel):
@@ -133,6 +132,7 @@ class CompactErrataRecord(BaseModel):
 
 class CreateErrataResponse(BaseModel):
     ok: bool
+    error: Optional[str] = None
 
 
 class ChangeErrataPackageStatusResponse(BaseModel):
