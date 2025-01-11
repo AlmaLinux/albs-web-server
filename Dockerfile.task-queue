@@ -1,7 +1,5 @@
 FROM almalinux/9-base:latest
 
-ADD https://packages.codenotary.org/codenotary.repo /etc/yum.repos.d/
-
 RUN <<EOT
   set -ex
   dnf upgrade -y
