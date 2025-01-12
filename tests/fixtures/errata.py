@@ -1,13 +1,19 @@
 import datetime
+from pathlib import Path
 import typing
+import json
 
 import pytest
+import sqlalchemy
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.inspection import inspect
+from sqlalchemy.dialects.postgresql import JSONB
+
 
 from alws.crud.errata import create_errata_record, create_new_errata_record
 from alws.dramatiq.errata import create_new_errata
 from alws.schemas.errata_schema import BaseErrataRecord
-
+from alws.models import NewErrataRecord
 
 @pytest.fixture(
     params=[
@@ -1222,3 +1228,53 @@ def pulp_updateinfos():
             "reboot_suggested": False,
         },
     ]
+
+def deserialize_model(cls, data):
+    instance = cls()
+
+    for column in inspect(cls).columns:
+        value = data.get(column.key)
+
+        if value is None:
+            continue
+
+        if isinstance(column.type, sqlalchemy.Enum):
+            enum_class = column.type.python_type
+            value = enum_class[value]
+
+        elif isinstance(column.type, sqlalchemy.DateTime):
+            value = datetime.datetime.fromisoformat(value)
+
+        elif isinstance(column.type, JSONB):
+            value = json.loads(value) if isinstance(value, str) else value
+
+        setattr(instance, column.key, value)
+
+    for relationship in inspect(cls).relationships:
+        related_data = data.get(relationship.key)
+        if related_data is not None:
+            if isinstance(related_data, dict):
+                related_instance = deserialize_model(relationship.mapper.class_, related_data)
+                setattr(instance, relationship.key, related_instance)
+
+            elif isinstance(related_data, list):
+                related_instances = [deserialize_model(relationship.mapper.class_, item) for item in related_data]
+                setattr(instance, relationship.key, related_instances)
+
+    return instance
+
+@pytest.fixture
+def new_errata_records_samples():
+    with (Path(__file__).parents[1] / 'samples/new_errata_records.json').open(encoding='utf-8') as f:
+        json_data = json.load(f)
+
+    records = [deserialize_model(NewErrataRecord, el) for el in json_data]
+
+    return records
+
+@pytest.fixture
+def oval_sample():
+    with (Path(__file__).parents[1] / 'samples/test_oval.xml').open(encoding='utf-8') as f:
+        oval = f.read().encode()
+
+    return oval
