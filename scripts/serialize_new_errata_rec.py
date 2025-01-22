@@ -119,10 +119,10 @@ if __name__ == '__main__':
     session = Session(engine)
     stmt = select(NewErrataRecord).where(
         NewErrataRecord.id.in_((
-            'ALSA-2022:4991',
-            'ALSA-2022:4887',
-            'ALSA-2019:2593',
-            'ALSA-2022:1759',
+            'ALSA-2025:0281',
+            'ALSA-2025:0325',
+            'ALSA-2024:9644',
+            'ALSA-2024:6964',
         ))
     )
     errata_records = session.execute(stmt).scalars().fetchall()
