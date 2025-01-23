@@ -20,9 +20,12 @@ load_dotenv('vars.env')
 from alws.models import NewErrataRecord, NewErrataPackage, Platform
 
 
-def serialize_model(instance, seen=None, exclude_models=None):
+def serialize_model(
+    instance, seen=None, exclude_models=None, exclude_columns=None
+):
     seen = set() if seen is None else seen
     exclude_models = [] if exclude_models is None else exclude_models
+    exclude_columns = [] if exclude_columns is None else exclude_columns
 
     if type(instance) in exclude_models:
         return None
@@ -36,6 +39,10 @@ def serialize_model(instance, seen=None, exclude_models=None):
 
     data = {}
     for column in inspect(instance).mapper.column_attrs:
+        if column.key in exclude_columns:
+            data[column.key] = None
+            continue
+
         value = getattr(instance, column.key)
 
         if isinstance(value, Enum):
@@ -128,7 +135,19 @@ if __name__ == '__main__':
     errata_records = session.execute(stmt).scalars().fetchall()
 
     serialized_records = [
-        serialize_model(rec, exclude_models=[NewErrataPackage, Platform])
+        serialize_model(
+            rec,
+            exclude_models=[NewErrataPackage, Platform],
+            exclude_columns=[
+                'last_release_log',
+                'original_title',
+                'original_criteria',
+                'original_tests',
+                'original_objects',
+                'original_states',
+                'original_variables',
+            ],
+        )
         for rec in errata_records
     ]
 
