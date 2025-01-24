@@ -2432,12 +2432,19 @@ async def prepare_resetting(
         items_to_insert.extend(matching_packages)
 
 
-async def reset_matched_errata_packages(record_id: str, session: AsyncSession):
+async def reset_matched_errata_packages(
+    record_id: str,
+    platform_id: int,
+    session: AsyncSession,
+):
     record = (
         (
             await session.execute(
                 select(models.NewErrataRecord)
-                .where(models.NewErrataRecord.id == record_id)
+                .where(
+                    models.NewErrataRecord.id == record_id,
+                    models.NewErrataRecord.platform_id == platform_id,
+                )
                 .options(
                     selectinload(models.NewErrataRecord.platform).selectinload(
                         models.Platform.repos

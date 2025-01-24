@@ -324,11 +324,16 @@ async def bulk_release_errata_records(
 @router.post('/reset-matched-packages')
 async def reset_matched_packages(
     record_id: str,
+    platform_id: int,
     session: AsyncSession = Depends(
         AsyncSessionDependency(key=get_async_db_key())
     ),
 ):
-    await errata_crud.reset_matched_errata_packages(record_id, session)
+    await errata_crud.reset_matched_errata_packages(
+        record_id,
+        platform_id,
+        session,
+    )
     return {'message': f'Packages for record {record_id} have been matched'}
 
 
