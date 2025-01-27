@@ -5,6 +5,9 @@
 `fixtures/` - a directory with pytest fixtures, new module should be also added in `conftest.pytest_plugins`
 
 `mock_classes.py` - a module which contain base class with `httpx` request method, setup logic for each test suite and HTTP status codes
+
+`../scripts/serialize_new_errata_rec.py` - a helper module for exporting/importing NewErrataRecords from a DB to json file.
+
 ## How to run tests locally
 1. Adjust variables in `vars.env`
     ```
@@ -29,7 +32,20 @@
     docker compose up -d sign_file
     ```
 
-4. Run `pytest` within `web_server_tests` container
+4. Update `tests/samples/new_errata_records.json`:
+    Needed only on major changes in `NewErrataRecord` model that affect OVAL generation.
+
+    Note: In order to export data you'll need DB with some data,\
+    ideally the data must be as similar to production as possible
+    ```bash
+    # set SQLALCHEMY_URL is it was not done on step 1
+    # export SQLALCHEMY_URL="postgresql+psycopg2://<your-db-address>"
+    python3 scripts/serialize_new_errata_rec.py
+    ```
+    Also, you'll need to update `tests/samples/test_oval.xml`.\
+    For that uncomment block inside the test case in `tests/test_oval/test_oval_generation.py` file
+
+5. Run `pytest` within `web_server_tests` container
     ```bash
     docker compose run --rm web_server_tests pytest -v
     ```

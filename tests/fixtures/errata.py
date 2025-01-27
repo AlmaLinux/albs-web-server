@@ -1,12 +1,15 @@
 import datetime
+from pathlib import Path
 import typing
+import json
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws.crud.errata import create_errata_record, create_new_errata_record
 from alws.dramatiq.errata import create_new_errata
-from alws.schemas.errata_schema import BaseErrataRecord
+from alws.models import NewErrataRecord
+from scripts.serialize_new_errata_rec import deserialize_model
 
 
 @pytest.fixture(
@@ -127,6 +130,7 @@ async def create_errata_dramatiq(
     await create_new_errata.send(errata_create_payload)
     await async_session.commit()
     yield
+
 
 @pytest.fixture
 def pulp_updateinfos():
@@ -1222,3 +1226,25 @@ def pulp_updateinfos():
             "reboot_suggested": False,
         },
     ]
+
+
+@pytest.fixture
+def new_errata_records_samples():
+    with (Path(__file__).parents[1] / 'samples/new_errata_records.json').open(
+        encoding='utf-8'
+    ) as f:
+        json_data = json.load(f)
+
+    records = [deserialize_model(NewErrataRecord, el) for el in json_data]
+
+    return records
+
+
+@pytest.fixture
+def oval_sample():
+    with (Path(__file__).parents[1] / 'samples/test_oval.xml').open(
+        encoding='utf-8'
+    ) as f:
+        oval = f.read().encode()
+
+    return oval

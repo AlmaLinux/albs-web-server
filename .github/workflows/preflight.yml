@@ -48,6 +48,13 @@ jobs:
           repository: AlmaLinux/albs-sign-file
           path: albs-sign-file
 
+      - name: Checkout oval-processor
+        uses: actions/checkout@v4
+        with:
+          repository: AlmaLinux/oval-processor
+          path: oval-processor
+          ssh-key: ${{ secrets.OVAL_PROCESSOR_PRIVKEY }}
+
       - name: Set up Docker Buildx
         # https://github.com/marketplace/actions/docker-setup-buildx
         uses: docker/setup-buildx-action@v3
@@ -85,6 +92,7 @@ jobs:
           mkdir -p $REPORTS_DIR
           mkdir -p ../{alts,albs-frontend,albs-node,albs-sign-node,alma-tests-cacher}
           ln -sf tests/test-vars.env vars.env
+          ln -sf oval-processor/almalinux almalinux
 
       - name: Start services
         run: docker compose up -d test_db sign_file
