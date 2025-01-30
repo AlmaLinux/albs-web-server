@@ -14,7 +14,7 @@ email-validator>=2.0
 fastapi-sqla==3.4.8
 structlog==24.4.0
 fastapi-limiter==0.1.6
-fastapi-users-db-sqlalchemy==6.0.1
+fastapi-users-db-sqlalchemy==7.0.0
 fastapi-users[all]==14.0.0
 fastapi==0.115.6
 feedgen==1.0.0
