@@ -78,7 +78,7 @@
         "%__pesign_client_cert": "%pe_signing_cert"
         "%__pesign_client_token": "%pe_signing_token"
         "%__pesign_token": "-t %pe_signing_token"
-        "%pe_signing_cert": "'f4217b7b99a69128'"
+        "%pe_signing_cert": "'05'"
         "%pe_signing_token": "'AlmaLinux OS Foundation'"
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
@@ -1778,7 +1778,7 @@
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
       secure_boot_macros:
-        "%pe_signing_cert": 'f4217b7b99a69128'
+        "%pe_signing_cert": '05'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
@@ -3424,7 +3424,7 @@
         - '--capability=cap_ipc_lock'
       rpmautospec_enable: true
       secure_boot_macros:
-        "%pe_signing_cert": 'f4217b7b99a69128'
+        "%pe_signing_cert": '05'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
@@ -5357,7 +5357,7 @@
         - '--capability=cap_ipc_lock'
       rpmautospec_enable: true
       secure_boot_macros:
-        "%pe_signing_cert": 'f4217b7b99a69128'
+        "%pe_signing_cert": '05'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
         "%_pesign": "/usr/local/bin/pesign"
         "%_pesign_client": "/usr/local/bin/pesign-client"
