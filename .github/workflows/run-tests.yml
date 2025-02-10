@@ -30,7 +30,7 @@ jobs:
         with:
           repository: AlmaLinux/oval-processor
           path: oval-processor
-          ssh-key: ${{ secrets.OVAL_PROCESSOR_PRIVKEY }}
+          token: ${{ secrets.OVAL_PROCESSOR_SECRET }}
 
       - name: Set up Docker Buildx
         # https://github.com/marketplace/actions/docker-setup-buildx
