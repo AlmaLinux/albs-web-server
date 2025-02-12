@@ -47,7 +47,7 @@ async def gen_token(secret: str, email: str = None, username: str = None):
     get_async_session_context = open_async_session(key=get_async_db_key())
     get_user_db_context = contextlib.asynccontextmanager(get_user_db)
     get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
-    async with get_async_session_context() as session:
+    async with get_async_session_context as session:
         conds = []
         if email:
             conds.append(User.email == email)
