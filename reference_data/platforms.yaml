@@ -5364,7 +5364,7 @@
         "%with_modsign": "1"
         "%modsign_os": "almalinux10"
     mock_dist: el10
-    timeout: 43200
+    timeout: 86400
     yum:
       best: true
       module_platform_id: platform:el10
