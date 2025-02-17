@@ -653,7 +653,10 @@ class BuildPlanner:
                     else None
                 ),
             )
-            await self._add_single_project(db_ref)
+            await self._add_single_project(
+                ref=db_ref,
+                mock_options=ref.mock_options
+            )
         else:
             await self._add_single_module(ref)
 
