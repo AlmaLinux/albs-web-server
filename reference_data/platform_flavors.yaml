@@ -903,6 +903,10 @@
       priority: 10
 
 - name: Fedora-40-riscv64
+  data:
+    mock:
+      dnf_common_opts:
+        - --nobest
   repositories:
     - name: fedora-40-riscv64
       arch: riscv64

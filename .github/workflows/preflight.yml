@@ -48,13 +48,6 @@ jobs:
           repository: AlmaLinux/albs-sign-file
           path: albs-sign-file
 
-      - name: Checkout oval-processor
-        uses: actions/checkout@v4
-        with:
-          repository: AlmaLinux/oval-processor
-          path: oval-processor
-          ssh-key: ${{ secrets.OVAL_PROCESSOR_PRIVKEY }}
-
       - name: Set up Docker Buildx
         # https://github.com/marketplace/actions/docker-setup-buildx
         uses: docker/setup-buildx-action@v3
@@ -125,10 +118,11 @@ jobs:
             bandit -c pyproject.toml ${{ steps.changed-files.outputs.src_files }} \
               | tee >(sed 's/\x1B\[[0-9;]*m//g' > $REPORTS_DIR/bandit-report.txt)"
 
+      # Run pytest ignoring tests/test_oval due to inability to clone oval-processor
       - name: Run pytest
         run: |
           docker compose run --rm web_server_tests bash -o pipefail -c "
-            pytest -v --cov \
+            pytest -v --ignore tests/test_oval --cov \
               --junit-xml=$REPORTS_DIR/pytest-report.xml \
               --cov-report=xml:$REPORTS_DIR/pytest-coverage.xml \
               --cov-report=term | tee $REPORTS_DIR/pytest-output.txt"
