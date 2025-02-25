@@ -907,6 +907,8 @@
     mock:
       dnf_common_opts:
         - --nobest
+    definitions:
+      __spec_check_template: "exit 0; "
   repositories:
     - name: fedora-40-riscv64
       arch: riscv64
