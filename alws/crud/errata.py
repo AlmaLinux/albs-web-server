@@ -672,8 +672,9 @@ async def update_errata_record(
 async def get_matching_albs_packages(
     db: AsyncSession,
     errata_package: models.NewErrataPackage,
-    prod_repos_cache,
-    module,
+    prod_repos_cache: typing.Dict,
+    module: Optional[str] = None,
+    build_id: Optional[int] = None,
 ) -> Tuple[List[models.NewErrataToALBSPackage], dict]:
     package_type = {}
     items_to_insert = []
@@ -723,13 +724,19 @@ async def get_matching_albs_packages(
     # inside the ALBS, this is, build_task_artifacts.
     name_query = f"{errata_package.name}-{errata_package.version}"
 
+    conditions = [
+        models.BuildTaskArtifact.type == "rpm",
+        models.BuildTaskArtifact.name.startswith(name_query),
+    ]
+    if build_id:
+        conditions.append(
+            models.BuildTask.build_id == build_id
+        )
     query = (
         select(models.BuildTaskArtifact)
+        .join(models.BuildTaskArtifact.build_task)
         .where(
-            and_(
-                models.BuildTaskArtifact.type == "rpm",
-                models.BuildTaskArtifact.name.startswith(name_query),
-            )
+            and_(*conditions)
         )
         .options(
             selectinload(models.BuildTaskArtifact.build_task),
@@ -739,13 +746,15 @@ async def get_matching_albs_packages(
     # only packages that belong to the right module:stream
     if module:
         module_name, module_stream = module.split(":")
+        filters = [
+            models.RpmModule.name == module_name,
+            models.RpmModule.stream == module_stream,
+        ]
+
         query = (
             query.join(models.BuildTaskArtifact.build_task)
             .join(models.BuildTask.rpm_modules)
-            .filter(
-                models.RpmModule.name == module_name,
-                models.RpmModule.stream == module_stream,
-            )
+            .filter(*filters)
         )
 
     result = (await db.execute(query)).scalars().all()
@@ -880,15 +889,18 @@ async def process_new_errata_packages(
     db_errata: models.NewErrataRecord,
     platform: models.Platform,
 ):
-    packages = []
+    db_packages = []
     pkg_types = []
+    prod_repos_cache = {}
+
     search_params = prepare_search_params(errata)
-    prod_repos_cache = await load_platform_packages(
-        platform,
-        search_params,
-        False,
-        db_errata.module,
-    )
+    if not errata.is_issued_by_almalinux:
+        prod_repos_cache = await load_platform_packages(
+            platform,
+            search_params,
+            False,
+            db_errata.module,
+        )
     for package in errata.packages:
         # Just in case
         if package.arch == "src":
@@ -904,14 +916,14 @@ async def process_new_errata_packages(
             reboot_suggested=False,
         )
         db_errata.packages.append(db_package)
-        packages.append(db_package)
+        db_packages.append(db_package)
         # Create ErrataToAlbsPackages
         matching_packages, pkg_type = await get_matching_albs_packages(
-            db, db_package, prod_repos_cache, db_errata.module
+            db, db_package, prod_repos_cache, db_errata.module, package.build_id
         )
-        packages.extend(matching_packages)
+        db_packages.extend(matching_packages)
         pkg_types.append(pkg_type)
-    return packages, pkg_types
+    return db_packages, pkg_types
 
 
 async def create_new_errata_record(errata: typing.Dict):
