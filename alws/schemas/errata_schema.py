@@ -1,7 +1,8 @@
 import datetime
+import re
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, computed_field
 
 from alws.constants import ErrataReleaseStatus, ErrataPackageStatus
 
@@ -43,6 +44,7 @@ class BaseErrataPackage(BaseModel):
     epoch: int
     arch: str
     reboot_suggested: bool
+    build_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -100,6 +102,11 @@ class BaseErrataRecord(BaseModel):
     variables: Optional[Any] = None
     references: List[BaseErrataReference]
     packages: List[BaseErrataPackage]
+
+    @computed_field
+    @property
+    def is_issued_by_almalinux(self) -> bool:
+        return bool(re.search(r"AL[BES]A-\d{4}:A", self.id))
 
 
 class ErrataRecord(BaseErrataRecord):
