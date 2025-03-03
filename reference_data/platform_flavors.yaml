@@ -928,16 +928,18 @@
       debug: false
       priority: 9
 
-- name: EPEL-10_altarch
+- name: EPEL-Kitten-10_altarch
+  data:
+    mock_dist: el10.alma_altarch
   repositories:
-    - name: EPEL_altarch
+    - name: EPEL_Kitten_altarch
       arch: x86_64_v2
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-x86_64_v2-dr/
       production: true
       debug: false
       priority: 10
-    - name: EPEL_altarch
+    - name: EPEL_Kitten_altarch
       arch: riscv64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-riscv64-dr/
@@ -945,7 +947,27 @@
       debug: false
       priority: 10
 
+- name: EPEL-10_altarch
+  data:
+    mock_dist: el10_0.alma_altarch
+  repositories:
+    - name: EPEL_altarch
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-10-x86_64_v2-dr/
+      production: true
+      debug: false
+      priority: 10
+    - name: EPEL_altarch
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-10-riscv64-dr/
+      production: true
+      debug: false
+      priority: 10
+
 - name: EPEL-10-v2-bootstrap
+  repositories:
     - name: epel-10-x86_64_v2-bootstrap
       arch: x86_64_v2
       type: rpm
