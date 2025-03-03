@@ -18,6 +18,7 @@ class Config(BaseSettings):
     git_cache_keys: typing.Dict[str, str] = {
         'rpms': 'rpms_gitea_cache',
         'modules': 'modules_gitea_cache',
+        'autopatch': 'autopatch_gitea_cache',
     }
     cacher_sentry_environment: str = "dev"
     cacher_sentry_dsn: str = ""
@@ -56,8 +57,11 @@ async def run(config, logger, redis_client, gitea_client, organization):
     to_index = []
     git_names = set()
     for repo in await gitea_client.list_repos(organization):
-        if repo['empty'] is True:
+        if repo['empty']:
             logger.warning(f"Skipping empty repo {repo['html_url']}")
+            continue
+        if organization == 'autopatch' and repo['archived']:
+            logger.warning(f"Skipping archived repo {repo['html_url']}")
             continue
         repo_name = repo['full_name']
         git_names.add(repo_name)
@@ -79,6 +83,12 @@ async def run(config, logger, redis_client, gitea_client, organization):
     for result in results:
         cache_record = cache[result['repo_name']]
         cache_record['tags'] = [tag['name'] for tag in result['tags']]
+        if organization == 'autopatch':
+            cache_record['branches'] = [
+                branch for branch in result['branches']
+                if not branch['name'].endswith('-deprecated')
+            ]
+
         cache_record['branches'] = [
             branch['name'] for branch in result['branches']
         ]
@@ -104,8 +114,11 @@ async def main():
     while True:
         logger.info('Checking cache for updates')
         await asyncio.gather(
+            # projects git data live in these gitea orgs
             run(config, logger, redis_client, gitea_client, 'rpms'),
             run(config, logger, redis_client, gitea_client, 'modules'),
+            # almalinux modified packages live in autopatch gitea org
+            run(config, logger, redis_client, gitea_client, 'autopatch'),
         )
         logger.info(
             f'Cache has been updated, waiting for {wait} sec for next update'
