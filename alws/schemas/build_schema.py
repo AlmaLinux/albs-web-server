@@ -7,6 +7,7 @@ import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
+import redis.asyncio as aioredis
 from pydantic import (
     AfterValidator,
     AnyHttpUrl,
@@ -15,8 +16,6 @@ from pydantic import (
     field_validator,
 )
 from typing_extensions import Annotated
-
-import redis.asyncio as aioredis
 
 from alws import models
 from alws.config import settings
@@ -127,9 +126,7 @@ class BuildCreatePlatforms(BaseModel):
 
 class BuildCreate(BaseModel):
     platforms: conlist(BuildCreatePlatforms, min_length=1)
-    tasks: conlist(
-        typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1
-    )
+    tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1)
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     platform_flavors: typing.Optional[typing.List[int]] = None

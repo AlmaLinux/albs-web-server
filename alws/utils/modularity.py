@@ -9,17 +9,17 @@ import urllib.parse
 
 import aiohttp
 import gi
+import redis.asyncio as aioredis
 import requests
 import yaml
-
 from pydantic import BaseModel
-import redis.asyncio as aioredis
 
 gi.require_version("Modulemd", "2.0")
 from gi.repository import Modulemd
 
 from alws.scripts.git_cacher.git_cacher import Config as GitCacherConfig
 from alws.scripts.git_cacher.git_cacher import load_redis_cache
+
 
 def calc_dist_macro(
     module_name: str,
@@ -45,10 +45,9 @@ async def get_modified_refs_list(
 
     cache = await load_redis_cache(redis, config.git_cache_keys['autopatch'])
     package_list = [
-        repo['name'] for repo in cache.values()
-        if any(
-            branch.startswith(dist_prefix) for branch in repo['branches']
-        )
+        repo['name']
+        for repo in cache.values()
+        if any(branch.startswith(dist_prefix) for branch in repo['branches'])
     ]
     return package_list
 
@@ -251,9 +250,7 @@ class ModuleWrapper:
                     if stream:
                         new_deps.add_runtime_stream(name, stream)
                     else:
-                        new_deps.set_empty_runtime_dependencies_for_module(
-                            name
-                        )
+                        new_deps.set_empty_runtime_dependencies_for_module(name)
 
         for module in old_runtime:
             if module == "platform":

@@ -1,8 +1,8 @@
 import typing
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_sqla import AsyncSessionDependency
-import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models

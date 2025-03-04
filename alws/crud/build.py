@@ -2,7 +2,6 @@ import logging
 import typing
 
 import redis.asyncio as aioredis
-
 import sqlalchemy
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession

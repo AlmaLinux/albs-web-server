@@ -85,7 +85,8 @@ async def run(config, logger, redis_client, gitea_client, organization):
         cache_record['tags'] = [tag['name'] for tag in result['tags']]
         if organization == 'autopatch':
             cache_record['branches'] = [
-                branch for branch in result['branches']
+                branch
+                for branch in result['branches']
                 if not branch['name'].endswith('-deprecated')
             ]
 
@@ -121,7 +122,7 @@ async def main():
             run(config, logger, redis_client, gitea_client, 'autopatch'),
         )
         logger.info(
-            f'Cache has been updated, waiting for {wait} sec for next update'
+            'Cache has been updated, waiting for %d secs for next update' % wait
         )
         await asyncio.sleep(wait)
 
