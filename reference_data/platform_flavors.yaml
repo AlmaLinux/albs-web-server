@@ -929,9 +929,6 @@
       priority: 9
 
 - name: EPEL-Kitten-10_altarch
-  data:
-    definitions:
-      dist: ".el10.alma_altarch"
   repositories:
     - name: EPEL_Kitten_altarch
       arch: x86_64_v2
@@ -949,9 +946,6 @@
       priority: 10
 
 - name: EPEL-10_altarch
-  data:
-    definitions:
-      dist: ".el10_0.alma_altarch"
   repositories:
     - name: EPEL_altarch
       arch: x86_64_v2
