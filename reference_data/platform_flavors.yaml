@@ -244,28 +244,28 @@
     - name: epel-10
       arch: x86_64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/x86_64/os/
+      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/x86_64/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: aarch64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/os/
+      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: ppc64le
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/ppc64le/os/
+      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/ppc64le/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: s390x
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/s390x/os/
+      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/s390x/
       production: false
       debug: false
       priority: 10
@@ -927,3 +927,47 @@
       production: true
       debug: false
       priority: 9
+
+- name: EPEL-Kitten-10_altarch
+  repositories:
+    - name: EPEL_Kitten_altarch
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-x86_64_v2-dr/
+      production: true
+      debug: false
+      priority: 10
+    - name: EPEL_Kitten_altarch
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-riscv64-dr/
+      production: true
+      debug: false
+      priority: 10
+
+- name: EPEL-10_altarch
+  repositories:
+    - name: EPEL_altarch
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-10-x86_64_v2-dr/
+      production: true
+      debug: false
+      priority: 10
+    - name: EPEL_altarch
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-10-riscv64-dr/
+      production: true
+      debug: false
+      priority: 10
+
+- name: EPEL-10-v2-bootstrap
+  repositories:
+    - name: epel-10-x86_64_v2-bootstrap
+      arch: x86_64_v2
+      type: rpm
+      url: https://dl.fedoraproject.org/pub/epel/10/Everything/x86_64/
+      production: false
+      debug: false
+      priority: 10
