@@ -7,6 +7,7 @@ import typing
 import urllib.parse
 
 import aiohttp.client_exceptions
+import redis.asyncio as aioredis
 from pydantic import (
     AfterValidator,
     AnyHttpUrl,
@@ -125,9 +126,7 @@ class BuildCreatePlatforms(BaseModel):
 
 class BuildCreate(BaseModel):
     platforms: conlist(BuildCreatePlatforms, min_length=1)
-    tasks: conlist(
-        typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1
-    )
+    tasks: conlist(typing.Union[BuildTaskRef, BuildTaskModuleRef], min_length=1)
     linked_builds: typing.List[int] = []
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     platform_flavors: typing.Optional[typing.List[int]] = None
@@ -432,6 +431,7 @@ async def _get_module_ref(
 
 
 async def get_module_refs(
+    redis: aioredis.client.Redis,
     task: BuildTaskRef,
     platform: models.Platform,
     flavors: typing.List[models.PlatformFlavour],
@@ -448,9 +448,7 @@ async def get_module_refs(
 
     clean_dist_name = get_clean_distr_name(platform.name)
     distr_ver = platform.distr_version
-    modified_list = await get_modified_refs_list(
-        platform.modularity['modified_packages_url']
-    )
+    modified_list = await get_modified_refs_list(redis, platform.distr_version)
     template = await download_modules_yaml(
         task.url, task.git_ref, BuildTaskRefType.to_text(task.ref_type)
     )
