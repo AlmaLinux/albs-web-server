@@ -669,7 +669,7 @@ class CommunityReleasePlanner(BaseReleasePlanner):
     @staticmethod
     def get_repo_pretty_name(repo_name: str) -> str:
         regex = re.compile(
-            r"-(i686|x86_64|aarch64|ppc64le|s390x|src)(?P<debug>-debug)?-dr$"
+            r"-([a-z0-9_]+)(?P<debug>-debug)?-dr$"
         )
         pretty_name = regex.sub("", repo_name)
         debug_part = regex.search(repo_name)
