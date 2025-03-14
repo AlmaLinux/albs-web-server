@@ -1,12 +1,14 @@
 import asyncio
 import logging
+import os
 import re
 import shutil
 import sys
 import urllib.parse
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, Union
 
+import aiohttp
 from plumbum import local
 from sqlalchemy import select
 
@@ -54,6 +56,9 @@ class BasePulpExporter:
                 logging.StreamHandler(stream=sys.stdout),
             ],
         )
+        self.web_server_headers = {
+            "Authorization": f"Bearer {settings.albs_jwt_token}",
+        }
 
     def regenerate_repo_metadata(self, repo_path: str):
         partial_path = re.sub(
@@ -198,3 +203,107 @@ class BasePulpExporter:
             *(self._export_repository(e) for e in exporters)
         )
         return [path for path in results if path]
+
+    async def get_sign_keys(self):
+        endpoint = "sign-keys/"
+        return await self.make_request("GET", endpoint)
+
+    async def get_sign_server_token(self) -> str:
+        body = {
+            'email': settings.sign_server_username,
+            'password': settings.sign_server_password,
+        }
+        endpoint = 'token'
+        method = 'POST'
+        response = await self.make_request(
+            method=method,
+            endpoint=endpoint,
+            body=body,
+            send_to='sign_server',
+        )
+        return response['token']
+
+    async def sign_repomd_xml(self, path_to_file: str, key_id: str, token: str):
+        endpoint = "sign"
+        result = {"asc_content": None, "error": None}
+        try:
+            response = await self.make_request(
+                "POST",
+                endpoint,
+                params={"keyid": key_id},
+                data={"file": Path(path_to_file).read_bytes()},
+                user_headers={"Authorization": f"Bearer {token}"},
+                send_to="sign_server",
+            )
+            result["asc_content"] = response
+        except Exception as err:
+            result['error'] = err
+        return result
+
+    async def repomd_signer(self, repodata_path, key_id, token):
+        string_repodata_path = str(repodata_path)
+        if key_id is None:
+            self.logger.info(
+                "Cannot sign repomd.xml in %s, missing GPG key",
+                string_repodata_path,
+            )
+            return
+
+        file_path = os.path.join(repodata_path, "repomd.xml")
+        result = await self.sign_repomd_xml(file_path, key_id, token)
+        self.logger.info('PGP key id: %s', key_id)
+        result_data = result.get("asc_content")
+        if result_data is None:
+            self.logger.error(
+                "repomd.xml in %s is failed to sign:\n%s",
+                string_repodata_path,
+                result["error"],
+            )
+            return
+
+        repodata_path = os.path.join(repodata_path, "repomd.xml.asc")
+        with open(repodata_path, "w") as file:
+            file.writelines(result_data)
+        self.logger.info("repomd.xml in %s is signed", string_repodata_path)
+
+    async def make_request(
+        self,
+        method: str,
+        endpoint: str,
+        params: Optional[dict] = None,
+        body: Optional[dict] = None,
+        user_headers: Optional[dict] = None,
+        data: Optional[list] = None,
+        send_to: Literal['web_server', 'sign_server'] = 'web_server',
+    ) -> Union[dict, str]:
+        if send_to == 'web_server':
+            headers = {**self.web_server_headers}
+            full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
+        elif send_to == 'sign_server':
+            headers = {}
+            full_url = urllib.parse.urljoin(
+                settings.sign_server_api_url,
+                endpoint,
+            )
+        else:
+            raise ValueError(
+                "'send_to' param must be either 'web_server' or 'sign_server'"
+            )
+
+        if user_headers:
+            headers.update(user_headers)
+
+        async with aiohttp.ClientSession(
+            headers=headers,
+            raise_for_status=True,
+        ) as session:
+            async with session.request(
+                method,
+                full_url,
+                json=body,
+                params=params,
+                data=data,
+            ) as response:
+                if response.headers['Content-Type'] == 'application/json':
+                    return await response.json()
+                return await response.text()
