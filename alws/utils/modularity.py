@@ -113,7 +113,7 @@ class RpmArtifact(BaseModel):
         regex = re.compile(
             r"^(?P<name>[\w+-.]+)-"
             r"((?P<epoch>\d+):)?"
-            r"(?P<version>\d+?[\w.]*)-"
+            r"(?P<version>\d+?[\w.~]*)-"
             r"(?P<release>\d+?[\w.+]*?)"
             r"\.(?P<arch>[\w]*)(\.rpm)?$"
         )
