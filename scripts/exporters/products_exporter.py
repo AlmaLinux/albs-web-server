@@ -67,6 +67,13 @@ def parse_args():
         help="Method of exporting (choices: write, hardlink, symlink)",
     )
     parser.add_argument(
+        "-sw",
+        "--sign-with",
+        type=str,
+        required=True,
+        help="GPG key name to use when signing repodata.",
+    )
+    parser.add_argument(
         "-l",
         "--log",
         type=str,
@@ -137,6 +144,16 @@ class ProductExporter(BasePulpExporter):
             list({repo.id for repo in product.repositories})
         )
 
+    async def get_sign_key_id(self, key_name):
+        sign_keys = await self.get_sign_keys()
+        return next(
+            (
+                sign_key['keyid']
+                for sign_key in sign_keys
+                if sign_key["name"] == key_name
+            ), None
+        )
+
 
 async def repo_post_processing(
     exporter: ProductExporter,
@@ -149,7 +166,29 @@ async def repo_post_processing(
         except Exception as exc:
             result = False
             exporter.logger.exception("Post-processing failed: %s", str(exc))
+        # TODO: Ask Daniil - aren't we always returning False here?
         return result
+
+
+async def sign_repodata(
+    exporter: ProductExporter,
+    exported_paths: List[str],
+    key_id: str,
+):
+    tasks = []
+    token = await exporter.get_sign_server_token()
+
+    for repo_path in exported_paths:
+        path = Path(repo_path)
+        parent_dir = path.parent
+        repodata = parent_dir / "repodata"
+        if not os.path.exists(repo_path):
+            continue
+
+        exporter.logger.info('Key ID: %s', str(key_id))
+        tasks.append(exporter.repomd_signer(repodata, key_id, token))
+
+    await asyncio.gather(*tasks)
 
 
 async def main():
@@ -161,6 +200,15 @@ async def main():
         export_method=args.export_method,
         log_file_path=args.log,
     )
+
+    sign_key = None
+    if args.sign_with:
+        sign_key_id = await exporter.get_sign_key_id(args.sign_with)
+        if not sign_key_id:
+            err = "Couldn't retrieve the '{args.sign_with}' sign key"
+            raise Exception(f'Aborting product export, error was: {err}')
+
+
     pulp_client.PULP_SEMAPHORE = asyncio.Semaphore(10)
     exported_paths = await exporter.export_product_repos(
         product_name=args.product,
@@ -170,6 +218,9 @@ async def main():
     await asyncio.gather(
         *(repo_post_processing(exporter, path) for path in exported_paths)
     )
+
+    if sign_key:
+        await sign_repodata(exporter, exported_paths, sign_key_id)
 
 
 if __name__ == '__main__':
