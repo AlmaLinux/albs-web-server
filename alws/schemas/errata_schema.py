@@ -9,7 +9,7 @@ from alws.constants import ErrataReleaseStatus, ErrataPackageStatus
 
 class BaseErrataCVE(BaseModel):
     id: str
-    cvss3: str
+    cvss3: Optional[str] = None
     cwe: Optional[str] = None
     impact: str
     public: str

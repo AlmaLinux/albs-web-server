@@ -1961,7 +1961,7 @@ class ErrataCVE(Base):
     __tablename__ = "errata_cves"
 
     id: Mapped[str] = mapped_column(sqlalchemy.Text, primary_key=True)
-    cvss3: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
+    cvss3: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=True)
     cwe: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     impact: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
