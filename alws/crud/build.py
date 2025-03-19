@@ -1,6 +1,7 @@
 import logging
 import typing
 
+import redis.asyncio as aioredis
 import sqlalchemy
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -238,11 +239,13 @@ async def get_builds(
 
 
 async def get_module_preview(
+    redis: aioredis.client.Redis,
     platform: models.Platform,
     flavors: typing.List[models.PlatformFlavour],
     module_request: build_schema.ModulePreviewRequest,
 ) -> build_schema.ModulePreview:
     refs, modules, enabled_modules = await build_schema.get_module_refs(
+        redis=redis,
         task=module_request.ref,
         platform=platform,
         flavors=flavors,

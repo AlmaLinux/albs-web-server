@@ -9,12 +9,16 @@ import urllib.parse
 
 import aiohttp
 import gi
+import redis.asyncio as aioredis
 import requests
 import yaml
 from pydantic import BaseModel
 
 gi.require_version("Modulemd", "2.0")
 from gi.repository import Modulemd
+
+from alws.scripts.git_cacher.git_cacher import Config as GitCacherConfig
+from alws.scripts.git_cacher.git_cacher import load_redis_cache
 
 
 def calc_dist_macro(
@@ -32,14 +36,20 @@ def calc_dist_macro(
     return f".module_{dist_prefix}+{build_index}+{dist_hash}"
 
 
-async def get_modified_refs_list(platform_url: str):
+async def get_modified_refs_list(
+    redis: aioredis.client.Redis, distr_version: str
+):
     package_list = []
-    async with aiohttp.ClientSession() as session:
-        async with session.get(platform_url) as response:
-            yaml_body = await response.text()
-            response.raise_for_status()
-            package_list = yaml.safe_load(yaml_body)["modified_packages"]
-            return package_list
+    dist_prefix = f'a{distr_version}'
+    config = GitCacherConfig()
+
+    cache = await load_redis_cache(redis, config.git_cache_keys['autopatch'])
+    package_list = [
+        repo['name']
+        for repo in cache.values()
+        if any(branch.startswith(dist_prefix) for branch in repo['branches'])
+    ]
+    return package_list
 
 
 def get_modules_yaml_from_repo(repo_name: str):
@@ -240,9 +250,7 @@ class ModuleWrapper:
                     if stream:
                         new_deps.add_runtime_stream(name, stream)
                     else:
-                        new_deps.set_empty_runtime_dependencies_for_module(
-                            name
-                        )
+                        new_deps.set_empty_runtime_dependencies_for_module(name)
 
         for module in old_runtime:
             if module == "platform":

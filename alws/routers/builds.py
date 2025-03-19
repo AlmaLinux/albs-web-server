@@ -1,5 +1,6 @@
 import typing
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from alws.crud import build as build_crud
 from alws.crud import build_node
 from alws.crud import platform as platform_crud
 from alws.crud import platform_flavors as flavors_crud
-from alws.dependencies import get_async_db_key
+from alws.dependencies import get_async_db_key, get_redis
 from alws.errors import BuildError, DataNotFoundError
 from alws.schemas import build_schema
 
@@ -82,6 +83,7 @@ async def get_builds_per_page(
 async def get_module_preview(
     module_request: build_schema.ModulePreviewRequest,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     platform = await platform_crud.get_platform(
         db,
@@ -94,6 +96,7 @@ async def get_module_preview(
             ids=module_request.flavors,
         )
     return await build_crud.get_module_preview(
+        redis,
         platform,
         flavors,
         module_request,
