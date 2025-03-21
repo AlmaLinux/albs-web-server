@@ -121,6 +121,10 @@ async def get_task(
                     response["platform"].data["mock"][key].update(
                         flavour.data["mock"][key]
                     )
+                if "chroot_setup_cmd" in flavour.data.get('mock', {}):
+                    response["platform"].data["mock"]["chroot_setup_cmd"] = (
+                        flavour.data["mock"]["chroot_setup_cmd"]
+                    )
                 if "dnf_common_opts" in flavour.data.get('mock', {}):
                     if "dnf_common_opts" not in response["platform"].data["mock"]:
                         response["platform"].data["mock"]["dnf_common_opts"] = []
