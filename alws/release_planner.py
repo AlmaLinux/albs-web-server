@@ -769,8 +769,9 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             arch = pkg["arch"]
             if arch == "noarch":
                 repositories = [
-                    db_repos_mapping[(a, is_debug)]
+                    db_repos_mapping.get((a, is_debug))
                     for a in base_platform.arch_list
+                    if (a, is_debug) in db_repos_mapping
                 ]
             else:
                 repositories = [db_repos_mapping[(arch, is_debug)]]
