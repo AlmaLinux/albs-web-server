@@ -6,12 +6,11 @@ import os
 import pwd
 import re
 import sys
-import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from time import time
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import aiohttp
 import jmespath
@@ -157,9 +156,6 @@ class PackagesExporter(BasePulpExporter):
             export_path=export_path,
         )
 
-        self.web_server_headers = {
-            "Authorization": f"Bearer {settings.albs_jwt_token}",
-        }
         self.osv_dir = osv_dir
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
@@ -199,69 +195,6 @@ class PackagesExporter(BasePulpExporter):
             ecosystem=osv_distr_mapping[platform],
         )
         self.logger.debug("OSV data are generated")
-
-    async def make_request(
-        self,
-        method: str,
-        endpoint: str,
-        params: Optional[dict] = None,
-        body: Optional[dict] = None,
-        user_headers: Optional[dict] = None,
-        data: Optional[list] = None,
-        send_to: Literal['web_server', 'sign_server'] = 'web_server',
-    ) -> Union[dict, str]:
-        if send_to == 'web_server':
-            headers = {**self.web_server_headers}
-            full_url = urllib.parse.urljoin(settings.albs_api_url, endpoint)
-        elif send_to == 'sign_server':
-            headers = {}
-            full_url = urllib.parse.urljoin(
-                settings.sign_server_api_url,
-                endpoint,
-            )
-        else:
-            raise ValueError(
-                "send_to parameter must be either web_server or sign_server"
-            )
-
-        if user_headers:
-            headers.update(user_headers)
-
-        async with aiohttp.ClientSession(
-            headers=headers,
-            raise_for_status=True,
-        ) as session:
-            async with session.request(
-                method,
-                full_url,
-                json=body,
-                params=params,
-                data=data,
-            ) as response:
-                if response.headers['Content-Type'] == 'application/json':
-                    return await response.json()
-                return await response.text()
-
-    async def sign_repomd_xml(self, path_to_file: str, key_id: str, token: str):
-        endpoint = "sign"
-        result = {"asc_content": None, "error": None}
-        try:
-            response = await self.make_request(
-                "POST",
-                endpoint,
-                params={"keyid": key_id},
-                data={"file": Path(path_to_file).read_bytes()},
-                user_headers={"Authorization": f"Bearer {token}"},
-                send_to="sign_server",
-            )
-            result["asc_content"] = response
-        except Exception as err:
-            result['error'] = err
-        return result
-
-    async def get_sign_keys(self):
-        endpoint = "sign-keys/"
-        return await self.make_request("GET", endpoint)
 
     # TODO: Use direct function call to alws.crud.errata_get_oval_xml
     async def get_oval_xml(
@@ -314,32 +247,6 @@ class PackagesExporter(BasePulpExporter):
             entry.pubDate(pub_date)
 
         return feed.rss_str(pretty=True).decode('utf-8')
-
-    async def repomd_signer(self, repodata_path, key_id, token):
-        string_repodata_path = str(repodata_path)
-        if key_id is None:
-            self.logger.info(
-                "Cannot sign repomd.xml in %s, missing GPG key",
-                string_repodata_path,
-            )
-            return
-
-        file_path = os.path.join(repodata_path, "repomd.xml")
-        result = await self.sign_repomd_xml(file_path, key_id, token)
-        self.logger.info('PGP key id: %s', key_id)
-        result_data = result.get("asc_content")
-        if result_data is None:
-            self.logger.error(
-                "repomd.xml in %s is failed to sign:\n%s",
-                string_repodata_path,
-                result["error"],
-            )
-            return
-
-        repodata_path = os.path.join(repodata_path, "repomd.xml.asc")
-        with open(repodata_path, "w") as file:
-            file.writelines(result_data)
-        self.logger.info("repomd.xml in %s is signed", string_repodata_path)
 
     def check_rpms_signature(self, repository_path: str, sign_keys: list):
         self.logger.info("Checking signature for %s repo", repository_path)
@@ -525,21 +432,6 @@ class PackagesExporter(BasePulpExporter):
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
 
-    async def get_sign_server_token(self) -> str:
-        body = {
-            'email': settings.sign_server_username,
-            'password': settings.sign_server_password,
-        }
-        endpoint = 'token'
-        method = 'POST'
-        response = await self.make_request(
-            method=method,
-            endpoint=endpoint,
-            body=body,
-            send_to='sign_server',
-        )
-        return response['token']
-
 
 async def sign_repodata(
     exporter: PackagesExporter,
@@ -548,8 +440,6 @@ async def sign_repodata(
     db_sign_keys: list,
     key_id_by_platform: Optional[str] = None,
 ):
-    repodata_paths = []
-
     tasks = []
     token = await exporter.get_sign_server_token()
 
@@ -559,8 +449,6 @@ async def sign_repodata(
         repodata = parent_dir / "repodata"
         if not os.path.exists(repo_path):
             continue
-
-        repodata_paths.append(repodata)
 
         key_id = key_id_by_platform or None
         for platform_id, platform_repos in platforms_dict.items():
