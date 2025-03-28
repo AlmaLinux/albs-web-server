@@ -915,6 +915,8 @@ class CommunityReleasePlanner(BaseReleasePlanner):
             )
         )
         for build in builds.scalars().all():
+            if build in release.product.builds:
+                continue
             release.product.builds.append(build)
 
         return additional_messages
