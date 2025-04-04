@@ -71,7 +71,7 @@ def parse_args():
         "-sw",
         "--sign-with",
         type=str,
-        required=True,
+        required=False,
         help="GPG key name to use when signing repodata.",
     )
     parser.add_argument(
