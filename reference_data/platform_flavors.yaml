@@ -244,28 +244,28 @@
     - name: epel-10
       arch: x86_64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/x86_64/
+      url: https://dl.fedoraproject.org/pub/epel/${releasever}z/Everything/x86_64/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: aarch64
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/aarch64/
+      url: https://dl.fedoraproject.org/pub/epel/${releasever}z/Everything/aarch64/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: ppc64le
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/ppc64le/
+      url: https://dl.fedoraproject.org/pub/epel/${releasever}z/Everything/ppc64le/
       production: false
       debug: false
       priority: 10
     - name: epel-10
       arch: s390x
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/$releasever/Everything/s390x/
+      url: https://dl.fedoraproject.org/pub/epel/${releasever}z/Everything/s390x/
       production: false
       debug: false
       priority: 10
@@ -938,14 +938,14 @@
     - name: EPEL_Kitten_altarch
       arch: x86_64_v2
       type: rpm
-      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-x86_64_v2-dr/
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-kitten-10-x86_64_v2-dr/
       production: true
       debug: false
       priority: 10
     - name: EPEL_Kitten_altarch
       arch: riscv64
       type: rpm
-      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-almalinux-kitten-10-riscv64-dr/
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-epel-al-almalinux-kitten-10-riscv64-dr/
       production: true
       debug: false
       priority: 10
@@ -972,7 +972,7 @@
     - name: epel-10-x86_64_v2-bootstrap
       arch: x86_64_v2
       type: rpm
-      url: https://dl.fedoraproject.org/pub/epel/10/Everything/x86_64/
+      url: https://dl.fedoraproject.org/pub/epel/10z/Everything/x86_64/
       production: false
       debug: false
       priority: 10
