@@ -8,7 +8,7 @@ from alws.schemas.repository_schema import Repository, RepositoryCreate
 class CreateFlavour(BaseModel):
     name: str
     modularity: typing.Optional[dict] = None
-    repositories: typing.List[RepositoryCreate]
+    repositories: typing.List[RepositoryCreate] = []
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
