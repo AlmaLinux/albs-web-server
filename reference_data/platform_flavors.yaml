@@ -976,3 +976,9 @@
       production: false
       debug: false
       priority: 10
+
+- name: disable_host_resolv
+  data:
+    mock:
+      use_host_resolv: false
+  repositories:
