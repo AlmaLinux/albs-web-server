@@ -62,6 +62,12 @@ class GiteaClient:
                         ) as response:
                             response.raise_for_status()
                             return await response.json()
+            except aiohttp.client_exceptions.ClientResponseError:
+                self.log.exception(
+                    'Request %s returned with an error',
+                    full_url,
+                )
+                return []
             except (
                 aiohttp.client_exceptions.ClientConnectorError,
                 aiohttp.client_exceptions.ServerDisconnectedError,
@@ -99,6 +105,13 @@ class GiteaClient:
         endpoint = f'repos/{repo}/tags'
         return await self._list_all_pages(endpoint)
 
+    async def list_tags_from_repo_refs(self, repo: str) -> list[dict]:
+        endpoint = f'repos/{repo}/git/refs/tags'
+        return [
+            {'name': ref['ref'].replace('refs/tags/', '')}
+            for ref in await self.make_request(endpoint)
+        ]
+
     async def list_branches(self, repo: str) -> typing.List:
         endpoint = f'repos/{repo}/branches'
         return await self._list_all_pages(endpoint)
@@ -108,6 +121,6 @@ class GiteaClient:
         return await self.make_request(endpoint)
 
     async def index_repo(self, repo_name: str):
-        tags = await self.list_tags(repo_name)
+        tags = await self.list_tags_from_repo_refs(repo_name)
         branches = await self.list_branches(repo_name)
         return {'repo_name': repo_name, 'tags': tags, 'branches': branches}
