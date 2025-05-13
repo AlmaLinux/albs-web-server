@@ -1743,6 +1743,9 @@
       - name: '9.5'
         version_prefix: '90500'
         dist_prefix: 'el9.5.0'
+      - name: '9.6'
+        version_prefix: '90600'
+        dist_prefix: 'el9.6.0'
   type: rpm
   arch_list:
     - i686

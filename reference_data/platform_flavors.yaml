@@ -94,8 +94,8 @@
 - name: AlmaLinux-9-beta
   modularity:
     git_tag_prefix:
-      modified: a9-beta
-      non_modified: c9-beta
+      modified: a9
+      non_modified: c9
     versions:
       - name: '9.6'
         version_prefix: '90600'
