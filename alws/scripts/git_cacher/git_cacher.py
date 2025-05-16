@@ -25,14 +25,14 @@ class Config(BaseSettings):
     cacher_sentry_traces_sample_rate: float = 0.2
 
 
-async def load_redis_cache(redis, cache_key):
+async def load_redis_cache(redis: aioredis.Redis, cache_key: str) -> dict:
     value = await redis.get(cache_key)
     if not value:
         return {}
     return json.loads(value)
 
 
-async def save_redis_cache(redis, cache_key, cache):
+async def save_redis_cache(redis: aioredis.Redis, cache_key: str, cache: dict):
     await redis.set(cache_key, json.dumps(cache))
 
 
@@ -49,7 +49,13 @@ def setup_logger():
     return logger
 
 
-async def run(config, logger, redis_client, gitea_client, organization):
+async def run(
+    config: Config,
+    logger: logging.Logger,
+    redis_client: aioredis.Redis,
+    gitea_client: GiteaClient,
+    organization: str,
+):
     cache = await load_redis_cache(
         redis_client, config.git_cache_keys[organization]
     )
@@ -114,15 +120,19 @@ async def main():
     wait = 600
     while True:
         logger.info('Checking cache for updates')
-        await asyncio.gather(
-            # projects git data live in these gitea orgs
-            run(config, logger, redis_client, gitea_client, 'rpms'),
-            run(config, logger, redis_client, gitea_client, 'modules'),
-            # almalinux modified packages live in autopatch gitea org
-            run(config, logger, redis_client, gitea_client, 'autopatch'),
-        )
+        await asyncio.gather(*(
+            run(config, logger, redis_client, gitea_client, organization)
+            for organization in (
+                # projects git data live in these gitea orgs
+                'rpms',
+                'modules',
+                # almalinux modified packages live in autopatch gitea org
+                'autopatch',
+            )
+        ))
         logger.info(
-            'Cache has been updated, waiting for %d secs for next update' % wait
+            'Cache has been updated, waiting for %d secs for next update',
+            wait,
         )
         await asyncio.sleep(wait)
 
