@@ -291,6 +291,13 @@
       debug: false
       priority: 10
     - name: dotnet-build
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-x86_64_v2-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: dotnet-build
       arch: aarch64
       type: rpm
       url: https://build.almalinux.org/pulp/content/copr/eabdullin1-dotnet-build-almalinux-$releasever-aarch64-dr/
