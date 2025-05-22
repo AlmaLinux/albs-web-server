@@ -47,9 +47,7 @@ class UpdateCollection(PulpBase):
     pulp_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True
     )
-    pulp_created: Mapped[datetime.datetime] = mapped_column(
-        sqlalchemy.DATETIME
-    )
+    pulp_created: Mapped[datetime.datetime] = mapped_column(sqlalchemy.DATETIME)
     pulp_last_updated: Mapped[datetime.datetime] = mapped_column(
         sqlalchemy.DATETIME
     )
@@ -125,9 +123,7 @@ class UpdateReference(PulpBase):
     ref_id: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True
     )
-    title: Mapped[Optional[str]] = mapped_column(
-        sqlalchemy.Text, nullable=True
-    )
+    title: Mapped[Optional[str]] = mapped_column(sqlalchemy.Text, nullable=True)
     ref_type: Mapped[str] = mapped_column(sqlalchemy.Text)
     update_record_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -404,7 +400,7 @@ class RpmPackage(PulpBase):
     summary: Mapped[str] = mapped_column(sqlalchemy.Text)
     description: Mapped[str] = mapped_column(sqlalchemy.Text)
     url: Mapped[str] = mapped_column(sqlalchemy.Text)
-    # changelogs = mapped_column(JSONB)
+    changelogs: Mapped[Dict[str, Any]] = mapped_column(JSONB)
     # files = mapped_column(JSONB)
     # requires = mapped_column(JSONB)
     # provides = mapped_column(JSONB)

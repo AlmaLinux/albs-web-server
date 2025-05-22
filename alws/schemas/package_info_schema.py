@@ -9,7 +9,6 @@ class PackageInfo(BaseModel):
     name: str
     version: str
     release: str
-    arch: str
     changelogs: List
 
     class Config:
