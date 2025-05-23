@@ -109,3 +109,11 @@ class GenKeyError(Exception):
 
 class PlatformMissingError(ValueError):
     pass
+
+
+class PlatformNotFoundError(Exception):
+    pass
+
+
+class RepositoriesNotFoundError(Exception):
+    pass

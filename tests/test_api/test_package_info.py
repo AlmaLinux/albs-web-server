@@ -1,57 +1,57 @@
 import pytest
 
+from fastapi import status
+
 from alws.app import app
 from tests.mock_classes import BaseAsyncTestCase
 
 
 @pytest.mark.usefixtures(
-    "get_rpm_packages",
     "patch_limiter"
 )
 class TestPackageInfoEndpoints(BaseAsyncTestCase):
-    async def test_get_package_info(self):
+    async def test_get_package_info_success(self, mock_get_package_info_success, package_info):
         response = await self.make_request(
             "get",
-            "/api/v1/package_info/?package_name=example_package",
+            "/api/v1/package_info/?name=example_package&almalinux_version=9",
         )
-        assert (
-            response.status_code == self.status_codes.HTTP_200_OK
-            and response.json()
-        ), f"Cannot get package info by package name:\n{response.text}"
 
-    async def test_get_package_info_version(self):
-        version = 9
-        not_version = 5
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data == package_info
 
+    async def test_platform_not_found(self, mock_get_package_info_platform_not_found):
         response = await self.make_request(
             "get",
-            f"/api/v1/package_info/?package_name=example_package&release_version={version}",
-        )
-        response_json = response.json()
-        assert (
-            response.status_code == self.status_codes.HTTP_200_OK
-            and response_json
-        ), f"Cannot get package info by package name and major version:\n{response.text}"
-        assert (
-            response_json[0]["release"]
-            and f"el9" in response_json[0]["release"]
+            "/api/v1/package_info/?name=bash&almalinux_version=999",
         )
 
-        response = await self.make_request(
-            "get",
-            f"/api/v1/package_info/?package_name=example_package&release_version={not_version}",
-        )
-        assert (
-            response.status_code == self.status_codes.HTTP_200_OK
-            and not response.json()
-        ), f"Cannot get package info by package name and major version:\n{response.text}"
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid distribution" in response.text
 
-    async def test_get_no_package_info(self):
+    async def test_repositories_not_found(self, mock_get_package_info_repos_not_found):
         response = await self.make_request(
             "get",
-            "/api/v1/package_info/?package_name=doesnt_exist",
+            "/api/v1/package_info/?name=bash&almalinux_version=9&arch=x86_64",
         )
-        assert (
-            response.status_code == self.status_codes.HTTP_200_OK
-            and not response.json()
-        ), f"Error in fetching missing package:\n{response.text}"
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "No repositories found" in response.text
+
+
+    async def test_empty_package_list(self, mock_get_package_info_empty):
+        response = await self.make_request(
+            "get",
+            "/api/v1/package_info/?name=none&almalinux_version=9",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == []
+
+    async def test_missing_required_query_params(self):
+        response = await self.make_request(
+            "get",
+            "/api/v1/package_info/?name=bash",
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
