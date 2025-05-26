@@ -93,7 +93,7 @@
     - arch: i686
       name: almalinux-8-baseos
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/i686/os/
+      remote_url: http://vault.almalinux.org/8/BaseOS/i686/os/
       export_path: vault/8/BaseOS/i686/os/
       production: true
       debug: false
@@ -103,7 +103,7 @@
     - arch: i686
       name: almalinux-8-appstream
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/i686/os/
+      remote_url: http://vault.almalinux.org/8/AppStream/i686/os/
       export_path: vault/8/AppStream/i686/os/
       production: true
       debug: false
@@ -113,7 +113,7 @@
     - arch: i686
       name: almalinux-8-powertools
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/i686/os/
+      remote_url: http://vault.almalinux.org/8/PowerTools/i686/os/
       export_path: vault/8/PowerTools/i686/os/
       production: true
       debug: false
@@ -123,7 +123,7 @@
     - arch: i686
       name: almalinux-8-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/i686/os/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/i686/os/
       export_path: vault/8/HighAvailability/i686/os/
       production: true
       debug: false
@@ -133,7 +133,7 @@
     - arch: i686
       name: almalinux-8-resilientstorage
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/i686/os/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/i686/os/
       export_path: vault/8/ResilientStorage/i686/os/
       production: true
       debug: false
@@ -143,7 +143,7 @@
     - arch: i686
       name: almalinux-8-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/i686/os/
+      remote_url: http://vault.almalinux.org/8/devel/i686/os/
       export_path: vault/8/devel/i686/os/
       production: true
       debug: false
@@ -153,7 +153,7 @@
     - arch: i686
       name: almalinux-8-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/i686/os/
+      remote_url: http://vault.almalinux.org/8/extras/i686/os/
       export_path: vault/8/extras/i686/os/
       production: true
       debug: false
@@ -163,7 +163,7 @@
     - arch: i686
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/i686/os/
+      remote_url: http://vault.almalinux.org/8/testing/i686/os/
       export_path: vault/8/testing/i686/os/
       production: true
       debug: false
@@ -244,7 +244,7 @@
     - arch: x86_64
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/x86_64/os/
+      remote_url: http://vault.almalinux.org/8/testing/x86_64/os/
       export_path: vault/8/testing/x86_64/os/
       production: true
       debug: false
@@ -325,7 +325,7 @@
     - arch: aarch64
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/aarch64/os/
+      remote_url: http://vault.almalinux.org/8/testing/aarch64/os/
       export_path: vault/8/testing/aarch64/os/
       production: true
       debug: false
@@ -396,7 +396,7 @@
     - arch: ppc64le
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/ppc64le/os/
+      remote_url: http://vault.almalinux.org/8/testing/ppc64le/os/
       export_path: vault/8/testing/ppc64le/os/
       production: true
       debug: false
@@ -417,7 +417,7 @@
     - arch: ppc64le
       name: almalinux-8-devel-debuginfo
       export_path: vault/8/devel/debug/ppc64le/
-      remote_url: http://repo.almalinux.org/vault/8/devel/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/devel/debug/ppc64le/
       type: rpm
       debug: true
       remote_sync_policy: on_demand
@@ -450,7 +450,7 @@
     - name: almalinux-8-gcp
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/cloud/Source/gcp/
+      remote_url: http://vault.almalinux.org/8/cloud/Source/gcp/
       export_path: vault/8/cloud/Source/gcp/
       production: true
       debug: false
@@ -483,7 +483,7 @@
     - name: almalinux-8-gcp-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/aarch64/gcp/
+      remote_url: http://vault.almalinux.org/8/cloud/debug/aarch64/gcp/
       export_path: vault/8/cloud/debug/aarch64/gcp/
       production: true
       debug: true
@@ -494,7 +494,7 @@
     - name: almalinux-8-gcp-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/x86_64/gcp/
+      remote_url: http://vault.almalinux.org/8/cloud/debug/x86_64/gcp/
       export_path: vault/8/cloud/debug/x86_64/gcp/
       production: true
       debug: true
@@ -505,7 +505,7 @@
     - name: almalinux-8-baseos
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/Source/
+      remote_url: http://vault.almalinux.org/8/BaseOS/Source/
       export_path: vault/8/BaseOS/Source/
       production: true
       debug: false
@@ -515,7 +515,7 @@
     - name: almalinux-8-appstream
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/Source/
+      remote_url: http://vault.almalinux.org/8/AppStream/Source/
       export_path: vault/8/AppStream/Source/
       production: true
       debug: false
@@ -525,7 +525,7 @@
     - name: almalinux-8-powertools
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/Source/
+      remote_url: http://vault.almalinux.org/8/PowerTools/Source/
       export_path: vault/8/PowerTools/Source/
       production: true
       debug: false
@@ -535,7 +535,7 @@
     - arch: src
       name: almalinux-8-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/Source/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/Source/
       export_path: vault/8/HighAvailability/Source/
       production: true
       debug: false
@@ -545,7 +545,7 @@
     - arch: src
       name: almalinux-8-resilientstorage
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/Source/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/Source/
       export_path: vault/8/ResilientStorage/Source/
       production: true
       debug: false
@@ -555,7 +555,7 @@
     - arch: src
       name: almalinux-8-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/Source/
+      remote_url: http://vault.almalinux.org/8/devel/Source/
       export_path: vault/8/devel/Source/
       production: true
       debug: false
@@ -565,7 +565,7 @@
     - arch: src
       name: almalinux-8-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/Source/
+      remote_url: http://vault.almalinux.org/8/extras/Source/
       export_path: vault/8/extras/Source/
       production: true
       debug: false
@@ -575,7 +575,7 @@
     - arch: src
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/Source/
+      remote_url: http://vault.almalinux.org/8/testing/Source/
       export_path: vault/8/testing/Source/
       production: true
       debug: false
@@ -586,7 +586,7 @@
     - name: almalinux-8-raspberrypi
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/raspberrypi/Source/
+      remote_url: http://vault.almalinux.org/8/raspberrypi/Source/
       export_path: vault/8/raspberrypi/Source/
       production: true
       debug: false
@@ -597,7 +597,7 @@
     - name: almalinux-8-azure
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/cloud/Source/azure/
+      remote_url: http://vault.almalinux.org/8/cloud/Source/azure/
       export_path: vault/8/cloud/Source/azure/
       production: true
       debug: false
@@ -608,7 +608,7 @@
     - name: almalinux-8-baseos-debuginfo
       arch: i686
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/debug/i686/
+      remote_url: http://vault.almalinux.org/8/BaseOS/debug/i686/
       export_path: vault/8/BaseOS/debug/i686/
       production: true
       debug: true
@@ -619,7 +619,7 @@
     - name: almalinux-8-appstream-debuginfo
       arch: i686
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/debug/i686/
+      remote_url: http://vault.almalinux.org/8/AppStream/debug/i686/
       export_path: vault/8/AppStream/debug/i686/
       production: true
       debug: true
@@ -630,7 +630,7 @@
     - name: almalinux-8-powertools-debuginfo
       arch: i686
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/debug/i686/
+      remote_url: http://vault.almalinux.org/8/PowerTools/debug/i686/
       export_path: vault/8/PowerTools/debug/i686/
       production: true
       debug: true
@@ -641,7 +641,7 @@
     - arch: i686
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/debug/i686/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/debug/i686/
       export_path: vault/8/HighAvailability/debug/i686/
       production: true
       debug: true
@@ -652,7 +652,7 @@
     - arch: i686
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/debug/i686/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/debug/i686/
       export_path: vault/8/ResilientStorage/debug/i686/
       production: true
       debug: true
@@ -663,7 +663,7 @@
     - arch: i686
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/debug/i686/
+      remote_url: http://vault.almalinux.org/8/devel/debug/i686/
       export_path: vault/8/devel/debug/i686/
       production: true
       debug: true
@@ -674,7 +674,7 @@
     - arch: i686
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/debug/i686/
+      remote_url: http://vault.almalinux.org/8/extras/debug/i686/
       export_path: vault/8/extras/debug/i686/
       production: true
       debug: true
@@ -685,7 +685,7 @@
     - arch: i686
       name: almalinux-8-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/debug/i686/
+      remote_url: http://vault.almalinux.org/8/testing/debug/i686/
       export_path: vault/8/testing/debug/i686/
       production: true
       debug: true
@@ -696,7 +696,7 @@
     - name: almalinux-8-baseos-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/BaseOS/debug/x86_64/
       export_path: vault/8/BaseOS/debug/x86_64/
       production: true
       debug: true
@@ -707,7 +707,7 @@
     - name: almalinux-8-appstream-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/AppStream/debug/x86_64/
       export_path: vault/8/AppStream/debug/x86_64/
       production: true
       debug: true
@@ -718,7 +718,7 @@
     - name: almalinux-8-powertools-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/PowerTools/debug/x86_64/
       export_path: vault/8/PowerTools/debug/x86_64/
       production: true
       debug: true
@@ -729,7 +729,7 @@
     - arch: x86_64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/debug/x86_64/
       export_path: vault/8/HighAvailability/debug/x86_64/
       production: true
       debug: true
@@ -740,7 +740,7 @@
     - arch: x86_64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/debug/x86_64/
       export_path: vault/8/ResilientStorage/debug/x86_64/
       production: true
       debug: true
@@ -751,7 +751,7 @@
     - arch: x86_64
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/devel/debug/x86_64/
       export_path: vault/8/devel/debug/x86_64/
       production: true
       debug: true
@@ -762,7 +762,7 @@
     - arch: x86_64
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/extras/debug/x86_64/
       export_path: vault/8/extras/debug/x86_64/
       production: true
       debug: true
@@ -773,7 +773,7 @@
     - arch: x86_64
       name: almalinux-8-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/testing/debug/x86_64/
       export_path: vault/8/testing/debug/x86_64/
       production: true
       debug: true
@@ -784,7 +784,7 @@
     - name: almalinux-8-baseos-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/BaseOS/debug/aarch64/
       export_path: vault/8/BaseOS/debug/aarch64/
       production: true
       debug: true
@@ -795,7 +795,7 @@
     - name: almalinux-8-appstream-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/AppStream/debug/aarch64/
       export_path: vault/8/AppStream/debug/aarch64/
       production: true
       debug: true
@@ -806,7 +806,7 @@
     - name: almalinux-8-powertools-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/PowerTools/debug/aarch64/
       export_path: vault/8/PowerTools/debug/aarch64/
       production: true
       debug: true
@@ -817,7 +817,7 @@
     - arch: aarch64
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/debug/aarch64/
       export_path: vault/8/HighAvailability/debug/aarch64/
       production: true
       debug: true
@@ -828,7 +828,7 @@
     - arch: aarch64
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/debug/aarch64/
       export_path: vault/8/ResilientStorage/debug/aarch64/
       production: true
       debug: true
@@ -839,7 +839,7 @@
     - arch: aarch64
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/devel/debug/aarch64/
       export_path: vault/8/devel/debug/aarch64/
       production: true
       debug: true
@@ -850,7 +850,7 @@
     - arch: aarch64
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/extras/debug/aarch64/
       export_path: vault/8/extras/debug/aarch64/
       production: true
       debug: true
@@ -861,7 +861,7 @@
     - arch: aarch64
       name: almalinux-8-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/testing/debug/aarch64/
       export_path: vault/8/testing/debug/aarch64/
       production: true
       debug: true
@@ -872,7 +872,7 @@
     - name: almalinux-8-baseos-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/BaseOS/debug/ppc64le/
       export_path: vault/8/BaseOS/debug/ppc64le/
       production: true
       debug: true
@@ -883,7 +883,7 @@
     - name: almalinux-8-appstream-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/AppStream/debug/ppc64le/
       export_path: vault/8/AppStream/debug/ppc64le/
       production: true
       debug: true
@@ -894,7 +894,7 @@
     - name: almalinux-8-powertools-debuginfo
       arch: ppc64le
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/PowerTools/debug/ppc64le/
       export_path: vault/8/PowerTools/debug/ppc64le/
       production: true
       debug: true
@@ -905,7 +905,7 @@
     - arch: ppc64le
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/debug/ppc64le/
       export_path: vault/8/HighAvailability/debug/ppc64le/
       production: true
       debug: true
@@ -916,7 +916,7 @@
     - arch: ppc64le
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/debug/ppc64le/
       export_path: vault/8/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
@@ -927,7 +927,7 @@
     - arch: ppc64le
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/extras/debug/ppc64le/
       export_path: vault/8/extras/debug/ppc64le/
       production: true
       debug: true
@@ -938,7 +938,7 @@
     - arch: ppc64le
       name: almalinux-8-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/testing/debug/ppc64le/
       export_path: vault/8/testing/debug/ppc64le/
       production: true
       debug: true
@@ -979,7 +979,7 @@
     - arch: i686
       name: almalinux-8-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/i686/os/
+      remote_url: http://vault.almalinux.org/8/plus/i686/os/
       export_path: vault/8/plus/i686/os/
       production: true
       debug: false
@@ -989,7 +989,7 @@
     - arch: src
       name: almalinux-8-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/Source/
+      remote_url: http://vault.almalinux.org/8/plus/Source/
       export_path: vault/8/plus/Source/
       production: true
       debug: false
@@ -999,7 +999,7 @@
     - arch: aarch64
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/plus/debug/aarch64/
       export_path: vault/8/plus/debug/aarch64/
       production: true
       debug: true
@@ -1010,7 +1010,7 @@
     - arch: ppc64le
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/plus/debug/ppc64le/
       export_path: vault/8/plus/debug/ppc64le/
       production: true
       debug: true
@@ -1021,7 +1021,7 @@
     - arch: x86_64
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/plus/debug/x86_64/
       export_path: vault/8/plus/debug/x86_64/
       production: true
       debug: true
@@ -1032,7 +1032,7 @@
     - arch: i686
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/debug/i686/
+      remote_url: http://vault.almalinux.org/8/plus/debug/i686/
       export_path: vault/8/plus/debug/i686/
       production: true
       debug: true
@@ -1043,7 +1043,7 @@
     - name: almalinux-8-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/raspberrypi/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/raspberrypi/debug/aarch64/
       export_path: vault/8/raspberrypi/debug/aarch64/
       production: true
       debug: true
@@ -1054,7 +1054,7 @@
     - name: almalinux-8-azure-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/cloud/debug/aarch64/azure/
+      remote_url: http://vault.almalinux.org/8/cloud/debug/aarch64/azure/
       export_path: vault/8/cloud/debug/aarch64/azure/
       production: true
       debug: true
@@ -1065,7 +1065,7 @@
     - arch: i686
       name: almalinux-8-nfv
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/NFV/i686/os/
+      remote_url: http://vault.almalinux.org/8/NFV/i686/os/
       export_path: vault/8/NFV/i686/os/
       production: true
       debug: false
@@ -1075,7 +1075,7 @@
     - arch: i686
       name: almalinux-8-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/NFV/debug/i686/
+      remote_url: http://vault.almalinux.org/8/NFV/debug/i686/
       export_path: vault/8/NFV/debug/i686/
       production: true
       debug: true
@@ -1096,7 +1096,7 @@
     - arch: src
       name: almalinux-8-nfv
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/NFV/Source/
+      remote_url: http://vault.almalinux.org/8/NFV/Source/
       export_path: vault/8/NFV/Source/
       production: true
       debug: false
@@ -1106,7 +1106,7 @@
     - arch: x86_64
       name: almalinux-8-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/NFV/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/NFV/debug/x86_64/
       export_path: vault/8/NFV/debug/x86_64/
       production: true
       debug: true
@@ -1117,7 +1117,7 @@
     - arch: i686
       name: almalinux-8-rt
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/RT/i686/os/
+      remote_url: http://vault.almalinux.org/8/RT/i686/os/
       export_path: vault/8/RT/i686/os/
       production: true
       debug: false
@@ -1127,7 +1127,7 @@
     - arch: i686
       name: almalinux-8-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/RT/debug/i686/
+      remote_url: http://vault.almalinux.org/8/RT/debug/i686/
       export_path: vault/8/RT/debug/i686/
       production: true
       debug: true
@@ -1148,7 +1148,7 @@
     - arch: src
       name: almalinux-8-rt
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/RT/Source/
+      remote_url: http://vault.almalinux.org/8/RT/Source/
       export_path: vault/8/RT/Source/
       production: true
       debug: false
@@ -1158,7 +1158,7 @@
     - arch: x86_64
       name: almalinux-8-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/RT/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/RT/debug/x86_64/
       export_path: vault/8/RT/debug/x86_64/
       production: true
       debug: true
@@ -1239,7 +1239,7 @@
     - arch: s390x
       name: almalinux-8-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/s390x/os/
+      remote_url: http://vault.almalinux.org/8/testing/s390x/os/
       export_path: vault/8/testing/s390x/os/
       production: true
       debug: false
@@ -1250,7 +1250,7 @@
     - name: almalinux-8-baseos-debuginfo
       arch: s390x
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/BaseOS/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/BaseOS/debug/s390x/
       export_path: vault/8/BaseOS/debug/s390x/
       production: true
       debug: true
@@ -1261,7 +1261,7 @@
     - name: almalinux-8-appstream-debuginfo
       arch: s390x
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/AppStream/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/AppStream/debug/s390x/
       export_path: vault/8/AppStream/debug/s390x/
       production: true
       debug: true
@@ -1272,7 +1272,7 @@
     - name: almalinux-8-powertools-debuginfo
       arch: s390x
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/PowerTools/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/PowerTools/debug/s390x/
       export_path: vault/8/PowerTools/debug/s390x/
       production: true
       debug: true
@@ -1283,7 +1283,7 @@
     - arch: s390x
       name: almalinux-8-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/HighAvailability/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/HighAvailability/debug/s390x/
       export_path: vault/8/HighAvailability/debug/s390x/
       production: true
       debug: true
@@ -1294,7 +1294,7 @@
     - arch: s390x
       name: almalinux-8-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/ResilientStorage/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/ResilientStorage/debug/s390x/
       export_path: vault/8/ResilientStorage/debug/s390x/
       production: true
       debug: true
@@ -1305,7 +1305,7 @@
     - arch: s390x
       name: almalinux-8-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/devel/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/devel/debug/s390x/
       export_path: vault/8/devel/debug/s390x/
       production: true
       debug: true
@@ -1316,7 +1316,7 @@
     - arch: s390x
       name: almalinux-8-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/extras/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/extras/debug/s390x/
       export_path: vault/8/extras/debug/s390x/
       production: true
       debug: true
@@ -1338,7 +1338,7 @@
     - arch: s390x
       name: almalinux-8-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/plus/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/plus/debug/s390x/
       export_path: vault/8/plus/debug/s390x/
       production: true
       debug: true
@@ -1349,7 +1349,7 @@
     - arch: i686
       name: almalinux-8-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/i686/os/
+      remote_url: http://vault.almalinux.org/8/SAP/i686/os/
       export_path: vault/8/SAP/i686/os/
       production: true
       debug: false
@@ -1399,7 +1399,7 @@
     - arch: src
       name: almalinux-8-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/Source/
+      remote_url: http://vault.almalinux.org/8/SAP/Source/
       export_path: vault/8/SAP/Source/
       production: true
       debug: false
@@ -1409,7 +1409,7 @@
     - arch: i686
       name: almalinux-8-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/debug/i686/
+      remote_url: http://vault.almalinux.org/8/SAP/debug/i686/
       export_path: vault/8/SAP/debug/i686/
       production: true
       debug: true
@@ -1420,7 +1420,7 @@
     - arch: x86_64
       name: almalinux-8-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/SAP/debug/x86_64/
       export_path: vault/8/SAP/debug/x86_64/
       production: true
       debug: true
@@ -1431,7 +1431,7 @@
     - arch: ppc64le
       name: almalinux-8-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/SAP/debug/ppc64le/
       export_path: vault/8/SAP/debug/ppc64le/
       production: true
       debug: true
@@ -1442,7 +1442,7 @@
     - arch: aarch64
       name: almalinux-8-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/SAP/debug/aarch64/
       export_path: vault/8/SAP/debug/aarch64/
       production: true
       debug: true
@@ -1453,7 +1453,7 @@
     - arch: s390x
       name: almalinux-8-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAP/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/SAP/debug/s390x/
       export_path: vault/8/SAP/debug/s390x/
       production: true
       debug: true
@@ -1464,7 +1464,7 @@
     - arch: i686
       name: almalinux-8-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/i686/os/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/i686/os/
       export_path: vault/8/SAPHANA/i686/os/
       production: true
       debug: false
@@ -1514,7 +1514,7 @@
     - arch: src
       name: almalinux-8-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/Source/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/Source/
       export_path: vault/8/SAPHANA/Source/
       production: true
       debug: false
@@ -1524,7 +1524,7 @@
     - arch: i686
       name: almalinux-8-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/debug/i686/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/debug/i686/
       export_path: vault/8/SAPHANA/debug/i686/
       production: true
       debug: true
@@ -1535,7 +1535,7 @@
     - arch: x86_64
       name: almalinux-8-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/debug/x86_64/
       export_path: vault/8/SAPHANA/debug/x86_64/
       production: true
       debug: true
@@ -1546,7 +1546,7 @@
     - arch: ppc64le
       name: almalinux-8-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/debug/ppc64le/
       export_path: vault/8/SAPHANA/debug/ppc64le/
       production: true
       debug: true
@@ -1557,7 +1557,7 @@
     - arch: aarch64
       name: almalinux-8-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/debug/aarch64/
       export_path: vault/8/SAPHANA/debug/aarch64/
       production: true
       debug: true
@@ -1568,7 +1568,7 @@
     - arch: s390x
       name: almalinux-8-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/SAPHANA/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/SAPHANA/debug/s390x/
       export_path: vault/8/SAPHANA/debug/s390x/
       production: true
       debug: true
@@ -1579,7 +1579,7 @@
     - arch: s390x
       name: almalinux-8-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/testing/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/testing/debug/s390x/
       export_path: vault/8/testing/debug/s390x/
       production: true
       debug: true
@@ -1590,7 +1590,7 @@
     - arch: i686
       name: almalinux-8-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/i686/os/
+      remote_url: http://vault.almalinux.org/8/synergy/i686/os/
       export_path: vault/8/synergy/i686/os/
       production: true
       debug: false
@@ -1645,7 +1645,7 @@
     - arch: src
       name: almalinux-8-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/Source/
+      remote_url: http://vault.almalinux.org/8/synergy/Source/
       export_path: vault/8/synergy/Source/
       production: true
       debug: false
@@ -1656,7 +1656,7 @@
     - arch: i686
       name: almalinux-8-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/i686/
+      remote_url: http://vault.almalinux.org/8/synergy/debug/i686/
       export_path: vault/8/synergy/debug/i686/
       production: true
       debug: true
@@ -1667,7 +1667,7 @@
     - arch: x86_64
       name: almalinux-8-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/x86_64/
+      remote_url: http://vault.almalinux.org/8/synergy/debug/x86_64/
       export_path: vault/8/synergy/debug/x86_64/
       production: true
       debug: true
@@ -1678,7 +1678,7 @@
     - arch: aarch64
       name: almalinux-8-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/aarch64/
+      remote_url: http://vault.almalinux.org/8/synergy/debug/aarch64/
       export_path: vault/8/synergy/debug/aarch64/
       production: true
       debug: true
@@ -1689,7 +1689,7 @@
     - arch: ppc64le
       name: almalinux-8-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/8/synergy/debug/ppc64le/
       export_path: vault/8/synergy/debug/ppc64le/
       production: true
       debug: true
@@ -1700,7 +1700,7 @@
     - arch: s390x
       name: almalinux-8-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/8/synergy/debug/s390x/
+      remote_url: http://vault.almalinux.org/8/synergy/debug/s390x/
       export_path: vault/8/synergy/debug/s390x/
       production: true
       debug: true
@@ -1826,7 +1826,7 @@
     - arch: i686
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/i686/os/
+      remote_url: http://vault.almalinux.org/9/devel/i686/os/
       export_path: vault/9/devel/i686/os/
       production: true
       debug: false
@@ -1846,7 +1846,7 @@
     - arch: src
       name: almalinux-9-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/Source/
+      remote_url: http://vault.almalinux.org/9/devel/Source/
       export_path: vault/9/devel/Source/
       production: true
       debug: false
@@ -1856,7 +1856,7 @@
     - arch: s390x
       name: almalinux-9-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/devel/debug/s390x/
       export_path: vault/9/devel/debug/s390x/
       production: true
       debug: true
@@ -1867,7 +1867,7 @@
     - arch: x86_64
       name: almalinux-9-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/devel/debug/x86_64/
       export_path: vault/9/devel/debug/x86_64/
       production: true
       debug: true
@@ -1878,7 +1878,7 @@
     - arch: ppc64le
       name: almalinux-9-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/devel/debug/ppc64le/
       export_path: vault/9/devel/debug/ppc64le/
       production: true
       debug: true
@@ -1889,7 +1889,7 @@
     - arch: i686
       name: almalinux-9-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/debug/i686/
+      remote_url: http://vault.almalinux.org/9/devel/debug/i686/
       export_path: vault/9/devel/debug/i686/
       production: true
       debug: true
@@ -1900,7 +1900,7 @@
     - arch: aarch64
       name: almalinux-9-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/devel/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/devel/debug/aarch64/
       export_path: vault/9/devel/debug/aarch64/
       production: true
       debug: true
@@ -1911,7 +1911,7 @@
     - arch: i686
       name: almalinux-9-appstream
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/i686/os/
+      remote_url: http://vault.almalinux.org/9/AppStream/i686/os/
       export_path: vault/9/AppStream/i686/os/
       production: true
       debug: false
@@ -1961,7 +1961,7 @@
     - arch: src
       name: almalinux-9-appstream
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/Source/
+      remote_url: http://vault.almalinux.org/9/AppStream/Source/
       export_path: vault/9/AppStream/Source/
       production: true
       debug: false
@@ -1971,7 +1971,7 @@
     - arch: i686
       name: almalinux-9-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/debug/i686/
+      remote_url: http://vault.almalinux.org/9/AppStream/debug/i686/
       export_path: vault/9/AppStream/debug/i686/
       production: true
       debug: true
@@ -1982,7 +1982,7 @@
     - arch: x86_64
       name: almalinux-9-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/AppStream/debug/x86_64/
       export_path: vault/9/AppStream/debug/x86_64/
       production: true
       debug: true
@@ -1993,7 +1993,7 @@
     - arch: ppc64le
       name: almalinux-9-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/AppStream/debug/ppc64le/
       export_path: vault/9/AppStream/debug/ppc64le/
       production: true
       debug: true
@@ -2004,7 +2004,7 @@
     - arch: aarch64
       name: almalinux-9-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/AppStream/debug/aarch64/
       export_path: vault/9/AppStream/debug/aarch64/
       production: true
       debug: true
@@ -2015,7 +2015,7 @@
     - arch: s390x
       name: almalinux-9-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/AppStream/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/AppStream/debug/s390x/
       export_path: vault/9/AppStream/debug/s390x/
       production: true
       debug: true
@@ -2026,7 +2026,7 @@
     - arch: i686
       name: almalinux-9-baseos
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/i686/os/
+      remote_url: http://vault.almalinux.org/9/BaseOS/i686/os/
       export_path: vault/9/BaseOS/i686/os/
       production: true
       debug: false
@@ -2076,7 +2076,7 @@
     - arch: src
       name: almalinux-9-baseos
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/Source/
+      remote_url: http://vault.almalinux.org/9/BaseOS/Source/
       export_path: vault/9/BaseOS/Source/
       production: true
       debug: false
@@ -2086,7 +2086,7 @@
     - arch: i686
       name: almalinux-9-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/debug/i686/
+      remote_url: http://vault.almalinux.org/9/BaseOS/debug/i686/
       export_path: vault/9/BaseOS/debug/i686/
       production: true
       debug: true
@@ -2097,7 +2097,7 @@
     - arch: x86_64
       name: almalinux-9-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/BaseOS/debug/x86_64/
       export_path: vault/9/BaseOS/debug/x86_64/
       production: true
       debug: true
@@ -2108,7 +2108,7 @@
     - arch: ppc64le
       name: almalinux-9-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/BaseOS/debug/ppc64le/
       export_path: vault/9/BaseOS/debug/ppc64le/
       production: true
       debug: true
@@ -2119,7 +2119,7 @@
     - arch: aarch64
       name: almalinux-9-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/BaseOS/debug/aarch64/
       export_path: vault/9/BaseOS/debug/aarch64/
       production: true
       debug: true
@@ -2130,7 +2130,7 @@
     - arch: s390x
       name: almalinux-9-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/BaseOS/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/BaseOS/debug/s390x/
       export_path: vault/9/BaseOS/debug/s390x/
       production: true
       debug: true
@@ -2141,7 +2141,7 @@
     - arch: i686
       name: almalinux-9-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/i686/os/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/i686/os/
       export_path: vault/9/HighAvailability/i686/os/
       production: true
       debug: false
@@ -2191,7 +2191,7 @@
     - arch: src
       name: almalinux-9-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/Source/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/Source/
       export_path: vault/9/HighAvailability/Source/
       production: true
       debug: false
@@ -2201,7 +2201,7 @@
     - arch: i686
       name: almalinux-9-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/debug/i686/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/debug/i686/
       export_path: vault/9/HighAvailability/debug/i686/
       production: true
       debug: true
@@ -2212,7 +2212,7 @@
     - arch: x86_64
       name: almalinux-9-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/debug/x86_64/
       export_path: vault/9/HighAvailability/debug/x86_64/
       production: true
       debug: true
@@ -2223,7 +2223,7 @@
     - arch: ppc64le
       name: almalinux-9-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/debug/ppc64le/
       export_path: vault/9/HighAvailability/debug/ppc64le/
       production: true
       debug: true
@@ -2234,7 +2234,7 @@
     - arch: aarch64
       name: almalinux-9-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/debug/aarch64/
       export_path: vault/9/HighAvailability/debug/aarch64/
       production: true
       debug: true
@@ -2245,7 +2245,7 @@
     - arch: s390x
       name: almalinux-9-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/HighAvailability/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/HighAvailability/debug/s390x/
       export_path: vault/9/HighAvailability/debug/s390x/
       production: true
       debug: true
@@ -2256,7 +2256,7 @@
     - arch: i686
       name: almalinux-9-resilientstorage
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/i686/os/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/i686/os/
       export_path: vault/9/ResilientStorage/i686/os/
       production: true
       debug: false
@@ -2306,7 +2306,7 @@
     - arch: src
       name: almalinux-9-resilientstorage
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/Source/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/Source/
       export_path: vault/9/ResilientStorage/Source/
       production: true
       debug: false
@@ -2316,7 +2316,7 @@
     - arch: i686
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/debug/i686/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/debug/i686/
       export_path: vault/9/ResilientStorage/debug/i686/
       production: true
       debug: true
@@ -2327,7 +2327,7 @@
     - arch: x86_64
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/debug/x86_64/
       export_path: vault/9/ResilientStorage/debug/x86_64/
       production: true
       debug: true
@@ -2338,7 +2338,7 @@
     - arch: ppc64le
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/debug/ppc64le/
       export_path: vault/9/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
@@ -2349,7 +2349,7 @@
     - arch: aarch64
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/debug/aarch64/
       export_path: vault/9/ResilientStorage/debug/aarch64/
       production: true
       debug: true
@@ -2360,7 +2360,7 @@
     - arch: s390x
       name: almalinux-9-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/ResilientStorage/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/ResilientStorage/debug/s390x/
       export_path: vault/9/ResilientStorage/debug/s390x/
       production: true
       debug: true
@@ -2371,7 +2371,7 @@
     - arch: i686
       name: almalinux-9-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/i686/os/
+      remote_url: http://vault.almalinux.org/9/extras/i686/os/
       export_path: vault/9/extras/i686/os/
       production: true
       debug: false
@@ -2421,7 +2421,7 @@
     - arch: src
       name: almalinux-9-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/Source/
+      remote_url: http://vault.almalinux.org/9/extras/Source/
       export_path: vault/9/extras/Source/
       production: true
       debug: false
@@ -2431,7 +2431,7 @@
     - arch: i686
       name: almalinux-9-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/debug/i686/
+      remote_url: http://vault.almalinux.org/9/extras/debug/i686/
       export_path: vault/9/extras/debug/i686/
       production: true
       debug: true
@@ -2442,7 +2442,7 @@
     - arch: x86_64
       name: almalinux-9-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/extras/debug/x86_64/
       export_path: vault/9/extras/debug/x86_64/
       production: true
       debug: true
@@ -2453,7 +2453,7 @@
     - arch: ppc64le
       name: almalinux-9-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/extras/debug/ppc64le/
       export_path: vault/9/extras/debug/ppc64le/
       production: true
       debug: true
@@ -2464,7 +2464,7 @@
     - arch: aarch64
       name: almalinux-9-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/extras/debug/aarch64/
       export_path: vault/9/extras/debug/aarch64/
       production: true
       debug: true
@@ -2475,7 +2475,7 @@
     - arch: s390x
       name: almalinux-9-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/extras/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/extras/debug/s390x/
       export_path: vault/9/extras/debug/s390x/
       production: true
       debug: true
@@ -2486,7 +2486,7 @@
     - arch: i686
       name: almalinux-9-crb
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/i686/os/
+      remote_url: http://vault.almalinux.org/9/CRB/i686/os/
       export_path: vault/9/CRB/i686/os/
       production: true
       debug: false
@@ -2536,7 +2536,7 @@
     - arch: src
       name: almalinux-9-crb
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/Source/
+      remote_url: http://vault.almalinux.org/9/CRB/Source/
       export_path: vault/9/CRB/Source/
       production: true
       debug: false
@@ -2546,7 +2546,7 @@
     - arch: i686
       name: almalinux-9-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/debug/i686/
+      remote_url: http://vault.almalinux.org/9/CRB/debug/i686/
       export_path: vault/9/CRB/debug/i686/
       production: true
       debug: true
@@ -2557,7 +2557,7 @@
     - arch: x86_64
       name: almalinux-9-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/CRB/debug/x86_64/
       export_path: vault/9/CRB/debug/x86_64/
       production: true
       debug: true
@@ -2568,7 +2568,7 @@
     - arch: ppc64le
       name: almalinux-9-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/CRB/debug/ppc64le/
       export_path: vault/9/CRB/debug/ppc64le/
       production: true
       debug: true
@@ -2579,7 +2579,7 @@
     - arch: aarch64
       name: almalinux-9-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/CRB/debug/aarch64/
       export_path: vault/9/CRB/debug/aarch64/
       production: true
       debug: true
@@ -2590,7 +2590,7 @@
     - arch: s390x
       name: almalinux-9-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/CRB/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/CRB/debug/s390x/
       export_path: vault/9/CRB/debug/s390x/
       production: true
       debug: true
@@ -2601,7 +2601,7 @@
     - arch: i686
       name: almalinux-9-nfv
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/NFV/i686/os/
+      remote_url: http://vault.almalinux.org/9/NFV/i686/os/
       export_path: vault/9/NFV/i686/os/
       production: true
       debug: false
@@ -2611,7 +2611,7 @@
     - arch: i686
       name: almalinux-9-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/NFV/debug/i686/
+      remote_url: http://vault.almalinux.org/9/NFV/debug/i686/
       export_path: vault/9/NFV/debug/i686/
       production: true
       debug: true
@@ -2632,7 +2632,7 @@
     - arch: src
       name: almalinux-9-nfv
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/NFV/Source/
+      remote_url: http://vault.almalinux.org/9/NFV/Source/
       export_path: vault/9/NFV/Source/
       production: true
       debug: false
@@ -2642,7 +2642,7 @@
     - arch: x86_64
       name: almalinux-9-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/NFV/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/NFV/debug/x86_64/
       export_path: vault/9/NFV/debug/x86_64/
       production: true
       debug: true
@@ -2653,7 +2653,7 @@
     - arch: i686
       name: almalinux-9-rt
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/RT/i686/os/
+      remote_url: http://vault.almalinux.org/9/RT/i686/os/
       export_path: vault/9/RT/i686/os/
       production: true
       debug: false
@@ -2663,7 +2663,7 @@
     - arch: i686
       name: almalinux-9-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/RT/debug/i686/
+      remote_url: http://vault.almalinux.org/9/RT/debug/i686/
       export_path: vault/9/RT/debug/i686/
       production: true
       debug: true
@@ -2684,7 +2684,7 @@
     - arch: src
       name: almalinux-9-rt
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/RT/Source/
+      remote_url: http://vault.almalinux.org/9/RT/Source/
       export_path: vault/9/RT/Source/
       production: true
       debug: false
@@ -2694,7 +2694,7 @@
     - arch: x86_64
       name: almalinux-9-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/RT/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/RT/debug/x86_64/
       export_path: vault/9/RT/debug/x86_64/
       production: true
       debug: true
@@ -2705,7 +2705,7 @@
     - arch: i686
       name: almalinux-9-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/i686/os/
+      remote_url: http://vault.almalinux.org/9/SAP/i686/os/
       export_path: vault/9/SAP/i686/os/
       production: true
       debug: false
@@ -2755,7 +2755,7 @@
     - arch: src
       name: almalinux-9-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/Source/
+      remote_url: http://vault.almalinux.org/9/SAP/Source/
       export_path: vault/9/SAP/Source/
       production: true
       debug: false
@@ -2765,7 +2765,7 @@
     - arch: i686
       name: almalinux-9-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/debug/i686/
+      remote_url: http://vault.almalinux.org/9/SAP/debug/i686/
       export_path: vault/9/SAP/debug/i686/
       production: true
       debug: true
@@ -2776,7 +2776,7 @@
     - arch: x86_64
       name: almalinux-9-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/SAP/debug/x86_64/
       export_path: vault/9/SAP/debug/x86_64/
       production: true
       debug: true
@@ -2787,7 +2787,7 @@
     - arch: ppc64le
       name: almalinux-9-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/SAP/debug/ppc64le/
       export_path: vault/9/SAP/debug/ppc64le/
       production: true
       debug: true
@@ -2798,7 +2798,7 @@
     - arch: aarch64
       name: almalinux-9-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/SAP/debug/aarch64/
       export_path: vault/9/SAP/debug/aarch64/
       production: true
       debug: true
@@ -2809,7 +2809,7 @@
     - arch: s390x
       name: almalinux-9-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAP/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/SAP/debug/s390x/
       export_path: vault/9/SAP/debug/s390x/
       production: true
       debug: true
@@ -2820,7 +2820,7 @@
     - arch: i686
       name: almalinux-9-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/i686/os/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/i686/os/
       export_path: vault/9/SAPHANA/i686/os/
       production: true
       debug: false
@@ -2870,7 +2870,7 @@
     - arch: src
       name: almalinux-9-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/Source/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/Source/
       export_path: vault/9/SAPHANA/Source/
       production: true
       debug: false
@@ -2880,7 +2880,7 @@
     - arch: i686
       name: almalinux-9-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/debug/i686/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/debug/i686/
       export_path: vault/9/SAPHANA/debug/i686/
       production: true
       debug: true
@@ -2891,7 +2891,7 @@
     - arch: x86_64
       name: almalinux-9-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/debug/x86_64/
       export_path: vault/9/SAPHANA/debug/x86_64/
       production: true
       debug: true
@@ -2902,7 +2902,7 @@
     - arch: ppc64le
       name: almalinux-9-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/debug/ppc64le/
       export_path: vault/9/SAPHANA/debug/ppc64le/
       production: true
       debug: true
@@ -2913,7 +2913,7 @@
     - arch: aarch64
       name: almalinux-9-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/debug/aarch64/
       export_path: vault/9/SAPHANA/debug/aarch64/
       production: true
       debug: true
@@ -2924,7 +2924,7 @@
     - arch: s390x
       name: almalinux-9-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/SAPHANA/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/SAPHANA/debug/s390x/
       export_path: vault/9/SAPHANA/debug/s390x/
       production: true
       debug: true
@@ -2975,7 +2975,7 @@
     - arch: i686
       name: almalinux-9-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/i686/os/
+      remote_url: http://vault.almalinux.org/9/plus/i686/os/
       export_path: vault/9/plus/i686/os/
       production: true
       debug: false
@@ -2985,7 +2985,7 @@
     - arch: src
       name: almalinux-9-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/Source/
+      remote_url: http://vault.almalinux.org/9/plus/Source/
       export_path: vault/9/plus/Source/
       production: true
       debug: false
@@ -2995,7 +2995,7 @@
     - arch: aarch64
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/plus/debug/aarch64/
       export_path: vault/9/plus/debug/aarch64/
       production: true
       debug: true
@@ -3006,7 +3006,7 @@
     - arch: ppc64le
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/plus/debug/ppc64le/
       export_path: vault/9/plus/debug/ppc64le/
       production: true
       debug: true
@@ -3017,7 +3017,7 @@
     - arch: x86_64
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/plus/debug/x86_64/
       export_path: vault/9/plus/debug/x86_64/
       production: true
       debug: true
@@ -3028,7 +3028,7 @@
     - arch: s390x
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/plus/debug/s390x/
       export_path: vault/9/plus/debug/s390x/
       production: true
       debug: true
@@ -3039,7 +3039,7 @@
     - arch: i686
       name: almalinux-9-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/plus/debug/i686/
+      remote_url: http://vault.almalinux.org/9/plus/debug/i686/
       export_path: vault/9/plus/debug/i686/
       production: true
       debug: true
@@ -3061,7 +3061,7 @@
     - name: almalinux-9-raspberrypi
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/raspberrypi/Source/
+      remote_url: http://vault.almalinux.org/9/raspberrypi/Source/
       export_path: vault/9/raspberrypi/Source/
       production: true
       debug: false
@@ -3072,7 +3072,7 @@
     - name: almalinux-9-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/raspberrypi/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/raspberrypi/debug/aarch64/
       export_path: vault/9/raspberrypi/debug/aarch64/
       production: true
       debug: true
@@ -3083,7 +3083,7 @@
     - name: almalinux-9-gcp
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/cloud/Source/gcp/
+      remote_url: http://vault.almalinux.org/9/cloud/Source/gcp/
       export_path: vault/9/cloud/Source/gcp/
       production: true
       debug: false
@@ -3116,7 +3116,7 @@
     - name: almalinux-9-gcp-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/aarch64/gcp/
+      remote_url: http://vault.almalinux.org/9/cloud/debug/aarch64/gcp/
       export_path: vault/9/cloud/debug/aarch64/gcp/
       production: true
       debug: true
@@ -3127,7 +3127,7 @@
     - name: almalinux-9-gcp-debuginfo
       arch: x86_64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/cloud/debug/x86_64/gcp/
+      remote_url: http://vault.almalinux.org/9/cloud/debug/x86_64/gcp/
       export_path: vault/9/cloud/debug/x86_64/gcp/
       production: true
       debug: true
@@ -3138,7 +3138,7 @@
     - arch: i686
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/i686/os/
+      remote_url: http://vault.almalinux.org/9/testing/i686/os/
       export_path: vault/9/testing/i686/os/
       production: true
       debug: false
@@ -3149,7 +3149,7 @@
     - arch: x86_64
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/x86_64/os/
+      remote_url: http://vault.almalinux.org/9/testing/x86_64/os/
       export_path: vault/9/testing/x86_64/os/
       production: true
       debug: false
@@ -3160,7 +3160,7 @@
     - arch: aarch64
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/aarch64/os/
+      remote_url: http://vault.almalinux.org/9/testing/aarch64/os/
       export_path: vault/9/testing/aarch64/os/
       production: true
       debug: false
@@ -3171,7 +3171,7 @@
     - arch: ppc64le
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/ppc64le/os/
+      remote_url: http://vault.almalinux.org/9/testing/ppc64le/os/
       export_path: vault/9/testing/ppc64le/os/
       production: true
       debug: false
@@ -3182,7 +3182,7 @@
     - arch: src
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/Source/
+      remote_url: http://vault.almalinux.org/9/testing/Source/
       export_path: vault/9/testing/Source/
       production: true
       debug: false
@@ -3193,7 +3193,7 @@
     - arch: i686
       name: almalinux-9-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/debug/i686/
+      remote_url: http://vault.almalinux.org/9/testing/debug/i686/
       export_path: vault/9/testing/debug/i686/
       production: true
       debug: true
@@ -3204,7 +3204,7 @@
     - arch: x86_64
       name: almalinux-9-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/testing/debug/x86_64/
       export_path: vault/9/testing/debug/x86_64/
       production: true
       debug: true
@@ -3215,7 +3215,7 @@
     - arch: aarch64
       name: almalinux-9-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/testing/debug/aarch64/
       export_path: vault/9/testing/debug/aarch64/
       production: true
       debug: true
@@ -3226,7 +3226,7 @@
     - arch: ppc64le
       name: almalinux-9-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/testing/debug/ppc64le/
       export_path: vault/9/testing/debug/ppc64le/
       production: true
       debug: true
@@ -3237,7 +3237,7 @@
     - arch: s390x
       name: almalinux-9-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/s390x/os/
+      remote_url: http://vault.almalinux.org/9/testing/s390x/os/
       export_path: vault/9/testing/s390x/os/
       production: true
       debug: false
@@ -3248,7 +3248,7 @@
     - arch: s390x
       name: almalinux-9-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/testing/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/testing/debug/s390x/
       export_path: vault/9/testing/debug/s390x/
       production: true
       debug: true
@@ -3259,7 +3259,7 @@
     - arch: i686
       name: almalinux-9-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/i686/os/
+      remote_url: http://vault.almalinux.org/9/synergy/i686/os/
       export_path: vault/9/synergy/i686/os/
       production: true
       debug: false
@@ -3314,7 +3314,7 @@
     - arch: src
       name: almalinux-9-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/Source/
+      remote_url: http://vault.almalinux.org/9/synergy/Source/
       export_path: vault/9/synergy/Source/
       production: true
       debug: false
@@ -3325,7 +3325,7 @@
     - arch: i686
       name: almalinux-9-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/i686/
+      remote_url: http://vault.almalinux.org/9/synergy/debug/i686/
       export_path: vault/9/synergy/debug/i686/
       production: true
       debug: true
@@ -3336,7 +3336,7 @@
     - arch: x86_64
       name: almalinux-9-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/x86_64/
+      remote_url: http://vault.almalinux.org/9/synergy/debug/x86_64/
       export_path: vault/9/synergy/debug/x86_64/
       production: true
       debug: true
@@ -3347,7 +3347,7 @@
     - arch: aarch64
       name: almalinux-9-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/aarch64/
+      remote_url: http://vault.almalinux.org/9/synergy/debug/aarch64/
       export_path: vault/9/synergy/debug/aarch64/
       production: true
       debug: true
@@ -3358,7 +3358,7 @@
     - arch: ppc64le
       name: almalinux-9-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/9/synergy/debug/ppc64le/
       export_path: vault/9/synergy/debug/ppc64le/
       production: true
       debug: true
@@ -3369,7 +3369,7 @@
     - arch: s390x
       name: almalinux-9-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/9/synergy/debug/s390x/
+      remote_url: http://vault.almalinux.org/9/synergy/debug/s390x/
       export_path: vault/9/synergy/debug/s390x/
       production: true
       debug: true
@@ -3502,7 +3502,7 @@
     - arch: src
       name: almalinux-10-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/Source/
+      remote_url: http://vault.almalinux.org/10/devel/Source/
       export_path: vault/10/devel/Source/
       production: true
       debug: false
@@ -3512,7 +3512,7 @@
     - arch: s390x
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/devel/debug/s390x/
       export_path: vault/10/devel/debug/s390x/
       production: true
       debug: true
@@ -3523,7 +3523,7 @@
     - arch: riscv64
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/devel/debug/riscv64/
       export_path: vault/10/devel/debug/riscv64/
       production: true
       debug: true
@@ -3534,7 +3534,7 @@
     - arch: x86_64
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/devel/debug/x86_64/
       export_path: vault/10/devel/debug/x86_64/
       production: true
       debug: true
@@ -3545,7 +3545,7 @@
     - arch: ppc64le
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/devel/debug/ppc64le/
       export_path: vault/10/devel/debug/ppc64le/
       production: true
       debug: true
@@ -3556,7 +3556,7 @@
     - arch: x86_64_v2
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/devel/debug/x86_64_v2/
       export_path: vault/10/devel/debug/x86_64_v2/
       production: true
       debug: true
@@ -3567,7 +3567,7 @@
     - arch: aarch64
       name: almalinux-10-devel-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/devel/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/devel/debug/aarch64/
       export_path: vault/10/devel/debug/aarch64/
       production: true
       debug: true
@@ -3638,7 +3638,7 @@
     - arch: src
       name: almalinux-10-appstream
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/Source/
+      remote_url: http://vault.almalinux.org/10/AppStream/Source/
       export_path: vault/10/AppStream/Source/
       production: true
       debug: false
@@ -3648,7 +3648,7 @@
     - arch: x86_64_v2
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/x86_64_v2/
       export_path: vault/10/AppStream/debug/x86_64_v2/
       production: true
       debug: true
@@ -3659,7 +3659,7 @@
     - arch: x86_64
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/x86_64/
       export_path: vault/10/AppStream/debug/x86_64/
       production: true
       debug: true
@@ -3670,7 +3670,7 @@
     - arch: ppc64le
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/ppc64le/
       export_path: vault/10/AppStream/debug/ppc64le/
       production: true
       debug: true
@@ -3681,7 +3681,7 @@
     - arch: aarch64
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/aarch64/
       export_path: vault/10/AppStream/debug/aarch64/
       production: true
       debug: true
@@ -3692,7 +3692,7 @@
     - arch: s390x
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/s390x/
       export_path: vault/10/AppStream/debug/s390x/
       production: true
       debug: true
@@ -3703,7 +3703,7 @@
     - arch: riscv64
       name: almalinux-10-appstream-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/AppStream/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/AppStream/debug/riscv64/
       export_path: vault/10/AppStream/debug/riscv64/
       production: true
       debug: true
@@ -3774,7 +3774,7 @@
     - arch: src
       name: almalinux-10-baseos
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/Source/
+      remote_url: http://vault.almalinux.org/10/BaseOS/Source/
       export_path: vault/10/BaseOS/Source/
       production: true
       debug: false
@@ -3784,7 +3784,7 @@
     - arch: x86_64_v2
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/x86_64_v2/
       export_path: vault/10/BaseOS/debug/x86_64_v2/
       production: true
       debug: true
@@ -3795,7 +3795,7 @@
     - arch: x86_64
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/x86_64/
       export_path: vault/10/BaseOS/debug/x86_64/
       production: true
       debug: true
@@ -3806,7 +3806,7 @@
     - arch: ppc64le
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/ppc64le/
       export_path: vault/10/BaseOS/debug/ppc64le/
       production: true
       debug: true
@@ -3817,7 +3817,7 @@
     - arch: aarch64
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/aarch64/
       export_path: vault/10/BaseOS/debug/aarch64/
       production: true
       debug: true
@@ -3828,7 +3828,7 @@
     - arch: s390x
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/s390x/
       export_path: vault/10/BaseOS/debug/s390x/
       production: true
       debug: true
@@ -3839,7 +3839,7 @@
     - arch: riscv64
       name: almalinux-10-baseos-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/BaseOS/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/BaseOS/debug/riscv64/
       export_path: vault/10/BaseOS/debug/riscv64/
       production: true
       debug: true
@@ -3910,7 +3910,7 @@
     - arch: src
       name: almalinux-10-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/Source/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/Source/
       export_path: vault/10/HighAvailability/Source/
       production: true
       debug: false
@@ -3920,7 +3920,7 @@
     - arch: x86_64_v2
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/x86_64_v2/
       export_path: vault/10/HighAvailability/debug/x86_64_v2/
       production: true
       debug: true
@@ -3931,7 +3931,7 @@
     - arch: x86_64
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/x86_64/
       export_path: vault/10/HighAvailability/debug/x86_64/
       production: true
       debug: true
@@ -3942,7 +3942,7 @@
     - arch: ppc64le
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/ppc64le/
       export_path: vault/10/HighAvailability/debug/ppc64le/
       production: true
       debug: true
@@ -3953,7 +3953,7 @@
     - arch: aarch64
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/aarch64/
       export_path: vault/10/HighAvailability/debug/aarch64/
       production: true
       debug: true
@@ -3964,7 +3964,7 @@
     - arch: s390x
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/s390x/
       export_path: vault/10/HighAvailability/debug/s390x/
       production: true
       debug: true
@@ -3975,7 +3975,7 @@
     - arch: riscv64
       name: almalinux-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/HighAvailability/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/debug/riscv64/
       export_path: vault/10/HighAvailability/debug/riscv64/
       production: true
       debug: true
@@ -4046,7 +4046,7 @@
     - arch: src
       name: almalinux-10-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/Source/
+      remote_url: http://vault.almalinux.org/10/extras/Source/
       export_path: vault/10/extras/Source/
       production: true
       debug: false
@@ -4056,7 +4056,7 @@
     - arch: x86_64_v2
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/extras/debug/x86_64_v2/
       export_path: vault/10/extras/debug/x86_64_v2/
       production: true
       debug: true
@@ -4067,7 +4067,7 @@
     - arch: x86_64
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/extras/debug/x86_64/
       export_path: vault/10/extras/debug/x86_64/
       production: true
       debug: true
@@ -4078,7 +4078,7 @@
     - arch: ppc64le
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/extras/debug/ppc64le/
       export_path: vault/10/extras/debug/ppc64le/
       production: true
       debug: true
@@ -4089,7 +4089,7 @@
     - arch: aarch64
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/extras/debug/aarch64/
       export_path: vault/10/extras/debug/aarch64/
       production: true
       debug: true
@@ -4100,7 +4100,7 @@
     - arch: s390x
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/extras/debug/s390x/
       export_path: vault/10/extras/debug/s390x/
       production: true
       debug: true
@@ -4111,7 +4111,7 @@
     - arch: riscv64
       name: almalinux-10-extras-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/extras/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/extras/debug/riscv64/
       export_path: vault/10/extras/debug/riscv64/
       production: true
       debug: true
@@ -4182,7 +4182,7 @@
     - arch: src
       name: almalinux-10-crb
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/Source/
+      remote_url: http://vault.almalinux.org/10/CRB/Source/
       export_path: vault/10/CRB/Source/
       production: true
       debug: false
@@ -4192,7 +4192,7 @@
     - arch: x86_64_v2
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/x86_64_v2/
       export_path: vault/10/CRB/debug/x86_64_v2/
       production: true
       debug: true
@@ -4203,7 +4203,7 @@
     - arch: x86_64
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/x86_64/
       export_path: vault/10/CRB/debug/x86_64/
       production: true
       debug: true
@@ -4214,7 +4214,7 @@
     - arch: ppc64le
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/ppc64le/
       export_path: vault/10/CRB/debug/ppc64le/
       production: true
       debug: true
@@ -4225,7 +4225,7 @@
     - arch: aarch64
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/aarch64/
       export_path: vault/10/CRB/debug/aarch64/
       production: true
       debug: true
@@ -4236,7 +4236,7 @@
     - arch: s390x
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/s390x/
       export_path: vault/10/CRB/debug/s390x/
       production: true
       debug: true
@@ -4247,7 +4247,7 @@
     - arch: riscv64
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/CRB/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/riscv64/
       export_path: vault/10/CRB/debug/riscv64/
       production: true
       debug: true
@@ -4268,7 +4268,7 @@
     - arch: x86_64_v2
       name: almalinux-10-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/NFV/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/NFV/debug/x86_64_v2/
       export_path: vault/10/NFV/debug/x86_64_v2/
       production: true
       debug: true
@@ -4289,7 +4289,7 @@
     - arch: src
       name: almalinux-10-nfv
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/NFV/Source/
+      remote_url: http://vault.almalinux.org/10/NFV/Source/
       export_path: vault/10/NFV/Source/
       production: true
       debug: false
@@ -4299,7 +4299,7 @@
     - arch: x86_64
       name: almalinux-10-nfv-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/NFV/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/NFV/debug/x86_64/
       export_path: vault/10/NFV/debug/x86_64/
       production: true
       debug: true
@@ -4320,7 +4320,7 @@
     - arch: x86_64_v2
       name: almalinux-10-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/RT/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/RT/debug/x86_64_v2/
       export_path: vault/10/RT/debug/x86_64_v2/
       production: true
       debug: true
@@ -4341,7 +4341,7 @@
     - arch: src
       name: almalinux-10-rt
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/RT/Source/
+      remote_url: http://vault.almalinux.org/10/RT/Source/
       export_path: vault/10/RT/Source/
       production: true
       debug: false
@@ -4351,7 +4351,7 @@
     - arch: x86_64
       name: almalinux-10-rt-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/RT/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/RT/debug/x86_64/
       export_path: vault/10/RT/debug/x86_64/
       production: true
       debug: true
@@ -4422,7 +4422,7 @@
     - arch: src
       name: almalinux-10-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/Source/
+      remote_url: http://vault.almalinux.org/10/SAP/Source/
       export_path: vault/10/SAP/Source/
       production: true
       debug: false
@@ -4432,7 +4432,7 @@
     - arch: x86_64_v2
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/x86_64_v2/
       export_path: vault/10/SAP/debug/x86_64_v2/
       production: true
       debug: true
@@ -4443,7 +4443,7 @@
     - arch: x86_64
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/x86_64/
       export_path: vault/10/SAP/debug/x86_64/
       production: true
       debug: true
@@ -4454,7 +4454,7 @@
     - arch: ppc64le
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/ppc64le/
       export_path: vault/10/SAP/debug/ppc64le/
       production: true
       debug: true
@@ -4465,7 +4465,7 @@
     - arch: aarch64
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/aarch64/
       export_path: vault/10/SAP/debug/aarch64/
       production: true
       debug: true
@@ -4476,7 +4476,7 @@
     - arch: s390x
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/s390x/
       export_path: vault/10/SAP/debug/s390x/
       production: true
       debug: true
@@ -4487,7 +4487,7 @@
     - arch: riscv64
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAP/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/riscv64/
       export_path: vault/10/SAP/debug/riscv64/
       production: true
       debug: true
@@ -4558,7 +4558,7 @@
     - arch: src
       name: almalinux-10-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/Source/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/Source/
       export_path: vault/10/SAPHANA/Source/
       production: true
       debug: false
@@ -4568,7 +4568,7 @@
     - arch: x86_64_v2
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/x86_64_v2/
       export_path: vault/10/SAPHANA/debug/x86_64_v2/
       production: true
       debug: true
@@ -4579,7 +4579,7 @@
     - arch: x86_64
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/x86_64/
       export_path: vault/10/SAPHANA/debug/x86_64/
       production: true
       debug: true
@@ -4590,7 +4590,7 @@
     - arch: ppc64le
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/ppc64le/
       export_path: vault/10/SAPHANA/debug/ppc64le/
       production: true
       debug: true
@@ -4601,7 +4601,7 @@
     - arch: aarch64
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/aarch64/
       export_path: vault/10/SAPHANA/debug/aarch64/
       production: true
       debug: true
@@ -4612,7 +4612,7 @@
     - arch: s390x
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/s390x/
       export_path: vault/10/SAPHANA/debug/s390x/
       production: true
       debug: true
@@ -4623,7 +4623,7 @@
     - arch: riscv64
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/SAPHANA/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/riscv64/
       export_path: vault/10/SAPHANA/debug/riscv64/
       production: true
       debug: true
@@ -4674,7 +4674,7 @@
     - arch: riscv64
       name: almalinux-10-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/riscv64/os/
+      remote_url: http://vault.almalinux.org/10/plus/riscv64/os/
       export_path: vault/10/plus/riscv64/os/
       production: true
       debug: false
@@ -4694,7 +4694,7 @@
     - arch: src
       name: almalinux-10-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/Source/
+      remote_url: http://vault.almalinux.org/10/plus/Source/
       export_path: vault/10/plus/Source/
       production: true
       debug: false
@@ -4704,7 +4704,7 @@
     - arch: aarch64
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/plus/debug/aarch64/
       export_path: vault/10/plus/debug/aarch64/
       production: true
       debug: true
@@ -4715,7 +4715,7 @@
     - arch: ppc64le
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/plus/debug/ppc64le/
       export_path: vault/10/plus/debug/ppc64le/
       production: true
       debug: true
@@ -4726,7 +4726,7 @@
     - arch: x86_64
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/plus/debug/x86_64/
       export_path: vault/10/plus/debug/x86_64/
       production: true
       debug: true
@@ -4737,7 +4737,7 @@
     - arch: s390x
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/plus/debug/s390x/
       export_path: vault/10/plus/debug/s390x/
       production: true
       debug: true
@@ -4748,7 +4748,7 @@
     - arch: riscv64
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/plus/debug/riscv64/
       export_path: vault/10/plus/debug/riscv64/
       production: true
       debug: true
@@ -4759,7 +4759,7 @@
     - arch: x86_64_v2
       name: almalinux-10-plus-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/plus/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/plus/debug/x86_64_v2/
       export_path: vault/10/plus/debug/x86_64_v2/
       production: true
       debug: true
@@ -4781,7 +4781,7 @@
     - name: almalinux-10-raspberrypi
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/raspberrypi/Source/
+      remote_url: http://vault.almalinux.org/10/raspberrypi/Source/
       export_path: vault/10/raspberrypi/Source/
       production: true
       debug: false
@@ -4792,7 +4792,7 @@
     - name: almalinux-10-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/raspberrypi/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/raspberrypi/debug/aarch64/
       export_path: vault/10/raspberrypi/debug/aarch64/
       production: true
       debug: true
@@ -4803,7 +4803,7 @@
     - arch: x86_64_v2
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/x86_64_v2/os/
+      remote_url: http://vault.almalinux.org/10/testing/x86_64_v2/os/
       export_path: vault/10/testing/x86_64_v2/os/
       production: true
       debug: false
@@ -4814,7 +4814,7 @@
     - arch: x86_64
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/x86_64/os/
+      remote_url: http://vault.almalinux.org/10/testing/x86_64/os/
       export_path: vault/10/testing/x86_64/os/
       production: true
       debug: false
@@ -4825,7 +4825,7 @@
     - arch: aarch64
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/aarch64/os/
+      remote_url: http://vault.almalinux.org/10/testing/aarch64/os/
       export_path: vault/10/testing/aarch64/os/
       production: true
       debug: false
@@ -4836,7 +4836,7 @@
     - arch: ppc64le
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/ppc64le/os/
+      remote_url: http://vault.almalinux.org/10/testing/ppc64le/os/
       export_path: vault/10/testing/ppc64le/os/
       production: true
       debug: false
@@ -4847,7 +4847,7 @@
     - arch: src
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/Source/
+      remote_url: http://vault.almalinux.org/10/testing/Source/
       export_path: vault/10/testing/Source/
       production: true
       debug: false
@@ -4858,7 +4858,7 @@
     - arch: x86_64_v2
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/testing/debug/x86_64_v2/
       export_path: vault/10/testing/debug/x86_64_v2/
       production: true
       debug: true
@@ -4869,7 +4869,7 @@
     - arch: x86_64
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/testing/debug/x86_64/
       export_path: vault/10/testing/debug/x86_64/
       production: true
       debug: true
@@ -4880,7 +4880,7 @@
     - arch: aarch64
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/testing/debug/aarch64/
       export_path: vault/10/testing/debug/aarch64/
       production: true
       debug: true
@@ -4891,7 +4891,7 @@
     - arch: ppc64le
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/testing/debug/ppc64le/
       export_path: vault/10/testing/debug/ppc64le/
       production: true
       debug: true
@@ -4902,7 +4902,7 @@
     - arch: s390x
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/s390x/os/
+      remote_url: http://vault.almalinux.org/10/testing/s390x/os/
       export_path: vault/10/testing/s390x/os/
       production: true
       debug: false
@@ -4913,7 +4913,7 @@
     - arch: s390x
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/testing/debug/s390x/
       export_path: vault/10/testing/debug/s390x/
       production: true
       debug: true
@@ -4924,7 +4924,7 @@
     - arch: riscv64
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/riscv64/os/
+      remote_url: http://vault.almalinux.org/10/testing/riscv64/os/
       export_path: vault/10/testing/riscv64/os/
       production: true
       debug: false
@@ -4935,7 +4935,7 @@
     - arch: riscv64
       name: almalinux-10-testing-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/testing/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/testing/debug/riscv64/
       export_path: vault/10/testing/debug/riscv64/
       production: true
       debug: true
@@ -5012,7 +5012,7 @@
     - arch: src
       name: almalinux-10-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/Source/
+      remote_url: http://vault.almalinux.org/10/synergy/Source/
       export_path: vault/10/synergy/Source/
       production: true
       debug: false
@@ -5023,7 +5023,7 @@
     - arch: x86_64_v2
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/x86_64_v2/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/x86_64_v2/
       export_path: vault/10/synergy/debug/x86_64_v2/
       production: true
       debug: true
@@ -5034,7 +5034,7 @@
     - arch: x86_64
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/x86_64/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/x86_64/
       export_path: vault/10/synergy/debug/x86_64/
       production: true
       debug: true
@@ -5045,7 +5045,7 @@
     - arch: aarch64
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/aarch64/
       export_path: vault/10/synergy/debug/aarch64/
       production: true
       debug: true
@@ -5056,7 +5056,7 @@
     - arch: ppc64le
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/ppc64le/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/ppc64le/
       export_path: vault/10/synergy/debug/ppc64le/
       production: true
       debug: true
@@ -5067,7 +5067,7 @@
     - arch: s390x
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/s390x/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/s390x/
       export_path: vault/10/synergy/debug/s390x/
       production: true
       debug: true
@@ -5078,7 +5078,7 @@
     - arch: riscv64
       name: almalinux-10-synergy-debuginfo
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/synergy/debug/riscv64/
+      remote_url: http://vault.almalinux.org/10/synergy/debug/riscv64/
       export_path: vault/10/synergy/debug/riscv64/
       production: true
       debug: true
@@ -5100,7 +5100,7 @@
     - name: almalinux-10-raspberrypi
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/raspberrypi/Source/
+      remote_url: http://vault.almalinux.org/10/raspberrypi/Source/
       export_path: vault/10/raspberrypi/Source/
       production: true
       debug: false
@@ -5111,8 +5111,85 @@
     - name: almalinux-10-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10/raspberrypi/debug/aarch64/
+      remote_url: http://vault.almalinux.org/10/raspberrypi/debug/aarch64/
       export_path: vault/10/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia
+      arch: src
+      type: rpm
+      remote_url: http://vault.almalinux.org/10/nvidia/Source/
+      export_path: vault/10/nvidia/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/nvidia/aarch64/os/
+      export_path: almalinux/10/nvidia/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://vault.almalinux.org/10/nvidia/debug/aarch64/
+      export_path: vault/10/nvidia/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/nvidia/x86_64/os/
+      export_path: almalinux/10/nvidia/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://vault.almalinux.org/10/nvidia/debug/x86_64/
+      export_path: vault/10/nvidia/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia
+      arch: x86_64_v2
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/10/nvidia/x86_64_v2/os/
+      export_path: almalinux/10/nvidia/x86_64_v2/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-10-nvidia-debuginfo
+      arch: x86_64_v2
+      type: rpm
+      remote_url: http://vault.almalinux.org/10/nvidia/debug/x86_64_v2/
+      export_path: vault/10/nvidia/debug/x86_64_v2/
       production: true
       debug: true
       remote_sync_policy: on_demand
