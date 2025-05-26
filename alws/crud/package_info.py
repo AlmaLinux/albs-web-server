@@ -1,3 +1,4 @@
+import datetime
 from collections import namedtuple
 from typing import Optional
 
@@ -15,6 +16,7 @@ async def get_package_info(
     package_name: str,
     platform_name: str,
     arch: Optional[str] = None,
+    updated_after: Optional[str] = None,
 ):
     platform_id_query = select(Platform.id).where(
         Platform.name == platform_name
@@ -22,7 +24,7 @@ async def get_package_info(
     platform_id = (await bs_db.execute(platform_id_query)).scalar()
 
     if not platform_id:
-        raise PlatformNotFoundError(f'Invalid distribution: {platform_name}')
+        raise PlatformNotFoundError(f"Invalid distribution: {platform_name}")
 
     conditions = [
         Repository.platform_id == platform_id,
@@ -40,10 +42,18 @@ async def get_package_info(
 
     repo_ids = [repo.pulp_href.split('/')[-2] for repo in repositories]
 
-    subq = select(CoreRepositoryContent.content_id).where(
+    subq_conditions = [
         CoreRepositoryContent.repository_id.in_(repo_ids),
         CoreRepositoryContent.version_removed_id.is_(None),
-    )
+    ]
+    if updated_after:
+        last_updated = datetime.datetime.strptime(
+            updated_after, "%Y-%m-%d %H:%M:%S"
+        )
+        subq_conditions.append(
+            CoreRepositoryContent.pulp_last_updated >= last_updated
+        )
+    subq = select(CoreRepositoryContent.content_id).where(*subq_conditions)
 
     query = select(
         RpmPackage.name,
@@ -57,12 +67,12 @@ async def get_package_info(
     pulp_packages = (await pulp_db.execute(query)).all()
 
     PackageTuple = namedtuple(
-        'PackageTuple',
+        "PackageTuple",
         [
-            'name',
-            'version',
-            'release',
-            'changelogs',
+            "name",
+            "version",
+            "release",
+            "changelogs",
         ],
     )
     packages = []

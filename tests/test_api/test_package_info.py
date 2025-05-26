@@ -55,3 +55,19 @@ class TestPackageInfoEndpoints(BaseAsyncTestCase):
         )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    async def test_get_package_info_with_updated_after(
+        self, mock_get_package_info_with_date_filter
+    ):
+        updated_after = "updated_after=2024-05-01 00:00:00"
+        q_params = f"?name=example_package&almalinux_version=9&{updated_after}"
+        response = await self.make_request(
+            "get",
+            f"/api/v1/package_info/{q_params}",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["version"] == "1.1"
+        assert data[0]["release"] == "2.el9"

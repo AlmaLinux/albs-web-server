@@ -25,6 +25,7 @@ async def get_package_info(
     name: str,
     almalinux_version: int,
     arch: Optional[str] = None,
+    updated_after: Optional[str] = None,
     bs_db: AsyncSession = Depends(
         AsyncSessionDependency(key=get_async_db_key())
     ),
@@ -41,6 +42,7 @@ async def get_package_info(
             name,
             platform_name,
             arch,
+            updated_after,
         )
         return packages
     except (PlatformNotFoundError, RepositoriesNotFoundError) as exc:
