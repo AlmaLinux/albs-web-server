@@ -5244,7 +5244,7 @@
     - arch: src
       name: almalinux-kitten-10-devel
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/Source/
       export_path: vault/10-kitten/devel/Source/
       production: true
       debug: false
@@ -5254,7 +5254,7 @@
     - arch: s390x
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/s390x/
       export_path: vault/10-kitten/devel/debug/s390x/
       production: true
       debug: true
@@ -5265,7 +5265,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/riscv64/
       export_path: vault/10-kitten/devel/debug/riscv64/
       production: true
       debug: true
@@ -5276,7 +5276,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/x86_64/
       export_path: vault/10-kitten/devel/debug/x86_64/
       production: true
       debug: true
@@ -5287,7 +5287,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/ppc64le/
       export_path: vault/10-kitten/devel/debug/ppc64le/
       production: true
       debug: true
@@ -5298,7 +5298,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/x86_64_v2/
       export_path: vault/10-kitten/devel/debug/x86_64_v2/
       production: true
       debug: true
@@ -5309,7 +5309,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/devel/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/aarch64/
       export_path: vault/10-kitten/devel/debug/aarch64/
       production: true
       debug: true
@@ -5380,7 +5380,7 @@
     - arch: src
       name: almalinux-kitten-10-appstream
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/Source/
       export_path: vault/10-kitten/AppStream/Source/
       production: true
       debug: false
@@ -5390,7 +5390,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/x86_64_v2/
       export_path: vault/10-kitten/AppStream/debug/x86_64_v2/
       production: true
       debug: true
@@ -5401,7 +5401,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/x86_64/
       export_path: vault/10-kitten/AppStream/debug/x86_64/
       production: true
       debug: true
@@ -5412,7 +5412,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/ppc64le/
       export_path: vault/10-kitten/AppStream/debug/ppc64le/
       production: true
       debug: true
@@ -5423,7 +5423,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/aarch64/
       export_path: vault/10-kitten/AppStream/debug/aarch64/
       production: true
       debug: true
@@ -5434,7 +5434,7 @@
     - arch: s390x
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/s390x/
       export_path: vault/10-kitten/AppStream/debug/s390x/
       production: true
       debug: true
@@ -5445,7 +5445,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/AppStream/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/riscv64/
       export_path: vault/10-kitten/AppStream/debug/riscv64/
       production: true
       debug: true
@@ -5516,7 +5516,7 @@
     - arch: src
       name: almalinux-kitten-10-baseos
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/Source/
       export_path: vault/10-kitten/BaseOS/Source/
       production: true
       debug: false
@@ -5526,7 +5526,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/x86_64_v2/
       export_path: vault/10-kitten/BaseOS/debug/x86_64_v2/
       production: true
       debug: true
@@ -5537,7 +5537,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/x86_64/
       export_path: vault/10-kitten/BaseOS/debug/x86_64/
       production: true
       debug: true
@@ -5548,7 +5548,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/ppc64le/
       export_path: vault/10-kitten/BaseOS/debug/ppc64le/
       production: true
       debug: true
@@ -5559,7 +5559,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/aarch64/
       export_path: vault/10-kitten/BaseOS/debug/aarch64/
       production: true
       debug: true
@@ -5570,7 +5570,7 @@
     - arch: s390x
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/s390x/
       export_path: vault/10-kitten/BaseOS/debug/s390x/
       production: true
       debug: true
@@ -5581,7 +5581,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/BaseOS/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/riscv64/
       export_path: vault/10-kitten/BaseOS/debug/riscv64/
       production: true
       debug: true
@@ -5652,7 +5652,7 @@
     - arch: src
       name: almalinux-kitten-10-highavailability
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/Source/
       export_path: vault/10-kitten/HighAvailability/Source/
       production: true
       debug: false
@@ -5662,7 +5662,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/x86_64_v2/
       export_path: vault/10-kitten/HighAvailability/debug/x86_64_v2/
       production: true
       debug: true
@@ -5673,7 +5673,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/x86_64/
       export_path: vault/10-kitten/HighAvailability/debug/x86_64/
       production: true
       debug: true
@@ -5684,7 +5684,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/ppc64le/
       export_path: vault/10-kitten/HighAvailability/debug/ppc64le/
       production: true
       debug: true
@@ -5695,7 +5695,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/aarch64/
       export_path: vault/10-kitten/HighAvailability/debug/aarch64/
       production: true
       debug: true
@@ -5706,7 +5706,7 @@
     - arch: s390x
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/s390x/
       export_path: vault/10-kitten/HighAvailability/debug/s390x/
       production: true
       debug: true
@@ -5717,7 +5717,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/HighAvailability/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/riscv64/
       export_path: vault/10-kitten/HighAvailability/debug/riscv64/
       production: true
       debug: true
@@ -5788,7 +5788,7 @@
     - arch: src
       name: almalinux-kitten-10-resilientstorage
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/Source/
       export_path: vault/10-kitten/ResilientStorage/Source/
       production: true
       debug: false
@@ -5798,7 +5798,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/x86_64_v2/
       export_path: vault/10-kitten/ResilientStorage/debug/x86_64_v2/
       production: true
       debug: true
@@ -5809,7 +5809,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/x86_64/
       export_path: vault/10-kitten/ResilientStorage/debug/x86_64/
       production: true
       debug: true
@@ -5820,7 +5820,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/ppc64le/
       export_path: vault/10-kitten/ResilientStorage/debug/ppc64le/
       production: true
       debug: true
@@ -5831,7 +5831,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/aarch64/
       export_path: vault/10-kitten/ResilientStorage/debug/aarch64/
       production: true
       debug: true
@@ -5842,7 +5842,7 @@
     - arch: s390x
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/s390x/
       export_path: vault/10-kitten/ResilientStorage/debug/s390x/
       production: true
       debug: true
@@ -5853,7 +5853,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-resilientstorage-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/ResilientStorage/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/ResilientStorage/debug/riscv64/
       export_path: vault/10-kitten/ResilientStorage/debug/riscv64/
       production: true
       debug: true
@@ -5924,7 +5924,7 @@
     - arch: src
       name: almalinux-kitten-10-extras-common
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/Source/
       export_path: vault/10-kitten/extras-common/Source/
       production: true
       debug: false
@@ -5934,7 +5934,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/x86_64_v2/
       export_path: vault/10-kitten/extras-common/debug/x86_64_v2/
       production: true
       debug: true
@@ -5945,7 +5945,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/x86_64/
       export_path: vault/10-kitten/extras-common/debug/x86_64/
       production: true
       debug: true
@@ -5956,7 +5956,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/ppc64le/
       export_path: vault/10-kitten/extras-common/debug/ppc64le/
       production: true
       debug: true
@@ -5967,7 +5967,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/aarch64/
       export_path: vault/10-kitten/extras-common/debug/aarch64/
       production: true
       debug: true
@@ -5978,7 +5978,7 @@
     - arch: s390x
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/s390x/
       export_path: vault/10-kitten/extras-common/debug/s390x/
       production: true
       debug: true
@@ -5989,7 +5989,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-extras-common-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/extras-common/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/debug/riscv64/
       export_path: vault/10-kitten/extras-common/debug/riscv64/
       production: true
       debug: true
@@ -6060,7 +6060,7 @@
     - arch: src
       name: almalinux-kitten-10-crb
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/Source/
       export_path: vault/10-kitten/CRB/Source/
       production: true
       debug: false
@@ -6070,7 +6070,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/x86_64_v2/
       export_path: vault/10-kitten/CRB/debug/x86_64_v2/
       production: true
       debug: true
@@ -6081,7 +6081,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/x86_64/
       export_path: vault/10-kitten/CRB/debug/x86_64/
       production: true
       debug: true
@@ -6092,7 +6092,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/ppc64le/
       export_path: vault/10-kitten/CRB/debug/ppc64le/
       production: true
       debug: true
@@ -6103,7 +6103,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/aarch64/
       export_path: vault/10-kitten/CRB/debug/aarch64/
       production: true
       debug: true
@@ -6114,7 +6114,7 @@
     - arch: s390x
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/s390x/
       export_path: vault/10-kitten/CRB/debug/s390x/
       production: true
       debug: true
@@ -6125,7 +6125,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/CRB/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/riscv64/
       export_path: vault/10-kitten/CRB/debug/riscv64/
       production: true
       debug: true
@@ -6146,7 +6146,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-nfv-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/NFV/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/NFV/debug/x86_64_v2/
       export_path: vault/10-kitten/NFV/debug/x86_64_v2/
       production: true
       debug: true
@@ -6167,7 +6167,7 @@
     - arch: src
       name: almalinux-kitten-10-nfv
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/NFV/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/NFV/Source/
       export_path: vault/10-kitten/NFV/Source/
       production: true
       debug: false
@@ -6177,7 +6177,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-nfv-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/NFV/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/NFV/debug/x86_64/
       export_path: vault/10-kitten/NFV/debug/x86_64/
       production: true
       debug: true
@@ -6198,7 +6198,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-rt-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/RT/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/RT/debug/x86_64_v2/
       export_path: vault/10-kitten/RT/debug/x86_64_v2/
       production: true
       debug: true
@@ -6219,7 +6219,7 @@
     - arch: src
       name: almalinux-kitten-10-rt
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/RT/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/RT/Source/
       export_path: vault/10-kitten/RT/Source/
       production: true
       debug: false
@@ -6229,7 +6229,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-rt-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/RT/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/RT/debug/x86_64/
       export_path: vault/10-kitten/RT/debug/x86_64/
       production: true
       debug: true
@@ -6300,7 +6300,7 @@
     - arch: src
       name: almalinux-kitten-10-sap
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/Source/
       export_path: vault/10-kitten/SAP/Source/
       production: true
       debug: false
@@ -6310,7 +6310,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/x86_64_v2/
       export_path: vault/10-kitten/SAP/debug/x86_64_v2/
       production: true
       debug: true
@@ -6321,7 +6321,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/x86_64/
       export_path: vault/10-kitten/SAP/debug/x86_64/
       production: true
       debug: true
@@ -6332,7 +6332,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/ppc64le/
       export_path: vault/10-kitten/SAP/debug/ppc64le/
       production: true
       debug: true
@@ -6343,7 +6343,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/aarch64/
       export_path: vault/10-kitten/SAP/debug/aarch64/
       production: true
       debug: true
@@ -6354,7 +6354,7 @@
     - arch: s390x
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/s390x/
       export_path: vault/10-kitten/SAP/debug/s390x/
       production: true
       debug: true
@@ -6365,7 +6365,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAP/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/riscv64/
       export_path: vault/10-kitten/SAP/debug/riscv64/
       production: true
       debug: true
@@ -6436,7 +6436,7 @@
     - arch: src
       name: almalinux-kitten-10-saphana
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/Source/
       export_path: vault/10-kitten/SAPHANA/Source/
       production: true
       debug: false
@@ -6446,7 +6446,7 @@
     - arch: x86_64_v2
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/x86_64_v2/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/x86_64_v2/
       export_path: vault/10-kitten/SAPHANA/debug/x86_64_v2/
       production: true
       debug: true
@@ -6457,7 +6457,7 @@
     - arch: x86_64
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/x86_64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/x86_64/
       export_path: vault/10-kitten/SAPHANA/debug/x86_64/
       production: true
       debug: true
@@ -6468,7 +6468,7 @@
     - arch: ppc64le
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/ppc64le/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/ppc64le/
       export_path: vault/10-kitten/SAPHANA/debug/ppc64le/
       production: true
       debug: true
@@ -6479,7 +6479,7 @@
     - arch: aarch64
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/aarch64/
       export_path: vault/10-kitten/SAPHANA/debug/aarch64/
       production: true
       debug: true
@@ -6490,7 +6490,7 @@
     - arch: s390x
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/s390x/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/s390x/
       export_path: vault/10-kitten/SAPHANA/debug/s390x/
       production: true
       debug: true
@@ -6501,7 +6501,7 @@
     - arch: riscv64
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/vault/10-kitten/SAPHANA/debug/riscv64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/riscv64/
       export_path: vault/10-kitten/SAPHANA/debug/riscv64/
       production: true
       debug: true
@@ -6512,7 +6512,7 @@
     - name: almalinux-kitten-10-raspberrypi
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux-kitten/10-kitten/raspberrypi/aarch64/os/
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/raspberrypi/aarch64/os/
       export_path: almalinux-kitten/10-kitten/raspberrypi/aarch64/os/
       production: true
       debug: false
@@ -6523,7 +6523,7 @@
     - name: almalinux-kitten-10-raspberrypi
       arch: src
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10-kitten/raspberrypi/Source/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/raspberrypi/Source/
       export_path: vault/10-kitten/raspberrypi/Source/
       production: true
       debug: false
@@ -6534,8 +6534,85 @@
     - name: almalinux-kitten-10-raspberrypi-debuginfo
       arch: aarch64
       type: rpm
-      remote_url: http://repo.almalinux.org/vault/10-kitten/raspberrypi/debug/aarch64/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/raspberrypi/debug/aarch64/
       export_path: vault/10-kitten/raspberrypi/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia
+      arch: src
+      type: rpm
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/nvidia/Source/
+      export_path: vault/10-kitten/nvidia/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia
+      arch: aarch64
+      type: rpm
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/nvidia/aarch64/os/
+      export_path: almalinux-kitten/10-kitten/nvidia/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/nvidia/debug/aarch64/
+      export_path: vault/10-kitten/nvidia/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia
+      arch: x86_64
+      type: rpm
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/nvidia/x86_64/os/
+      export_path: almalinux-kitten/10-kitten/nvidia/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/nvidia/debug/x86_64/
+      export_path: vault/10-kitten/nvidia/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia
+      arch: x86_64_v2
+      type: rpm
+      remote_url: http://kitten.repo.almalinux.org/10-kitten/nvidia/x86_64_v2/os/
+      export_path: almalinux-kitten/10-kitten/nvidia/x86_64_v2/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-kitten-10-nvidia-debuginfo
+      arch: x86_64_v2
+      type: rpm
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/nvidia/debug/x86_64_v2/
+      export_path: vault/10-kitten/nvidia/debug/x86_64_v2/
       production: true
       debug: true
       remote_sync_policy: on_demand
