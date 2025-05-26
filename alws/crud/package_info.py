@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alws.errors import PlatformNotFoundError, RepositoriesNotFoundError
 from alws.models import Platform, Repository
 from alws.pulp_models import CoreRepositoryContent, RpmPackage
+from alws.utils.pulp_utils import get_uuid_from_pulp_href
 
 
 async def get_package_info(
@@ -40,7 +41,9 @@ async def get_package_info(
         msg = f"No repositories found for {platform_name}.{arch}"
         raise RepositoriesNotFoundError(msg)
 
-    repo_ids = [repo.pulp_href.split('/')[-2] for repo in repositories]
+    repo_ids = [
+        get_uuid_from_pulp_href(repo.pulp_href) for repo in repositories
+    ]
 
     subq_conditions = [
         CoreRepositoryContent.repository_id.in_(repo_ids),
@@ -75,8 +78,4 @@ async def get_package_info(
             "changelogs",
         ],
     )
-    packages = []
-    for pulp_pkg in pulp_packages:
-        packages.append(PackageTuple(*pulp_pkg)._asdict())
-
-    return packages
+    return [PackageTuple(*pulp_pkg)._asdict() for pulp_pkg in pulp_packages]
