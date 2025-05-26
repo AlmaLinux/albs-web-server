@@ -1,9 +1,10 @@
 import datetime
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import pytest
 
-from alws.errors import PlatformNotFoundError, RepositoriesNotFoundError 
+from alws.errors import PlatformNotFoundError, RepositoriesNotFoundError
+
 
 @pytest.fixture
 def package_info() -> List[Dict[str, Any]]:
@@ -27,6 +28,7 @@ def package_info() -> List[Dict[str, Any]]:
 def mock_get_package_info_success(monkeypatch, package_info):
     async def mock_func(*args, **kwargs):
         return package_info
+
     monkeypatch.setattr("alws.crud.package_info.get_package_info", mock_func)
 
 
@@ -34,6 +36,7 @@ def mock_get_package_info_success(monkeypatch, package_info):
 def mock_get_package_info_platform_not_found(monkeypatch):
     async def mock_func(*args, **kwargs):
         raise PlatformNotFoundError("Invalid distribution: AlmaLinux-999")
+
     monkeypatch.setattr("alws.crud.package_info.get_package_info", mock_func)
 
 
@@ -41,6 +44,7 @@ def mock_get_package_info_platform_not_found(monkeypatch):
 def mock_get_package_info_repos_not_found(monkeypatch):
     async def mock_func(*args, **kwargs):
         raise RepositoriesNotFoundError("No repositories found")
+
     monkeypatch.setattr("alws.crud.package_info.get_package_info", mock_func)
 
 
@@ -48,7 +52,9 @@ def mock_get_package_info_repos_not_found(monkeypatch):
 def mock_get_package_info_empty(monkeypatch):
     async def mock_func(*args, **kwargs):
         return []
+
     monkeypatch.setattr("alws.crud.package_info.get_package_info", mock_func)
+
 
 @pytest.fixture
 def mock_get_package_info_with_date_filter(monkeypatch):
@@ -72,16 +78,22 @@ def mock_get_package_info_with_date_filter(monkeypatch):
         ]
 
         if updated_after:
-            cutoff = datetime.datetime.strptime(updated_after, "%Y-%m-%d %H:%M:%S")
+            cutoff = datetime.datetime.strptime(
+                updated_after, "%Y-%m-%d %H:%M:%S"
+            )
             filtered = [
-                {
-                    k: v for k, v in pkg.items() if k != "pulp_last_updated"
-                }
+                {k: v for k, v in pkg.items() if k != "pulp_last_updated"}
                 for pkg in packages
-                if datetime.datetime.strptime(pkg["pulp_last_updated"], "%Y-%m-%d %H:%M:%S") >= cutoff
+                if datetime.datetime.strptime(
+                    pkg["pulp_last_updated"], "%Y-%m-%d %H:%M:%S"
+                )
+                >= cutoff
             ]
         else:
-            filtered = [ {k: v for k, v in pkg.items() if k != "pulp_last_updated"} for pkg in packages ]
+            filtered = [
+                {k: v for k, v in pkg.items() if k != "pulp_last_updated"}
+                for pkg in packages
+            ]
 
         return filtered
 
