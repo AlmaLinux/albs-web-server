@@ -989,3 +989,10 @@
     mock:
       use_host_resolv: false
   repositories:
+
+- name: disable_scl-utils
+  data:
+    mock:
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
+        make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
+        info patch util-linux findutils grep zlib git-core
