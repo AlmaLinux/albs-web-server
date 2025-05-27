@@ -974,12 +974,22 @@
       debug: false
       priority: 10
 
-- name: EPEL-10-v2-bootstrap
+- name: EPEL-ALK10-10-v2-bootstrap
   repositories:
-    - name: epel-10-x86_64_v2-bootstrap
+    - name: epel-alk10-10-x86_64_v2-bootstrap
       arch: x86_64_v2
       type: rpm
       url: https://dl.fedoraproject.org/pub/epel/10/Everything/x86_64/
+      production: false
+      debug: false
+      priority: 10
+
+- name: EPEL-AL10-10-v2-bootstrap
+  repositories:
+    - name: epel-al10-10-x86_64_v2-bootstrap
+      arch: x86_64_v2
+      type: rpm
+      url: https://dl.fedoraproject.org/pub/epel/10z/Everything/x86_64/
       production: false
       debug: false
       priority: 10
