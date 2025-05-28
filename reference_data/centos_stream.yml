@@ -4,9 +4,9 @@
   distr_version: '8'
   priority: 2
   test_dist_name: CentOSStream8
-  modularity:
+  modularity: {}
+  data:
       versions:
-  data: {}
   is_reference: true
   type: rpm
   arch_list:
@@ -19,9 +19,9 @@
   distr_version: '9'
   priority: 2
   test_dist_name: CentOSStream9
-  modularity:
+  modularity: {}
+  data:
       versions:
-  data: {}
   is_reference: true
   type: rpm
   arch_list:
@@ -35,9 +35,9 @@
   distr_version: '10'
   priority: 2
   test_dist_name: CentOSStream10
-  modularity:
+  modularity: {}
+  data:
       versions:
-  data: {}
   is_reference: true
   type: rpm
   arch_list:

@@ -3,15 +3,15 @@
     git_tag_prefix:
       modified: a8
       non_modified: c8
+  data:
+    mock:
+      secure_boot_macros:
+        "%pe_signing_cert": "'05'"
+        "%pe_signing_token": "'AlmaLinux OS Foundation'"
     versions:
       - name: '8.10'
         version_prefix: '81000'
         dist_prefix: 'el8.10.0'
-  data:
-     mock:
-       secure_boot_macros:
-         "%pe_signing_cert": "'05'"
-         "%pe_signing_token": "'AlmaLinux OS Foundation'"
   repositories:
     - name: almalinux-8-beta
       arch: i686
@@ -96,15 +96,15 @@
     git_tag_prefix:
       modified: a9
       non_modified: c9
+  data:
+    mock:
+      secure_boot_macros:
+        "%pe_signing_cert": '06'
+        "%pe_signing_token": 'AlmaLinux OS Foundation'
     versions:
       - name: '9.6'
         version_prefix: '90600'
         dist_prefix: 'el9.6.0'
-  data:
-     mock:
-       secure_boot_macros:
-         "%pe_signing_cert": '06'
-         "%pe_signing_token": 'AlmaLinux OS Foundation'
   repositories:
     - name: almalinux-9-beta
       arch: i686

@@ -1364,7 +1364,7 @@ async def release_errata_packages(
         return
     repo_stage = repo["name"].split("-")[-2]
     arch = repo["name"].split("-")[-1]
-    platform_version = platform.modularity["versions"][-1]
+    platform_version = platform.data["versions"][-1]
     platform_version = platform_version["name"].replace(".", "_")
     rpm_module = None
     reboot_suggested = False
