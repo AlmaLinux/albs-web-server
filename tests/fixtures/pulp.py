@@ -263,7 +263,9 @@ def modify_repository(monkeypatch):
 def create_rpm_publication(monkeypatch):
     async def func(*args, **kwargs):
         return {
-            "pulp_href": ("/pulp/api/v3/tasks/fd754c2e-3b6c-4d69-9417-6d7f5bdf1e28/"),
+            "pulp_href": (
+                "/pulp/api/v3/tasks/fd754c2e-3b6c-4d69-9417-6d7f5bdf1e28/"
+            ),
             "pulp_created": "2023-02-16T15:06:52.836410Z",
             "state": "completed",
             "name": "pulp_file.app.tasks.publishing.publish",
@@ -271,7 +273,9 @@ def create_rpm_publication(monkeypatch):
             "started_at": "2023-02-16T15:06:53.072299Z",
             "finished_at": "2023-02-16T15:06:53.229928Z",
             "error": None,
-            "worker": ("/pulp/api/v3/workers/19ae1f30-d1cb-414c-9d42-29bda565e00d/"),
+            "worker": (
+                "/pulp/api/v3/workers/19ae1f30-d1cb-414c-9d42-29bda565e00d/"
+            ),
             "parent_task": None,
             "child_tasks": [],
             "task_group": None,
@@ -484,45 +488,11 @@ def get_empty_module_from_pulp_db(monkeypatch):
 
 
 @pytest.fixture
-def package_info() -> List[Dict[str, Any]]:
-    return [
-        {
-            "name": "example_package",
-            "version": "example_version",
-            "release": "example_release.el8",
-            "arch": "example_arch",
-            "changelogs": ["example_changelogs"],
-        },
-        {
-            "name": "example_package",
-            "version": "example_version_2",
-            "release": "example_release_2.el9",
-            "arch": "example_arch_2",
-            "changelogs": ["example_changelogs_2"],
-        },
-    ]
-
-
-@pytest.fixture
-def get_rpm_packages(monkeypatch, package_info):
-    async def func(*args, **kwargs):
-        res = []
-        for package in package_info:
-            if "name" in kwargs and package["name"] != kwargs["name"]:
-                continue
-            if "include_fields" in kwargs:
-                package = {field: package[field] for field in kwargs["include_fields"]}
-            res.append(package)
-        return res
-
-    monkeypatch.setattr(PulpClient, "get_rpm_packages", func)
-
-
-@pytest.fixture
 def get_removed_rpm_packages_from_latest_repo_version(monkeypatch):
     def func(*args, **kwargs):
         class RpmPackage:
             pulp_href = uuid.uuid4()
+
         return [RpmPackage() for i in range(10)]
 
     monkeypatch.setattr(
