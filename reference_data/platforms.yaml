@@ -14,28 +14,6 @@
     git_tag_prefix:
       modified: a8
       non_modified: c8
-    versions:
-      - name: '8.4'
-        version_prefix: '80400'
-        dist_prefix: 'el8.4.0'
-      - name: '8.5'
-        version_prefix: '80500'
-        dist_prefix: 'el8.5.0'
-      - name: '8.6'
-        version_prefix: '80600'
-        dist_prefix: 'el8.6.0'
-      - name: '8.7'
-        version_prefix: '80700'
-        dist_prefix: 'el8.7.0'
-      - name: '8.8'
-        version_prefix: '80800'
-        dist_prefix: 'el8.8.0'
-      - name: '8.9'
-        version_prefix: '80900'
-        dist_prefix: 'el8.9.0'
-      - name: '8.10'
-        version_prefix: '81000'
-        dist_prefix: 'el8.10.0'
   type: rpm
   arch_list:
     - i686
@@ -86,6 +64,28 @@
         "%modsign_os": "almalinux8"
     mock_dist: el8
     timeout: 43200
+    versions:
+      - name: '8.4'
+        version_prefix: '80400'
+        dist_prefix: 'el8.4.0'
+      - name: '8.5'
+        version_prefix: '80500'
+        dist_prefix: 'el8.5.0'
+      - name: '8.6'
+        version_prefix: '80600'
+        dist_prefix: 'el8.6.0'
+      - name: '8.7'
+        version_prefix: '80700'
+        dist_prefix: 'el8.7.0'
+      - name: '8.8'
+        version_prefix: '80800'
+        dist_prefix: 'el8.8.0'
+      - name: '8.9'
+        version_prefix: '80900'
+        dist_prefix: 'el8.9.0'
+      - name: '8.10'
+        version_prefix: '81000'
+        dist_prefix: 'el8.10.0'
     yum:
       best: false
       module_platform_id: platform:el8
@@ -1724,28 +1724,6 @@
     git_tag_prefix:
       modified: a9
       non_modified: c9
-    versions:
-      - name: '9'
-        version_prefix: '90000'
-        dist_prefix: 'el9.0.0'
-      - name: '9.1'
-        version_prefix: '90100'
-        dist_prefix: 'el9.1.0'
-      - name: '9.2'
-        version_prefix: '90200'
-        dist_prefix: 'el9.2.0'
-      - name: '9.3'
-        version_prefix: '90300'
-        dist_prefix: 'el9.3.0'
-      - name: '9.4'
-        version_prefix: '90400'
-        dist_prefix: 'el9.4.0'
-      - name: '9.5'
-        version_prefix: '90500'
-        dist_prefix: 'el9.5.0'
-      - name: '9.6'
-        version_prefix: '90600'
-        dist_prefix: 'el9.6.0'
   type: rpm
   arch_list:
     - i686
@@ -1789,6 +1767,28 @@
         "%modsign_os": "almalinux9"
     mock_dist: el9
     timeout: 43200
+    versions:
+      - name: '9'
+        version_prefix: '90000'
+        dist_prefix: 'el9.0.0'
+      - name: '9.1'
+        version_prefix: '90100'
+        dist_prefix: 'el9.1.0'
+      - name: '9.2'
+        version_prefix: '90200'
+        dist_prefix: 'el9.2.0'
+      - name: '9.3'
+        version_prefix: '90300'
+        dist_prefix: 'el9.3.0'
+      - name: '9.4'
+        version_prefix: '90400'
+        dist_prefix: 'el9.4.0'
+      - name: '9.5'
+        version_prefix: '90500'
+        dist_prefix: 'el9.5.0'
+      - name: '9.6'
+        version_prefix: '90600'
+        dist_prefix: 'el9.6.0'
     yum:
       best: true
       module_platform_id: platform:el9
@@ -3435,6 +3435,8 @@
         "%modsign_os": "almalinux10"
     mock_dist: el10
     timeout: 43200
+    versions:
+      - name: '10.0'
     yum:
       best: true
       module_platform_id: platform:el10

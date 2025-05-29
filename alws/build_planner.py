@@ -525,21 +525,21 @@ class BuildPlanner:
         else:
             mock_options = {'definitions': {}}
         for platform in self._platforms:
-            modularity_version = platform.modularity['versions'][-1]
+            modularity_version = platform.data['versions'][-1]
             for flavour in self._platform_flavors:
-                if flavour.modularity and flavour.modularity.get('versions'):
-                    modularity_version = flavour.modularity['versions'][-1]
+                if flavour.data and flavour.data.get('versions'):
+                    modularity_version = flavour.data['versions'][-1]
             if task.module_platform_version:
                 flavour_versions = [
-                    flavour.modularity['versions']
+                    flavour.data['versions']
                     for flavour in self._platform_flavors
-                    if flavour.modularity
-                    and flavour.modularity.get('versions')
+                    if flavour.data
+                    and flavour.data.get('versions')
                 ]
                 modularity_version = next(
                     item
                     for item in itertools.chain(
-                        platform.modularity['versions'], *flavour_versions
+                        platform.data['versions'], *flavour_versions
                     )
                     if item['name'] == task.module_platform_version
                 )

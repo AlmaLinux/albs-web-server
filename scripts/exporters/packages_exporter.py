@@ -180,6 +180,7 @@ class PackagesExporter(BasePulpExporter):
         osv_distr_mapping = {
             "AlmaLinux-8": "AlmaLinux:8",
             "AlmaLinux-9": "AlmaLinux:9",
+            "AlmaLinux-10": "AlmaLinux:10",
         }
         self.logger.debug("Generating OSV data")
         osv_target_dir = os.path.join(
@@ -575,7 +576,6 @@ def export_errata_and_oval(
 def extract_errata_from_exported_paths(
     exporter: PackagesExporter,
     exported_paths: List[str],
-    platform_regex: re.Pattern,
 ) -> dict:
     platform_errata_cache = {}
     with ThreadPoolExecutor(max_workers=4) as executor:
@@ -593,9 +593,12 @@ def extract_errata_from_exported_paths(
                     "Extracted errata records from %s",
                     repo_path,
                 )
-                platform = "AlmaLinux-8"
-                if platform_regex.search(repo_path):
-                    platform = "AlmaLinux-9"
+                repo_match = re.search(r"/(almalinux|vault)/(\d+)/", repo_path)
+                if repo_match:
+                    version = repo_match.group(2)
+                    platform = f"AlmaLinux-{version}"
+                else:
+                    platform = "AlmaLinux-8"
                 if platform not in platform_errata_cache:
                     platform_errata_cache[platform] = {
                         "cache": [],
@@ -678,11 +681,9 @@ def main():
                     repo_path,
                 )
 
-    platform_regex = re.compile(r"\/(almalinux|vault)\/9\/")
     platform_errata_cache = extract_errata_from_exported_paths(
         exporter=exporter,
         exported_paths=exported_paths,
-        platform_regex=platform_regex,
     )
 
     sync(
