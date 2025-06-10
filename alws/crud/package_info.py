@@ -47,7 +47,6 @@ async def get_package_info(
 
     subq_conditions = [
         CoreRepositoryContent.repository_id.in_(repo_ids),
-        CoreRepositoryContent.version_removed_id.is_(None),
     ]
     if updated_after:
         last_updated = datetime.datetime.strptime(
