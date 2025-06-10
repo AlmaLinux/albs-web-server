@@ -54,16 +54,10 @@ class Platform(BaseModel):
     pgp_key: typing.Optional[str] = None
     arch_list: typing.List[str]
     modularity: typing.Optional[typing.Dict] = None
-    # We're only going to take versions from 'data' column
-    data: typing.Optional[typing.Dict[str, typing.Any]] = None
-
-    @root_validator(pre=True)
-    def filter_data_to_versions_only(cls, values):
-        if hasattr(values, 'data'):
-            raw_data = values.data
-            versions = raw_data.get("versions")
-            values.data = {"versions": versions} if versions else {}
-        return values
 
     class Config:
         from_attributes = True
+
+
+class PlatformResponse(Platform):
+    data: typing.Optional[typing.Dict[str, typing.Any]] = None

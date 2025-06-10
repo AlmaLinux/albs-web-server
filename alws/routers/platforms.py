@@ -38,11 +38,22 @@ async def modify_platform(
     return await pl_crud.modify_platform(db, platform)
 
 
-@public_router.get('/', response_model=typing.List[platform_schema.Platform])
+@public_router.get(
+    '/', response_model=typing.List[platform_schema.PlatformResponse]
+)
 async def get_platforms(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
-    return await pl_crud.get_platforms(db)
+    platforms = await pl_crud.get_platforms(db)
+    return [
+        {
+            **platform_schema.PlatformResponse.from_orm(platform).dict(
+                exclude={"data"}
+            ),
+            "data": {"versions": (platform.data or {}).get("versions", [])},
+        }
+        for platform in platforms
+    ]
 
 
 @router.patch(
