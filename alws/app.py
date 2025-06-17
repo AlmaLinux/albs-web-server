@@ -1,10 +1,8 @@
 import importlib
 import logging
 
-import sentry_sdk
 from fastapi import FastAPI
 from fastapi_sqla import setup as fastapi_sqla_setup
-from pika.exceptions import StreamLostError
 from starlette.middleware.exceptions import ExceptionMiddleware
 
 from alws import routers
@@ -16,6 +14,7 @@ from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers
 from alws.utils.limiter import limiter_shutdown, limiter_startup
+from alws.utils.sentry import sentry_init
 
 logging.basicConfig(level=settings.logging_level)
 
@@ -27,16 +26,7 @@ APP_PREFIX = '/api/v1'
 AUTH_PREFIX = APP_PREFIX + '/auth'
 AUTH_TAG = 'auth'
 
-if settings.sentry_dsn:
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        traces_sample_rate=settings.sentry_traces_sample_rate,
-        environment=settings.sentry_environment,
-        ignore_errors=[
-            ConnectionResetError,
-            StreamLostError,
-        ],
-    )
+sentry_init()
 
 
 app = FastAPI()

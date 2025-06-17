@@ -14,8 +14,12 @@ from alws.crud.errata import (
 )
 from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.sentry import sentry_init
 
 __all__ = ["release_errata"]
+
+
+sentry_init()
 
 
 async def _create_new_errata_record(errata):
