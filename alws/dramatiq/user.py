@@ -9,8 +9,12 @@ from alws.crud import build as build_crud
 from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.sentry import sentry_init
 
 __all__ = ['perform_user_removal']
+
+
+sentry_init()
 
 
 async def _perform_user_removal(user_id: int):

@@ -17,10 +17,14 @@ from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.log_utils import setup_logger
 from alws.utils.pulp_client import PulpClient
+from alws.utils.sentry import sentry_init
 
 __all__ = ['perform_product_modification']
 
 logger = setup_logger(__name__)
+
+
+sentry_init()
 
 
 async def get_existing_packages(
