@@ -2459,7 +2459,6 @@ async def prepare_resetting(
             package,
             prod_repos_cache,
             record.module,
-            record.is_issued_by_almalinux,
         )
         items_to_insert.extend(matching_packages)
 
