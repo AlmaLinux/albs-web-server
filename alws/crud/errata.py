@@ -611,7 +611,7 @@ async def load_platform_packages(
                 pkg_names=search_params["name"],
                 pkg_versions=search_params["version"],
                 pkg_epochs=search_params["epoch"],
-                pkg_releases=search_params.get("release", None)
+                pkg_releases=search_params.get("release", None),
             )
 
         if not pkgs:
@@ -736,15 +736,11 @@ async def get_matching_albs_packages(
         models.BuildTaskArtifact.name.startswith(name_query),
     ]
     if build_id:
-        conditions.append(
-            models.BuildTask.build_id == build_id
-        )
+        conditions.append(models.BuildTask.build_id == build_id)
     query = (
         select(models.BuildTaskArtifact)
         .join(models.BuildTaskArtifact.build_task)
-        .where(
-            and_(*conditions)
-        )
+        .where(and_(*conditions))
         .options(
             selectinload(models.BuildTaskArtifact.build_task),
         )
@@ -954,7 +950,9 @@ async def create_new_errata_record(errata: typing.Dict):
         platform = platform.scalars().first()
         items_to_insert = []
         original_id = errata.id
-        oval_title = f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
+        oval_title = (
+            f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
+        )
 
         # Errata db record
         db_errata = models.NewErrataRecord(
@@ -1010,7 +1008,9 @@ async def create_new_errata_record(errata: typing.Dict):
 
         # References
         items_to_insert.extend(
-            await process_new_errata_references(session, errata, db_errata, platform)
+            await process_new_errata_references(
+                session, errata, db_errata, platform
+            )
         )
         # Errata Packages
         new_errata_packages, pkg_types = await process_new_errata_packages(
@@ -1090,7 +1090,9 @@ async def create_errata_record(errata: typing.Dict):
             oval_title=get_oval_title(
                 errata.title, alma_errata_id, errata.severity
             ),
-            original_title=get_verbose_errata_title(errata.title, errata.severity),
+            original_title=get_verbose_errata_title(
+                errata.title, errata.severity
+            ),
             contact_mail=platform.contact_mail,
             status=errata.status,
             version=errata.version,

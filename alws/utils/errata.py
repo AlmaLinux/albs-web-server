@@ -89,9 +89,7 @@ def debrand_id(rec_id: str) -> str:
     return f'oval:{org}.{adv}:{data["rec_type"]}:{data["idx"]}'
 
 
-def debrand_affected_cpe_list(
-    cpe_list: List[str], distro_version
-) -> List[str]:
+def debrand_affected_cpe_list(cpe_list: List[str], distro_version) -> List[str]:
     new_list = []
     for cpe in cpe_list:
         cpe = cpe.replace("redhat:enterprise_linux", "almalinux:almalinux")
