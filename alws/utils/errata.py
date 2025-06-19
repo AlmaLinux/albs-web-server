@@ -376,3 +376,7 @@ def generate_errata_page(errata, errata_dir):
     with open(errata_path, "wb") as fd:
         fd.write(dump_errata_to_html(errata).encode("utf-8"))
     return errata_path
+
+
+def is_issued_by_almalinux(errata_id):
+    return bool(re.search(r"AL[BES]A-\d{4}:A", errata_id))

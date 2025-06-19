@@ -27,8 +27,11 @@ def slice_list(
     )
 
 
-def clean_release(release: str) -> str:
-    release = re.sub(r'\.alma.*$', '', release)
+def clean_release(
+    release: str, keep_alma_suffix: typing.Optional[bool] = False
+) -> str:
+    if not keep_alma_suffix:
+        release = re.sub(r'\.alma.*$', '', release)
     latest = None
     raw_res = re.search(r'\.module.*', release)
     if raw_res:
