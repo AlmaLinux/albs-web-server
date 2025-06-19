@@ -1,11 +1,10 @@
 import re
 import typing
-from tap import parser
 
 import hawkey
+from tap import parser
 
 from alws.constants import TestCaseStatus
-
 
 __all__ = [
     'clean_release',
@@ -22,13 +21,16 @@ def slice_list(
     max_len: int,
 ) -> typing.Generator[typing.List[str], None, None]:
     return (
-        source_list[i:i + max_len]
+        source_list[i : i + max_len]
         for i in range(0, len(source_list), max_len)
     )
 
 
-def clean_release(release: str) -> str:
-    release = re.sub(r'\.alma.*$', '', release)
+def clean_release(
+    release: str, keep_alma_suffix: typing.Optional[bool] = False
+) -> str:
+    if not keep_alma_suffix:
+        release = re.sub(r'\.alma.*$', '', release)
     latest = None
     raw_res = re.search(r'\.module.*', release)
     if raw_res:
@@ -41,9 +43,15 @@ def clean_release(release: str) -> str:
 
 
 def get_clean_distr_name(distr_name: str) -> str:
-    clean_distr_name = re.search(
-        r'^(?P<dist_name>[^\d]*)', distr_name, re.IGNORECASE,
-    ).groupdict().get('dist_name', '')
+    clean_distr_name = (
+        re.search(
+            r'^(?P<dist_name>[^\d]*)',
+            distr_name,
+            re.IGNORECASE,
+        )
+        .groupdict()
+        .get('dist_name', '')
+    )
     return clean_distr_name.strip('-')
 
 
@@ -91,8 +99,9 @@ def parse_tap_output(text: bytes) -> list:
     def get_diagnostic(tap_item):
         diagnostics = []
         index = raw_data.index(tap_item) + 1
-        while index < len(raw_data) and \
-                raw_data[index].category == "diagnostic":
+        while (
+            index < len(raw_data) and raw_data[index].category == "diagnostic"
+        ):
             diagnostics.append(raw_data[index].text)
             index += 1
         return u"\n".join(diagnostics)
@@ -135,5 +144,7 @@ def tap_set_status(tap_results):
         True if all tests have passed, False otherwise
 
     """
-    conditions = [item["status"] == TestCaseStatus.FAILED for item in tap_results]
+    conditions = [
+        item["status"] == TestCaseStatus.FAILED for item in tap_results
+    ]
     return False if any(conditions) else True

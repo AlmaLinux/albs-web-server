@@ -4,8 +4,6 @@ import re
 from typing import Any, Dict, List, Literal, Optional
 
 import sqlalchemy
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import (
     SQLAlchemyBaseOAuthAccountTable,
     SQLAlchemyBaseUserTable,
@@ -18,13 +16,14 @@ from sqlalchemy.ext.associationproxy import (
     AssociationProxy,
     association_proxy,
 )
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import (
     Mapped,
     declarative_mixin,
     declared_attr,
     mapped_column,
     relationship,
+    selectinload,
 )
 from sqlalchemy.sql import func
 
@@ -663,9 +662,7 @@ class BuildTaskArtifact(Base):
     name: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     type: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
     href: Mapped[str] = mapped_column(sqlalchemy.Text, nullable=False)
-    meta: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
+    meta: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     build_task: Mapped["BuildTask"] = relationship(
         "BuildTask", back_populates="artifacts"
     )
@@ -1624,6 +1621,10 @@ class NewErrataRecord(Base):
             "SA": "security",
             "EA": "enhancement",
         }[self.id[2:4]]
+
+    @property
+    def is_issued_by_almalinux(self) -> bool:
+        return bool(re.search(r"AL[BES]A-\d{4}:A", self.id))
 
 
 class NewErrataPackage(Base):
