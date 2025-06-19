@@ -1,10 +1,10 @@
 import datetime
+import re
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, field_validator, computed_field
 
 from alws.constants import ErrataReleaseStatus, ErrataPackageStatus
-from alws.utils.errata import is_issued_by_almalinux
 
 
 class BaseErrataCVE(BaseModel):
@@ -106,7 +106,7 @@ class BaseErrataRecord(BaseModel):
     @computed_field
     @property
     def is_issued_by_almalinux(self) -> bool:
-        return is_issued_by_almalinux(self.id)
+        return bool(re.search(r"AL[BES]A-\d{4}:A", self.id))
 
 
 class ErrataRecord(BaseErrataRecord):

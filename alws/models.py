@@ -40,7 +40,6 @@ from alws.constants import (
     SignStatus,
 )
 from alws.database import Base
-from alws.utils.errata import is_issued_by_almalinux
 
 __all__ = [
     "Build",
@@ -1628,7 +1627,7 @@ class NewErrataRecord(Base):
 
     @property
     def is_issued_by_almalinux(self) -> bool:
-        return is_issued_by_almalinux(self.id)
+        return bool(re.search(r"AL[BES]A-\d{4}:A", self.id))
 
 
 class NewErrataPackage(Base):
