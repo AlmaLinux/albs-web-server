@@ -1,14 +1,17 @@
 import typing
 
 import dramatiq
-
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import sign_task
 from alws.dramatiq import event_loop
 from alws.schemas import sign_schema
 from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.sentry import sentry_init
 
 __all__ = ['complete_sign_task']
+
+
+sentry_init()
 
 
 async def _complete_sign_task(

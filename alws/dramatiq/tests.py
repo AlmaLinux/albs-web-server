@@ -3,15 +3,18 @@ import typing
 
 import dramatiq
 from fastapi_sqla import open_async_session
-
 from alws.constants import DRAMATIQ_TASK_TIMEOUT, TestTaskStatus
 from alws.crud import test as t_crud
 from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
 from alws.schemas.test_schema import TestTaskResult
 from alws.utils.fastapi_sqla_setup import setup_all
+from alws.utils.sentry import sentry_init
 
 __all__ = ['complete_test_task']
+
+
+sentry_init()
 
 
 async def _complete_test_task(task_id: int, task_result: TestTaskResult):

@@ -38,11 +38,14 @@ from alws.utils.github_integration_helper import (
     move_issues,
     set_build_id_to_issues,
 )
+from alws.utils.sentry import sentry_init
+
 
 __all__ = ['start_build', 'build_done']
 
 logger = logging.getLogger(__name__)
 
+sentry_init()
 
 def _sync_fetch_build(db: Session, build_id: int) -> models.Build:
     query = select(models.Build).where(models.Build.id == build_id)
