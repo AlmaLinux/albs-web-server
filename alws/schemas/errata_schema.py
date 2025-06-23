@@ -2,9 +2,9 @@ import datetime
 import re
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, field_validator, computed_field
+from pydantic import BaseModel, computed_field, field_validator
 
-from alws.constants import ErrataReleaseStatus, ErrataPackageStatus
+from alws.constants import ErrataPackageStatus, ErrataReleaseStatus
 
 
 class BaseErrataCVE(BaseModel):

@@ -61,7 +61,9 @@ def get_rpm_module_packages_from_repository(
         return result
 
     module_name, module_stream = module.split(":")
-    devel_module_name = f"{module_name}-devel" if not module_name.endswith("-devel") else ""
+    devel_module_name = (
+        f"{module_name}-devel" if not module_name.endswith("-devel") else ""
+    )
     repo_modules = []
     try:
         repo_index = IndexWrapper.from_template(repo_modules_yaml)
@@ -201,9 +203,12 @@ def get_rpm_packages_from_repository(
     pkg_versions: typing.Optional[typing.List[str]] = None,
     pkg_epochs: typing.Optional[typing.List[str]] = None,
     pkg_arches: typing.Optional[typing.List[str]] = None,
+    pkg_releases: typing.Optional[typing.List[str]] = None,
 ) -> typing.List[RpmPackage]:
     first_subq = (
-        select(CoreRepository.pulp_id).where(CoreRepository.pulp_id == repo_id).scalar_subquery()
+        select(CoreRepository.pulp_id)
+        .where(CoreRepository.pulp_id == repo_id)
+        .scalar_subquery()
     )
     second_subq = (
         select(CoreRepositoryContent.content_id)
@@ -233,6 +238,8 @@ def get_rpm_packages_from_repository(
         conditions.append(RpmPackage.epoch.in_(pkg_epochs))
     if pkg_arches:
         conditions.append(RpmPackage.arch.in_(pkg_arches))
+    if pkg_releases:
+        conditions.append(RpmPackage.release.in_(pkg_releases))
 
     query = select(RpmPackage).where(*conditions)
     with open_session(key="pulp") as pulp_db:
