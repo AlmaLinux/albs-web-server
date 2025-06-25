@@ -914,13 +914,11 @@
     mock:
       dnf_common_opts:
         - --nobest
-    definitions:
-      __spec_check_template: "exit 0; "
   repositories:
     - name: fedora-40-riscv64
       arch: riscv64
       type: rpm
-      url: http://fedora.riscv.rocks/kojifiles/repos/f40-build/latest/riscv64/
+      url: https://repo.almalinux.org/development/almalinux/10/fedora-40-riscv64/
       production: false
       debug: false
       priority: 20
