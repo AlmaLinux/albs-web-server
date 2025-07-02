@@ -573,8 +573,11 @@ def prepare_search_params(
     errata_record: Union[models.NewErrataRecord, BaseErrataRecord],
 ) -> DefaultDict[str, List[str]]:
     search_params = collections.defaultdict(list)
+    attrs = ["name", "version", "epoch"]
+    if errata_record.is_issued_by_almalinux:
+        attrs.append("release")
     for package in errata_record.packages:
-        for attr in ("name", "version", "epoch"):
+        for attr in attrs:
             value = str(getattr(package, attr))
             if value in search_params[attr]:
                 continue
@@ -608,6 +611,7 @@ async def load_platform_packages(
                 pkg_names=search_params["name"],
                 pkg_versions=search_params["version"],
                 pkg_epochs=search_params["epoch"],
+                pkg_releases=search_params.get("release", None),
             )
 
         if not pkgs:
@@ -675,6 +679,7 @@ async def get_matching_albs_packages(
     prod_repos_cache: typing.Dict,
     module: Optional[str] = None,
     build_id: Optional[int] = None,
+    is_issued_by_almalinux: Optional[bool] = False,
 ) -> Tuple[List[models.NewErrataToALBSPackage], dict]:
     package_type = {}
     items_to_insert = []
@@ -683,10 +688,12 @@ async def get_matching_albs_packages(
     #   - my-pkg-2.0-2
     #   - my-pkg-2.0-20191233git
     #   - etc
+    # Also, note that when processing erratas issued by almalinux, we don't
+    # clean the package release
     clean_package_name = "-".join((
         errata_package.name,
         errata_package.version,
-        clean_release(errata_package.release),
+        clean_release(errata_package.release, is_issued_by_almalinux),
     ))
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
@@ -729,15 +736,11 @@ async def get_matching_albs_packages(
         models.BuildTaskArtifact.name.startswith(name_query),
     ]
     if build_id:
-        conditions.append(
-            models.BuildTask.build_id == build_id
-        )
+        conditions.append(models.BuildTask.build_id == build_id)
     query = (
         select(models.BuildTaskArtifact)
         .join(models.BuildTaskArtifact.build_task)
-        .where(
-            and_(*conditions)
-        )
+        .where(and_(*conditions))
         .options(
             selectinload(models.BuildTaskArtifact.build_task),
         )
@@ -775,6 +778,11 @@ async def get_matching_albs_packages(
     ]
     pulp_pkgs = get_rpm_packages_by_ids(pulp_pkg_ids, pkg_fields)
     errata_record_ids = set()
+    package_status = (
+        ErrataPackageStatus.approved
+        if is_issued_by_almalinux
+        else ErrataPackageStatus.proposal
+    )
     for package in result:
         pulp_rpm_package = pulp_pkgs.get(package.href)
         if not pulp_rpm_package:
@@ -782,7 +790,7 @@ async def get_matching_albs_packages(
         clean_pulp_package_name = "-".join((
             pulp_rpm_package.name,
             pulp_rpm_package.version,
-            clean_release(pulp_rpm_package.release),
+            clean_release(pulp_rpm_package.release, is_issued_by_almalinux),
         ))
         if (
             pulp_rpm_package.arch not in (errata_package.arch, "noarch")
@@ -791,7 +799,7 @@ async def get_matching_albs_packages(
             continue
         mapping = models.NewErrataToALBSPackage(
             albs_artifact_id=package.id,
-            status=ErrataPackageStatus.proposal,
+            status=package_status,
             name=pulp_rpm_package.name,
             version=pulp_rpm_package.version,
             release=pulp_rpm_package.release,
@@ -919,7 +927,12 @@ async def process_new_errata_packages(
         db_packages.append(db_package)
         # Create ErrataToAlbsPackages
         matching_packages, pkg_type = await get_matching_albs_packages(
-            db, db_package, prod_repos_cache, db_errata.module, package.build_id
+            db,
+            db_package,
+            prod_repos_cache,
+            db_errata.module,
+            package.build_id,
+            errata.is_issued_by_almalinux,
         )
         db_packages.extend(matching_packages)
         pkg_types.append(pkg_type)
@@ -937,7 +950,9 @@ async def create_new_errata_record(errata: typing.Dict):
         platform = platform.scalars().first()
         items_to_insert = []
         original_id = errata.id
-        oval_title = f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
+        oval_title = (
+            f"{errata.id}: {errata.title} ({errata.severity.capitalize()})"
+        )
 
         # Errata db record
         db_errata = models.NewErrataRecord(
@@ -993,7 +1008,9 @@ async def create_new_errata_record(errata: typing.Dict):
 
         # References
         items_to_insert.extend(
-            await process_new_errata_references(session, errata, db_errata, platform)
+            await process_new_errata_references(
+                session, errata, db_errata, platform
+            )
         )
         # Errata Packages
         new_errata_packages, pkg_types = await process_new_errata_packages(
@@ -1073,7 +1090,9 @@ async def create_errata_record(errata: typing.Dict):
             oval_title=get_oval_title(
                 errata.title, alma_errata_id, errata.severity
             ),
-            original_title=get_verbose_errata_title(errata.title, errata.severity),
+            original_title=get_verbose_errata_title(
+                errata.title, errata.severity
+            ),
             contact_mail=platform.contact_mail,
             status=errata.status,
             version=errata.version,
