@@ -925,6 +925,21 @@
       debug: false
       priority: 20
 
+- name: Fedora-41-riscv64
+  data:
+    mock:
+      dnf_common_opts:
+        - --nobest
+        - --exclude=fedora*
+  repositories:
+    - name: fedora-41-riscv64
+      arch: riscv64
+      type: rpm
+      url: http://fedora.riscv.rocks/kojifiles/repos/f41-build/latest/riscv64/
+      production: false
+      debug: false
+      priority: 20
+
 - name: libsolv_for_v2
   repositories:
     - name: libsolv_for_v2
