@@ -914,6 +914,8 @@
     mock:
       dnf_common_opts:
         - --nobest
+        - --exclude fedora*
+        - --exclude perl*5.38*
   repositories:
     - name: fedora-40-riscv64
       arch: riscv64
