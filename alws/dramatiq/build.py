@@ -316,3 +316,23 @@ def build_done(request: Dict[str, Any]):
     parsed_build = build_node_schema.BuildDone(**request)
     event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(_build_done(parsed_build))
+
+
+@dramatiq.actor(
+    max_retries=0,
+    priority=1,
+    queue_name='sources',
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
+    throws=(
+        ArtifactConversionError,
+        ModuleUpdateError,
+        MultilibProcessingError,
+        NoarchProcessingError,
+        RepositoryAddError,
+        SrpmProvisionError,
+    ),
+)
+def sources_build_done(request: Dict[str, Any]):
+    parsed_build = build_node_schema.BuildDone(**request)
+    event_loop.run_until_complete(setup_all())
+    event_loop.run_until_complete(_build_done(parsed_build))

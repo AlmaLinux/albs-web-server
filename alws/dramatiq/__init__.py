@@ -30,12 +30,16 @@ dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
 
 # Tasks import started from here
-from alws.dramatiq.build import build_done, start_build
+from alws.dramatiq.build import (
+    build_done,
+    sources_build_done,
+    start_build,
+)
 from alws.dramatiq.errata import (
     bulk_errata_release,
     bulk_new_errata_release,
-    create_new_errata,
     create_errata,
+    create_new_errata,
     release_errata,
     release_new_errata,
     reset_records_threshold,
