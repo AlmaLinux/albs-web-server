@@ -48,7 +48,10 @@ async def build_done(
     # in the future this probably should be handled somehow better
     build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
     await db.flush()
-    dramatiq.build_done.send(build_done_.model_dump())
+    actor = dramatiq.build_done
+    if build_task.arch == 'src':
+        actor = dramatiq.sources_build_done
+    actor.send(build_done_.model_dump())
     return {"ok": True}
 
 

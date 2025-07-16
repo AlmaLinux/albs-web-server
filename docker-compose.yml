@@ -166,6 +166,31 @@ services:
         max-size: "100Mb"
         max-file: "3"
 
+  task_queue_sources:
+    image: task-queue:latest
+    env_file:
+      - vars.env
+    build:
+      dockerfile: Dockerfile.task-queue
+      context: .
+    volumes:
+      - "./alws:/code/alws"
+    command: |
+      bash -c "
+        set -ex
+        /wait-for-it.sh rabbitmq:5672
+        dramatiq alws.dramatiq --threads 1 -Q sources"
+    restart: on-failure
+    depends_on:
+      - db
+      - pulp
+      - rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
   task_queue_builds:
     image: task-queue:latest
     env_file:
