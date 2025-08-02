@@ -940,6 +940,12 @@
       debug: false
       priority: 20
 
+- name: nobest
+  data:
+    mock:
+      dnf_common_opts:
+        - --nobest
+
 - name: libsolv_for_v2
   repositories:
     - name: libsolv_for_v2
