@@ -3377,6 +3377,61 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - name: almalinux-9-nvidia
+      arch: src
+      type: rpm
+      remote_url: http://vault.almalinux.org/9/nvidia/Source/
+      export_path: vault/9/nvidia/Source/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-nvidia
+      arch: aarch64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/nvidia/aarch64/os/
+      export_path: almalinux/9/nvidia/aarch64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-nvidia-debuginfo
+      arch: aarch64
+      type: rpm
+      remote_url: http://vault.almalinux.org/9/nvidia/debug/aarch64/
+      export_path: vault/9/nvidia/debug/aarch64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-nvidia
+      arch: x86_64
+      type: rpm
+      remote_url: http://repo.almalinux.org/almalinux/9/nvidia/x86_64/os/
+      export_path: almalinux/9/nvidia/x86_64/os/
+      production: true
+      debug: false
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
+    - name: almalinux-9-nvidia-debuginfo
+      arch: x86_64
+      type: rpm
+      remote_url: http://vault.almalinux.org/9/nvidia/debug/x86_64/
+      export_path: vault/9/nvidia/debug/x86_64/
+      production: true
+      debug: true
+      remote_sync_policy: on_demand
+      repository_sync_policy: additive
+      priority: 10
+      mock_enabled: false
 
 - name: AlmaLinux-10
   distr_type: rhel
