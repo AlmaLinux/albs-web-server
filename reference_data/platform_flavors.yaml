@@ -1020,7 +1020,7 @@
     mock:
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
-        info patch util-linux findutils grep zlib git-core
+        info patch util-linux findutils grep zlib git-core kernel-rpm-macros
 
 - name: add-epel-rpm-macros
   data:
@@ -1028,3 +1028,4 @@
       chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core epel-rpm-macros
+        kernel-rpm-macros
