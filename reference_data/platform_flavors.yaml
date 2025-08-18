@@ -570,6 +570,13 @@
       production: false
       debug: false
       priority: 10
+    - name: java-portable
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-10-riscv64-dr/
+      production: false
+      debug: false
+      priority: 10
 
 - name: Synergy
   repositories:
