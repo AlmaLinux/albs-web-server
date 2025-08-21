@@ -6753,3 +6753,45 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
+    - name: almalinux-kitten-10-buildroot
+      arch: x86_64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-kitten-10-buildroot
+      arch: x86_64_v2
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-x86_64_v2-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-kitten-10-buildroot
+      arch: aarch64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-aarch64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-kitten-10-buildroot
+      arch: s390x
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-s390x-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-kitten-10-buildroot
+      arch: ppc64le
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-ppc64le-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: almalinux-kitten-10-buildroot
+      arch: riscv64
+      type: rpm
+      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-buildroot-almalinux-kitten-10-riscv64-dr/
+      production: false
+      debug: false
+      priority: 10
