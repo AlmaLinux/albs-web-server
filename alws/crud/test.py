@@ -502,8 +502,8 @@ async def complete_test_task(
                         if not test_item.get('success', False):
                             status = TestTaskStatus.FAILED
                             break
-                # Skip logs from processing
-                elif key == 'logs':
+                # Skip logs and skipped_tests list from processing
+                elif key in ['logs', 'skipped_tests']:
                     continue
                 elif not item.get('success', False):
                     status = TestTaskStatus.FAILED
