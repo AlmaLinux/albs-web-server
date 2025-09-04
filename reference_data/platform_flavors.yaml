@@ -1036,3 +1036,20 @@
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core epel-rpm-macros
         kernel-rpm-macros
+
+- name: nvidia-cuda
+  repositories:
+    - name: nvidia-cuda
+      arch: x86_64
+      type: rpm
+      url: https://developer.download.nvidia.com/compute/cuda/repos/rhel$releasever/x86_64
+      production: false
+      debug: false
+      priority: 10
+    - name: nvidia-cuda
+      arch: aarch64
+      type: rpm
+      url: https://developer.download.nvidia.com/compute/cuda/repos/rhel$releasever/aarch64
+      production: false
+      debug: false
+      priority: 10
