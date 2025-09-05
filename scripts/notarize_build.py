@@ -46,25 +46,29 @@ def parse_args():
         '--pulp-host',
         type=str,
         help='Pulp host',
-        required=True,
+        default=os.getenv('PULP_HOST'),
+        required='PULP_HOST' not in os.environ,
     )
     parser.add_argument(
         '--pulp-username',
         type=str,
         help='Pulp username',
-        required=True,
+        default=os.getenv('PULP_USER'),
+        required='PULP_USER' not in os.environ,
     )
     parser.add_argument(
         '--pulp-password',
         type=str,
         help='Pulp password',
-        required=True,
+        default=os.getenv('PULP_PASSWORD'),
+        required='PULP_PASSWORD' not in os.environ,
     )
     parser.add_argument(
         '--immudb-address',
         type=str,
         help='Immudb address',
-        required=True,
+        default=os.getenv('IMMUDB_ADDRESS'),
+        required='IMMUDB_ADDRESS' not in os.environ,
     )
     parser.add_argument(
         '--immudb-username',
@@ -82,7 +86,8 @@ def parse_args():
         '--immudb-database',
         type=str,
         help='Immudb database',
-        required=True,
+        default=os.getenv('IMMUDB_DATABASE'),
+        required='IMMUDB_DATABASE' not in os.environ,
     )
     return parser.parse_args()
 
