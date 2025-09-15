@@ -94,17 +94,17 @@
 - name: AlmaLinux-9-beta
   modularity:
     git_tag_prefix:
-      modified: a9
-      non_modified: c9
+      modified: a9-beta
+      non_modified: c9-beta
   data:
     mock:
       secure_boot_macros:
         "%pe_signing_cert": '06'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
     versions:
-      - name: '9.6'
-        version_prefix: '90600'
-        dist_prefix: 'el9.6.0'
+      - name: '9.7'
+        version_prefix: '90700'
+        dist_prefix: 'el9.7.0'
   repositories:
     - name: almalinux-9-beta
       arch: i686
