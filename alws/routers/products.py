@@ -178,18 +178,26 @@ async def create_gen_key_task(
 
 
 @router.post(
-    '/{product_id}/add_platforms/',
+    '/{product_id}/add-platforms/',
     status_code=201,
 )
 async def add_platforms(
     product_id: int,
     platforms: List[product_schema.Platform],
-    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    ignore_errors: bool = False,
+    session: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
+    """
+    Adds new product repositories into a product according to the given platforms
+    """
     try:
         await products.add_platform_to_product(
-            db, product_id, platforms, user.id
+            session=session,
+            product_id=product_id,
+            platforms=platforms,
+            user_id=user.id,
+            ignore_errors=ignore_errors,
         )
     except Exception as exc:
         raise HTTPException(
