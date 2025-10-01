@@ -10,8 +10,13 @@ from scripts.utils.pulp import get_pulp_params
 
 
 PROG_NAME = "backup_beta_repositories"
-ReposType = typing.List[typing.Dict[str, typing.Any]]
+# We search using startswith
+PLATFORM_REPO_MAP = {
+    "almalinux_9": "AlmaLinux-9-beta-AlmaLinux-9",
+    "almalinux_10": "eabdullin1-almalinux10-beta-almalinux-10",
+}
 
+ReposType = typing.List[typing.Dict[str, typing.Any]]
 
 async def find_pulp_repos(
         name_starts: str,
@@ -55,15 +60,17 @@ async def create_pulp_backup_repos(
     return result
 
 
-async def _main(dry_run: bool = False):
+async def _main(repos_to_backup, dry_run: bool = False):
     logger = logging.getLogger(PROG_NAME)
     logger.debug("Acquiring Pulp connection data and creating client")
     host, user, password = get_pulp_params()
     pulp_client = PulpClient(host, user, password)
     logger.info("Searching for all beta repositories")
-    repos = await find_pulp_repos("almalinux8-beta", pulp_client=pulp_client)
-    repos.extend(await find_pulp_repos(
-        "AlmaLinux-9-beta", pulp_client=pulp_client))
+    repos = []
+    for repo_to_backup in repos_to_backup:
+        repos.extend(
+            await find_pulp_repos(repo_to_backup, pulp_client=pulp_client)
+        )
     backup_repos = await create_pulp_backup_repos(repos, dry_run=dry_run)
     fields = ["pulp_href", "sha256"]
     add_tasks = []
@@ -130,10 +137,25 @@ def main():
     parser.add_argument("-d", "--dry-run", action="store_true", default=False,
                         help="Output everything that will happen, "
                              "but do not create/modify anything")
+    for platform in PLATFORM_REPO_MAP:
+        parser.add_argument(
+            f"--{platform}", f"--{platform.replace('_', '-')}",
+            help=f"Create backups of {platform} beta repos",
+            action="store_true"
+        )
     args = parser.parse_args()
+
+    repos_to_backup = [
+        PLATFORM_REPO_MAP[platform]
+        for platform in PLATFORM_REPO_MAP
+        if getattr(args, platform)
+    ]
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
-    asyncio.run(_main(dry_run=args.dry_run))
+    if not repos_to_backup:
+        logging.info("You need to specify at least one platform")
+    else:
+        asyncio.run(_main(repos_to_backup, dry_run=args.dry_run))
 
 
 if __name__ == "__main__":
