@@ -34,7 +34,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         user_product: Product,
         add_platfroms_to_product_payload,
     ):
-        endpoint = f"/api/v1/products/{user_product.id}/add_platforms/"
+        endpoint = f"/api/v1/products/{user_product.id}/add-platforms/"
         response = await self.make_request(
             "post",
             endpoint,

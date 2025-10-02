@@ -1,6 +1,13 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,13 +46,37 @@ async def add_repos_to_product(
     product: models.Product,
     owner: models.User,
     platforms: List[models.Platform],
+    ignore_errors: bool = False,
 ):
     repos_to_insert = []
     repo_tasks = []
+
+    async def _create_repo(
+        pulp_client: PulpClient,
+        product_name: str,
+        owner_name: str,
+        platform_name: str,
+        arch: str,
+        is_debug: bool,
+    ) -> Tuple[str, str, str, str, str, bool]:
+        try:
+            return await create_product_repo(
+                pulp_client=pulp_client,
+                product_name=product_name,
+                ownername=owner_name,
+                platform_name=platform_name,
+                arch=arch,
+                is_debug=is_debug,
+            )
+        except Exception:
+            if ignore_errors:
+                return '', '', '', '', '', False
+            raise
+
     for platform in platforms:
         platform_name = platform.name.lower()
         repo_tasks.extend((
-            create_product_repo(
+            _create_repo(
                 pulp_client,
                 product.name,
                 owner.username,
@@ -57,7 +88,7 @@ async def add_repos_to_product(
             for is_debug in (True, False)
         ))
         repo_tasks.append(
-            create_product_repo(
+            _create_repo(
                 pulp_client,
                 product.name,
                 owner.username,
@@ -76,6 +107,8 @@ async def add_repos_to_product(
         export_path,
         is_debug,
     ) in task_results:
+        if not any((repo_name, repo_url, pulp_href)):
+            continue
         repo = models.Repository(
             name=repo_name,
             url=repo_url,
@@ -391,6 +424,7 @@ async def add_platform_to_product(
     product_id: int,
     platforms: List[Platform],
     user_id: int,
+    ignore_errors: bool = False,
 ):
     pulp_client = PulpClient(
         settings.pulp_host,
@@ -424,6 +458,7 @@ async def add_platform_to_product(
         owner=db_product.owner,
         product=db_product,
         platforms=db_platforms,
+        ignore_errors=ignore_errors,
     )
     db_product.repositories.extend(repos)
     session.add_all(repos)
