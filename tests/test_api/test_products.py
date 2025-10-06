@@ -17,6 +17,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         self,
         product_create_payload,
         create_file_repository,
+        get_rpm_repository,
     ):
         response = await self.make_request(
             "post",
@@ -33,6 +34,7 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         self,
         user_product: Product,
         add_platfroms_to_product_payload,
+        get_rpm_repository,
     ):
         endpoint = f"/api/v1/products/{user_product.id}/add-platforms/"
         response = await self.make_request(
