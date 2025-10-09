@@ -303,6 +303,13 @@ def get_rpm_repo_by_params(monkeypatch):
 
 
 @pytest.fixture
+def get_rpm_repository(monkeypatch):
+    async def func(*args, **kwargs):
+        return None
+    monkeypatch.setattr(PulpClient, "get_rpm_repository", func)
+
+
+@pytest.fixture
 def create_log_repo(monkeypatch):
     async def func(*args, **kwargs):
         _, repo_name = args

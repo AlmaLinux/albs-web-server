@@ -98,14 +98,26 @@ async def create_product_repo(
     repo_name = (
         f'{ownername}-{product_name}-{platform_name}-{arch}{debug_suffix}-dr'
     )
+    export_path = (
+        f"{product_name}/{platform_name}/{'debug/' if is_debug else ''}{arch}/"
+    )
+    pulp_repo = await pulp_client.get_rpm_repository(repo_name)
+    if pulp_repo:
+        repo_href = pulp_repo['pulp_href']
+        distro = await pulp_client.get_rpm_distro(f'{repo_name}-distro')
+        distro_url = distro['base_url'] if distro else ''
+        if not distro_url:
+            distro_url = await pulp_client.create_rpm_distro(
+                name=repo_name,
+                repository=repo_href,
+                base_path_start='copr',
+            )
+        return repo_name, distro_url, arch, repo_href, export_path, is_debug
     repo_url, repo_href = await pulp_client.create_rpm_repository(
         repo_name,
         auto_publish=False,
         create_publication=True,
         base_path_start='copr',
-    )
-    export_path = (
-        f"{product_name}/{platform_name}/{'debug/' if is_debug else ''}{arch}/"
     )
     return repo_name, repo_url, arch, repo_href, export_path, is_debug
 

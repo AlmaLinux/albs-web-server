@@ -184,7 +184,6 @@ async def create_gen_key_task(
 async def add_platforms(
     product_id: int,
     platforms: List[product_schema.Platform],
-    ignore_errors: bool = False,
     session: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
     user: User = Depends(get_current_user),
 ):
@@ -197,7 +196,6 @@ async def add_platforms(
             product_id=product_id,
             platforms=platforms,
             user_id=user.id,
-            ignore_errors=ignore_errors,
         )
     except Exception as exc:
         raise HTTPException(

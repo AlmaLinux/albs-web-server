@@ -97,7 +97,10 @@ def user_product_create_payload(request) -> dict:
 
 @pytest.fixture
 async def base_product(
-    async_session: AsyncSession, product_create_payload: dict, create_repo
+    async_session: AsyncSession,
+    product_create_payload: dict,
+    get_rpm_repository,
+    create_repo,
 ) -> AsyncIterable[Product]:
     product = (
         (
@@ -151,6 +154,7 @@ async def user_product(
     user_product_create_payload: dict,
     create_repo,
     create_file_repository,
+    get_rpm_repository,
 ) -> AsyncIterable[Product]:
     product = (
         (
