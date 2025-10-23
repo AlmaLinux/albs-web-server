@@ -944,6 +944,21 @@
       debug: false
       priority: 20
 
+- name: Fedora-40-i686
+  data:
+    mock:
+      dnf_common_opts:
+        - --nobest
+        # - --exclude=fedora*
+  repositories:
+    - name: fedora-40-i686
+      arch: i686
+      type: rpm
+      url: https://kojipkgs.fedoraproject.org/repos/f40-build/6370873/i386/
+      production: false
+      debug: false
+      priority: 20
+
 - name: Fedora-41-riscv64
   data:
     mock:
