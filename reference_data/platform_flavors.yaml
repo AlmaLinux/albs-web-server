@@ -959,6 +959,16 @@
       debug: false
       priority: 20
 
+- name: AlmaLinux-Kitten-10-bootstrap-i686
+  repositories:
+    - name: almalinux-kitten-10-bootstrap-i686
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-AlmaLinux-Kitten-10-i686-bootstrap-almalinux-kitten-10-i686-dr/
+      production: false
+      debug: false
+      priority: 10
+
 - name: Fedora-41-riscv64
   data:
     mock:
