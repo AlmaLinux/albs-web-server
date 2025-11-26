@@ -590,6 +590,58 @@
       debug: false
       priority: 10
 
+- name: java-25-portable
+  repositories:
+    - name: java-25-portable
+      arch: i686
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-i686-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: x86_64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: x86_64_v2
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-x86_64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: aarch64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-aarch64-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: ppc64le
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-ppc64le-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: s390x
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-9-s390x-dr/
+      production: false
+      debug: false
+      priority: 10
+    - name: java-25-portable
+      arch: riscv64
+      type: rpm
+      url: https://build.almalinux.org/pulp/content/copr/eabdullin1-java-portable-almalinux-10-riscv64-dr/
+      production: false
+      debug: false
+      priority: 10
+
 - name: Synergy
   repositories:
     - name: almalinux-synergy
