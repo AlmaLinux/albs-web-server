@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import typing
@@ -147,7 +148,9 @@ async def get_repository(
 async def get_remote(repo_info: dict, remote_sync_policy: str):
     async with open_async_session(key=get_async_db_key()) as db:
         remote_payload = repo_info.copy()
-        remote_payload["name"] = f'{repo_info["name"]}-{repo_info["arch"]}'
+        remote_payload["name"] = (
+            f'{repo_info["name"]}-{repo_info["arch"]}-{remote_sync_policy}'
+        )
         remote_payload.pop("type", None)
         remote_payload.pop("debug", False)
         remote_payload.pop("production", False)
@@ -231,6 +234,43 @@ async def add_repositories_to_platform(
         )
 
 
+async def sync_repositories(repo_sync_list: list, pulp_client: PulpClient):
+    sync_tasks = []
+    publish_tasks = []
+
+    async def sync_repo(repo_, remote_, policy):
+        logging.info('Syncing repository %s from %s', repo_, remote_)
+        try:
+            await pulp_client.sync_rpm_repo_from_remote(
+                repo_,
+                remote_,
+                policy,
+                wait_for_result=True,
+            )
+        except Exception:
+            logging.exception('Cannot sync repository %s', repo_)
+
+    async def publish_repo(repo_):
+        logging.info('Publishing repo %s', repo_)
+        try:
+            await pulp_client.create_rpm_publication(repo['repo_href'])
+        except Exception:
+            logging.exception('Cannot publish repository %s', repo_)
+
+    for repo in repo_sync_list:
+        sync_tasks.append(
+            sync_repo(
+                repo['repo_href'],
+                repo['remote_href'],
+                repo['sync_policy'],
+            )
+        )
+        publish_tasks.append(publish_repo(repo['repo_href']))
+    async with asyncio.Semaphore(5):
+        await asyncio.gather(*sync_tasks)
+        await asyncio.gather(*publish_tasks)
+
+
 def main():
     pulp_host = os.environ["PULP_HOST"]
     pulp_user = os.environ["PULP_USER"]
@@ -302,6 +342,7 @@ def main():
                     repo["pulp_href"],
                 )
 
+        repos_to_sync = []
         for repo_info in repositories_data:
             logger.info(
                 "Creating repository from the following data: %s",
@@ -336,7 +377,7 @@ def main():
             remote = sync(get_remote(repo_info, remote_sync_policy))
             pulp_remote = sync(
                 pulp_client.get_rpm_remote(
-                    f'{repo_info["name"]}-{repo_info["arch"]}',
+                    f'{repo_info["name"]}-{repo_info["arch"]}-{remote_sync_policy}',
                 )
             )
             if pulp_remote['pulp_href'] != remote.pulp_href:
@@ -354,22 +395,16 @@ def main():
             if args.no_sync:
                 logger.info("Synchronization from remote is disabled, skipping")
                 continue
-            try:
-                logger.info("Syncing %s from %s...", repository, remote)
-                sync(
-                    pulp_client.sync_rpm_repo_from_remote(
-                        repository.pulp_href,
-                        remote.pulp_href,
-                        sync_policy=repo_sync_policy,
-                        wait_for_result=True,
-                    )
-                )
-                sync(pulp_client.create_rpm_publication(repository.pulp_href))
-                logger.info("Repository %s sync is completed", repository)
-            except Exception as e:
-                logger.info(
-                    "Repository %s sync is failed: \n%s", repository, str(e)
-                )
+            logger.info("Appending %s to sync from %s...", repository, remote)
+            repo_sync_info = {
+                'repo_href': repository.pulp_href,
+                'remote_href': remote.pulp_href,
+                'sync_policy': repo_sync_policy,
+            }
+            repos_to_sync.append(repo_sync_info)
+        if repos_to_sync and not args.no_sync:
+            sync(sync_repositories(repos_to_sync, pulp_client))
+            return
         sync(add_repositories_to_platform(platform_data, repository_ids))
         sync(add_owner_id())
 

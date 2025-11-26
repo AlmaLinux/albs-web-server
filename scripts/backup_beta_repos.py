@@ -5,42 +5,43 @@ import logging
 import pprint
 import typing
 
-from alws.utils.pulp_client import PulpClient
+from alws.utils import pulp_client as pulp_cli
 from scripts.utils.pulp import get_pulp_params
-
 
 PROG_NAME = "backup_beta_repositories"
 # We search using startswith
 PLATFORM_REPO_MAP = {
     "almalinux_9": "AlmaLinux-9-beta-AlmaLinux-9",
     "almalinux_10": "eabdullin1-almalinux10-beta-almalinux-10",
+    "almalinux_10_epel": "eabdullin1-epel-al-almalinux-10",
 }
 
 ReposType = typing.List[typing.Dict[str, typing.Any]]
 
+
 async def find_pulp_repos(
-        name_starts: str,
-        pulp_client: typing.Optional[PulpClient] = None
+    name_starts: str, pulp_client: typing.Optional[pulp_cli.PulpClient] = None
 ) -> ReposType:
     if not pulp_client:
         host, user, password = get_pulp_params()
-        pulp_client = PulpClient(host, user, password)
+        pulp_client = pulp_cli.PulpClient(host, user, password)
     repositories = await pulp_client.get_rpm_repositories_by_params(
-        {"name__startswith": name_starts})
+        {"name__startswith": name_starts}
+    )
     repositories = [r for r in repositories if "backup" not in r["name"]]
 
     return repositories
 
 
 async def create_pulp_backup_repos(
-        repos: ReposType,
-        dry_run: bool = False,
-        pulp_client: typing.Optional[PulpClient] = None
+    repos: ReposType,
+    dry_run: bool = False,
+    pulp_client: typing.Optional[pulp_cli.PulpClient] = None,
 ) -> typing.Dict[str, typing.Dict[str, typing.Any]]:
     logger = logging.getLogger(PROG_NAME)
     if not pulp_client:
         host, user, password = get_pulp_params()
-        pulp_client = PulpClient(host, user, password)
+        pulp_client = pulp_cli.PulpClient(host, user, password)
 
     result = {}
     for repo in repos:
@@ -51,8 +52,9 @@ async def create_pulp_backup_repos(
         backup_repo = await pulp_client.get_rpm_repository(backup_repo_name)
         if not backup_repo:
             url, href = await pulp_client.create_rpm_repository(
-                backup_repo_name, create_publication=True,
-                base_path_start="backups"
+                backup_repo_name,
+                create_publication=True,
+                base_path_start="backups",
             )
             logger.info("Backup repository URL: %s, href: %s", url, href)
             backup_repo = await pulp_client.get_rpm_repository(backup_repo_name)
@@ -64,7 +66,8 @@ async def _main(repos_to_backup, dry_run: bool = False):
     logger = logging.getLogger(PROG_NAME)
     logger.debug("Acquiring Pulp connection data and creating client")
     host, user, password = get_pulp_params()
-    pulp_client = PulpClient(host, user, password)
+    pulp_cli.PULP_SEMAPHORE = asyncio.Semaphore(10)
+    pulp_client = pulp_cli.PulpClient(host, user, password)
     logger.info("Searching for all beta repositories")
     repos = []
     for repo_to_backup in repos_to_backup:
@@ -82,13 +85,9 @@ async def _main(repos_to_backup, dry_run: bool = False):
         version_href = repo["latest_version_href"]
         logger.debug("Version href: %s", version_href)
         pkgs = await pulp_client.get_rpm_packages(
-            include_fields=fields,
-            repository_version=version_href,
-            limit=1000
+            include_fields=fields, repository_version=version_href, limit=1000
         )
-        modules = await pulp_client.get_modules(
-            repository_version=version_href
-        )
+        modules = await pulp_client.get_modules(repository_version=version_href)
         for entity in itertools.chain(pkgs, modules):
             hrefs.append(entity["pulp_href"])
         backup_repo = backup_repos[repo["name"]]
@@ -109,7 +108,8 @@ async def _main(repos_to_backup, dry_run: bool = False):
                 )
             remove_tasks.append(
                 pulp_client.modify_repository(
-                    repo["pulp_href"], add=[], remove=hrefs)
+                    repo["pulp_href"], add=[], remove=hrefs
+                )
             )
             if not repo.get("autopublish", False):
                 publications_tasks.append(
@@ -132,16 +132,27 @@ async def _main(repos_to_backup, dry_run: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(PROG_NAME)
-    parser.add_argument("-v", "--verbose", action="store_true", default=False,
-                        help="Enable verbose output")
-    parser.add_argument("-d", "--dry-run", action="store_true", default=False,
-                        help="Output everything that will happen, "
-                             "but do not create/modify anything")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-d",
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Output everything that will happen, "
+        "but do not create/modify anything",
+    )
     for platform in PLATFORM_REPO_MAP:
         parser.add_argument(
-            f"--{platform}", f"--{platform.replace('_', '-')}",
+            f"--{platform}",
+            f"--{platform.replace('_', '-')}",
             help=f"Create backups of {platform} beta repos",
-            action="store_true"
+            action="store_true",
         )
     args = parser.parse_args()
 
