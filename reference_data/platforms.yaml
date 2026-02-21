@@ -47,7 +47,7 @@
       releasever: '8'
       environment:
         DFLTCC: '0'
-      use_bootstrap_container: false
+      bootstrap_image: 'quay.io/almalinuxorg/almalinux:8'
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -1754,7 +1754,7 @@
       dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: dnf
       releasever: '9'
-      use_bootstrap_container: false
+      bootstrap_image: 'quay.io/almalinuxorg/almalinux:9'
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -3481,7 +3481,7 @@
       dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: dnf
       releasever: '10'
-      use_bootstrap_container: false
+      bootstrap_image: 'quay.io/almalinuxorg/almalinux:10'
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -5535,7 +5535,7 @@
       dnf_install_command: install dnf dnf-plugins-core shadow-utils
       package_manager: dnf
       releasever: '10'
-      use_bootstrap_container: false
+      bootstrap_image: 'quay.io/almalinuxorg/almalinux:10-kitten'
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
