@@ -252,6 +252,7 @@ class BasePulpExporter:
         file_path = os.path.join(repodata_path, "repomd.xml")
         result = await self.sign_repomd_xml(file_path, key_id, token)
         self.logger.info('PGP key id: %s', key_id)
+        self.logger.info('sign-file result: %s', result)
         result_data = result.get("asc_content")
         if result_data is None:
             self.logger.error(
@@ -296,6 +297,7 @@ class BasePulpExporter:
         async with aiohttp.ClientSession(
             headers=headers,
             raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(total=900),
         ) as session:
             async with session.request(
                 method,
