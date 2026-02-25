@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import urllib.parse
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
@@ -90,6 +91,31 @@ class BasePulpExporter:
                 shutil.rmtree(cache_repodata_dir)
 
         shutil.copytree(repodata_path, cache_repodata_dir)
+
+    def remove_packages_from_repo(
+        self,
+        repo_path: str,
+        exclude_patterns: List[str],
+    ):
+        packages_dir = Path(repo_path)
+        if not packages_dir.exists():
+            self.logger.warning(
+                'Packages directory does not exist: %s', repo_path,
+            )
+            return
+        globs = [
+            p + '*' if not p.endswith('*') else p
+            for p in exclude_patterns
+        ]
+        removed_count = 0
+        for rpm_file in packages_dir.rglob('*.rpm'):
+            if any(fnmatch(rpm_file.name, g) for g in globs):
+                self.logger.info('Removing package: %s', rpm_file)
+                rpm_file.unlink()
+                removed_count += 1
+        self.logger.info(
+            'Removed %d packages from %s', removed_count, repo_path,
+        )
 
     async def create_filesystem_exporters(
         self,
