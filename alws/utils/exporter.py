@@ -39,7 +39,8 @@ async def get_repodata_file_links(base_url: str):
         async with session.get(base_url) as response:
             content = await response.text()
             doc = document_fromstring(content)
-            children_urls = [base_url + a.get('href') for a in doc.xpath('//a')]
+            children_urls = [base_url + a.get('href')
+                             for a in doc.xpath('//a') if '..' not in a.get('href')]
             return children_urls
 
 

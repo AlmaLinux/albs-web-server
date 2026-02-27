@@ -433,7 +433,6 @@ class PackagesExporter(BasePulpExporter):
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
 
-
 async def sign_repodata(
     exporter: PackagesExporter,
     exported_paths: List[str],
@@ -520,13 +519,16 @@ def export_errata_and_oval(
         if not os.path.exists(errata_export_base_path):
             os.mkdir(errata_export_base_path)
         for platform in platform_names:
+            errata_cache = platform_errata_cache.get(platform, {}).get('cache')
+            if not errata_cache:
+                exporter.logger.debug('No errata cache for %s platform, skipping', platform)
+                continue
             platform_path = os.path.join(errata_export_base_path, platform)
             if not os.path.exists(platform_path):
                 os.mkdir(platform_path)
             html_path = os.path.join(platform_path, "html")
             if not os.path.exists(html_path):
                 os.mkdir(html_path)
-            errata_cache = platform_errata_cache[platform]["cache"]
             exporter.process_osv_data(errata_cache, platform)
             exporter.logger.debug("Generating HTML errata pages")
             for record in errata_cache:

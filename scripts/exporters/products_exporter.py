@@ -83,6 +83,15 @@ def parse_args():
         help="Path to export log",
     )
     parser.add_argument(
+        "-rp",
+        "--remove-packages",
+        type=str,
+        nargs="+",
+        default=None,
+        required=False,
+        help="List of package names to remove from exported repos",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -215,6 +224,11 @@ async def main():
         distr_name=args.distribution,
         arches=args.arches,
     )
+
+    if args.remove_packages:
+        for path in exported_paths:
+            exporter.remove_packages_from_repo(path, args.remove_packages)
+
     await asyncio.gather(
         *(repo_post_processing(exporter, path) for path in exported_paths)
     )
