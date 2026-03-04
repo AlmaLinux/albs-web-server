@@ -173,4 +173,12 @@ async def get_task(
             }
         }
         response["platform"].add_mock_options(module_build_options)
+    if task.is_secure_boot:
+        sb_packages = response["platform"].data["mock"].get(
+            "secure_boot_additional_packages", []
+        )
+        if sb_packages:
+            response["platform"].data["mock"]["chroot_setup_cmd"] += (
+                " " + " ".join(sb_packages)
+            )
     return response
