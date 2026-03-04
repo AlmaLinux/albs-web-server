@@ -5547,6 +5547,8 @@
         "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
         "%modsign_os": "almalinux10"
+      secure_boot_additional_packages:
+        - al-signing-client
     mock_dist: el10
     timeout: 172800
     yum:
