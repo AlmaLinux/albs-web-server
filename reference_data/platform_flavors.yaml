@@ -538,6 +538,75 @@
       debug: false
       production: false
 
+- name: "copr:build.almalinux.org:soksanichenko:albs-build-node"
+  repositories:
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:x86_64"
+      arch: x86_64
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-x86_64-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:x86_64-debug"
+      arch: x86_64
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-x86_64-debug-dr/"
+      debug: true
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:x86_64_v2"
+      arch: x86_64_v2
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-x86_64_v2-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:x86_64_v2-debug"
+      arch: x86_64_v2
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-x86_64_v2-debug-dr/"
+      debug: true
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:aarch64"
+      arch: aarch64
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-aarch64-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:aarch64-debug"
+      arch: aarch64
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-aarch64-debug-dr/"
+      debug: true
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:ppc64le"
+      arch: ppc64le
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-ppc64le-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:ppc64le-debug"
+      arch: ppc64le
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-ppc64le-debug-dr/"
+      debug: true
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:s390x"
+      arch: s390x
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-s390x-dr/"
+      debug: false
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:s390x-debug"
+      arch: s390x
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-s390x-debug-dr/"
+      debug: true
+      production: false
+    - name: "copr:build.almalinux.org:soksanichenko:albs-build-node:src"
+      arch: src
+      type: rpm
+      url: "https://build.almalinux.org/pulp/content/copr/soksanichenko-albs-build-node-almalinux-kitten-$releasever-src-dr/"
+      debug: false
+      production: false
+
 - name: java-portable
   repositories:
     - name: java-portable
