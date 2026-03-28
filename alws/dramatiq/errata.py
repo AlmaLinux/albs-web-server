@@ -12,7 +12,7 @@ from alws.crud.errata import (
     release_new_errata_record,
     reset_matched_erratas_packages_threshold,
 )
-from alws.dramatiq import event_loop
+from alws.dramatiq._event_loop import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.sentry import sentry_init
 
