@@ -51,6 +51,8 @@
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
+      macros:
+        "%bcond()": '%{expand:%%bcond_%{lua:if "%2"=="1" then print("without") else print("with") end} %1}'
       secure_boot_macros:
         "%__pesign_cert": "%pe_signing_cert"
         "%__pesign_client_cert": "%pe_signing_cert"
