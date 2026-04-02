@@ -1164,6 +1164,15 @@
         make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
         info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core epel-rpm-macros
 
+- name: add-gcc-toolset-12
+  data:
+    mock:
+      chroot_setup_cmd: install tar gcc-c++ redhat-rpm-config almalinux-release which xz sed
+        make bzip2 gzip gcc coreutils unzip shadow-utils diffutils cpio bash gawk rpm-build
+        info patch util-linux findutils grep zlib scl-utils scl-utils-build git-core gcc-toolset-12
+        gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck
+        gcc-toolset-12-annobin-plugin-gcc
+
 - name: nvidia-cuda
   repositories:
     - name: nvidia-cuda
