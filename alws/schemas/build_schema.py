@@ -122,6 +122,7 @@ class BuildCreatePlatforms(BaseModel):
         ]
     ]
     parallel_mode_enabled: bool
+    independent_tasks: bool = False
 
 
 class BuildCreate(BaseModel):
