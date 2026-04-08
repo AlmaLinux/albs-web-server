@@ -48,6 +48,7 @@
       environment:
         DFLTCC: '0'
       bootstrap_image: 'quay.io/almalinuxorg/almalinux:8'
+      bootstrap_image_ready: true
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -1755,6 +1756,7 @@
       package_manager: dnf
       releasever: '9'
       bootstrap_image: 'quay.io/almalinuxorg/almalinux:9'
+      bootstrap_image_ready: true
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -3422,6 +3424,7 @@
       package_manager: dnf
       releasever: '10'
       bootstrap_image: 'quay.io/almalinuxorg/almalinux:10'
+      bootstrap_image_ready: true
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
@@ -5243,6 +5246,7 @@
       package_manager: dnf
       releasever: '10'
       bootstrap_image: 'quay.io/almalinuxorg/almalinux:10-kitten'
+      bootstrap_image_ready: true
       nspawn_args:
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
