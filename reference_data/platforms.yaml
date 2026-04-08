@@ -5542,6 +5542,7 @@
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
       rpmautospec_enable: true
+      use_shared_yum_cache: true
       secure_boot_macros:
         "%with_modsign": "1"
         "%modsign_os": "almalinux10"
@@ -5551,6 +5552,8 @@
     timeout: 172800
     yum:
       best: true
+      keepcache: true
+      metadata_expire: 60
       module_platform_id: platform:el10
   repositories:
     - arch: s390x
