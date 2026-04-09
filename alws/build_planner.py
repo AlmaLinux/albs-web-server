@@ -47,6 +47,7 @@ class BuildPlanner:
         self._task_index = 0
         self._request_platforms_arch_list = {}
         self._parallel_modes = {}
+        self._independent_tasks = {}
         self._platforms = []
         self._platform_flavors = []
         self._modules_by_platform_arch = collections.defaultdict(list)
@@ -73,6 +74,7 @@ class BuildPlanner:
             self._parallel_modes[platform.name] = (
                 platform.parallel_mode_enabled
             )
+            self._independent_tasks[platform.name] = platform.independent_tasks
         await self.load_platforms()
         if platform_flavors:
             await self.load_platform_flavors(platform_flavors)
@@ -670,17 +672,19 @@ class BuildPlanner:
         #   - All architectures should have dependencies
         #     between their own tasks to ensure correct build order.
         all_tasks = []
-        for platform_task_cache in self._tasks_cache.values():
+        for platform_name, platform_task_cache in self._tasks_cache.items():
+            independent = self._independent_tasks.get(platform_name, False)
             first_arch = 'src'
             first_arch_tasks = platform_task_cache.get(first_arch)
             if not first_arch_tasks:
                 first_arch = next(iter(platform_task_cache))
                 first_arch_tasks = platform_task_cache.get(first_arch)
-            for index in range(1, len(first_arch_tasks)):
-                previous_task_index = index - 1
-                current_task = first_arch_tasks[index]
-                previous_task = first_arch_tasks[previous_task_index]
-                current_task.dependencies.append(previous_task)
+            if not independent:
+                for index in range(1, len(first_arch_tasks)):
+                    previous_task_index = index - 1
+                    current_task = first_arch_tasks[index]
+                    previous_task = first_arch_tasks[previous_task_index]
+                    current_task.dependencies.append(previous_task)
             all_tasks.extend(first_arch_tasks)
             # If it's the only arch, do not need to go additional cycle
             if len(platform_task_cache.keys()) == 1:
@@ -693,11 +697,16 @@ class BuildPlanner:
                 tasks[0].dependencies.append(first_arch_tasks[0])
                 # Add dependencies for all other tasks
                 for index in range(1, len(tasks)):
-                    previous_tasks = tasks[:index]
                     first_arch_task = first_arch_tasks[index]
                     current_task = tasks[index]
-                    current_task.dependencies.extend(
-                        [first_arch_task, *previous_tasks]
-                    )
+                    if independent:
+                        # Only depend on the same package's first-arch task,
+                        # not on previous packages in this arch
+                        current_task.dependencies.append(first_arch_task)
+                    else:
+                        previous_tasks = tasks[:index]
+                        current_task.dependencies.extend(
+                            [first_arch_task, *previous_tasks]
+                        )
                 all_tasks.extend(tasks)
         self._db.add_all(all_tasks)
