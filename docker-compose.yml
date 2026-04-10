@@ -563,6 +563,8 @@ services:
       - "../albs-sign-file/sign:/app/sign"
       - "../albs-sign-file/start.py:/app/start.py"
       - "../albs-sign-file/db_manage.py:/app/db_manage.py"
+      - "../albs-sign-file/alembic.ini:/app/alembic.ini"
+      - "../albs-sign-file/alembic:/app/alembic"
     ports:
       - "8083:8000"
     logging:
