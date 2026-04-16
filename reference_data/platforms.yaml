@@ -5594,8 +5594,8 @@
     - arch: i686
       name: almalinux-kitten-10-devel
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/devel/i686/os/
-      export_path: almalinux-kitten/10-kitten/devel/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/i686/os/
+      export_path: vault/10-kitten/devel/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5678,7 +5678,7 @@
     - arch: i686
       name: almalinux-kitten-10-devel-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/devel/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/devel/debug/i686/
       export_path: vault/10-kitten/devel/debug/i686/
       production: true
       debug: true
@@ -5711,8 +5711,8 @@
     - arch: i686
       name: almalinux-kitten-10-appstream
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/appstream/i686/os/
-      export_path: almalinux-kitten/10-kitten/appstream/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/i686/os/
+      export_path: vault/10-kitten/AppStream/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5791,8 +5791,8 @@
     - arch: i686
       name: almalinux-kitten-10-appstream-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/appstream/debug/i686/
-      export_path: vault/10-kitten/appstream/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/AppStream/debug/i686/
+      export_path: vault/10-kitten/AppStream/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -5868,8 +5868,8 @@
     - arch: i686
       name: almalinux-kitten-10-baseos
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/baseos/i686/os/
-      export_path: almalinux-kitten/10-kitten/baseos/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/i686/os/
+      export_path: vault/10-kitten/BaseOS/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5948,8 +5948,8 @@
     - arch: i686
       name: almalinux-kitten-10-baseos-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/baseos/debug/i686/
-      export_path: vault/10-kitten/baseos/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/BaseOS/debug/i686/
+      export_path: vault/10-kitten/BaseOS/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -6025,8 +6025,8 @@
     - arch: i686
       name: almalinux-kitten-10-highavailability
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/highavailability/i686/os/
-      export_path: almalinux-kitten/10-kitten/highavailability/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/i686/os/
+      export_path: vault/10-kitten/HighAvailability/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6105,8 +6105,8 @@
     - arch: i686
       name: almalinux-kitten-10-highavailability-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/highavailability/debug/i686/
-      export_path: vault/10-kitten/highavailability/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/HighAvailability/debug/i686/
+      export_path: vault/10-kitten/HighAvailability/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -6318,8 +6318,8 @@
     - arch: i686
       name: almalinux-kitten-10-extras-common
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/extras/i686/os/
-      export_path: almalinux-kitten/10-kitten/extras/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/extras-common/i686/os/
+      export_path: vault/10-kitten/extras-common/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6475,8 +6475,8 @@
     - arch: i686
       name: almalinux-kitten-10-crb
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/crb/i686/os/
-      export_path: almalinux-kitten/10-kitten/crb/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/i686/os/
+      export_path: vault/10-kitten/CRB/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6555,8 +6555,8 @@
     - arch: i686
       name: almalinux-kitten-10-crb-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/crb/debug/i686/
-      export_path: vault/10-kitten/crb/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/CRB/debug/i686/
+      export_path: vault/10-kitten/CRB/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -6736,8 +6736,8 @@
     - arch: i686
       name: almalinux-kitten-10-sap
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/sap/i686/os/
-      export_path: almalinux-kitten/10-kitten/sap/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/i686/os/
+      export_path: vault/10-kitten/SAP/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6816,8 +6816,8 @@
     - arch: i686
       name: almalinux-kitten-10-sap-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/sap/debug/i686/
-      export_path: vault/10-kitten/sap/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAP/debug/i686/
+      export_path: vault/10-kitten/SAP/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -6893,8 +6893,8 @@
     - arch: i686
       name: almalinux-kitten-10-saphana
       type: rpm
-      remote_url: http://kitten.repo.almalinux.org/10-kitten/saphana/i686/os/
-      export_path: almalinux-kitten/10-kitten/saphana/i686/os/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/i686/os/
+      export_path: vault/10-kitten/SAPHANA/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -6973,8 +6973,8 @@
     - arch: i686
       name: almalinux-kitten-10-saphana-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10-kitten/saphana/debug/i686/
-      export_path: vault/10-kitten/saphana/debug/i686/
+      remote_url: http://kitten.vault.almalinux.org/10-kitten/SAPHANA/debug/i686/
+      export_path: vault/10-kitten/SAPHANA/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -7157,17 +7157,3 @@
       repository_sync_policy: additive
       priority: 10
       mock_enabled: false
-    - name: almalinux-kitten-10-i686-beta
-      arch: i686
-      type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-AlmaLinux-Kitten-10-i686-beta-almalinux-kitten-10-i686-dr/
-      production: false
-      debug: false
-      priority: 10
-    - name: almalinux-kitten-10-riscv64-beta
-      arch: riscv64
-      type: rpm
-      remote_url: https://build.almalinux.org/pulp/content/copr/eabdullin1-almalinux10-beta-riscv64-almalinux-kitten-10-riscv64-dr/
-      production: false
-      debug: false
-      priority: 10
