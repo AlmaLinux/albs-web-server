@@ -54,16 +54,10 @@
       macros:
         "%bcond()": '%{expand:%%bcond_%{lua:if "%2"=="1" then print("without") else print("with") end} %1}'
       secure_boot_macros:
-        "%__pesign_cert": "%pe_signing_cert"
-        "%__pesign_client_cert": "%pe_signing_cert"
-        "%__pesign_client_token": "%pe_signing_token"
-        "%__pesign_token": "-t %pe_signing_token"
-        "%pe_signing_cert": "'05'"
-        "%pe_signing_token": "'AlmaLinux OS Foundation'"
-        "%_pesign": "/usr/local/bin/pesign"
-        "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
         "%modsign_os": "almalinux8"
+      secure_boot_additional_packages:
+        - al-signing-client
     mock_dist: el8
     timeout: 43200
     versions:
@@ -1761,12 +1755,10 @@
         - '--rlimit=RLIMIT_NOFILE=20480'
         - '--capability=cap_ipc_lock'
       secure_boot_macros:
-        "%pe_signing_cert": '06'
-        "%pe_signing_token": 'AlmaLinux OS Foundation'
-        "%_pesign": "/usr/local/bin/pesign"
-        "%_pesign_client": "/usr/local/bin/pesign-client"
         "%with_modsign": "1"
         "%modsign_os": "almalinux9"
+      secure_boot_additional_packages:
+        - al-signing-client
     mock_dist: el9
     timeout: 43200
     versions:
