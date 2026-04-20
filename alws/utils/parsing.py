@@ -9,11 +9,26 @@ from alws.constants import TestCaseStatus
 __all__ = [
     'clean_release',
     'get_clean_distr_name',
+    'parse_evr',
     'parse_git_ref',
+    'parse_rpm_nevra',
     'parse_tap_output',
     'tap_set_status',
     'slice_list',
 ]
+
+
+def parse_evr(evr: str) -> typing.Tuple[int, str, str]:
+    """Split an ``epoch:version-release`` string into its components.
+
+    Leverages ``hawkey.split_nevra`` by wrapping the evr in a synthetic
+    ``<name>-<evr>.<arch>`` envelope so the same parser used elsewhere in the
+    codebase handles the edge cases (missing epoch, module suffix, etc.).
+    Returns ``(epoch, version, release)`` with ``epoch`` as an int (defaulting
+    to ``0`` when unset in the input).
+    """
+    nevra = hawkey.split_nevra(f"pkg-{evr}.noarch")
+    return nevra.epoch, nevra.version, nevra.release
 
 
 def slice_list(
