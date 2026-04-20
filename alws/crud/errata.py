@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import copy
 import datetime
 import json
 import logging
@@ -60,7 +61,7 @@ from alws.utils.github_integration_helper import (
     get_github_client,
 )
 from alws.utils.oval_add_al8_gpg_keys import add_multiple_gpg_keys_to_oval
-from alws.utils.parsing import clean_release, parse_rpm_nevra
+from alws.utils.parsing import clean_release, parse_evr, parse_rpm_nevra
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
     get_rpm_module_packages_from_repository,
@@ -205,6 +206,133 @@ def add_oval_objects(new_objects, objects, oval, get_cls_by_tag_func):
             )
 
 
+_EVR_COMMENT_RE = re.compile(r"^(\S+)\s+is earlier than\s+(\S+)\s*$")
+_MODULAR_RELEASE_RE = re.compile(r"\.module[_+]")
+
+# Kernel-family RPMs (including built-from-kernel-source tooling like perf,
+# bpftool, rtla, rv) keep the same RPM `version` (e.g. `5.14.0`) across every
+# point release while the release string encodes a different upstream backport
+# each time. Cross-linking their point-release siblings inflates definitions
+# without adding real signal: these packages also ship multi-variant builds
+# (rt, 64k, zfcpdump) whose divergent evrs are expected, not a detection gap.
+_CROSS_REF_SKIP_EXACT = frozenset({
+    "perf",
+    "python3-perf",
+    "bpftool",
+    "rtla",
+    "rv",
+    "libperf",
+    "libperf-devel",
+})
+_CROSS_REF_SKIP_PREFIXES = ("kernel",)
+
+
+def _should_skip_cross_ref(pkg):
+    if pkg in _CROSS_REF_SKIP_EXACT:
+        return True
+    for prefix in _CROSS_REF_SKIP_PREFIXES:
+        if pkg == prefix or pkg.startswith(prefix + "-"):
+            return True
+    return False
+
+
+def _evr_from_comment(comment):
+    match = _EVR_COMMENT_RE.match(comment or "")
+    if not match:
+        return None, None, None
+    try:
+        parts = parse_evr(match.group(2))
+    except Exception:
+        return None, None, None
+    return match.group(1), match.group(2), parts
+
+
+def _collect_evr_criteria_by_pkg(node, out):
+    for crit in node.get("criterion", []) or []:
+        pkg, _evr, _parts = _evr_from_comment(crit.get("comment", ""))
+        if pkg:
+            out.setdefault(pkg, []).append(crit)
+    for sub in node.get("criteria", []) or []:
+        _collect_evr_criteria_by_pkg(sub, out)
+
+
+def _inject_sibling_evr(node, sibling_evr_by_pkg):
+    # Inject a sibling's "is earlier than" criterion into the current AND block
+    # only when both sides are non-modular builds of the same epoch:version and
+    # differ only by release (e.g. `2:2.99.8-4.el9_3` vs `2:2.99.8-4.el9_6`).
+    # This narrows the fix to point-release rebuilds of the same upstream
+    # version, so module streams and genuine version bumps aren't conflated.
+    crits = node.get("criterion", []) or []
+    if node.get("operator") == "AND" and crits:
+        existing_refs = {c["ref"] for c in crits}
+        new_list = []
+        for crit in crits:
+            new_list.append(crit)
+            pkg, _evr, parts = _evr_from_comment(crit.get("comment", ""))
+            if not pkg:
+                continue
+            if _should_skip_cross_ref(pkg):
+                continue
+            epoch, version, release = parts
+            if _MODULAR_RELEASE_RE.search(release or ""):
+                continue
+            for sibling in sibling_evr_by_pkg.get(pkg, []):
+                if sibling["ref"] in existing_refs:
+                    continue
+                _, _, sib_parts = _evr_from_comment(sibling.get("comment", ""))
+                if sib_parts == (None, None, None):
+                    continue
+                sib_epoch, sib_version, sib_release = sib_parts
+                if sib_epoch != epoch or sib_version != version:
+                    continue
+                if _MODULAR_RELEASE_RE.search(sib_release or ""):
+                    continue
+                if sib_release == release:
+                    continue
+                existing_refs.add(sibling["ref"])
+                new_list.append({
+                    "ref": sibling["ref"],
+                    "comment": sibling["comment"],
+                })
+        node["criterion"] = new_list
+    for sub in node.get("criteria", []) or []:
+        _inject_sibling_evr(sub, sibling_evr_by_pkg)
+
+
+def _build_sibling_evr_index(records):
+    # Map cve_id -> [record, ...] and record.id -> {pkg_name: [evr_criterion,...]}
+    cve_to_records: typing.Dict[str, typing.List] = {}
+    record_evr: typing.Dict[str, typing.Dict[str, list]] = {}
+    for record in records:
+        if not record.criteria:
+            continue
+        per_pkg: typing.Dict[str, list] = {}
+        for top in record.criteria:
+            _collect_evr_criteria_by_pkg(top, per_pkg)
+        record_evr[record.id] = per_pkg
+        for ref in record.references:
+            if ref.ref_type == ErrataReferenceType.cve and ref.cve:
+                cve_to_records.setdefault(ref.cve.id, []).append(record)
+    return cve_to_records, record_evr
+
+
+def _sibling_evr_for_record(record, cve_to_records, record_evr):
+    merged: typing.Dict[str, list] = {}
+    seen = {record.id}
+    for ref in record.references:
+        if ref.ref_type != ErrataReferenceType.cve or not ref.cve:
+            continue
+        for sibling in cve_to_records.get(ref.cve.id, []):
+            if sibling.id in seen:
+                continue
+            if sibling.platform_id != record.platform_id:
+                continue
+            seen.add(sibling.id)
+            for pkg, evr_list in record_evr.get(sibling.id, {}).items():
+                merged.setdefault(pkg, []).extend(evr_list)
+    return merged
+
+
 def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
     oval = Composer()
     generator = Generator(
@@ -215,6 +343,7 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
     )
     oval.generator = generator
     objects = set()
+    cve_to_records, record_evr = _build_sibling_evr_index(records)
     for record in records:
         if not record.criteria:
             logging.warning(
@@ -222,6 +351,14 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                 record.id,
             )
             continue
+        sibling_evr_by_pkg = _sibling_evr_for_record(
+            record, cve_to_records, record_evr
+        )
+        merged_criteria = record.criteria
+        if sibling_evr_by_pkg:
+            merged_criteria = copy.deepcopy(record.criteria)
+            for top in merged_criteria:
+                _inject_sibling_evr(top, sibling_evr_by_pkg)
         title = record.oval_title
         definition = Definition.from_dict({
             "id": record.definition_id,
@@ -296,7 +433,7 @@ def new_errata_records_to_oval(records: List[models.NewErrataRecord]):
                     ]
                 ],
             },
-            "criteria": record.criteria,
+            "criteria": merged_criteria,
         })
         oval.append_object(definition)
 
