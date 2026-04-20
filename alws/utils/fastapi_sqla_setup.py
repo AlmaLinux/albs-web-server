@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi_sqla import setup
-from fastapi_sqla.async_sqla import startup as async_startup
-from fastapi_sqla.sqla import _DEFAULT_SESSION_KEY, startup
+from fastapi_sqla.async_sqla import (
+    _async_session_factories,
+    startup as async_startup,
+)
+from fastapi_sqla.sqla import _DEFAULT_SESSION_KEY, _session_factories, startup
 
 app = FastAPI()
 setup(app)
@@ -17,9 +20,11 @@ async def setup_all():
 
 async def async_setup():
     for key in async_keys:
-        await async_startup(key)
+        if key not in _async_session_factories:
+            await async_startup(key)
 
 
 def sync_setup():
     for key in sync_keys:
-        startup(key)
+        if key not in _session_factories:
+            startup(key)
