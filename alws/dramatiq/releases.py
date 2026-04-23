@@ -4,7 +4,7 @@ from fastapi_sqla import open_async_session
 from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import release as r_crud
 from alws.dependencies import get_async_db_key
-from alws.dramatiq import event_loop
+from alws.dramatiq._event_loop import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.sentry import sentry_init
 
