@@ -1526,8 +1526,18 @@ async def release_errata_packages(
     reboot_suggested = False
     dict_packages = []
     released_pkgs = set()
+    pkg_hrefs = [pkg.get_pulp_href() for pkg in packages]
+    pulp_pkgs_by_href = await pulp_client.get_rpm_packages_by_hrefs(
+        pkg_hrefs,
+        include_fields=[
+            "pulp_href", "name", "release", "version", "epoch",
+            "arch", "location_href", "rpm_sourcerpm", "sha256",
+        ],
+    )
     for errata_pkg in packages:
-        pulp_pkg = await pulp_client.get_by_href(errata_pkg.get_pulp_href())
+        pulp_pkg = pulp_pkgs_by_href.get(errata_pkg.get_pulp_href())
+        if not pulp_pkg:
+            continue
         pkg_name_arch = "_".join([pulp_pkg["name"], pulp_pkg["arch"]])
         if errata_pkg.errata_package.reboot_suggested:
             reboot_suggested = True
