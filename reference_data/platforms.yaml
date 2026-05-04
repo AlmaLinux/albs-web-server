@@ -53,6 +53,7 @@
         - '--capability=cap_ipc_lock'
       macros:
         "%bcond()": '%{expand:%%bcond_%{lua:if "%2"=="1" then print("without") else print("with") end} %1}'
+        "%_smp_build_ncpus": '%(nproc)'
       secure_boot_macros:
         "%with_modsign": "1"
         "%modsign_os": "almalinux8"
