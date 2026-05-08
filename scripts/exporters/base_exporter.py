@@ -249,21 +249,51 @@ class BasePulpExporter:
         )
         return response['token']
 
-    async def sign_repomd_xml(self, path_to_file: str, key_id: str, token: str):
+    async def sign_repomd_xml(
+        self,
+        path_to_file: str,
+        key_id: str,
+        token: str,
+        max_attempts: int = 5,
+        initial_backoff: float = 2.0,
+    ):
         endpoint = "sign"
         result = {"asc_content": None, "error": None}
-        try:
-            response = await self.make_request(
-                "POST",
-                endpoint,
-                params={"keyid": key_id},
-                data={"file": Path(path_to_file).read_bytes()},
-                user_headers={"Authorization": f"Bearer {token}"},
-                send_to="sign_server",
+        file_bytes = Path(path_to_file).read_bytes()
+        backoff = initial_backoff
+        for attempt in range(1, max_attempts + 1):
+            err_msg = None
+            try:
+                response = await self.make_request(
+                    "POST",
+                    endpoint,
+                    params={"keyid": key_id},
+                    data={"file": file_bytes},
+                    user_headers={"Authorization": f"Bearer {token}"},
+                    send_to="sign_server",
+                )
+                if response:
+                    result["asc_content"] = response
+                    result["error"] = None
+                    return result
+                err_msg = "sign server returned empty response"
+                result["error"] = err_msg
+            except Exception as err:
+                err_msg = err
+                result["error"] = err
+
+            if attempt == max_attempts:
+                self.logger.error(
+                    "Signing %s failed after %d attempts: %s",
+                    path_to_file, attempt, err_msg,
+                )
+                break
+            self.logger.warning(
+                "Signing %s failed on attempt %d/%d: %s; retrying in %.1fs",
+                path_to_file, attempt, max_attempts, err_msg, backoff,
             )
-            result["asc_content"] = response
-        except Exception as err:
-            result['error'] = err
+            await asyncio.sleep(backoff)
+            backoff *= 2
         return result
 
     async def repomd_signer(self, repodata_path, key_id, token):
