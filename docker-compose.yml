@@ -5,8 +5,6 @@ services:
     profiles: ["tests"]
     env_file:
       - vars.env
-    ports:
-      - "5432:5432"
 
   web_server_tests:
     image: albs-web-server-tests:latest
