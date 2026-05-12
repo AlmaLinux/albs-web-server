@@ -69,8 +69,9 @@ class GiteaClient:
                 )
                 return []
             except (
-                aiohttp.client_exceptions.ClientConnectorError,
-                aiohttp.client_exceptions.ServerDisconnectedError,
+                aiohttp.ClientConnectionError,
+                aiohttp.ServerDisconnectedError,
+                asyncio.TimeoutError,
             ) as e:
                 wait = attempt * 2
                 self.log.error(
@@ -82,6 +83,12 @@ class GiteaClient:
                 )
                 await asyncio.sleep(wait)
                 continue
+        self.log.error(
+            'Giving up on %s after %d attempts, skipping',
+            full_url,
+            max_retries,
+        )
+        return []
 
     async def _list_all_pages(self, endpoint: str) -> typing.List:
         items = []
