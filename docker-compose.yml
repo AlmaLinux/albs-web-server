@@ -1,9 +1,8 @@
-version: "3.9"
-
 services:
 
   test_db:
     image: postgres:13
+    profiles: ["tests"]
     env_file:
       - vars.env
     ports:
@@ -11,6 +10,7 @@ services:
 
   web_server_tests:
     image: albs-web-server-tests:latest
+    profiles: ["tests"]
     env_file:
       - vars.env
     build:
@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
       target: web-server-tests
     volumes:
-      - ".:/code"
+      - ".:/code:z"
 
   db:
     image: postgres:13
@@ -30,7 +30,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - "../volumes/postgresql/data:/var/lib/postgresql/data"
+      - "../volumes/postgresql/data:/var/lib/postgresql/data:z"
     logging:
       driver: "json-file"
       options:
@@ -69,9 +69,9 @@ services:
     privileged: true
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "../alts/configs/alts_config.yaml:/celery_config.yaml"
-      - "../alts/alts:/code/alts"
-      - "../alts/resources:/code/resources"
+      - "../alts/configs/alts_config.yaml:/celery_config.yaml:z"
+      - "../alts/alts:/code/alts:z"
+      - "../alts/resources:/code/resources:z"
     depends_on:
       - rabbitmq
     logging:
@@ -98,9 +98,9 @@ services:
         uvicorn --host 0.0.0.0 alts.scheduler.app:app --limit-concurrency 100 --backlog 1000"
     restart: on-failure
     volumes:
-      - "../alts/configs/alts_config.yaml:/scheduler_config.yaml"
-      - "../alts/alts:/code/alts"
-      - "../alts/resources:/code/resources"
+      - "../alts/configs/alts_config.yaml:/scheduler_config.yaml:z"
+      - "../alts/alts:/code/alts:z"
+      - "../alts/resources:/code/resources:z"
     depends_on:
       - web_server
       - rabbitmq
@@ -121,10 +121,10 @@ services:
       dockerfile: Dockerfile
       target: web-server
     volumes:
-      - "./alws:/code/alws"
-      - "./scripts:/code/scripts"
-      - "./reference_data:/code/reference_data"
-      - "../volumes/pulp/exports:/srv/exports"
+      - "./alws:/code/alws:z"
+      - "./scripts:/code/scripts:z"
+      - "./reference_data:/code/reference_data:z"
+      - "../volumes/pulp/exports:/srv/exports:z"
     command: |
       bash -c "
         set -ex
@@ -149,7 +149,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -174,7 +174,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -199,7 +199,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -224,7 +224,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -249,7 +249,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -274,7 +274,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: dramatiq alws.dramatiq --processes 1 --threads 1 -Q sign
     restart: on-failure
     logging:
@@ -291,7 +291,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: dramatiq alws.dramatiq --processes 3 --threads 1 -Q product_modify
     restart: on-failure
     logging:
@@ -308,7 +308,7 @@ services:
       dockerfile: Dockerfile.task-queue
       context: .
     volumes:
-      - "./alws:/code/alws"
+      - "./alws:/code/alws:z"
     command: |
       bash -c "
         set -ex
@@ -334,7 +334,7 @@ services:
       context: ../albs-frontend
     command: npm run dev
     volumes:
-      - "../albs-frontend:/home/albs/code"
+      - "../albs-frontend:/home/albs/code:z"
     restart: on-failure
     depends_on:
       - web_server
@@ -354,9 +354,9 @@ services:
     env_file:
       - vars.env
     volumes:
-      - "../albs-node/node-config/castor/build_node.yml:/root/.config/castor/build_node.yml"
-      - "../albs-node/build_node:/build-node/build_node"
-      - "../albs-node/almalinux_build_node.py:/build-node/almalinux_build_node.py"
+      - "../albs-node/node-config/castor/build_node.yml:/root/.config/castor/build_node.yml:z"
+      - "../albs-node/build_node:/build-node/build_node:z"
+      - "../albs-node/almalinux_build_node.py:/build-node/almalinux_build_node.py:z"
     restart: on-failure
     command: |
       bash -c "
@@ -380,10 +380,10 @@ services:
     env_file:
       - vars.env
     volumes:
-      - "~/.gnupg:/root/.gnupg"
-      - "../albs-sign-node/node-config/sign_node.yml:/root/.config/sign_node.yml"
-      - "../albs-sign-node/almalinux_sign_node.py:/sign-node/almalinux_sign_node.py"
-      - "../albs-sign-node/sign_node:/sign-node/sign_node"
+      - "~/.gnupg:/root/.gnupg:z"
+      - "../albs-sign-node/node-config/sign_node.yml:/root/.config/sign_node.yml:z"
+      - "../albs-sign-node/almalinux_sign_node.py:/sign-node/almalinux_sign_node.py:z"
+      - "../albs-sign-node/sign_node:/sign-node/sign_node:z"
     restart: on-failure
     command: |
       bash -c "
@@ -409,11 +409,11 @@ services:
     depends_on:
       - mosquitto
     volumes:
-      - "./alws/scripts/albs-gitea-listener/gitea_listener.py:/code/gitea_listener.py"
-      - "./alws/scripts/albs-gitea-listener/gitea_models.py:/code/gitea_models.py"
-      - "./alws/scripts/albs-gitea-listener/albs-gitea-listener-config.yaml:/code/albs-gitea-listener-config.yaml"
-      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
-      - "./alws:/code/alws"
+      - "./alws/scripts/albs-gitea-listener/gitea_listener.py:/code/gitea_listener.py:z"
+      - "./alws/scripts/albs-gitea-listener/gitea_models.py:/code/gitea_models.py:z"
+      - "./alws/scripts/albs-gitea-listener/albs-gitea-listener-config.yaml:/code/albs-gitea-listener-config.yaml:z"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py:z"
+      - "./alws:/code/alws:z"
     command: python3 gitea_listener.py
     logging:
       driver: "json-file"
@@ -432,8 +432,8 @@ services:
     depends_on:
       - redis
     volumes:
-      - "./alws:/code/alws"
-      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py"
+      - "./alws:/code/alws:z"
+      - "./alws/scripts/git_cacher/git_cacher.py:/code/git_cacher.py:z"
     command: python3 git_cacher.py
     logging:
       driver: "json-file"
@@ -449,9 +449,9 @@ services:
       target: cacher
     restart: on-failure
     volumes:
-      - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher"
-      - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py"
-      - "../alma-tests-cacher/vars.yaml:/code/vars.yaml"
+      - "../alma-tests-cacher/alma_tests_cacher:/code/alma_tests_cacher:z"
+      - "../alma-tests-cacher/alma_tests_cacher.py:/code/alma_tests_cacher.py:z"
+      - "../alma-tests-cacher/vars.yaml:/code/vars.yaml:z"
     command: |
       bash -c "
         set -ex
@@ -471,12 +471,12 @@ services:
       - 8081:80
       - 5431:5432
     volumes:
-      - "../volumes/pulp/settings:/etc/pulp"
-      - "../volumes/pulp/exports:/srv/exports"
-      - "../volumes/pulp/pulp_storage:/var/lib/pulp"
-      - "../volumes/pulp/pgsql:/var/lib/pgsql"
-      - "../volumes/pulp/containers:/var/lib/containers"
-      - "./pulp_init.sh:/usr/local/bin/pulp_init.sh"
+      - "../volumes/pulp/settings:/etc/pulp:z"
+      - "../volumes/pulp/exports:/srv/exports:z"
+      - "../volumes/pulp/pulp_storage:/var/lib/pulp:z"
+      - "../volumes/pulp/pgsql:/var/lib/pgsql:z"
+      - "../volumes/pulp/containers:/var/lib/containers:z"
+      - "./pulp_init.sh:/usr/local/bin/pulp_init.sh:z"
     devices:
       - "/dev/fuse"
     restart: on-failure
@@ -495,7 +495,7 @@ services:
     ports:
       - "11883:1883"
     volumes:
-      - "./mosquitto-no-auth.conf:/mosquitto/config/mosquitto.conf"
+      - "./mosquitto-no-auth.conf:/mosquitto/config/mosquitto.conf:z"
     logging:
       driver: "json-file"
       options:
@@ -520,7 +520,7 @@ services:
     ports:
       - 8080:80
     volumes:
-      - "./nginx_configs:/etc/nginx/conf.d"
+      - "./nginx_configs:/etc/nginx/conf.d:z"
     depends_on:
       - web_server
       - frontend
@@ -559,12 +559,12 @@ services:
         python3 start.py"
     restart: on-failure
     volumes:
-      - "${SF_HOST_GNUPG:-~/.gnupg}:/root/.gnupg"
-      - "../albs-sign-file/sign:/app/sign"
-      - "../albs-sign-file/start.py:/app/start.py"
-      - "../albs-sign-file/db_manage.py:/app/db_manage.py"
-      - "../albs-sign-file/alembic.ini:/app/alembic.ini"
-      - "../albs-sign-file/alembic:/app/alembic"
+      - "${SF_HOST_GNUPG:-~/.gnupg}:/root/.gnupg:z"
+      - "../albs-sign-file/sign:/app/sign:z"
+      - "../albs-sign-file/start.py:/app/start.py:z"
+      - "../albs-sign-file/db_manage.py:/app/db_manage.py:z"
+      - "../albs-sign-file/alembic.ini:/app/alembic.ini:z"
+      - "../albs-sign-file/alembic:/app/alembic:z"
     ports:
       - "8083:8000"
     logging:
