@@ -11,13 +11,13 @@ import logging
 import yaml
 from fastapi_sqla import open_async_session
 from sqlalchemy import update
-from syncer import sync
 
 from alws import models
 from alws.crud import platform as pl_crud
 from alws.crud import repository as repo_crud
 from alws.dependencies import get_async_db_key
 from alws.schemas import platform_schema, remote_schema, repository_schema
+from alws.utils import pulp_client as pulp_client_module
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.pulp_client import PulpClient
 from scripts.bootstrap_permissions import ensure_system_user_exists
@@ -367,7 +367,7 @@ async def sync_repositories(repo_sync_list: list, pulp_client: PulpClient):
         await asyncio.gather(*publish_tasks)
 
 
-def main():
+async def main_async():
     pulp_host = os.environ["PULP_HOST"]
     pulp_user = os.environ["PULP_USER"]
     pulp_password = os.environ["PULP_PASSWORD"]
@@ -382,19 +382,22 @@ def main():
         loader = yaml.Loader(f)
         platforms_data = loader.get_data()
 
+    # Rebind PULP_SEMAPHORE to the current event loop.
+    pulp_client_module.PULP_SEMAPHORE = asyncio.Semaphore(BOOTSTRAP_CONCURRENCY)
+
     pulp_client = PulpClient(pulp_host, pulp_user, pulp_password)
 
-    sync(setup_all())
+    await setup_all()
 
     for platform_data in platforms_data:
         if args.only_update:
-            sync(update_platform(platform_data))
+            await update_platform(platform_data)
             platform_name = platform_data.get("name")
             logger.info(
                 "Updating %s platform data is completed",
                 platform_name,
             )
-            db_repos = sync(get_repositories_for_update(platform_name))
+            db_repos = await get_repositories_for_update(platform_name)
             repos_to_update = {}
             for repo in platform_data.get("repositories", []):
                 for db_repo in db_repos:
@@ -412,7 +415,7 @@ def main():
                 platform_name,
             )
             for repo_id, repo_data in repos_to_update.items():
-                sync(update_repository(repo_id, repo_data))
+                await update_repository(repo_id, repo_data)
             logger.info(
                 "Updating repository data for platform %s is completed",
                 platform_name,
@@ -426,17 +429,15 @@ def main():
 
         # populate repos cache (parallel, bounded by BOOTSTRAP_CONCURRENCY)
         logger.info('Making repository data cache')
-        sync(populate_repo_cache(pulp_client, repositories_data))
+        await populate_repo_cache(pulp_client, repositories_data)
 
         # process repos in parallel (bounded by BOOTSTRAP_CONCURRENCY)
-        results = sync(
-            process_repositories(
-                pulp_client,
-                repositories_data,
-                args.no_remotes,
-                args.no_sync,
-                logger,
-            )
+        results = await process_repositories(
+            pulp_client,
+            repositories_data,
+            args.no_remotes,
+            args.no_sync,
+            logger,
         )
         repos_to_sync = []
         for repo_id, sync_info in results:
@@ -444,10 +445,14 @@ def main():
             if sync_info is not None:
                 repos_to_sync.append(sync_info)
         if repos_to_sync and not args.no_sync:
-            sync(sync_repositories(repos_to_sync, pulp_client))
+            await sync_repositories(repos_to_sync, pulp_client)
             return
-        sync(add_repositories_to_platform(platform_data, repository_ids))
-        sync(add_owner_id())
+        await add_repositories_to_platform(platform_data, repository_ids)
+        await add_owner_id()
+
+
+def main():
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":
