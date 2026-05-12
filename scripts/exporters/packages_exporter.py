@@ -202,16 +202,34 @@ class PackagesExporter(BasePulpExporter):
         self,
         platform_name: str,
         only_released: bool = False,
+        max_attempts: int = 5,
+        initial_backoff: float = 2.0,
     ):
         endpoint = "errata/get_new_oval_xml/"
-        return await self.make_request(
-            "GET",
-            endpoint,
-            params={
-                "platform_name": platform_name,
-                "only_released": str(only_released).lower(),
-            },
-        )
+        params = {
+            "platform_name": platform_name,
+            "only_released": str(only_released).lower(),
+        }
+        backoff = initial_backoff
+        last_err = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return await self.make_request("GET", endpoint, params=params)
+            except Exception as err:
+                last_err = err
+                if attempt == max_attempts:
+                    self.logger.error(
+                        "Fetching OVAL for %s failed after %d attempts: %s",
+                        platform_name, attempt, err,
+                    )
+                    break
+                self.logger.warning(
+                    "Fetching OVAL for %s failed on attempt %d/%d: %s; retrying in %.1fs",
+                    platform_name, attempt, max_attempts, err, backoff,
+                )
+                await asyncio.sleep(backoff)
+                backoff *= 2
+        raise last_err
 
     async def generate_rss(self, platform, modern_cache):
         # Expect "AlmaLinux-9" here:
