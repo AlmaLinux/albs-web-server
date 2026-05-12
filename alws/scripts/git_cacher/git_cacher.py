@@ -84,9 +84,13 @@ async def run(
             cache[repo_name] = repo_meta
             to_index.append(repo_name)
     results = await asyncio.gather(
-        *list(gitea_client.index_repo(repo_name) for repo_name in to_index)
+        *list(gitea_client.index_repo(repo_name) for repo_name in to_index),
+        return_exceptions=True,
     )
     for result in results:
+        if isinstance(result, BaseException):
+            logger.error('Skipping repo due to error: %s', result)
+            continue
         cache_record = cache[result['repo_name']]
         cache_record['tags'] = [tag['name'] for tag in result['tags']]
         if organization == 'autopatch':
@@ -120,16 +124,24 @@ async def main():
     wait = 600
     while True:
         logger.info('Checking cache for updates')
-        await asyncio.gather(*(
-            run(config, logger, redis_client, gitea_client, organization)
-            for organization in (
-                # projects git data live in these gitea orgs
-                'rpms',
-                'modules',
-                # almalinux modified packages live in autopatch gitea org
-                'autopatch',
-            )
-        ))
+        org_results = await asyncio.gather(
+            *(
+                run(config, logger, redis_client, gitea_client, organization)
+                for organization in (
+                    # projects git data live in these gitea orgs
+                    'rpms',
+                    'modules',
+                    # almalinux modified packages live in autopatch gitea org
+                    'autopatch',
+                )
+            ),
+            return_exceptions=True,
+        )
+        for org_result in org_results:
+            if isinstance(org_result, BaseException):
+                logger.error(
+                    'Cache update for organization failed: %s', org_result
+                )
         logger.info(
             'Cache has been updated, waiting for %d secs for next update',
             wait,
