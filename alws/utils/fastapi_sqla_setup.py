@@ -20,11 +20,19 @@ async def setup_all():
 
 async def async_setup():
     for key in async_keys:
-        if key not in _async_session_factories:
-            await async_startup(key)
+        existing = _async_session_factories.pop(key, None)
+        if existing is not None:
+            engine = existing.kw.get('bind')
+            if engine is not None:
+                await engine.dispose()
+        await async_startup(key)
 
 
 def sync_setup():
     for key in sync_keys:
-        if key not in _session_factories:
-            startup(key)
+        existing = _session_factories.pop(key, None)
+        if existing is not None:
+            engine = existing.kw.get('bind')
+            if engine is not None:
+                engine.dispose()
+        startup(key)
