@@ -49,6 +49,15 @@ def parse_args():
         help="Do not sync repositories with " "corresponding remotes",
     )
     parser.add_argument(
+        "--use-remote-url",
+        action="store_true",
+        default=False,
+        required=False,
+        help="Use remote_url directly as the repository URL even for "
+        "production repos, skipping Pulp repo/remote creation and sync. "
+        "Intended for dev instances that should not sync from remotes.",
+    )
+    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -261,6 +270,7 @@ async def process_repository(
     repo_info: dict,
     no_remotes: bool,
     no_sync: bool,
+    use_remote_url: bool,
     logger: logging.Logger,
 ):
     """Process a single repo: create repo + remote, return (id, sync_info)."""
@@ -269,6 +279,14 @@ async def process_repository(
     is_production = repo_info.get("production", False)
     repo_sync_policy = repo_info.pop("repository_sync_policy", None)
     remote_sync_policy = repo_info.pop("remote_sync_policy", None)
+
+    if use_remote_url and is_production:
+        logger.info(
+            "use_remote_url is enabled; treating production repo %s as "
+            "non-production (remote_url used directly, no Pulp sync)",
+            repo_name,
+        )
+        is_production = False
 
     repository = await get_repository(
         pulp_client, repo_info, repo_name, is_production, logger
@@ -317,6 +335,7 @@ async def process_repositories(
     repositories_data: list,
     no_remotes: bool,
     no_sync: bool,
+    use_remote_url: bool,
     logger: logging.Logger,
 ):
     sem = asyncio.Semaphore(BOOTSTRAP_CONCURRENCY)
@@ -324,7 +343,12 @@ async def process_repositories(
     async def bounded(repo_info):
         async with sem:
             return await process_repository(
-                pulp_client, repo_info, no_remotes, no_sync, logger
+                pulp_client,
+                repo_info,
+                no_remotes,
+                no_sync,
+                use_remote_url,
+                logger,
             )
 
     return await asyncio.gather(*(bounded(r) for r in repositories_data))
@@ -415,6 +439,8 @@ async def main_async():
                 platform_name,
             )
             for repo_id, repo_data in repos_to_update.items():
+                if args.use_remote_url and repo_data.get("remote_url"):
+                    repo_data = {**repo_data, "url": repo_data["remote_url"]}
                 await update_repository(repo_id, repo_data)
             logger.info(
                 "Updating repository data for platform %s is completed",
@@ -437,6 +463,7 @@ async def main_async():
             repositories_data,
             args.no_remotes,
             args.no_sync,
+            args.use_remote_url,
             logger,
         )
         repos_to_sync = []
