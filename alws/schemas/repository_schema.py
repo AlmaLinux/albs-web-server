@@ -58,6 +58,7 @@ class RepositoryUpdate(BaseModel):
     export_path: typing.Optional[str] = None
     pulp_href: typing.Optional[str] = None
     mock_enabled: bool = True
+    url: typing.Optional[str] = None
 
 
 class RepositorySync(BaseModel):
