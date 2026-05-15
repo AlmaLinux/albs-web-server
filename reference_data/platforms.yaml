@@ -59,6 +59,17 @@
         "%modsign_os": "almalinux8"
       secure_boot_additional_packages:
         - al-signing-client
+      secure_boot_required_packages:
+        - fwupd
+        - fwupd-efi
+        - fwupdate
+        - grub2
+        - kernel
+        - kernel-rt
+        - kmod-kvdo
+        - kmod-redhat-oracleasm
+        - nvidia-open-kmod
+        - shim
     mock_dist: el8
     timeout: 43200
     versions:
@@ -1760,6 +1771,17 @@
         "%modsign_os": "almalinux9"
       secure_boot_additional_packages:
         - al-signing-client
+      secure_boot_required_packages:
+        - fwupd
+        - fwupd-efi
+        - fwupdate
+        - grub2
+        - kernel
+        - kernel-rt
+        - kmod-kvdo
+        - kmod-redhat-oracleasm
+        - nvidia-open-kmod
+        - shim
     mock_dist: el9
     timeout: 43200
     versions:
@@ -3486,6 +3508,17 @@
         "%modsign_os": "almalinux10"
       secure_boot_additional_packages:
         - al-signing-client
+      secure_boot_required_packages:
+        - fwupd
+        - fwupd-efi
+        - fwupdate
+        - grub2
+        - kernel
+        - kernel-rt
+        - kmod-kvdo
+        - kmod-redhat-oracleasm
+        - nvidia-open-kmod
+        - shim
     mock_dist: el10
     timeout: 43200
     versions:
@@ -5538,6 +5571,17 @@
         "%modsign_os": "almalinux10"
       secure_boot_additional_packages:
         - al-signing-client
+      secure_boot_required_packages:
+        - fwupd
+        - fwupd-efi
+        - fwupdate
+        - grub2
+        - kernel
+        - kernel-rt
+        - kmod-kvdo
+        - kmod-redhat-oracleasm
+        - nvidia-open-kmod
+        - shim
     mock_dist: el10
     timeout: 172800
     yum:
