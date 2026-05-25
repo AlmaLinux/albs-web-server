@@ -74,6 +74,11 @@ jobs:
             src:
               - added|modified: 'alws/**/*.py'
               - added|modified: 'scripts/**/*.py'
+            code:
+              - added|modified: '**'
+              - '!**/*.yml'
+              - '!**/*.yaml'
+              - '!**/*.md'
 
       - name: Prepare GPG key
         run: |
@@ -120,6 +125,7 @@ jobs:
 
       # Run pytest ignoring tests/test_oval due to inability to clone oval-processor
       - name: Run pytest
+        if: ${{ steps.changed-files.outputs.code == 'true' }}
         run: |
           docker compose run --rm web_server_tests bash -o pipefail -c "
             pytest -v --ignore tests/test_oval --cov \
@@ -129,6 +135,7 @@ jobs:
 
       - name: Check migrations
         run: docker compose run --rm web_server_tests alembic --config alws/alembic.ini upgrade head
+        if: ${{ steps.changed-files.outputs.code == 'true' }}
 
       - name: Stop services
         if: always()
@@ -175,3 +182,45 @@ jobs:
         run: |
           cat $REPORTS_DIR/{coverage,pytest,pylint,black,isort,bandit}-report.md \
             > $GITHUB_STEP_SUMMARY 2>/dev/null || true
+
+  check-reference-repos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'reference_data/**'
+              - 'scripts/check_repos_existence.py'
+              - '.github/workflows/preflight.yml'
+
+      - name: Set up Python
+        if: steps.changes.outputs.relevant == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        if: steps.changes.outputs.relevant == 'true'
+        run: pip install requests PyYAML
+
+      - name: Check remote_url reachability
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          status=0
+          shopt -s nullglob
+          for f in reference_data/*.yml reference_data/*.yaml; do
+            if grep -q '^\s*remote_url:' "$f"; then
+              echo "::group::$f"
+              python scripts/check_repos_existence.py "$f" || status=1
+              echo "::endgroup::"
+            fi
+          done
+          exit $status
