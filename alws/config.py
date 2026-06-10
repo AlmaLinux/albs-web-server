@@ -93,6 +93,8 @@ class Settings(BaseSettings):
 
     logging_level: Optional[str] = 'INFO'
 
+    build_task_expiration_minutes: int = 20
+
     frontend_baseurl: Annotated[str, Field(validate_default=True)] = (
         'http://localhost:8080'
     )
