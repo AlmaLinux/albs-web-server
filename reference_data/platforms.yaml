@@ -3500,8 +3500,8 @@
     - arch: i686
       name: almalinux-10-devel
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/devel/i686/os/
-      export_path: almalinux/10/devel/i686/os/
+      remote_url: http://vault.almalinux.org/10/devel/i686/os/
+      export_path: vault/10/devel/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3657,8 +3657,8 @@
     - arch: i686
       name: almalinux-10-appstream
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/AppStream/i686/os/
-      export_path: almalinux/10/AppStream/i686/os/
+      remote_url: http://vault.almalinux.org/10/AppStream/i686/os/
+      export_path: vault/10/AppStream/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3824,8 +3824,8 @@
     - arch: i686
       name: almalinux-10-baseos
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/BaseOS/i686/os/
-      export_path: almalinux/10/BaseOS/i686/os/
+      remote_url: http://vault.almalinux.org/10/BaseOS/i686/os/
+      export_path: vault/10/BaseOS/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -3971,8 +3971,8 @@
     - arch: i686
       name: almalinux-10-highavailability
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/HighAvailability/i686/os/
-      export_path: almalinux/10/HighAvailability/i686/os/
+      remote_url: http://vault.almalinux.org/10/HighAvailability/i686/os/
+      export_path: vault/10/HighAvailability/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4128,8 +4128,8 @@
     - arch: i686
       name: almalinux-10-extras
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/extras/i686/os/
-      export_path: almalinux/10/extras/i686/os/
+      remote_url: http://vault.almalinux.org/10/extras/i686/os/
+      export_path: vault/10/extras/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4285,8 +4285,8 @@
     - arch: i686
       name: almalinux-10-crb
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/crb/i686/os/
-      export_path: almalinux/10/crb/i686/os/
+      remote_url: http://vault.almalinux.org/10/CRB/i686/os/
+      export_path: vault/10/CRB/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4365,8 +4365,8 @@
     - arch: i686
       name: almalinux-10-crb-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10/crb/debug/i686/
-      export_path: vault/10/crb/debug/i686/
+      remote_url: http://vault.almalinux.org/10/CRB/debug/i686/
+      export_path: vault/10/CRB/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4546,8 +4546,8 @@
     - arch: i686
       name: almalinux-10-sap
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/sap/i686/os/
-      export_path: almalinux/10/sap/i686/os/
+      remote_url: http://vault.almalinux.org/10/SAP/i686/os/
+      export_path: vault/10/SAP/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4626,8 +4626,8 @@
     - arch: i686
       name: almalinux-10-sap-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10/sap/debug/i686/
-      export_path: vault/10/sap/debug/i686/
+      remote_url: http://vault.almalinux.org/10/SAP/debug/i686/
+      export_path: vault/10/SAP/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4703,8 +4703,8 @@
     - arch: i686
       name: almalinux-10-saphana
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/saphana/i686/os/
-      export_path: almalinux/10/saphana/i686/os/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/i686/os/
+      export_path: vault/10/SAPHANA/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -4783,8 +4783,8 @@
     - arch: i686
       name: almalinux-10-saphana-debuginfo
       type: rpm
-      remote_url: http://vault.almalinux.org/10/saphana/debug/i686/
-      export_path: vault/10/saphana/debug/i686/
+      remote_url: http://vault.almalinux.org/10/SAPHANA/debug/i686/
+      export_path: vault/10/SAPHANA/debug/i686/
       production: true
       debug: true
       remote_sync_policy: on_demand
@@ -4910,8 +4910,8 @@
     - arch: i686
       name: almalinux-10-plus
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/plus/i686/os/
-      export_path: almalinux/10/plus/i686/os/
+      remote_url: http://vault.almalinux.org/10/plus/i686/os/
+      export_path: vault/10/plus/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5050,8 +5050,8 @@
     - arch: i686
       name: almalinux-10-testing
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/testing/i686/os/
-      export_path: almalinux/10/testing/i686/os/
+      remote_url: http://vault.almalinux.org/10/testing/i686/os/
+      export_path: vault/10/testing/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
@@ -5214,8 +5214,8 @@
     - arch: i686
       name: almalinux-10-synergy
       type: rpm
-      remote_url: http://repo.almalinux.org/almalinux/10/synergy/i686/os/
-      export_path: almalinux/10/synergy/i686/os/
+      remote_url: http://vault.almalinux.org/10/synergy/i686/os/
+      export_path: vault/10/synergy/i686/os/
       production: true
       debug: false
       remote_sync_policy: on_demand
