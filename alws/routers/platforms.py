@@ -45,15 +45,27 @@ async def get_platforms(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     platforms = await pl_crud.get_platforms(db)
-    return [
-        {
-            **platform_schema.PlatformResponse.from_orm(platform).dict(
-                exclude={"data"}
-            ),
-            "data": {"versions": (platform.data or {}).get("versions", [])},
-        }
-        for platform in platforms
-    ]
+    result = []
+    for platform in platforms:
+        platform_data = platform.data or {}
+        mock_data = platform_data.get("mock", {}) or {}
+        result.append(
+            {
+                **platform_schema.PlatformResponse.from_orm(platform).dict(
+                    exclude={"data"}
+                ),
+                "data": {
+                    "versions": platform_data.get("versions", []),
+                    # Expose the list of SRPM names that must be built with
+                    # secure boot enabled so the UI can warn the user when
+                    # one of these packages is queued without is_secure_boot.
+                    "secure_boot_required_packages": mock_data.get(
+                        "secure_boot_required_packages", []
+                    ),
+                },
+            }
+        )
+    return result
 
 
 @router.patch(
