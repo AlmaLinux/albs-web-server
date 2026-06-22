@@ -2,7 +2,7 @@ import typing
 
 from fastapi import APIRouter, Depends
 from fastapi_sqla import AsyncSessionDependency
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
