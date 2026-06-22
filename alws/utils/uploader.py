@@ -222,6 +222,9 @@ class MetadataUploader:
                 self.session.add(task)
             await self.session.flush()
 
+        removed_pkgs = get_removed_rpm_packages_from_latest_repo_version(
+            get_uuid_from_pulp_href(repo_href),
+        )
         final_additions = module_hrefs.copy()
         if defaults_hrefs:
             final_additions.extend(defaults_hrefs)
@@ -234,9 +237,6 @@ class MetadataUploader:
                 add=final_additions,
                 remove=modules_in_version,
             )
-        removed_pkgs = get_removed_rpm_packages_from_latest_repo_version(
-            get_uuid_from_pulp_href(repo_href),
-        )
         if removed_pkgs:
             logging.info('Adding removed packages to repository')
             await self.pulp.modify_repository(
