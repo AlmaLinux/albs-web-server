@@ -950,10 +950,17 @@ class PulpClient:
         info = await self.get_artifact(entity_href, include_fields=["sha256"])
         return entity_href, info["sha256"], artifact
 
-    async def wait_for_task(self, task_href: str, sleep_time: float = 5.0):
+    async def wait_for_task(
+        self,
+        task_href: str,
+        sleep_time: float = 0.5,
+        max_sleep: float = 10.0,
+    ):
         task = await self.request("GET", task_href)
+        current_sleep = sleep_time
         while task["state"] not in ("failed", "completed"):
-            await asyncio.sleep(sleep_time)
+            await asyncio.sleep(current_sleep)
+            current_sleep = min(current_sleep * 2, max(max_sleep, sleep_time))
             task = await self.request("GET", task_href)
         if task["state"] == "failed":
             error = task.get("error")
