@@ -16,6 +16,7 @@ import asyncio
 
 import dramatiq
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+from dramatiq.middleware.prometheus import Prometheus
 
 from alws.config import settings
 
@@ -26,6 +27,11 @@ rabbitmq_broker = RabbitmqBroker(
     f"{settings.rabbitmq_default_host}:5672/"
     f"{settings.rabbitmq_default_vhost}",
 )
+# Instruments every actor with per-task duration/count/error/retry metrics
+# (queue_name, actor_name labels) and serves them on :9191 per worker process.
+# Metrics from alws.utils.metrics (track_time) ride the same multiprocess
+# exposition when PROMETHEUS_MULTIPROC_DIR is set in the worker environment.
+rabbitmq_broker.add_middleware(Prometheus())
 dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
 
