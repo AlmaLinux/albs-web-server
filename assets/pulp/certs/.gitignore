@@ -1,0 +1,4 @@
+# Keep this dir tracked but never commit generated keys/certs (secrets).
+*
+!.gitkeep
+!.gitignore

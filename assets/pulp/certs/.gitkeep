@@ -1,0 +1,2 @@
+# Pulp writes database_fields.symmetric.key here on first migration.
+# Back this directory up — losing the key makes encrypted DB fields unrecoverable.
