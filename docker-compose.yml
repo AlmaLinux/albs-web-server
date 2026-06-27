@@ -1,3 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pulp runs as a scalable multi-container stack (pulp-minimal + pulp-web), based
+# on pulp-oci-images, instead of the old all-in-one pulp/pulp image.
+#
+# The services that talk to Pulp (web_server + the task_queue_* workers) read
+# their Pulp config from vars.env (env_file). For the dev stack, vars.env MUST
+# set these to reach the stack below — NOT the test_db defaults:
+#   PULP_HOST=http://pulp                  # pulp_web alias, nginx on :80. Do NOT
+#                                          # use "pulp_web": Django rejects the
+#                                          # underscore in the Host header.
+#   PULP_USER=admin
+#   PULP_PASSWORD=password
+#   PULP_DATABASE_URL=postgresql+psycopg2://postgres:password@postgres:5432/pulp
+#   PULP_ASYNC_DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/pulp
+#   FASTAPI_SQLA__PULP__SQLALCHEMY_URL=postgresql+psycopg2://postgres:password@postgres:5432/pulp
+#   FASTAPI_SQLA__PULP_ASYNC__SQLALCHEMY_URL=postgresql+asyncpg://postgres:password@postgres:5432/pulp
+# (tests/test-vars.env keeps these pointed at test_db for the test suite.)
+# ─────────────────────────────────────────────────────────────────────────────
 services:
 
   test_db:
@@ -132,7 +150,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
     logging:
       driver: "json-file"
       options:
@@ -156,7 +174,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -181,7 +199,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -206,7 +224,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -231,7 +249,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -256,7 +274,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -315,7 +333,7 @@ services:
     restart: on-failure
     depends_on:
       - db
-      - pulp
+      - pulp_api
       - rabbitmq
     logging:
       driver: "json-file"
@@ -463,30 +481,208 @@ services:
         max-size: "100Mb"
         max-file: "3"
 
-  pulp:
-    image: pulp/pulp:3.49.1
+  # ───────────────────────────────────────────────────────────────────────────
+  # Pulp — scalable multi-container stack (pulp-minimal + pulp-web), replacing
+  # the old all-in-one pulp/pulp image. Config assets live under ./assets/pulp/.
+  # The ALBS services reach this via vars.env (host "pulp", DB "postgres") — see
+  # the PULP_* notes at the top of this file. DEV ONLY: postgres/password,
+  # admin/password.
+  # ───────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
     ports:
-      - 8081:80
-      - 5431:5432
+      - "5431:5432"   # host:container — keeps the old all-in-one's external port
+    env_file:
+      - pulp-postgres.env
     volumes:
-      - "../volumes/pulp/settings:/etc/pulp:z"
-      - "../volumes/pulp/exports:/srv/exports:z"
-      - "../volumes/pulp/pulp_storage:/var/lib/pulp:z"
-      - "../volumes/pulp/pgsql:/var/lib/pgsql:z"
-      - "../volumes/pulp/containers:/var/lib/containers:z"
-      - "./pulp_init.sh:/usr/local/bin/pulp_init.sh:z"
-    devices:
-      - "/dev/fuse"
-    restart: on-failure
+      - "../volumes/pulp/pgsql_16:/var/lib/postgresql/data:z"
+    restart: always
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
     logging:
       driver: "json-file"
       options:
         max-size: "100Mb"
         max-file: "3"
-    #  echo "listen_addresses = '*'" >> /var/lib/pgsql/data/postgresql.conf &&
-    #  echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
-    #  echo "host all all ::/0 md5" >> /var/lib/pgsql/data/pg_hba.conf &&
-    #  runuser postgres -c 'echo "ALTER USER postgres WITH PASSWORD '"'"'password'"'"';" | /usr/bin/psql'
+
+  pulp_redis:
+    image: redis
+    volumes:
+      - "pulp_redis:/data"
+    restart: always
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  pulp_migration:
+    image: pulp/pulp-minimal:3.49.1
+    # pulp-minimal (unlike the old all-in-one image) does NOT auto-generate the
+    # DB field-encryption key. Generate it here on first run if missing, then
+    # migrate. The key persists in the ./assets/pulp/certs bind mount — back it
+    # up; losing it makes encrypted DB fields unrecoverable.
+    command: |
+      bash -c "
+        set -e
+        if [ ! -s /etc/pulp/certs/database_fields.symmetric.key ]; then
+          echo 'Generating Pulp DB encryption key...'
+          python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())' > /etc/pulp/certs/database_fields.symmetric.key
+          chmod 0644 /etc/pulp/certs/database_fields.symmetric.key
+        fi
+        pulpcore-manager migrate --noinput"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - "./assets/pulp/settings.py:/etc/pulp/settings.py:z"
+      - "./assets/pulp/certs:/etc/pulp/certs:z"
+      - "pulp_storage:/var/lib/pulp"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  pulp_set_init_password:
+    image: pulp/pulp-minimal:3.49.1
+    command: set_init_password.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pulp_migration:
+        condition: service_completed_successfully
+    environment:
+      PULP_DEFAULT_ADMIN_PASSWORD: password
+    volumes:
+      - "./assets/pulp/settings.py:/etc/pulp/settings.py:z"
+      - "./assets/pulp/certs:/etc/pulp/certs:z"
+      - "pulp_storage:/var/lib/pulp"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  pulp_api:
+    image: pulp/pulp-minimal:3.49.1
+    command: ['pulp-api']
+    hostname: pulp-api
+    user: pulp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pulp_redis:
+        condition: service_healthy
+      pulp_migration:
+        condition: service_completed_successfully
+      pulp_set_init_password:
+        condition: service_completed_successfully
+    volumes:
+      - "./assets/pulp/settings.py:/etc/pulp/settings.py:z"
+      - "./assets/pulp/certs:/etc/pulp/certs:z"
+      - "pulp_storage:/var/lib/pulp"
+      - "../volumes/pulp/exports:/srv/exports:z"
+    restart: always
+    healthcheck:
+      test: readyz.py /pulp/api/v3/status/
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  pulp_content:
+    image: pulp/pulp-minimal:3.49.1
+    command: ['pulp-content']
+    hostname: pulp-content
+    user: pulp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pulp_redis:
+        condition: service_healthy
+      pulp_migration:
+        condition: service_completed_successfully
+    volumes:
+      - "./assets/pulp/settings.py:/etc/pulp/settings.py:z"
+      - "./assets/pulp/certs:/etc/pulp/certs:z"
+      - "pulp_storage:/var/lib/pulp"
+    restart: always
+    healthcheck:
+      test: readyz.py /pulp/content/
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  pulp_worker:
+    image: pulp/pulp-minimal:3.49.1
+    command: ['pulp-worker']
+    user: pulp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pulp_redis:
+        condition: service_healthy
+      pulp_migration:
+        condition: service_completed_successfully
+    volumes:
+      - "./assets/pulp/settings.py:/etc/pulp/settings.py:z"
+      - "./assets/pulp/certs:/etc/pulp/certs:z"
+      - "pulp_storage:/var/lib/pulp"
+      - "../volumes/pulp/exports:/srv/exports:z"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
+  # nginx front end. Aliased to "pulp" so ALBS can reach it at http://pulp (the
+  # old all-in-one service name); listens on :80 internally.
+  pulp_web:
+    image: pulp/pulp-web:3.49.1
+    command: ['/usr/bin/nginx.sh']
+    hostname: pulp
+    user: root
+    ports:
+      - "8081:80"   # host:container — browse Pulp at http://localhost:8081/
+    depends_on:
+      pulp_api:
+        condition: service_healthy
+      pulp_content:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - pulp
+    volumes:
+      - "./assets/pulp/bin/nginx.sh:/usr/bin/nginx.sh:Z"
+      - "./assets/pulp/nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:Z"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
 
   mosquitto:
     image: eclipse-mosquitto:2.0
@@ -573,3 +769,8 @@ services:
 
 volumes:
   redis:
+  pulp_redis:
+  # Pulp content store. Named volume (not a host bind mount) so Docker populates
+  # it from the image — preserving /var/lib/pulp/tmp and the uid:700 (pulp)
+  # ownership the pulp-minimal services need.
+  pulp_storage:
