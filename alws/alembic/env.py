@@ -7,11 +7,16 @@ from sqlalchemy import engine_from_config, pool
 # Check why this is needed:
 # https://stackoverflow.com/questions/45695008/alembic-trying-to-delete-my-tables
 import alws.models
+from alws.config import settings
 from alws.database import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Set the DB URL from application settings instead of hardcoding it in
+# alembic.ini, so it can be overridden via environment variables.
+config.set_main_option("sqlalchemy.url", settings.sync_database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

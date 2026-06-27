@@ -128,7 +128,7 @@ jobs:
               --cov-report=term | tee $REPORTS_DIR/pytest-output.txt"
 
       - name: Check migrations
-        run: docker compose run --rm web_server_tests alembic --config tests/test-alembic.ini upgrade head
+        run: docker compose run --rm web_server_tests alembic --config alws/alembic.ini upgrade head
 
       - name: Stop services
         if: always()
