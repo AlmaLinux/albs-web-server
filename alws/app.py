@@ -29,7 +29,14 @@ AUTH_TAG = 'auth'
 sentry_init()
 
 
-app = FastAPI()
+# Unless explicitly enabled (dev/local), disable Swagger UI "Try it out" so that
+# no endpoint (and especially no mutating one) can be executed against the live
+# server from /docs. The schema stays fully browsable; it's just not callable.
+swagger_ui_parameters = None
+if not settings.swagger_try_it_out_enabled:
+    swagger_ui_parameters = {"supportedSubmitMethods": []}
+
+app = FastAPI(swagger_ui_parameters=swagger_ui_parameters)
 app.add_event_handler("startup", limiter_startup)
 app.add_event_handler("shutdown", limiter_shutdown)
 app.add_middleware(ExceptionMiddleware, handlers=handlers)

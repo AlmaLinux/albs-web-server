@@ -91,6 +91,11 @@ class Settings(BaseSettings):
 
     documentation_path: str = 'alws/documentation/'
 
+    # When False, the Swagger UI "Try it out" button is removed from /docs so
+    # that endpoints can't be executed against the live server. Enable it only
+    # on dev/local environments.
+    swagger_try_it_out_enabled: bool = False
+
     logging_level: Optional[str] = 'INFO'
 
     frontend_baseurl: Annotated[str, Field(validate_default=True)] = (
