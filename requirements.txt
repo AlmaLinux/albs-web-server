@@ -2,7 +2,7 @@ PyYAML==6.0.2
 SQLAlchemy==2.0.36
 aiofiles==24.1.0
 aiohttp-retry==2.9.1
-aiohttp==3.11.11
+aiohttp==3.13.5
 aioredis==2.0.1
 alembic-postgresql-enum==1.4.0
 alembic==1.14.0
@@ -19,10 +19,10 @@ fastapi-users[all]==14.0.0
 fastapi==0.115.6
 feedgen==1.0.0
 httpx-oauth==0.15.1
-jinja2==3.1.5
+jinja2==3.1.6
 jmespath==1.0.1
-lxml==5.3.0
-markdown==3.7
+lxml==6.1.1
+markdown==3.9
 pgpy==0.6.0
 plumbum==1.9.0
 psycopg2-binary==2.9.10
