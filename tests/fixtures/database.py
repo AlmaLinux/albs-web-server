@@ -7,12 +7,39 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.pool import NullPool
 
+from fastapi_sqla.async_sqla import _async_session_factories
+from fastapi_sqla.sqla import _session_factories
+
 from alws import models
 from alws.config import settings
 from alws.database import Base
 from alws.dependencies import get_async_db_key
 from alws.utils.fastapi_sqla_setup import setup_all
 from tests.constants import ADMIN_USER_ID, CUSTOM_USER_ID
+
+
+async def reset_session_factories():
+    """Dispose and drop cached fastapi-sqla session factories.
+
+    ``setup_all()`` is idempotent: it reuses any session factory that is
+    already registered. That is correct in production, where every service
+    runs on a single, long-lived event loop. The test suite, however, runs
+    each module on its own event loop, so a factory (and its asyncpg pool)
+    cached on a previous module's loop would raise "got Future attached to a
+    different loop" when reused here. Clearing the caches per module forces
+    ``setup_all()`` to rebuild the engines on the current loop.
+    """
+    for factory in _async_session_factories.values():
+        engine = factory.kw.get('bind')
+        if engine is not None:
+            await engine.dispose()
+    _async_session_factories.clear()
+
+    for factory in _session_factories.values():
+        engine = factory.kw.get('bind')
+        if engine is not None:
+            engine.dispose()
+    _session_factories.clear()
 
 
 @pytest.fixture
@@ -80,6 +107,7 @@ async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    await reset_session_factories()
     await setup_all()
     async with open_async_session(get_async_db_key()) as async_session:
         for user_data in get_user_data():
