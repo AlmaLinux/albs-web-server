@@ -15,7 +15,7 @@ class CreateFlavour(BaseModel):
 class UpdateFlavour(BaseModel):
     name: str
     modularity: typing.Optional[dict] = None
-    repositories: typing.Optional[typing.List[RepositoryCreate]] = None
+    repositories: typing.Optional[typing.List[RepositoryCreate]] = []
     data: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 

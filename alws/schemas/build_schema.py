@@ -380,7 +380,12 @@ async def _get_module_ref(
         response = await gitea_client.get_branch(
             f'rpms/{gitea_component_name}', git_ref
         )
-        commit_id = response['commit']['id']
+        if not response:
+            exist = False
+        else:
+            commit_id = response['commit']['id']
+    except TypeError:
+        raise
     except aiohttp.client_exceptions.ClientResponseError as e:
         if e.status == 404:
             exist = False
