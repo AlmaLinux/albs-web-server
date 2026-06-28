@@ -125,11 +125,16 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
         task.status = TestTaskStatus.STARTED
         task.scheduled_at = datetime.datetime.utcnow()
         test_configuration = task.build_task.ref.test_configuration
+        test_distr_version = (
+            f'{platform.distr_version}-kitten'
+            if 'kitten' in platform.name.lower()
+            else platform.distr_version
+        )
         payload = {
             'bs_task_id': task.id,
             'runner_type': 'docker',
             'dist_name': platform.test_dist_name,
-            'dist_version': platform.distr_version,
+            'dist_version': test_distr_version,
             'dist_arch': task.env_arch,
             'package_name': task.package_name,
             'package_version': (
