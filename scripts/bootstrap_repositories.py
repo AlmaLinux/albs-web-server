@@ -473,7 +473,6 @@ async def main_async():
                 repos_to_sync.append(sync_info)
         if repos_to_sync and not args.no_sync:
             await sync_repositories(repos_to_sync, pulp_client)
-            return
         await add_repositories_to_platform(platform_data, repository_ids)
         await add_owner_id()
 
