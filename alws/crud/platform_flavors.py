@@ -76,9 +76,11 @@ async def update_flavour(db, flavour: UpdateFlavour) -> models.PlatformFlavour:
     db_flavour = await find_flavour_by_name(db, flavour.name)
     if not db_flavour:
         return
-    for key in ("name", "modularity", "data"):
+    for key in ("name", "modularity"):
         if getattr(flavour, key):
             setattr(db_flavour, key, getattr(flavour, key))
+    # always sync `data` so it can be cleared (set to None) on update
+    db_flavour.data = flavour.data
     for repo in flavour.repositories:
         db_repo = await db.execute(
             select(models.Repository).where(
