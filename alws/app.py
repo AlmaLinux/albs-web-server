@@ -14,6 +14,7 @@ from alws.auth.schemas import UserRead
 from alws.config import settings
 from alws.middlewares import handlers
 from alws.utils.limiter import limiter_shutdown, limiter_startup
+from alws.utils.metrics import PrometheusMiddleware, metrics_app
 from alws.utils.sentry import sentry_init
 
 logging.basicConfig(level=settings.logging_level)
@@ -40,6 +41,8 @@ app = FastAPI(swagger_ui_parameters=swagger_ui_parameters)
 app.add_event_handler("startup", limiter_startup)
 app.add_event_handler("shutdown", limiter_shutdown)
 app.add_middleware(ExceptionMiddleware, handlers=handlers)
+app.add_middleware(PrometheusMiddleware)
+app.mount("/metrics", metrics_app())
 fastapi_sqla_setup(app)
 
 for module in ROUTERS:
