@@ -6,7 +6,7 @@ aiohttp==3.13.5
 aioredis==2.0.1
 alembic-postgresql-enum==1.4.0
 alembic==1.14.0
-asyncpg==0.30.0
+asyncpg==0.31.0
 dramatiq[rabbitmq, watch]==1.17.1
 email-validator>=2.0
 # Can be updated only after migration to SQLAlchemy > 2.0
