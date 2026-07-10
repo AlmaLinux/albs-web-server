@@ -24,7 +24,7 @@ from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
 
-PULP_SEMAPHORE = asyncio.Semaphore(5)
+PULP_SEMAPHORE = asyncio.Semaphore(settings.pulp_semaphore_limit)
 
 
 class PulpClient:

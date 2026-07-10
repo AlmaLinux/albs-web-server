@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
+    pulp_semaphore_limit: int = 20
     pulp_database_url: str = (
         'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
     )
