@@ -127,31 +127,37 @@ async def get_builds(
         "arch": rpm_arch,
     }
 
-    async def generate_query(count=False):
-        query = (
-            select(models.Build)
-            .join(
-                models.Build.tasks,
-            )
-            .join(
-                models.BuildTask.ref,
-            )
-            .join(
-                models.BuildTask.artifacts,
-                isouter=True,
-            )
-            .order_by(models.Build.id.desc())
-            .options(
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.platform
-                ),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.ref
-                ),
-                selectinload(models.Build.owner),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.artifacts
-                ),
+    pulp_hrefs = None
+    has_rpm_filter = any(rpm_params.values())
+    if has_rpm_filter:
+        pulp_params.update({
+            key: value
+            for key, value in rpm_params.items()
+            if value is not None
+        })
+        pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
+        pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
+
+    async def generate_query(count=False, minimal=False):
+        load_options = [
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.platform
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.ref
+            ),
+            selectinload(models.Build.owner),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.artifacts
+            ),
+            selectinload(models.Build.tasks).selectinload(
+                models.BuildTask.rpm_modules
+            ),
+            selectinload(models.Build.platform_flavors),
+            selectinload(models.Build.products),
+        ]
+        if not minimal:
+            load_options.extend([
                 selectinload(models.Build.linked_builds),
                 selectinload(models.Build.tasks)
                 .selectinload(models.BuildTask.test_tasks)
@@ -160,14 +166,24 @@ async def get_builds(
                     models.BuildTask.performance_stats
                 ),
                 selectinload(models.Build.sign_tasks),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
-                ),
-                selectinload(models.Build.platform_flavors),
-                selectinload(models.Build.products),
+            ])
+        query = (
+            select(models.Build)
+            .join(
+                models.Build.tasks,
             )
-            .distinct(models.Build.id)
+            .join(
+                models.BuildTask.ref,
+            )
+            .order_by(models.Build.id.desc())
+            .options(*load_options)
         )
+
+        if has_rpm_filter:
+            query = query.join(
+                models.BuildTask.artifacts,
+                isouter=True,
+            ).distinct(models.Build.id)
 
         if build_id is not None:
             query = query.where(models.Build.id == build_id)
@@ -190,15 +206,7 @@ async def get_builds(
             query = query.filter(models.BuildTask.platform_id == platform_id)
         if build_task_arch is not None:
             query = query.filter(models.BuildTask.arch == build_task_arch)
-        if any(rpm_params.values()):
-            pulp_params.update({
-                key: value
-                for key, value in rpm_params.items()
-                if value is not None
-            })
-            # TODO: we can get packages from pulp database
-            pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
-            pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
+        if has_rpm_filter:
             query = query.filter(
                 sqlalchemy.and_(
                     models.BuildTaskArtifact.href.in_(pulp_hrefs),
@@ -227,7 +235,9 @@ async def get_builds(
     if page_number:
         return {
             "builds": (
-                (await db.execute(await generate_query())).scalars().all()
+                (await db.execute(await generate_query(minimal=True)))
+                .scalars()
+                .all()
             ),
             "total_builds": (
                 await db.execute(await generate_query(count=True))
