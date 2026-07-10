@@ -718,6 +718,34 @@ class PulpClient:
             **search_params,
         )
 
+    async def get_rpm_packages_by_hrefs(
+        self,
+        hrefs: typing.List[str],
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
+    ) -> typing.Dict[str, typing.Dict[str, typing.Any]]:
+        """Fetch multiple RPM packages by their hrefs in batched requests.
+
+        Returns a dict mapping pulp_href -> package data.
+        """
+        if not hrefs:
+            return {}
+        result = {}
+        # Pulp supports pulp_href__in filter; batch in groups to avoid
+        # excessively long query strings.
+        batch_size = 100
+        for i in range(0, len(hrefs), batch_size):
+            batch = hrefs[i : i + batch_size]
+            packages = await self.get_rpm_packages(
+                include_fields=include_fields,
+                exclude_fields=exclude_fields,
+                pulp_href__in=",".join(batch),
+                limit=len(batch),
+            )
+            for pkg in packages:
+                result[pkg["pulp_href"]] = pkg
+        return result
+
     async def get_rpm_repository_packages(
         self,
         repository_href: str,
