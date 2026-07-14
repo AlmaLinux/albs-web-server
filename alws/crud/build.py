@@ -88,6 +88,7 @@ async def create_build(
             db_build.platform_flavors.append(flavour)
     db.add(db_build)
     await db.flush()
+    await db.commit()
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
     return db_build
