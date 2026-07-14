@@ -88,6 +88,14 @@ async def create_build(
             db_build.platform_flavors.append(flavour)
     db.add(db_build)
     await db.flush()
+    # Commit before enqueueing so the build row is durable when the dramatiq
+    # worker looks it up. Sending inside the still-open request transaction
+    # races the worker: it can query the build before the row is committed (or
+    # after a rollback) and crash with "'NoneType' object has no attribute
+    # 'id'" in BuildPlanner.
+    await db.commit()
+    # commit expires the instance (expire_on_commit=True); refresh so the
+    # response model can read id/created_at/mock_options without a lazy load.
     await db.refresh(db_build)
     start_build.send(db_build.id, build.model_dump())
     return db_build
