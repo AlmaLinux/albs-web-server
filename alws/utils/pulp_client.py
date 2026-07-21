@@ -24,7 +24,7 @@ from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
 
-PULP_SEMAPHORE = asyncio.Semaphore(5)
+PULP_SEMAPHORE = asyncio.Semaphore(20)
 
 
 class PulpClient:
@@ -304,6 +304,7 @@ class PulpClient:
             "artifacts": artifacts,
             "dependencies": dependencies,
             "profiles": profiles,
+            "packages": [],
         }
         if packages:
             payload["packages"] = packages
@@ -692,12 +693,7 @@ class PulpClient:
             new_url = result.get("next")
             parsed_url = urllib.parse.urlsplit(new_url)
             new_url = parsed_url.path + "?" + parsed_url.query
-            result = await self.__get_content_info(
-                new_url,
-                include_fields=include_fields,
-                exclude_fields=exclude_fields,
-                **search_params,
-            )
+            result = await self.request("GET", new_url)
             all_entities.extend(result["results"])
         return all_entities
 
@@ -950,7 +946,7 @@ class PulpClient:
         info = await self.get_artifact(entity_href, include_fields=["sha256"])
         return entity_href, info["sha256"], artifact
 
-    async def wait_for_task(self, task_href: str, sleep_time: float = 5.0):
+    async def wait_for_task(self, task_href: str, sleep_time: float = 1.0):
         task = await self.request("GET", task_href)
         while task["state"] not in ("failed", "completed"):
             await asyncio.sleep(sleep_time)
