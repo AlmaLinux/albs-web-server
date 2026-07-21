@@ -525,7 +525,7 @@ services:
         max-file: "3"
 
   pulp_migration:
-    image: pulp/pulp-minimal:3.49.1
+    image: pulp/pulp-minimal:3.114.1
     # pulp-minimal (unlike the old all-in-one image) does NOT auto-generate the
     # DB field-encryption key. Generate it here on first run if missing, then
     # migrate. The key persists in the ./assets/pulp/certs bind mount — back it
@@ -553,7 +553,7 @@ services:
         max-file: "3"
 
   pulp_set_init_password:
-    image: pulp/pulp-minimal:3.49.1
+    image: pulp/pulp-minimal:3.114.1
     command: set_init_password.sh
     depends_on:
       postgres:
@@ -573,7 +573,7 @@ services:
         max-file: "3"
 
   pulp_api:
-    image: pulp/pulp-minimal:3.49.1
+    image: pulp/pulp-minimal:3.114.1
     command: ['pulp-api']
     hostname: pulp-api
     user: pulp
@@ -605,7 +605,7 @@ services:
         max-file: "3"
 
   pulp_content:
-    image: pulp/pulp-minimal:3.49.1
+    image: pulp/pulp-minimal:3.114.1
     command: ['pulp-content']
     hostname: pulp-content
     user: pulp
@@ -634,7 +634,7 @@ services:
         max-file: "3"
 
   pulp_worker:
-    image: pulp/pulp-minimal:3.49.1
+    image: pulp/pulp-minimal:3.114.1
     command: ['pulp-worker']
     user: pulp
     depends_on:
@@ -659,7 +659,7 @@ services:
   # nginx front end. Aliased to "pulp" so ALBS can reach it at http://pulp (the
   # old all-in-one service name); listens on :80 internally.
   pulp_web:
-    image: pulp/pulp-web:3.49.1
+    image: pulp/pulp-web:3.114.1
     command: ['/usr/bin/nginx.sh']
     hostname: pulp
     user: root

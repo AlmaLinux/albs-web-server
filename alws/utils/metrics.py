@@ -5,8 +5,9 @@ This module owns the metric definitions, the ASGI app exposed at ``/metrics``,
 the HTTP middleware that times every request, and a generic ``track_time``
 decorator for instrumenting arbitrary sync/async functions.
 
-Dramatiq workers run in separate processes and are instrumented separately
-(see ``alws/dramatiq/__init__.py``); they do not go through this middleware.
+Dramatiq workers run in separate processes and are instrumented separately by
+the dramatiq worker CLI's built-in Prometheus middleware; they do not go
+through this middleware.
 """
 
 import asyncio
