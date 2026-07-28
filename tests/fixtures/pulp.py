@@ -471,6 +471,22 @@ def get_rpm_distros(monkeypatch):
 
 
 @pytest.fixture
+def get_rpm_repositories(monkeypatch):
+    async def func(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(PulpClient, "get_rpm_repositories", func)
+
+
+@pytest.fixture
+def get_file_repositories(monkeypatch):
+    async def func(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(PulpClient, "get_file_repositories", func)
+
+
+@pytest.fixture
 def get_file_distros(monkeypatch):
     async def func(*args, **kwargs):
         return [

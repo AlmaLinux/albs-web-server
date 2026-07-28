@@ -305,44 +305,63 @@ async def remove_product(
         settings.pulp_password,
     )
     delete_tasks = []
-    # Pulp names a distribution after its repository, see
-    # PulpClient.create_rpm_distro() and PulpClient.create_file_distro()
-    repo_by_distro_name = {
-        f"{repo.name}-distro": repo for repo in db_product.repositories
-    }
-    # RPM repositories have an RPM distribution, the sign key repository
-    # of a community product is a file repository, so both endpoints
-    # have to be checked
-    distro_name_prefix = f"{db_product.pulp_base_distro_name}-"
-    found_distros = await asyncio.gather(
-        pulp_client.get_rpm_distros(
+    product_repo_names = {repo.name for repo in db_product.repositories}
+    # every pulp entity of a product is named after "{owner}-{product}",
+    # but so are the entities of a product whose name starts with the same
+    # string (e.g. "user-almalinux" and "user-almalinux-extras"), that's why
+    # the search results are matched against the product repositories
+    # by their exact name below
+    name_prefix = f"{db_product.pulp_base_distro_name}-"
+    # a community product keeps its sign key in a file repository,
+    # the rest of the product repositories are RPM ones
+    (
+        rpm_repos,
+        file_repos,
+        rpm_distros,
+        file_distros,
+    ) = await asyncio.gather(
+        pulp_client.get_rpm_repositories(
             include_fields=["pulp_href", "name"],
-            **{"name__startswith": distro_name_prefix},
+            **{"name__startswith": name_prefix},
+        ),
+        pulp_client.get_file_repositories(
+            include_fields=["pulp_href", "name"],
+            **{"name__startswith": name_prefix},
+        ),
+        pulp_client.get_rpm_distros(
+            include_fields=["pulp_href", "name", "repository"],
+            **{"name__startswith": name_prefix},
         ),
         pulp_client.get_file_distros(
-            include_fields=["pulp_href", "name"],
-            **{"name__startswith": distro_name_prefix},
+            include_fields=["pulp_href", "name", "repository"],
+            **{"name__startswith": name_prefix},
         ),
     )
-    # A prefix search matches other products whose name starts with the same
-    # string as well (e.g. "user-almalinux" also matches the distributions of
-    # "user-almalinux-extras"), so the result has to be narrowed down to the
-    # distributions that really belong to this product.
-    all_product_distros = [
-        distro
-        for distros in found_distros
-        for distro in distros
-        if distro["name"] in repo_by_distro_name
-    ]
-    for product_distro in all_product_distros:
-        # some repos from db can be absent in pulp
-        # in case if you reset pulp db, but didn't reset non-pulp db,
-        # so we only delete the repositories that still have a distribution
-        product_repo = repo_by_distro_name[product_distro["name"]]
-        delete_tasks.append(pulp_client.delete_by_href(product_repo.pulp_href))
+    # some repos from db can be absent in pulp or have an outdated href
+    # in case if you reset pulp db, but didn't reset non-pulp db,
+    # so pulp is the source of truth for what has to be deleted
+    repo_hrefs_to_delete = {
+        repo["pulp_href"]
+        for repo in rpm_repos + file_repos
+        if repo["name"] in product_repo_names
+    }
+    # a distribution is usually named "{repo_name}-distro",
+    # see PulpClient.create_rpm_distro(), but the repository it serves
+    # is a more reliable sign of ownership
+    distro_names_to_delete = {
+        f"{repo_name}-distro" for repo_name in product_repo_names
+    }
+    for product_distro in rpm_distros + file_distros:
+        if (
+            product_distro.get("repository") not in repo_hrefs_to_delete
+            and product_distro["name"] not in distro_names_to_delete
+        ):
+            continue
         delete_tasks.append(
             pulp_client.delete_by_href(product_distro["pulp_href"]),
         )
+    for repo_href in repo_hrefs_to_delete:
+        delete_tasks.append(pulp_client.delete_by_href(repo_href))
     await asyncio.gather(*delete_tasks)
     await db.delete(db_product)
     await db.flush()

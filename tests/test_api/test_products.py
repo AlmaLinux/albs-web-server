@@ -128,6 +128,8 @@ class TestProductsEndpoints(BaseAsyncTestCase):
     async def test_user_product_remove(
         self,
         user_product: Product,
+        get_rpm_repositories,
+        get_file_repositories,
         get_rpm_distros,
         get_file_distros,
         delete_by_href,
@@ -165,52 +167,69 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         sign_key_repos = [
             repo for repo in db_product.repositories if repo.type == "sign_key"
         ]
+        src_repos = [repo for repo in rpm_repos if repo.arch == "src"]
         assert rpm_repos, "The product has no RPM repositories"
         assert sign_key_repos, "The product has no sign key repository"
+        assert src_repos, "The product has no src repository"
 
         def make_distros(endpoint: str, repos):
-            return [
-                {
+            distros = []
+            for index, repo in enumerate(repos):
+                # a distribution that does not follow the naming convention
+                # still has to be recognized by the repository it serves
+                name = repo.name if repo in src_repos else f"{repo.name}-distro"
+                distros.append({
                     "pulp_href": f"{endpoint}{index}/",
-                    "name": f"{repo.name}-distro",
-                }
-                for index, repo in enumerate(repos)
+                    "name": name,
+                    "repository": repo.pulp_href,
+                })
+            return distros
+
+        def make_pulp_repos(repos):
+            return [
+                {"pulp_href": repo.pulp_href, "name": repo.name}
+                for repo in repos
             ]
 
-        rpm_endpoint = "/pulp/api/v3/distributions/rpm/rpm/"
-        file_endpoint = "/pulp/api/v3/distributions/file/file/"
-        rpm_distros = make_distros(rpm_endpoint, rpm_repos)
-        file_distros = make_distros(file_endpoint, sign_key_repos)
+        rpm_distro_endpoint = "/pulp/api/v3/distributions/rpm/rpm/"
+        file_distro_endpoint = "/pulp/api/v3/distributions/file/file/"
+        rpm_distros = make_distros(rpm_distro_endpoint, rpm_repos)
+        file_distros = make_distros(file_distro_endpoint, sign_key_repos)
 
         expected_hrefs = {repo.pulp_href for repo in db_product.repositories}
         expected_hrefs.update(
             distro["pulp_href"] for distro in rpm_distros + file_distros
         )
 
-        # distributions of a different product whose name starts with the
-        # same string, they must be left untouched
+        # entities of a different product whose name starts with the same
+        # string, they must be left untouched
+        foreign_prefix = f"{db_product.pulp_base_distro_name}-extra"
+        foreign_rpm_repo = {
+            "pulp_href": "/pulp/api/v3/repositories/rpm/rpm/foreign/",
+            "name": f"{foreign_prefix}-almalinux-8-x86_64-dr",
+        }
         foreign_rpm_distro = {
-            "pulp_href": f"{rpm_endpoint}foreign/",
-            "name": (
-                f"{db_product.pulp_base_distro_name}-extra"
-                "-almalinux-8-x86_64-dr-distro"
-            ),
+            "pulp_href": f"{rpm_distro_endpoint}foreign/",
+            "name": f"{foreign_rpm_repo['name']}-distro",
+            "repository": foreign_rpm_repo["pulp_href"],
+        }
+        foreign_file_repo = {
+            "pulp_href": "/pulp/api/v3/repositories/file/file/foreign/",
+            "name": f"{foreign_prefix}-sign-key-repo",
         }
         foreign_file_distro = {
-            "pulp_href": f"{file_endpoint}foreign/",
-            "name": (
-                f"{db_product.pulp_base_distro_name}-extra"
-                "-sign-key-repo-distro"
-            ),
+            "pulp_href": f"{file_distro_endpoint}foreign/",
+            "name": f"{foreign_file_repo['name']}-distro",
+            "repository": foreign_file_repo["pulp_href"],
         }
 
-        def make_search(distros):
+        def make_search(entities):
             async def func(*_, **kwargs):
                 prefix = kwargs["name__startswith"]
                 return [
-                    distro
-                    for distro in distros
-                    if distro["name"].startswith(prefix)
+                    entity
+                    for entity in entities
+                    if entity["name"].startswith(prefix)
                 ]
 
             return func
@@ -221,16 +240,16 @@ class TestProductsEndpoints(BaseAsyncTestCase):
             deleted_hrefs.append(args[1])
             return {"pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"}
 
-        monkeypatch.setattr(
-            PulpClient,
-            "get_rpm_distros",
-            make_search(rpm_distros + [foreign_rpm_distro]),
-        )
-        monkeypatch.setattr(
-            PulpClient,
-            "get_file_distros",
-            make_search(file_distros + [foreign_file_distro]),
-        )
+        patched_entities = {
+            "get_rpm_repositories": make_pulp_repos(rpm_repos)
+            + [foreign_rpm_repo],
+            "get_file_repositories": make_pulp_repos(sign_key_repos)
+            + [foreign_file_repo],
+            "get_rpm_distros": rpm_distros + [foreign_rpm_distro],
+            "get_file_distros": file_distros + [foreign_file_distro],
+        }
+        for method, entities in patched_entities.items():
+            monkeypatch.setattr(PulpClient, method, make_search(entities))
         monkeypatch.setattr(PulpClient, "delete_by_href", delete_by_href)
 
         endpoint = f"/api/v1/products/{user_product.id}/remove/"
@@ -240,6 +259,11 @@ class TestProductsEndpoints(BaseAsyncTestCase):
             "Cannot remove product:",
         )
         assert response.status_code == self.status_codes.HTTP_200_OK, message
-        assert foreign_rpm_distro["pulp_href"] not in deleted_hrefs
-        assert foreign_file_distro["pulp_href"] not in deleted_hrefs
+        foreign_hrefs = {
+            foreign_rpm_repo["pulp_href"],
+            foreign_rpm_distro["pulp_href"],
+            foreign_file_repo["pulp_href"],
+            foreign_file_distro["pulp_href"],
+        }
+        assert not foreign_hrefs & set(deleted_hrefs)
         assert set(deleted_hrefs) == expected_hrefs

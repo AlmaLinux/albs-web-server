@@ -193,6 +193,19 @@ class PulpClient:
             **search_params,
         )
 
+    async def get_file_repositories(
+        self,
+        include_fields: typing.Optional[typing.List[str]] = None,
+        exclude_fields: typing.Optional[typing.List[str]] = None,
+        **search_params,
+    ) -> typing.List[typing.Dict[str, typing.Any]]:
+        return await self.__get_entities(
+            "pulp/api/v3/repositories/file/file/",
+            include_fields=include_fields,
+            exclude_fields=exclude_fields,
+            **search_params,
+        )
+
     async def get_file_distros(
         self,
         include_fields: typing.Optional[typing.List[str]] = None,
