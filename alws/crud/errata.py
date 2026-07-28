@@ -41,6 +41,7 @@ from alws.pulp_models import (
     UpdateCollection,
     UpdatePackage,
     UpdateRecord,
+    UpdateReference,
 )
 from alws.schemas import errata_schema
 from alws.schemas.errata_schema import BaseErrataRecord
@@ -808,6 +809,96 @@ async def update_errata_record(
     await db.flush()
     await db.refresh(record)
     return record
+
+
+def _normalize_ref_type(ref_type) -> str:
+    if isinstance(ref_type, ErrataReferenceType):
+        return ref_type.value
+    return str(ref_type)
+
+
+async def add_missing_errata_references(
+    db: AsyncSession,
+    update_record: errata_schema.UpdateErrataReferencesRequest,
+) -> Optional[Tuple[models.NewErrataRecord, List[str]]]:
+    """Add references present in the payload but missing from the DB record.
+
+    Add-only: references already stored (matched by ref_type + ref_id) are left
+    untouched, and nothing is ever removed. CVE-type references create/link the
+    corresponding ``ErrataCVE`` row, mirroring ``process_new_errata_references``.
+
+    Returns ``None`` if the record doesn't exist, otherwise the record together
+    with the list of ``ref_id``s that were added (empty when nothing was missing).
+    """
+    record = await get_errata_record(
+        db,
+        update_record.errata_record_id,
+        update_record.errata_platform_id,
+    )
+    if record is None:
+        return None
+
+    existing_refs = {
+        (_normalize_ref_type(ref.ref_type), ref.ref_id)
+        for ref in record.references
+    }
+    new_refs = [
+        ref
+        for ref in update_record.references
+        if (_normalize_ref_type(ref.ref_type), ref.ref_id) not in existing_refs
+    ]
+    if not new_refs:
+        return record, []
+
+    db_cves = {}
+    cve_ids = [ref.cve.id for ref in new_refs if ref.cve]
+    if cve_ids:
+        db_cves = {
+            cve.id: cve
+            for cve in (
+                await db.execute(
+                    select(models.ErrataCVE).where(
+                        models.ErrataCVE.id.in_(cve_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+
+    added_ref_ids = []
+    for ref in new_refs:
+        db_cve = None
+        if ref.cve:
+            db_cve = db_cves.get(ref.cve.id)
+            if db_cve is None:
+                db_cve = models.ErrataCVE(
+                    id=ref.cve.id,
+                    cvss3=ref.cve.cvss3,
+                    cwe=ref.cve.cwe,
+                    impact=ref.cve.impact,
+                    public=ref.cve.public,
+                )
+                db_cves[ref.cve.id] = db_cve
+        ref_title = ref.title or ""
+        if ref.ref_type in (
+            ErrataReferenceType.cve.value,
+            ErrataReferenceType.rhsa.value,
+        ):
+            ref_title = ref.ref_id
+        db_reference = models.NewErrataReference(
+            href=ref.href,
+            ref_id=ref.ref_id,
+            ref_type=ref.ref_type,
+            title=ref_title,
+            cve=db_cve,
+        )
+        record.references.append(db_reference)
+        added_ref_ids.append(ref.ref_id)
+
+    await db.flush()
+    await db.refresh(record)
+    return record, added_ref_ids
 
 
 async def get_matching_albs_packages(
@@ -1729,7 +1820,7 @@ def append_update_packages_in_update_records(
             already_released = False
             collection = pulp_record.collections[0]
             collection_arch = re.search(
-                r"i686|x86_64|aarch64|ppc64le|s390x",
+                r"i686|x86_64|aarch64|ppc64le|s390x|riscv64",
                 collection.name,
             ).group()
             if pulp_pkg["arch"] not in (collection_arch, "noarch"):
@@ -1758,6 +1849,53 @@ def append_update_packages_in_update_records(
                     sum_type=cr.checksum_type("sha256"),
                 )
             )
+            pulp_record.updated_date = datetime.datetime.utcnow().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            pulp_db.flush()
+
+
+def append_references_in_update_records(
+    pulp_db: Session,
+    errata_records: List[Dict[str, Any]],
+    references: List[models.NewErrataReference],
+):
+    """Append missing references to already-released Pulp UpdateRecords in place.
+
+    Mirrors ``append_update_packages_in_update_records`` but for references:
+    it mutates the Pulp advisory rows directly (add-only, matched by
+    ref_type + ref_id) so a subsequent repository publication regenerates
+    ``updateinfo.xml`` with the corrected reference list.
+    """
+    for record in errata_records:
+        record_uuid = uuid.UUID(record["pulp_href"].split("/")[-2])
+        pulp_record = pulp_db.execute(
+            select(UpdateRecord)
+            .where(UpdateRecord.content_ptr_id == record_uuid)
+            .options(selectinload(UpdateRecord.references))
+        )
+        pulp_record: UpdateRecord = pulp_record.scalars().first()
+        if not pulp_record:
+            continue
+        existing_refs = {
+            (ref.ref_type, ref.ref_id) for ref in pulp_record.references
+        }
+        changed = False
+        for ref in references:
+            ref_type = _normalize_ref_type(ref.ref_type)
+            if (ref_type, ref.ref_id) in existing_refs:
+                continue
+            pulp_record.references.append(
+                UpdateReference(
+                    href=ref.href,
+                    ref_id=ref.ref_id,
+                    title=ref.title,
+                    ref_type=ref_type,
+                )
+            )
+            existing_refs.add((ref_type, ref.ref_id))
+            changed = True
+        if changed:
             pulp_record.updated_date = datetime.datetime.utcnow().strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
@@ -2229,6 +2367,77 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
                     err,
                 )
     logging.info("Record %s successfully released", record_id)
+
+
+async def update_errata_references_in_pulp(record_id: str, platform_id: int):
+    """Propagate DB reference changes of a released advisory into Pulp.
+
+    Reuses the release machinery for repo discovery, then appends the record's
+    references (add-only) to the advisory in each repo's latest version and
+    re-publishes so the served ``updateinfo.xml`` reflects them.
+    """
+    pulp = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    async with open_async_session(key=get_async_db_key()) as session:
+        session: AsyncSession
+        query = generate_query_for_release([record_id])
+        query = query.filter(models.NewErrataRecord.platform_id == platform_id)
+        db_record = await session.execute(query)
+        db_record: Optional[models.NewErrataRecord] = (
+            db_record.scalars().first()
+        )
+        if not db_record:
+            logging.info("Record with %s id doesn't exists", record_id)
+            return
+        if db_record.release_status != ErrataReleaseStatus.RELEASED:
+            logging.info(
+                "Record %s is not released, skipping pulp references update",
+                record_id,
+            )
+            return
+
+        search_params = prepare_search_params(db_record)
+        pulp_packages = await load_platform_packages(
+            db_record.platform,
+            search_params,
+            for_release=True,
+        )
+        # force=True: we're only reconciling references, missing packages
+        # must not abort the update.
+        repo_mapping, _ = get_albs_packages_from_record(
+            db_record,
+            pulp_packages,
+            force=True,
+        )
+
+        publish_tasks = []
+        for repo_href in repo_mapping:
+            latest_repo_version = await pulp.get_repo_latest_version(repo_href)
+            if not latest_repo_version:
+                continue
+            errata_records = await pulp.list_updateinfo_records(
+                id__in=[db_record.id],
+                repository_version=latest_repo_version,
+            )
+            if not errata_records:
+                continue
+            with open_session(key="pulp") as pulp_db:
+                append_references_in_update_records(
+                    pulp_db=pulp_db,
+                    errata_records=errata_records,
+                    references=db_record.references,
+                )
+            publish_tasks.append(
+                pulp.create_rpm_publication(repo_href, sleep_time=30.0)
+            )
+        if publish_tasks:
+            await asyncio.gather(*publish_tasks)
+    logging.info(
+        "References for record %s successfully updated in pulp", record_id
+    )
 
 
 async def bulk_new_errata_records_release(

@@ -47,6 +47,7 @@ from alws.dramatiq.errata import (
     release_errata,
     release_new_errata,
     reset_records_threshold,
+    update_errata_references,
 )
 
 # dramatiq.user and dramatiq.products need to go before dramatiq.releases

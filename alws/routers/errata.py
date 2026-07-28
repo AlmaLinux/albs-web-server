@@ -21,6 +21,7 @@ from alws.dramatiq import (
     release_errata,
     release_new_errata,
     reset_records_threshold,
+    update_errata_references,
 )
 from alws.schemas import errata_schema
 
@@ -174,6 +175,30 @@ async def update_errata_record(
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
     return await errata_crud.update_errata_record(db, errata)
+
+
+@router.post("/update_references/", response_model=errata_schema.ErrataRecord)
+async def update_errata_record_references(
+    payload: errata_schema.UpdateErrataReferencesRequest,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    result = await errata_crud.add_missing_errata_references(db, payload)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Unable to find errata record with "
+                f"errata_id={payload.errata_record_id} and "
+                f"platform_id={payload.errata_platform_id}"
+            ),
+        )
+    record, added_ref_ids = result
+    # References are populated in the DB for every record regardless of its
+    # release state; only already-released advisories need their Pulp records
+    # reconciled, and only when something was actually added.
+    if added_ref_ids and record.release_status == ErrataReleaseStatus.RELEASED:
+        update_errata_references.send(record.id, record.platform_id)
+    return record
 
 
 # TODO: Update this endpoint to include platform_id.
