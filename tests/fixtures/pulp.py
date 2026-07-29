@@ -471,6 +471,35 @@ def get_rpm_distros(monkeypatch):
 
 
 @pytest.fixture
+def get_rpm_repositories(monkeypatch):
+    async def func(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(PulpClient, "get_rpm_repositories", func)
+
+
+@pytest.fixture
+def get_file_repositories(monkeypatch):
+    async def func(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(PulpClient, "get_file_repositories", func)
+
+
+@pytest.fixture
+def get_file_distros(monkeypatch):
+    async def func(*args, **kwargs):
+        return [
+            {
+                "pulp_href": get_distros_href(),
+                "name": "file_distro_name",
+            },
+        ]
+
+    monkeypatch.setattr(PulpClient, "get_file_distros", func)
+
+
+@pytest.fixture
 def delete_by_href(monkeypatch):
     async def func(*args, **kwargs):
         return {"pulp_href": f"/pulp/api/v3/tasks/{uuid.uuid4()}/"}
