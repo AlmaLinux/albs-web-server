@@ -162,5 +162,11 @@ class UpdateErrataRequest(BaseModel):
     description: Optional[str] = None
 
 
+class UpdateErrataReferencesRequest(BaseModel):
+    errata_record_id: str
+    errata_platform_id: int
+    references: List[BaseErrataReference]
+
+
 class ReleaseErrataRecordResponse(BaseModel):
     message: str

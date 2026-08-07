@@ -11,6 +11,7 @@ from alws.crud.errata import (
     release_errata_record,
     release_new_errata_record,
     reset_matched_erratas_packages_threshold,
+    update_errata_references_in_pulp,
 )
 from alws.dramatiq import event_loop
 from alws.utils.fastapi_sqla_setup import setup_all
@@ -62,6 +63,10 @@ async def _bulk_new_errata_records_release(
 
 async def _reset_matched_erratas_packages_threshold(issued_date: str):
     await reset_matched_erratas_packages_threshold(issued_date)
+
+
+async def _update_errata_references_in_pulp(record_id: str, platform_id: int):
+    await update_errata_references_in_pulp(record_id, platform_id)
 
 
 @dramatiq.actor(
@@ -160,4 +165,17 @@ def reset_records_threshold(issued_date: str):
     event_loop.run_until_complete(setup_all())
     event_loop.run_until_complete(
         _reset_matched_erratas_packages_threshold(issued_date)
+    )
+
+
+@dramatiq.actor(
+    max_retries=0,
+    priority=0,
+    queue_name="errata",
+    time_limit=DRAMATIQ_TASK_TIMEOUT,
+)
+def update_errata_references(record_id: str, platform_id: int):
+    event_loop.run_until_complete(setup_all())
+    event_loop.run_until_complete(
+        _update_errata_references_in_pulp(record_id, platform_id)
     )
