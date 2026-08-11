@@ -1,15 +1,14 @@
+import asyncio
 import logging
 import os.path
 import sys
 from argparse import ArgumentParser
-from contextlib import asynccontextmanager
 from io import BytesIO
 
 from fastapi import UploadFile
-from fastapi_sqla import open_async_session
-from syncer import sync
 
-from alws.dependencies import get_async_db_key
+from alws.dependencies import get_async_db_session
+from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.uploader import MetadataUploader
 
 
@@ -32,6 +31,7 @@ async def main():
     if not args.modules_file and not args.comps_file:
         logger.error('Module or comps file should be specified')
         return 1
+    await setup_all()
     module_content = None
     comps_content = None
     if args.modules_file:
@@ -44,7 +44,7 @@ async def main():
             os.path.abspath(os.path.expanduser(args.comps_file)), 'rt'
         ) as f:
             comps_content = UploadFile(BytesIO(f.read().encode('utf-8')))
-    async with open_async_session(get_async_db_key()) as session:
+    async with get_async_db_session() as session:
         uploader = MetadataUploader(session, args.repo_name)
         await uploader.process_uploaded_files(
             module_content, comps_content, dry_run=args.dry_run
@@ -53,4 +53,4 @@ async def main():
 
 
 if __name__ == '__main__':
-    sys.exit(sync(main()))
+    sys.exit(asyncio.run(main()))
