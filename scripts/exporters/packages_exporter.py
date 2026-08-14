@@ -48,6 +48,9 @@ from scripts.exporters.base_exporter import BasePulpExporter
 KNOWN_SUBKEYS_CONFIG = os.path.abspath(
     os.path.expanduser("~/config/known_subkeys.json")
 )
+# Sign key to fall back to when a platform has several keys attached and
+# --sign-with wasn't passed explicitly.
+DEFAULT_SIGN_KEY_ID = "DEE5C11CC2A1E572"
 LOG_DIR = Path.home() / "exporter_logs"
 LOGGER_NAME = "packages-exporter"
 LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
@@ -115,6 +118,18 @@ def parse_args():
         default="hardlink",
         required=False,
         help="Method of exporting (choices: write, hardlink, symlink)",
+    )
+    parser.add_argument(
+        "-sw",
+        "--sign-with",
+        type=str,
+        required=False,
+        help=(
+            "GPG key id to use when signing repodata. Overrides the "
+            "per-platform key lookup for every exported repository. "
+            "When omitted, the key is taken from the platform; platforms "
+            f"with several keys fall back to {DEFAULT_SIGN_KEY_ID}."
+        ),
     )
     parser.add_argument(
         "-osv-dir",
@@ -451,12 +466,59 @@ class PackagesExporter(BasePulpExporter):
         exported_paths = await self.export_repositories(repo_ids)
         return exported_paths, db_release.platform_id
 
+
+class AmbiguousSignKeyError(Exception):
+    pass
+
+
+def get_platform_sign_key_id(
+    db_sign_keys: List[dict],
+    platform_id: int,
+    logger: Optional[logging.Logger] = None,
+) -> Optional[str]:
+    """
+    Return the sign key id bound to the platform.
+
+    A platform can have several sign keys attached (e.g. AlmaLinux-10 has
+    both the main key and the EPEL AltArch one). In that case there is no
+    way to guess which one the repodata must be signed with, so we fall
+    back to DEFAULT_SIGN_KEY_ID if it's among them; otherwise the caller
+    has to pick one explicitly via --sign-with.
+    """
+    matched_key_ids = [
+        sign_key["keyid"]
+        for sign_key in db_sign_keys
+        if platform_id in sign_key["platform_ids"]
+    ]
+    if not matched_key_ids:
+        return None
+    if len(matched_key_ids) == 1:
+        return matched_key_ids[0]
+    if DEFAULT_SIGN_KEY_ID not in matched_key_ids:
+        raise AmbiguousSignKeyError(
+            f"Platform {platform_id} has several sign keys: "
+            f"{', '.join(matched_key_ids)}, none of which is the default "
+            f"{DEFAULT_SIGN_KEY_ID}. Pass the one to sign repodata with "
+            "via --sign-with"
+        )
+    if logger:
+        logger.warning(
+            "Platform %s has several sign keys: %s. Falling back to the "
+            "default %s; pass --sign-with to pick another one",
+            platform_id,
+            ", ".join(matched_key_ids),
+            DEFAULT_SIGN_KEY_ID,
+        )
+    return DEFAULT_SIGN_KEY_ID
+
+
 async def sign_repodata(
     exporter: PackagesExporter,
     exported_paths: List[str],
     platforms_dict: dict,
     db_sign_keys: list,
     key_id_by_platform: Optional[str] = None,
+    override_key_id: Optional[str] = None,
 ):
     tasks = []
     token = await exporter.get_sign_server_token()
@@ -468,19 +530,17 @@ async def sign_repodata(
         if not os.path.exists(repo_path):
             continue
 
-        key_id = key_id_by_platform or None
-        for platform_id, platform_repos in platforms_dict.items():
-            for repo_export_path in platform_repos:
-                if repo_export_path in repo_path:
-                    key_id = next(
-                        (
-                            sign_key["keyid"]
-                            for sign_key in db_sign_keys
-                            if platform_id in sign_key["platform_ids"]
-                        ),
-                        None,
-                    )
-                    break
+        key_id = override_key_id or key_id_by_platform or None
+        if not override_key_id:
+            for platform_id, platform_repos in platforms_dict.items():
+                for repo_export_path in platform_repos:
+                    if repo_export_path in repo_path:
+                        key_id = get_platform_sign_key_id(
+                            db_sign_keys,
+                            platform_id,
+                            logger=exporter.logger,
+                        )
+                        break
         exporter.logger.info('Key ID: %s', str(key_id))
         tasks.append(exporter.repomd_signer(repodata, key_id, token))
 
@@ -656,18 +716,33 @@ def main():
     )
 
     db_sign_keys = sync(exporter.get_sign_keys())
+
+    sign_key_id = None
+    if args.sign_with:
+        sign_key_id = next(
+            (
+                sign_key["keyid"]
+                for sign_key in db_sign_keys
+                if sign_key["keyid"] == args.sign_with
+            ),
+            None,
+        )
+        if not sign_key_id:
+            raise Exception(
+                "Aborting packages export, error was: couldn't retrieve "
+                f"the '{args.sign_with}' sign key"
+            )
+
     if args.release_id:
         exported_paths, platform_id = sync(
             exporter.export_repos_from_release(args.release_id)
         )
-        key_id_by_platform = next(
-            (
-                sign_key["keyid"]
-                for sign_key in db_sign_keys
-                if platform_id in sign_key["platform_ids"]
-            ),
-            None,
-        )
+        if not sign_key_id:
+            key_id_by_platform = get_platform_sign_key_id(
+                db_sign_keys,
+                platform_id,
+                logger=exporter.logger,
+            )
 
     if args.platform_names or args.repo_ids:
         exported_paths, platforms_dict = sync(
@@ -677,6 +752,12 @@ def main():
                 repo_ids=args.repo_ids,
             )
         )
+        if not sign_key_id:
+            # Fail fast, before the expensive post-processing, if any of the
+            # exported platforms has an unresolvable sign key.
+            for platform_id, platform_repos in platforms_dict.items():
+                if platform_repos:
+                    get_platform_sign_key_id(db_sign_keys, platform_id)
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         post_processing_futures = {
@@ -713,6 +794,7 @@ def main():
             platforms_dict,
             db_sign_keys,
             key_id_by_platform=key_id_by_platform,
+            override_key_id=sign_key_id,
         )
     )
 
