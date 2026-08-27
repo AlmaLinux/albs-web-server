@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Prometheus scrape config for the ALBS stack.
+#
+# Prometheus runs as a compose service on the stack's default network, so every
+# target below is reached by its compose service name — no host port mappings
+# and no container IPs are needed.
+#
+# Two kinds of target:
+#   * web_server    — FastAPI, /metrics mounted by alws.app (alws/utils/metrics.py):
+#                     http_request_duration_seconds, http_requests_total,
+#                     function_duration_seconds.
+#   * task_queue_*  — dramatiq workers. The worker CLI's default Prometheus
+#                     middleware serves dramatiq_* metrics on :9191 (it answers
+#                     any GET path). See alws/dramatiq/__init__.py — the
+#                     middleware must NOT be registered a second time there.
+#
+# When a worker service is scaled (docker compose up --scale task_queue=N),
+# the service name resolves to every replica's IP and Prometheus scrapes them
+# all; the instance label keeps them apart.
+# ─────────────────────────────────────────────────────────────────────────────
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    stack: albs
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Trailing slash is deliberate: alws.app mounts the metrics ASGI app at
+  # "/metrics", so Starlette answers the bare path with a 307 to "/metrics/".
+  # Prometheus would follow it, but scraping the final path directly avoids a
+  # redirect round-trip on every single scrape.
+  - job_name: albs-web-server
+    metrics_path: /metrics/
+    static_configs:
+      - targets: ["web_server:8000"]
+        labels:
+          service: web_server
+
+  # One dramatiq exposition server per worker container, all on :9191 (one per
+  # container, not per --processes worker — the CLI starts a single fork).
+  #
+  # The queue label mirrors the -Q argument in docker-compose.yml. It overlaps
+  # with the queue_name label dramatiq puts on its own samples, but it is also
+  # attached to the synthetic up/scrape_* series — so `up{queue="sign"} == 0`
+  # alerts on a dead sign worker even when it has processed nothing yet.
+  - job_name: albs-dramatiq
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["task_queue:9191"]
+        labels:
+          service: task_queue
+          queue: default
+      - targets: ["task_queue_sources:9191"]
+        labels:
+          service: task_queue_sources
+          queue: sources
+      - targets: ["task_queue_builds:9191"]
+        labels:
+          service: task_queue_builds
+          queue: builds
+      - targets: ["task_queue_errata:9191"]
+        labels:
+          service: task_queue_errata
+          queue: errata
+      - targets: ["task_queue_releases:9191"]
+        labels:
+          service: task_queue_releases
+          queue: releases
+      - targets: ["task_queue_sign:9191"]
+        labels:
+          service: task_queue_sign
+          queue: sign
+      - targets: ["task_queue_product_modify:9191"]
+        labels:
+          service: task_queue_product_modify
+          queue: product_modify
+      - targets: ["task_queue_tests:9191"]
+        labels:
+          service: task_queue_tests
+          queue: tests
