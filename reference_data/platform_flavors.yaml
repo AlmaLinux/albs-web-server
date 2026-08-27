@@ -102,9 +102,9 @@
         "%pe_signing_cert": '06'
         "%pe_signing_token": 'AlmaLinux OS Foundation'
     versions:
-      - name: '9.8'
-        version_prefix: '90800'
-        dist_prefix: 'el9.8.0'
+      - name: '9.9'
+        version_prefix: '90900'
+        dist_prefix: 'el9.9.0'
   repositories:
     - name: almalinux-9-beta
       arch: i686
