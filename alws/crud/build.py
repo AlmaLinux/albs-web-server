@@ -239,6 +239,39 @@ async def get_builds(
     return query.scalars().all()
 
 
+async def get_build_releases(
+    db: AsyncSession,
+    build_id: int,
+) -> typing.List[build_schema.BuildRelease]:
+    """
+    Every release the build has ever been put into, newest first.
+
+    models.Build.release_id only keeps the release the build got into last,
+    so the full history has to be looked up from the releases side. Columns
+    are selected explicitly to keep the huge release plan out of the query.
+    """
+    result = await db.execute(
+        select(
+            models.Release.id,
+            models.Release.status,
+            models.Release.created_at,
+            models.Platform.name.label("platform_name"),
+            models.Product.name.label("product_name"),
+        )
+        .join(
+            models.Platform,
+            models.Release.platform_id == models.Platform.id,
+        )
+        .join(
+            models.Product,
+            models.Release.product_id == models.Product.id,
+        )
+        .where(models.Release.build_ids.any(build_id))
+        .order_by(models.Release.id.desc())
+    )
+    return [build_schema.BuildRelease(**row._asdict()) for row in result.all()]
+
+
 async def get_module_preview(
     redis: aioredis.client.Redis,
     platform: models.Platform,

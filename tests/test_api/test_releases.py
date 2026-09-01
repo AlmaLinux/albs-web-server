@@ -158,6 +158,28 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         message = f"Cannot retrieve release:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
 
+    async def test_get_build_releases(
+        self,
+    ):
+        self.headers = {}
+        response = await self.make_request(
+            "get",
+            "/api/v1/releases/",
+        )
+        release = response.json()[0]
+        build_id = release["build_ids"][0]
+        response = await self.make_request(
+            "get",
+            f"/api/v1/builds/{build_id}/releases/",
+        )
+        message = f"Cannot retrieve build releases:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
+        message = (
+            f"Release {release['id']} is missing "
+            f"among the releases of build {build_id}"
+        )
+        assert release["id"] in [row["id"] for row in response.json()], message
+
     async def test_revert_release(
         self,
         async_session: AsyncSession,

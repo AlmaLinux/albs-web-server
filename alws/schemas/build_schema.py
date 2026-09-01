@@ -248,6 +248,21 @@ class Product(BaseModel):
         from_attributes = True
 
 
+class BuildRelease(BaseModel):
+    """
+    A release the build is a part of, without the heavy release plan.
+    """
+
+    id: int
+    status: int
+    created_at: typing.Optional[datetime.datetime] = None
+    platform_name: typing.Optional[str] = None
+    product_name: typing.Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class Build(BaseModel):
     id: int
     created_at: datetime.datetime

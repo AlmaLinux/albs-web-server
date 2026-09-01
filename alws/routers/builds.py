@@ -117,6 +117,17 @@ async def get_build(
     return db_build
 
 
+@public_router.get(
+    '/{build_id}/releases/',
+    response_model=typing.List[build_schema.BuildRelease],
+)
+async def get_build_releases(
+    build_id: int,
+    db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+):
+    return await build_crud.get_build_releases(db, build_id)
+
+
 @router.patch('/{build_id}/restart-failed', status_code=status.HTTP_200_OK)
 async def restart_failed_build_items(
     build_id: int,
