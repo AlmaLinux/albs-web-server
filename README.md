@@ -75,6 +75,37 @@ sleep 25
 docker exec -it albs-web-server_pulp_1 bash -c 'pulpcore-manager reset-admin-password --password="admin"'
 ```
 
+# Metrics
+
+The stack ships a Prometheus collector as the `prometheus` compose service. It
+comes up with `docker-compose up -d` like everything else and is browsable at
+<http://localhost:9090> (Status → Target health lists every target).
+
+It scrapes the ALBS application services over the compose network, by service
+name — targets need no published host ports:
+
+| Target | Endpoint | Metrics |
+|---|---|---|
+| `web_server` | `:8000/metrics/` | `http_request_duration_seconds`, `http_requests_total`, `function_duration_seconds` (see `alws/utils/metrics.py`) |
+| `task_queue`, `task_queue_sources`, `task_queue_builds`, `task_queue_errata`, `task_queue_releases`, `task_queue_sign`, `task_queue_product_modify`, `task_queue_tests` | `:9191/metrics` | `dramatiq_messages_total`, `dramatiq_message_errors_total`, `dramatiq_message_retries_total`, `dramatiq_message_rejects_total`, `dramatiq_messages_inprogress`, `dramatiq_message_duration_milliseconds` |
+
+Scrape targets live in `monitoring/prometheus.yml`. Every worker target carries
+`service` and `queue` labels, so `up{queue="sign"} == 0` is a ready-made alert
+for a dead worker. Data is kept for 15 days in the `prometheus_data` volume.
+
+**Adding a worker service:** add the compose service *and* a target block under
+the `albs-dramatiq` job, with a `queue` label matching the new `-Q` argument.
+Validate with `docker run --rm -v "$PWD/monitoring/prometheus.yml:/p.yml"
+--entrypoint promtool prom/prometheus:v3.14.0 check config /p.yml`.
+Apply config edits with `docker-compose restart prometheus` (the TSDB is in a
+named volume, so no data is lost).
+
+**Worker metrics are served by dramatiq's *default* middleware.** Do not add
+`Prometheus()` to the broker in `alws/dramatiq/__init__.py` — `default_middleware`
+already includes it, and a second registration makes the CLI spawn two
+exposition servers, the second dying with `OSError: [Errno 98] Address already
+in use` on :9191.
+
 # Scheduling tasks 
 
 Web-server works with multiple parts of the Build System. Web-server works with API requests that are divided by usage. 

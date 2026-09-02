@@ -724,6 +724,32 @@ services:
         max-size: "100Mb"
         max-file: "3"
 
+  # Metrics collector for the ALBS application services. Scrapes web_server's
+  # /metrics and every task_queue_* worker's dramatiq exposition server on
+  # :9191 by compose service name — see monitoring/prometheus.yml. Targets need
+  # no host port mappings; only Prometheus' own UI/API is published.
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      # --web.enable-lifecycle is deliberately NOT set: :9090 is published to
+      # the host, and it would expose remote /-/reload and /-/quit. Pick up
+      # monitoring/prometheus.yml edits with `docker-compose restart prometheus`
+      # — the TSDB lives in a named volume, so nothing is lost.
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:z"
+      - "prometheus_data:/prometheus"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100Mb"
+        max-file: "3"
+
   immudb:
     image: codenotary/immudb:1.5
     ports:
@@ -770,6 +796,8 @@ services:
 volumes:
   redis:
   pulp_redis:
+  # Prometheus TSDB for the metrics collector (see the prometheus service).
+  prometheus_data:
   # Pulp content store. Named volume (not a host bind mount) so Docker populates
   # it from the image — preserving /var/lib/pulp/tmp and the uid:700 (pulp)
   # ownership the pulp-minimal services need.
