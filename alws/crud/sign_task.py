@@ -263,9 +263,9 @@ async def get_available_sign_task(
         select(models.SourceRpm)
         .where(models.SourceRpm.build_id == sign_task.build_id)
         .options(
-            selectinload(models.SourceRpm.artifact).selectinload(
-                models.BuildTaskArtifact.build_task,
-            )
+            selectinload(models.SourceRpm.artifact)
+            .selectinload(models.BuildTaskArtifact.build_task)
+            .selectinload(models.BuildTask.platform)
         )
     )
     build_src_rpms = build_src_rpms.scalars().all()
@@ -275,9 +275,9 @@ async def get_available_sign_task(
         select(models.BinaryRpm)
         .where(models.BinaryRpm.build_id == sign_task.build_id)
         .options(
-            selectinload(models.BinaryRpm.artifact).selectinload(
-                models.BuildTaskArtifact.build_task,
-            )
+            selectinload(models.BinaryRpm.artifact)
+            .selectinload(models.BuildTaskArtifact.build_task)
+            .selectinload(models.BuildTask.platform)
         )
     )
     build_binary_rpms = build_binary_rpms.scalars().all()
@@ -293,10 +293,11 @@ async def get_available_sign_task(
 
     repo_mapping = await __get_build_repos(db, sign_task.build_id)
     for src_rpm in build_src_rpms:
+        build_task = src_rpm.artifact.build_task
         repo_unique_key = RepoUniqueKey(
             arch='src',
             debug=False,
-            platform_id=src_rpm.artifact.build_task.platform_id,
+            platform_id=build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
         packages.append({
@@ -306,24 +307,33 @@ async def get_available_sign_task(
             "arch": "src",
             "type": "rpm",
             "download_url": __get_package_url(repo.url, src_rpm.artifact.name),
+            "platform_id": build_task.platform_id,
+            "platform_name": (
+                build_task.platform.name if build_task.platform else None
+            ),
         })
 
     for binary_rpm in build_binary_rpms:
+        build_task = binary_rpm.artifact.build_task
         debug = is_debuginfo_rpm(binary_rpm.artifact.name)
         repo_unique_key = RepoUniqueKey(
-            arch=binary_rpm.artifact.build_task.arch,
+            arch=build_task.arch,
             debug=debug,
-            platform_id=binary_rpm.artifact.build_task.platform_id,
+            platform_id=build_task.platform_id,
         )
         repo = repo_mapping[repo_unique_key]
         packages.append({
             "id": binary_rpm.artifact.id,
             "name": binary_rpm.artifact.name,
             "cas_hash": binary_rpm.artifact.cas_hash,
-            "arch": binary_rpm.artifact.build_task.arch,
+            "arch": build_task.arch,
             "type": "rpm",
             "download_url": __get_package_url(
                 repo.url, binary_rpm.artifact.name
+            ),
+            "platform_id": build_task.platform_id,
+            "platform_name": (
+                build_task.platform.name if build_task.platform else None
             ),
         })
     sign_task_payload["packages"] = packages
