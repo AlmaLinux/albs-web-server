@@ -73,6 +73,8 @@ class SignRpmInfo(BaseModel):
     type: str
     download_url: str
     cas_hash: typing.Optional[str] = None
+    platform_id: typing.Optional[int] = None
+    platform_name: typing.Optional[str] = None
 
 
 class SignedRpmInfo(BaseModel):
