@@ -19,6 +19,8 @@ from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
 from alws.utils.pulp_client import PulpClient
 
+BUILDS_PER_PAGE = 10
+
 
 async def create_build(
     db: AsyncSession,
@@ -94,6 +96,124 @@ async def create_build(
     return db_build
 
 
+def _build_load_options() -> tuple:
+    """
+    Eager loaders for everything build_schema.Build serializes.
+
+    Every entry is a separate SELECT ... IN (...) issued by SQLAlchemy, so
+    the amount of rows fetched does not depend on how the builds themselves
+    were found.
+    """
+    tasks = selectinload(models.Build.tasks)
+    return (
+        selectinload(models.Build.owner),
+        selectinload(models.Build.linked_builds),
+        selectinload(models.Build.platform_flavors),
+        selectinload(models.Build.products),
+        selectinload(models.Build.sign_tasks),
+        tasks.selectinload(models.BuildTask.platform),
+        tasks.selectinload(models.BuildTask.ref),
+        tasks.selectinload(models.BuildTask.artifacts),
+        tasks.selectinload(models.BuildTask.rpm_modules),
+        tasks.selectinload(models.BuildTask.performance_stats),
+        tasks.selectinload(models.BuildTask.test_tasks).selectinload(
+            models.TestTask.performance_stats
+        ),
+    )
+
+
+def _build_tasks_exists(
+    project: typing.Optional[str] = None,
+    ref: typing.Optional[str] = None,
+    platform_id: typing.Optional[int] = None,
+    build_task_arch: typing.Optional[str] = None,
+    pulp_hrefs: typing.Optional[typing.List[str]] = None,
+):
+    """
+    Correlated EXISTS over the build tasks of a build.
+
+    All the task-level conditions live in a single subquery on purpose: they
+    have to be satisfied by the same build task, the way an INNER JOIN would
+    require it. Compared to joining the tasks into the outer query this
+    cannot multiply the build rows, so neither DISTINCT nor a sort of the
+    whole result set is needed and Postgres may stop reading builds as soon
+    as the page is full.
+    """
+    subquery = select(1).select_from(models.BuildTask)
+    if project is not None or ref is not None:
+        subquery = subquery.join(
+            models.BuildTaskRef,
+            models.BuildTaskRef.id == models.BuildTask.ref_id,
+        )
+    if pulp_hrefs is not None:
+        subquery = subquery.join(
+            models.BuildTaskArtifact,
+            models.BuildTaskArtifact.build_task_id == models.BuildTask.id,
+        )
+    subquery = subquery.where(models.BuildTask.build_id == models.Build.id)
+    if project is not None:
+        subquery = subquery.where(
+            models.BuildTaskRef.url.like(f"%/{project}%"),
+        )
+    if ref is not None:
+        subquery = subquery.where(
+            sqlalchemy.or_(
+                models.BuildTaskRef.url.like(f"%{ref}%"),
+                models.BuildTaskRef.git_ref.like(f"%{ref}%"),
+            )
+        )
+    if platform_id is not None:
+        subquery = subquery.where(models.BuildTask.platform_id == platform_id)
+    if build_task_arch is not None:
+        subquery = subquery.where(models.BuildTask.arch == build_task_arch)
+    if pulp_hrefs is not None:
+        subquery = subquery.where(
+            models.BuildTaskArtifact.href.in_(pulp_hrefs),
+            models.BuildTaskArtifact.type == "rpm",
+        )
+    return subquery.correlate(models.Build).exists()
+
+
+async def _get_pulp_hrefs(
+    rpm_name: typing.Optional[str] = None,
+    rpm_epoch: typing.Optional[str] = None,
+    rpm_version: typing.Optional[str] = None,
+    rpm_release: typing.Optional[str] = None,
+    rpm_arch: typing.Optional[str] = None,
+) -> typing.Optional[typing.List[str]]:
+    """
+    hrefs of the packages matching the rpm_* filters, None if there are none.
+
+    Resolved once per request: the listing needs the same hrefs for the page
+    query and for the count, and asking Pulp twice is a wasted round trip.
+    """
+    rpm_params = {
+        "name": rpm_name,
+        "epoch": rpm_epoch,
+        "version": rpm_version,
+        "release": rpm_release,
+        "arch": rpm_arch,
+    }
+    if not any(rpm_params.values()):
+        return None
+    pulp_client = PulpClient(
+        settings.pulp_host,
+        settings.pulp_user,
+        settings.pulp_password,
+    )
+    pulp_params = {
+        "fields": ["pulp_href"],
+        **{
+            key: value
+            for key, value in rpm_params.items()
+            if value is not None
+        },
+    }
+    # TODO: we can get packages from pulp database
+    packages = await pulp_client.get_rpm_packages(**pulp_params)
+    return [row["pulp_href"] for row in packages]
+
+
 async def get_builds(
     db: AsyncSession,
     build_id: typing.Optional[int] = None,
@@ -112,131 +232,93 @@ async def get_builds(
     signed: typing.Optional[bool] = None,
     is_running: typing.Optional[bool] = None,
 ) -> typing.Union[models.Build, typing.List[models.Build], dict]:
-    pulp_params = {
-        "fields": ["pulp_href"],
-    }
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    rpm_params = {
-        "name": rpm_name,
-        "epoch": rpm_epoch,
-        "version": rpm_version,
-        "release": rpm_release,
-        "arch": rpm_arch,
-    }
-
-    async def generate_query(count=False):
-        query = (
+    if build_id is not None:
+        # A lookup by primary key needs no filtering machinery at all.
+        result = await db.execute(
             select(models.Build)
-            .join(
-                models.Build.tasks,
-            )
-            .join(
-                models.BuildTask.ref,
-            )
-            .join(
-                models.BuildTask.artifacts,
-                isouter=True,
-            )
-            .order_by(models.Build.id.desc())
-            .options(
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.platform
-                ),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.ref
-                ),
-                selectinload(models.Build.owner),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.artifacts
-                ),
-                selectinload(models.Build.linked_builds),
-                selectinload(models.Build.tasks)
-                .selectinload(models.BuildTask.test_tasks)
-                .selectinload(models.TestTask.performance_stats),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.performance_stats
-                ),
-                selectinload(models.Build.sign_tasks),
-                selectinload(models.Build.tasks).selectinload(
-                    models.BuildTask.rpm_modules
-                ),
-                selectinload(models.Build.platform_flavors),
-                selectinload(models.Build.products),
-            )
-            .distinct(models.Build.id)
+            .where(models.Build.id == build_id)
+            .where(_build_tasks_exists())
+            .options(*_build_load_options())
+        )
+        return result.scalars().first()
+
+    pulp_hrefs = await _get_pulp_hrefs(
+        rpm_name=rpm_name,
+        rpm_epoch=rpm_epoch,
+        rpm_version=rpm_version,
+        rpm_release=rpm_release,
+        rpm_arch=rpm_arch,
+    )
+    conditions = [
+        _build_tasks_exists(
+            project=project,
+            ref=ref,
+            platform_id=platform_id,
+            build_task_arch=build_task_arch,
+            pulp_hrefs=pulp_hrefs,
+        )
+    ]
+    if created_by is not None:
+        conditions.append(models.Build.owner_id == created_by)
+    if released is not None:
+        conditions.append(models.Build.released == released)
+    if signed is not None:
+        conditions.append(models.Build.signed == signed)
+    if is_running is not None:
+        conditions.append(
+            models.Build.finished_at.is_(None)
+            if is_running
+            else models.Build.finished_at.is_not(None)
         )
 
-        if build_id is not None:
-            query = query.where(models.Build.id == build_id)
-        if project is not None:
-            query = query.filter(
-                models.BuildTaskRef.url.like(f"%/{project}%"),
-            )
-        if created_by is not None:
-            query = query.filter(
-                models.Build.owner_id == created_by,
-            )
-        if ref is not None:
-            query = query.filter(
-                sqlalchemy.or_(
-                    models.BuildTaskRef.url.like(f"%{ref}%"),
-                    models.BuildTaskRef.git_ref.like(f"%{ref}%"),
-                )
-            )
-        if platform_id is not None:
-            query = query.filter(models.BuildTask.platform_id == platform_id)
-        if build_task_arch is not None:
-            query = query.filter(models.BuildTask.arch == build_task_arch)
-        if any(rpm_params.values()):
-            pulp_params.update({
-                key: value
-                for key, value in rpm_params.items()
-                if value is not None
-            })
-            # TODO: we can get packages from pulp database
-            pulp_hrefs = await pulp_client.get_rpm_packages(**pulp_params)
-            pulp_hrefs = [row["pulp_href"] for row in pulp_hrefs]
-            query = query.filter(
-                sqlalchemy.and_(
-                    models.BuildTaskArtifact.href.in_(pulp_hrefs),
-                    models.BuildTaskArtifact.type == "rpm",
-                )
-            )
-        if released is not None:
-            query = query.filter(models.Build.released == released)
-        if signed is not None:
-            query = query.filter(models.Build.signed == signed)
-        if is_running is not None:
-            query = query.filter(
-                models.Build.finished_at.is_(None)
-                if is_running
-                else models.Build.finished_at.is_not(None)
-            )
-        if page_number and not count:
-            query = query.slice(10 * page_number - 10, 10 * page_number)
-        if count:
-            query = select(func.count()).select_from(query)
-        return query
+    if not page_number:
+        result = await db.execute(
+            select(models.Build)
+            .where(*conditions)
+            .order_by(models.Build.id.desc())
+            .options(*_build_load_options())
+        )
+        return result.scalars().all()
 
-    if build_id:
-        query = await db.execute(await generate_query())
-        return query.scalars().first()
-    if page_number:
-        return {
-            "builds": (
-                (await db.execute(await generate_query())).scalars().all()
-            ),
-            "total_builds": (
-                await db.execute(await generate_query(count=True))
-            ).scalar(),
-            "current_page": page_number,
-        }
-    query = await db.execute(await generate_query())
-    return query.scalars().all()
+    # The page is resolved as bare ids first, so that the eager loaders run
+    # for the ten builds of the page instead of for every matching build.
+    build_ids = (
+        (
+            await db.execute(
+                select(models.Build.id)
+                .where(*conditions)
+                .order_by(models.Build.id.desc())
+                .limit(BUILDS_PER_PAGE)
+                .offset(BUILDS_PER_PAGE * (page_number - 1))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    builds = []
+    if build_ids:
+        builds = (
+            (
+                await db.execute(
+                    select(models.Build)
+                    .where(models.Build.id.in_(build_ids))
+                    .order_by(models.Build.id.desc())
+                    .options(*_build_load_options())
+                )
+            )
+            .scalars()
+            .all()
+        )
+    total_builds = (
+        await db.execute(
+            select(func.count(models.Build.id)).where(*conditions)
+        )
+    ).scalar()
+    return {
+        "builds": builds,
+        "total_builds": total_builds,
+        "current_page": page_number,
+    }
 
 
 async def get_build_releases(
