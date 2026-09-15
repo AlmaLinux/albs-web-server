@@ -27,6 +27,24 @@ from alws.utils.ids import get_random_unique_version
 PULP_SEMAPHORE = asyncio.Semaphore(20)
 
 
+async def parse_json_response(response, url: str) -> dict:
+    """
+    Decodes a JSON response, logging the raw body when it cannot be parsed.
+
+    Pulp answers with an HTML error page or a truncated body on some
+    failures, and the decoding error alone does not say what came back.
+    """
+    try:
+        return await response.json()
+    except Exception:
+        logging.exception(
+            'Cannot decode JSON response from %s: %s',
+            url,
+            await response.text(),
+        )
+        raise
+
+
 class PulpClient:
     def __init__(
         self,
@@ -1047,7 +1065,9 @@ class PulpClient:
                     )
                     if raw:
                         return {"result": await response.text()}
-                    response_json = await response.json()
+                    response_json = await parse_json_response(
+                        response, full_url
+                    )
             else:
                 async with aiohttp.request(
                     method,
@@ -1060,7 +1080,9 @@ class PulpClient:
                 ) as response:
                     if raw:
                         return {"result": await response.text()}
-                    response_json = await response.json()
+                    response_json = await parse_json_response(
+                        response, full_url
+                    )
 
             try:
                 response.raise_for_status()

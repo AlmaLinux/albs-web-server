@@ -271,7 +271,14 @@ async def get_builds(
             else models.Build.finished_at.is_not(None)
         )
 
-    if not page_number:
+    # `page_number is None` means the caller wants no pagination at all.
+    # Anything below the first page is a bad request value rather than a
+    # request for every build, so clamp it instead of falling through to
+    # the unpaginated branch or building a negative OFFSET below.
+    if page_number is not None and page_number < 1:
+        page_number = 1
+
+    if page_number is None:
         result = await db.execute(
             select(models.Build)
             .where(*conditions)
