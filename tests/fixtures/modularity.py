@@ -1144,3 +1144,134 @@ def modules_artifacts():
         ],
         "llvm-toolset-devel:i686": [],
     }
+
+
+@pytest.fixture
+def modules_yaml_multiple_contexts():
+    """4 perl-DBI modules: one version, 4 contexts, 4 sets of deps."""
+    return b"""---
+document: modulemd
+version: 2
+data:
+  name: perl-DBI
+  stream: "1.641"
+  version: 8100020260921064825
+  context: 082fdf2f
+  arch: x86_64
+  summary: A database access API for Perl
+  description: >
+    DBI is a database access Application Programming Interface (API) for the Perl
+    language. The DBI API specification defines a set of functions, variables and
+    conventions that provide a consistent database interface independent of the actual
+    database being used.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      perl: [5.24]
+      platform: [el8]
+    requires:
+      perl: [5.24]
+      platform: [el8]
+  artifacts:
+    rpms:
+    - perl-DBI-0:1.641-10.module_el8.10.0+4283+c1d0b799.src
+    - perl-DBI-0:1.641-10.module_el8.10.0+4283+c1d0b799.x86_64
+    - perl-DBI-debuginfo-0:1.641-10.module_el8.10.0+4283+c1d0b799.x86_64
+    - perl-DBI-debugsource-0:1.641-10.module_el8.10.0+4283+c1d0b799.x86_64
+---
+document: modulemd
+version: 2
+data:
+  name: perl-DBI
+  stream: "1.641"
+  version: 8100020260921064825
+  context: 0ccef39c
+  arch: x86_64
+  summary: A database access API for Perl
+  description: >
+    DBI is a database access Application Programming Interface (API) for the Perl
+    language. The DBI API specification defines a set of functions, variables and
+    conventions that provide a consistent database interface independent of the actual
+    database being used.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      perl: [5.30]
+      platform: [el8]
+    requires:
+      perl: [5.30]
+      platform: [el8]
+  artifacts:
+    rpms:
+    - perl-DBI-0:1.641-10.module_el8.10.0+4282+4ee1dbd0.src
+    - perl-DBI-0:1.641-10.module_el8.10.0+4282+4ee1dbd0.x86_64
+    - perl-DBI-debuginfo-0:1.641-10.module_el8.10.0+4282+4ee1dbd0.x86_64
+    - perl-DBI-debugsource-0:1.641-10.module_el8.10.0+4282+4ee1dbd0.x86_64
+---
+document: modulemd
+version: 2
+data:
+  name: perl-DBI
+  stream: "1.641"
+  version: 8100020260921064825
+  context: dbc5bc9a
+  arch: x86_64
+  summary: A database access API for Perl
+  description: >
+    DBI is a database access Application Programming Interface (API) for the Perl
+    language. The DBI API specification defines a set of functions, variables and
+    conventions that provide a consistent database interface independent of the actual
+    database being used.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      perl: [5.32]
+      platform: [el8]
+    requires:
+      perl: [5.32]
+      platform: [el8]
+  artifacts:
+    rpms:
+    - perl-DBI-0:1.641-10.module_el8.10.0+4285+6b8d7cbc.src
+    - perl-DBI-0:1.641-10.module_el8.10.0+4285+6b8d7cbc.x86_64
+    - perl-DBI-debuginfo-0:1.641-10.module_el8.10.0+4285+6b8d7cbc.x86_64
+    - perl-DBI-debugsource-0:1.641-10.module_el8.10.0+4285+6b8d7cbc.x86_64
+---
+document: modulemd
+version: 2
+data:
+  name: perl-DBI
+  stream: "1.641"
+  version: 8100020260921064825
+  context: fbe42456
+  arch: x86_64
+  summary: A database access API for Perl
+  description: >
+    DBI is a database access Application Programming Interface (API) for the Perl
+    language. The DBI API specification defines a set of functions, variables and
+    conventions that provide a consistent database interface independent of the actual
+    database being used.
+  license:
+    module:
+    - MIT
+  dependencies:
+  - buildrequires:
+      perl: [5.26]
+      platform: [el8]
+    requires:
+      perl: [5.26]
+      platform: [el8]
+  artifacts:
+    rpms:
+    - perl-DBI-0:1.641-10.module_el8.10.0+4284+a6cb93d8.src
+    - perl-DBI-0:1.641-10.module_el8.10.0+4284+a6cb93d8.x86_64
+    - perl-DBI-debuginfo-0:1.641-10.module_el8.10.0+4284+a6cb93d8.x86_64
+    - perl-DBI-debugsource-0:1.641-10.module_el8.10.0+4284+a6cb93d8.x86_64
+...
+"""
