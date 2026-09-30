@@ -95,6 +95,7 @@ class PulpClient:
         auto_publish: bool = False,
         create_publication: bool = False,
         base_path_start: str = "builds",
+        layout: typing.Optional[str] = None,
     ) -> (str, str):
         endpoint = "pulp/api/v3/repositories/rpm/rpm/"
         payload = {
@@ -102,6 +103,9 @@ class PulpClient:
             "autopublish": auto_publish,
             "retain_repo_versions": 5,
         }
+        # Pulp publishes packages nested alphabetically when not set
+        if layout:
+            payload["layout"] = layout
         response = await self.request("POST", endpoint, json=payload)
         repo_href = response["pulp_href"]
         if create_publication:
@@ -189,6 +193,16 @@ class PulpClient:
         if response["count"] == 0:
             return None
         return response["results"][0]
+
+    async def update_rpm_repository(
+        self,
+        repo_href: str,
+        **attributes,
+    ) -> dict:
+        # Repository attributes only apply to publications created
+        # afterwards, the ones already served are left as they are
+        task = await self.request("PATCH", repo_href, json=attributes)
+        return await self.wait_for_task(task["task"])
 
     async def get_rpm_distro(self, name: str) -> typing.Union[dict, None]:
         endpoint = "pulp/api/v3/distributions/rpm/rpm/"

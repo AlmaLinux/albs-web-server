@@ -13,6 +13,7 @@ from fastapi_sqla import open_async_session
 from sqlalchemy import update
 
 from alws import models
+from alws.config import settings
 from alws.crud import platform as pl_crud
 from alws.crud import repository as repo_crud
 from alws.dependencies import get_async_db_key
@@ -109,11 +110,13 @@ async def get_repository(
                     repo_url = distro["base_url"]
                     repo_href = repo["pulp_href"]
                 else:
+                    layout = settings.pulp_production_repo_layout
                     repo_url, repo_href = (
                         await pulp_client.create_rpm_repository(
                             repo_name,
                             create_publication=True,
                             base_path_start="prod",
+                            layout=layout.value,
                         )
                     )
                 REPO_CACHE[repo_name] = (repo_url, repo_href)

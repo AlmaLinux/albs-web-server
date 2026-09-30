@@ -118,6 +118,7 @@ async def create_product_repo(
         auto_publish=False,
         create_publication=True,
         base_path_start='copr',
+        layout=settings.pulp_production_repo_layout.value,
     )
     return repo_name, repo_url, arch, repo_href, export_path, is_debug
 
