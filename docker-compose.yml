@@ -130,6 +130,13 @@ services:
     image: albs-web-server:latest
     env_file:
       - vars.env
+    # Aggregate Prometheus metrics across uvicorn workers. Without it each
+    # --workers process keeps its own in-memory counters and every scrape
+    # hits a random one, so rate() sees constant fake resets. Must be set in
+    # the environment (not in code) so it's in place before prometheus_client
+    # is first imported; the dir is wiped on start so old totals don't leak in.
+    environment:
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus-multiproc
     ports:
       - "8088:8000"
     build:
@@ -144,6 +151,8 @@ services:
     command: |
       bash -c "
         set -ex
+        rm -rf /tmp/prometheus-multiproc
+        mkdir -p /tmp/prometheus-multiproc
         /wait-for-it.sh db:5432
         PYTHONPATH=. alembic --config alws/alembic.ini upgrade head
         uvicorn --host 0.0.0.0 alws.app:app"
