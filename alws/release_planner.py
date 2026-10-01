@@ -3,6 +3,7 @@ import copy
 import datetime
 import logging
 import re
+import time
 import traceback
 import typing
 from abc import ABCMeta, abstractmethod
@@ -57,6 +58,7 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
+from alws.utils.task_metrics import observe_stage, stage
 
 __all__ = [
     "CommunityReleasePlanner",
@@ -1648,17 +1650,22 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 "Cannot execute plan with empty packages or repositories: "
                 "{packages}, {repositories}".format_map(release.plan)
             )
-        for build_id in release.build_ids:
-            try:
-                verified = await sign_task.verify_signed_build(
-                    self.db, build_id, release.platform.id
-                )
-            except (DataNotFoundError, ValueError, SignError) as e:
-                msg = f"The build {build_id} was not verified, because\n{e}"
-                raise SignError(msg)
-            if not verified:
-                msg = f"Cannot execute plan with wrong singing of {build_id}"
-                raise SignError(msg)
+        with stage("verify_signed_builds"):
+            for build_id in release.build_ids:
+                try:
+                    verified = await sign_task.verify_signed_build(
+                        self.db, build_id, release.platform.id
+                    )
+                except (DataNotFoundError, ValueError, SignError) as e:
+                    msg = (
+                        f"The build {build_id} was not verified, because\n{e}"
+                    )
+                    raise SignError(msg)
+                if not verified:
+                    msg = (
+                        f"Cannot execute plan with wrong singing of {build_id}"
+                    )
+                    raise SignError(msg)
 
         # check packages presence in prod repos
         self.base_platform = release.platform
@@ -1677,7 +1684,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         release.plan["packages_from_repos"] = pkgs_from_repos
         release.plan["packages_in_repos"] = pkgs_in_repos
         if self.codenotary_enabled:
-            packages_mapping = dict(await asyncio.gather(*authenticate_tasks))
+            with stage("cas_authenticate_packages"):
+                packages_mapping = dict(
+                    await asyncio.gather(*authenticate_tasks)
+                )
 
         for package_dict in release.plan["packages"]:
             package = package_dict["package"]
@@ -1719,6 +1729,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     package_href
                 )
 
+        modules_start = time.perf_counter()
         prod_repo_modules_cache = {}
         added_modules = defaultdict(list)
         for module in release.plan.get("modules", []):
@@ -1798,6 +1809,9 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     module_pulp_href
                 )
                 added_modules[full_repo_name].append(release_module_nvsca)
+        observe_stage(
+            "lookup_release_modules", time.perf_counter() - modules_start
+        )
 
         modify_tasks = []
         publication_tasks = []
@@ -1827,8 +1841,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 publication_tasks.append(
                     self.pulp_client.create_rpm_publication(repo.pulp_href)
                 )
-        await asyncio.gather(*modify_tasks)
-        await asyncio.gather(*publication_tasks)
+        with stage("pulp_modify_repositories"):
+            await asyncio.gather(*modify_tasks)
+        with stage("pulp_publish_repositories"):
+            await asyncio.gather(*publication_tasks)
         return additional_messages
 
     @class_measure_work_time_async("check_released_errata_packages")

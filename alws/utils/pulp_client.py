@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import re
+import time
 import typing
 import urllib.parse
 from typing import (
@@ -23,6 +24,7 @@ from alws.config import settings
 from alws.constants import UPLOAD_FILE_CHUNK_SIZE
 from alws.utils.file_utils import hash_content, hash_file
 from alws.utils.ids import get_random_unique_version
+from alws.utils.task_metrics import observe_pulp_request, pulp_polling
 
 PULP_SEMAPHORE = asyncio.Semaphore(20)
 
@@ -489,19 +491,32 @@ class PulpClient:
 
     async def get_repo_modules_yaml(self, url: str):
         repomd_url = urllib.parse.urljoin(url, "repodata/repomd.xml")
-        async with aiohttp.ClientSession(auth=self._auth) as session:
-            async with session.get(repomd_url) as response:
-                repomd_xml = await response.text()
-                response.raise_for_status()
-            res = re.search(r"repodata/[\w\d]+-modules.yaml", repomd_xml)
-            if not res:
-                return
-            modules_path = res.group()
-            modules_url = urllib.parse.urljoin(url, modules_path)
-            async with session.get(modules_url) as response:
-                modules_yaml = await response.text()
-                response.raise_for_status()
-                return modules_yaml
+        start = time.perf_counter()
+        response_status = "error"
+        try:
+            async with aiohttp.ClientSession(auth=self._auth) as session:
+                async with session.get(repomd_url) as response:
+                    response_status = str(response.status)
+                    repomd_xml = await response.text()
+                    response.raise_for_status()
+                res = re.search(r"repodata/[\w\d]+-modules.yaml", repomd_xml)
+                if not res:
+                    return
+                modules_path = res.group()
+                modules_url = urllib.parse.urljoin(url, modules_path)
+                async with session.get(modules_url) as response:
+                    response_status = str(response.status)
+                    modules_yaml = await response.text()
+                    response.raise_for_status()
+                    return modules_yaml
+        finally:
+            observe_pulp_request(
+                "GET",
+                repomd_url,
+                response_status,
+                time.perf_counter() - start,
+                0.0,
+            )
 
     def begin(self):
         return self
@@ -991,10 +1006,11 @@ class PulpClient:
         return entity_href, info["sha256"], artifact
 
     async def wait_for_task(self, task_href: str, sleep_time: float = 1.0):
-        task = await self.request("GET", task_href)
-        while task["state"] not in ("failed", "completed"):
-            await asyncio.sleep(sleep_time)
+        with pulp_polling():
             task = await self.request("GET", task_href)
+            while task["state"] not in ("failed", "completed"):
+                await asyncio.sleep(sleep_time)
+                task = await self.request("GET", task_href)
         if task["state"] == "failed":
             error = task.get("error")
             error_msg = ""
@@ -1050,47 +1066,61 @@ class PulpClient:
             full_url = endpoint
         else:
             full_url = urllib.parse.urljoin(self._host, endpoint)
+        semaphore_start = time.perf_counter()
         async with self.semaphore or PULP_SEMAPHORE:
-            if method.lower() == "get":
-                async with RetryClient(
-                    retry_options=self._retry_options
-                ) as client:
-                    response = await client.get(
+            request_start = time.perf_counter()
+            response_status = "error"
+            try:
+                if method.lower() == "get":
+                    async with RetryClient(
+                        retry_options=self._retry_options
+                    ) as client:
+                        response = await client.get(
+                            full_url,
+                            params=params,
+                            json=json,
+                            data=data,
+                            headers=headers,
+                            auth=self._auth,
+                        )
+                        response_status = str(response.status)
+                        if raw:
+                            return {"result": await response.text()}
+                        response_json = await parse_json_response(
+                            response, full_url
+                        )
+                else:
+                    async with aiohttp.request(
+                        method,
                         full_url,
                         params=params,
                         json=json,
                         data=data,
                         headers=headers,
                         auth=self._auth,
-                    )
-                    if raw:
-                        return {"result": await response.text()}
-                    response_json = await parse_json_response(
-                        response, full_url
-                    )
-            else:
-                async with aiohttp.request(
+                    ) as response:
+                        response_status = str(response.status)
+                        if raw:
+                            return {"result": await response.text()}
+                        response_json = await parse_json_response(
+                            response, full_url
+                        )
+
+                try:
+                    response.raise_for_status()
+                except ClientResponseError as exc:
+                    if exc.status == status.HTTP_400_BAD_REQUEST:
+                        exc.message += f": {str(response_json)}"
+                    raise exc
+                return response_json
+            finally:
+                observe_pulp_request(
                     method,
                     full_url,
-                    params=params,
-                    json=json,
-                    data=data,
-                    headers=headers,
-                    auth=self._auth,
-                ) as response:
-                    if raw:
-                        return {"result": await response.text()}
-                    response_json = await parse_json_response(
-                        response, full_url
-                    )
-
-            try:
-                response.raise_for_status()
-            except ClientResponseError as exc:
-                if exc.status == status.HTTP_400_BAD_REQUEST:
-                    exc.message += f": {str(response_json)}"
-                raise exc
-            return response_json
+                    response_status,
+                    time.perf_counter() - request_start,
+                    request_start - semaphore_start,
+                )
 
 
 def get_pulp_client(

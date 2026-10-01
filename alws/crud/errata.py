@@ -70,6 +70,7 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
+from alws.utils.task_metrics import stage, timed_stage
 
 ERRATA_RECORDS_PER_PAGE = 10
 
@@ -725,6 +726,7 @@ def prepare_search_params(
     return search_params
 
 
+@timed_stage("load_platform_packages")
 async def load_platform_packages(
     platform: models.Platform,
     search_params: DefaultDict[str, List[str]],
@@ -1049,6 +1051,7 @@ async def get_matching_albs_packages(
     return items_to_insert, package_type
 
 
+@timed_stage("process_errata_references")
 async def process_new_errata_references(
     db: AsyncSession,
     errata: BaseErrataRecord,
@@ -1121,6 +1124,7 @@ async def process_new_errata_references(
     return references
 
 
+@timed_stage("process_errata_packages")
 async def process_new_errata_packages(
     db: AsyncSession,
     errata: BaseErrataRecord,
@@ -1255,19 +1259,20 @@ async def create_new_errata_record(errata: typing.Dict):
             return db_errata
 
         try:
-            github_client = await get_github_client()
-            await create_github_issue(
-                client=github_client,
-                title=errata.title,
-                description=errata.description,
-                advisory_id=errata.id,
-                original_id=original_id,
-                platform_name=platform.name,
-                severity=errata.severity.capitalize(),
-                packages=errata.packages,
-                platform_id=errata.platform_id,
-                find_packages_types=pkg_types,
-            )
+            with stage("create_github_issue"):
+                github_client = await get_github_client()
+                await create_github_issue(
+                    client=github_client,
+                    title=errata.title,
+                    description=errata.description,
+                    advisory_id=errata.id,
+                    original_id=original_id,
+                    platform_name=platform.name,
+                    severity=errata.severity.capitalize(),
+                    packages=errata.packages,
+                    platform_id=errata.platform_id,
+                    find_packages_types=pkg_types,
+                )
         except Exception as err:
             logging.exception(
                 "Cannot create GitHub issue: %s",
@@ -1605,6 +1610,7 @@ async def update_package_status(
     return True
 
 
+@timed_stage("release_errata_packages")
 async def release_errata_packages(
     session: AsyncSession,
     pulp_client: PulpClient,
@@ -1738,6 +1744,7 @@ async def release_errata_packages(
         await pulp_client.create_rpm_publication(repo_href)
 
 
+@timed_stage("prepare_updateinfo_mapping")
 async def prepare_updateinfo_mapping(
     db: AsyncSession,
     pulp: PulpClient,
@@ -1915,6 +1922,7 @@ def append_references_in_update_records(
             pulp_db.flush()
 
 
+@timed_stage("match_albs_packages")
 def get_albs_packages_from_record(
     record: models.NewErrataRecord,
     pulp_packages: Dict[str, Any],
@@ -2026,7 +2034,8 @@ async def process_errata_release_for_repos(
     logging.info("Releasing errata packages in async tasks")
     await asyncio.gather(*release_tasks)
     logging.info("Publicating repositories in async tasks")
-    await asyncio.gather(*publish_tasks)
+    with stage("pulp_publish_repositories"):
+        await asyncio.gather(*publish_tasks)
 
 
 def generate_query_for_release(records_ids: List[str]):
@@ -2048,6 +2057,7 @@ def generate_query_for_release(records_ids: List[str]):
 
 
 # TODO: Check db_record
+@timed_stage("build_release_log")
 async def get_release_logs(
     record_id: str,
     pulp_packages: dict,
@@ -2164,6 +2174,7 @@ async def get_packages_for_oval(
 # At this moment we need this cache, but if we finally migrate old records to
 # new approach, we can get rid of this redis cache and directly retrieve this
 # info from db without passing through get_oval_xml method
+@timed_stage("load_oval_cache")
 async def get_albs_oval_cache(
     session: AsyncSession, platform_name: str
 ) -> dict:
@@ -2184,6 +2195,7 @@ async def get_albs_oval_cache(
     return json.loads(cached_oval)
 
 
+@timed_stage("generate_oval_data")
 async def add_oval_data_to_errata_record(
     db_record: models.NewErrataRecord,
     albs_oval_cache: dict,
@@ -2447,7 +2459,8 @@ async def update_errata_references_in_pulp(record_id: str, platform_id: int):
                 pulp.create_rpm_publication(repo_href, sleep_time=30.0)
             )
         if publish_tasks:
-            await asyncio.gather(*publish_tasks)
+            with stage("pulp_publish_repositories"):
+                await asyncio.gather(*publish_tasks)
     logging.info(
         "References for record %s successfully updated in pulp", record_id
     )
@@ -2567,9 +2580,11 @@ async def bulk_new_errata_records_release(
     logging.info("Executing release tasks")
     await asyncio.gather(*release_tasks)
     logging.info("Executing publication tasks")
-    await asyncio.gather(
-        *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
-    )
+    with stage("pulp_publish_repositories"):
+        await asyncio.gather(*(
+            pulp.create_rpm_publication(href)
+            for href in set(repos_to_publish)
+        ))
 
     if settings.github_integration_enabled:
         try:
@@ -2665,9 +2680,11 @@ async def bulk_errata_records_release(
     logging.info("Executing release tasks")
     await asyncio.gather(*release_tasks)
     logging.info("Executing publication tasks")
-    await asyncio.gather(
-        *(pulp.create_rpm_publication(href) for href in set(repos_to_publish))
-    )
+    with stage("pulp_publish_repositories"):
+        await asyncio.gather(*(
+            pulp.create_rpm_publication(href)
+            for href in set(repos_to_publish)
+        ))
     logging.info("Bulk errata release is finished")
 
 

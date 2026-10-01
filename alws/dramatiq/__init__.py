@@ -18,6 +18,7 @@ import dramatiq
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 
 from alws.config import settings
+from alws.utils.task_metrics import TaskMetricsMiddleware, install_db_hooks
 
 rabbitmq_broker = RabbitmqBroker(
     url=f"amqp://"
@@ -30,6 +31,12 @@ rabbitmq_broker = RabbitmqBroker(
 # are provided automatically by the dramatiq worker CLI's default Prometheus
 # middleware whenever prometheus_client is installed — we do NOT add it here,
 # since a second explicit registration duplicates the collectors and conflicts.
+# TaskMetricsMiddleware is a separate class: it adds albs_task_* metrics
+# (queue wait, per-component and per-stage time) that the same :9191 server
+# exposes. Nothing imported from here may import prometheus_client at module
+# level, see alws/utils/task_metrics.py.
+rabbitmq_broker.add_middleware(TaskMetricsMiddleware())
+install_db_hooks()
 dramatiq.set_broker(rabbitmq_broker)
 event_loop = asyncio.get_event_loop()
 
