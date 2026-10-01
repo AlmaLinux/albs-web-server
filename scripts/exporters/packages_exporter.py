@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import aiohttp
 import jmespath
-import pgpy
 import rpm
 import sentry_sdk
 import sqlalchemy
@@ -51,6 +50,10 @@ KNOWN_SUBKEYS_CONFIG = os.path.abspath(
 # Sign key to fall back to when a platform has several keys attached and
 # --sign-with wasn't passed explicitly.
 DEFAULT_SIGN_KEY_ID = "DEE5C11CC2A1E572"
+SIGNATURE_QUERY_FORMAT = (
+    '%|SIGGPG?{%{SIGGPG:pgpsig}}:{%|SIGPGP?{%{SIGPGP:pgpsig}}:{}|}|'
+)
+SIGNATURE_KEY_ID_RE = re.compile(r'Key ID ([0-9a-f]+)$')
 LOG_DIR = Path.home() / "exporter_logs"
 LOGGER_NAME = "packages-exporter"
 LOG_FILE = LOG_DIR / f"{LOGGER_NAME}_{int(time())}.log"
@@ -286,7 +289,7 @@ class PackagesExporter(BasePulpExporter):
         self.logger.info("Checking signature for %s repo", repository_path)
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
         ts = rpm.TransactionSet()
-        ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
+        ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES | rpm._RPMVSF_NODIGESTS)
 
         def check(pkg_path: str) -> Tuple[SignStatusEnum, str]:
             if not os.path.exists(pkg_path):
@@ -294,24 +297,22 @@ class PackagesExporter(BasePulpExporter):
 
             with open(pkg_path, "rb") as fd:
                 header = ts.hdrFromFdno(fd)
-                signature = header[rpm.RPMTAG_SIGGPG]
-                sig = ""
-                if not signature:
-                    signature = header[rpm.RPMTAG_SIGPGP]
-                if not signature:
-                    return SignStatusEnum.NO_SIGNATURE, ""
+            signature = header.format(SIGNATURE_QUERY_FORMAT)
+            if not signature:
+                return SignStatusEnum.NO_SIGNATURE, ""
 
-                pgp_msg = pgpy.PGPMessage.from_blob(signature)
-                for signature in pgp_msg.signatures:
-                    sig = signature.signer.lower()
-                    if sig in key_ids_lower:
-                        return SignStatusEnum.SUCCESS, sig
-                    for key_id in key_ids_lower:
-                        sub_keys = self.known_subkeys.get(key_id, [])
-                        if sig in sub_keys:
-                            return SignStatusEnum.SUCCESS, sig
+            match = SIGNATURE_KEY_ID_RE.search(signature)
+            if not match:
+                return SignStatusEnum.WRONG_SIGNATURE, signature
+            sig = match.group(1)
+            if sig in key_ids_lower:
+                return SignStatusEnum.SUCCESS, sig
+            for key_id in key_ids_lower:
+                sub_keys = self.known_subkeys.get(key_id, [])
+                if sig in sub_keys:
+                    return SignStatusEnum.SUCCESS, sig
 
-                return SignStatusEnum.WRONG_SIGNATURE, sig
+            return SignStatusEnum.WRONG_SIGNATURE, sig
 
         errored_packages = set()
         no_signature_packages = set()
