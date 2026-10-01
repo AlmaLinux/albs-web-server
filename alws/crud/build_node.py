@@ -62,7 +62,18 @@ async def get_available_build_task(
         .join(
             models.BuildTask.ref,
         )
-        .with_for_update()
+        # Claiming a task is a queue pop, so it has to be shaped like one:
+        #
+        #   LIMIT 1   - .first() below only truncates in Python. Without it
+        #               the statement returns every eligible task and
+        #               FOR UPDATE takes a row lock on each one of them.
+        #   SKIP LOCKED - otherwise a second node polling at the same time
+        #               blocks on the row the first one is claiming instead
+        #               of moving on to the next free task, which caps
+        #               dispatch on lock contention rather than on work.
+        #   OF build_tasks - the ref join must not be locked as well.
+        .with_for_update(skip_locked=True, of=models.BuildTask)
+        .limit(1)
         .filter(
             sqlalchemy.and_(
                 models.BuildTask.status < BuildTaskStatus.COMPLETED,
