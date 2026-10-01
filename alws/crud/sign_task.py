@@ -248,6 +248,14 @@ async def get_available_sign_task(
             ),
         )
         .options(selectinload(models.SignTask.sign_key))
+        # Same queue pop as the build and test dispatchers. Beyond the cost
+        # of fetching every idle task to use one, the unlocked read followed
+        # by the unconditional UPDATE below let two sign nodes polling at the
+        # same time claim the same task; the row lock makes the claim
+        # exclusive, and SKIP LOCKED keeps the second node moving.
+        .order_by(models.SignTask.id.asc())
+        .with_for_update(skip_locked=True, of=models.SignTask)
+        .limit(1)
     )
     sign_task = sign_tasks.scalars().first()
     if not sign_task:

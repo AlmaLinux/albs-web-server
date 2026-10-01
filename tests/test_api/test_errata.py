@@ -1,8 +1,13 @@
 import copy
+import datetime
+import uuid
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws.crud.errata import create_errata_record
+from alws import models
+from alws.constants import ErrataReleaseStatus
+from alws.crud.errata import ERRATA_RECORDS_PER_PAGE, create_errata_record
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -155,3 +160,115 @@ class TestErrataEndpoints(BaseAsyncTestCase):
             response.status_code == self.status_codes.HTTP_200_OK
             and not response.json()
         ), f"Cannot get errata records by platform id:\n{response.text}"
+
+
+@pytest.mark.usefixtures("base_platform")
+class TestErrataQueryPagination(BaseAsyncTestCase):
+    """GET /errata/query/ must never return the whole table.
+
+    The endpoint is unauthenticated and its non-compact branch eager-loads
+    packages -> albs_packages -> build_artifacts -> build_tasks for every row,
+    so an unpaginated call is the cheapest way to exhaust the API from
+    outside. Records are created on a platform of their own so the assertions
+    do not depend on what other tests in this module leaked.
+    """
+
+    RECORD_COUNT = 12
+
+    @pytest.fixture
+    async def isolated_errata_records(self, async_session: AsyncSession):
+        suffix = uuid.uuid4().hex[:8]
+        platform = models.Platform(
+            name=f"errata-paging-{suffix}",
+            type="rpm",
+            distr_type="rhel",
+            distr_version="9",
+            test_dist_name="almalinux",
+            arch_list=["x86_64"],
+            data={},
+            modularity={},
+        )
+        async_session.add(platform)
+        await async_session.flush()
+        issued = datetime.datetime(2024, 1, 1)
+        async_session.add_all([
+            models.NewErrataRecord(
+                id=f"ALSA-2024:{9000 + number}",
+                platform_id=platform.id,
+                release_status=ErrataReleaseStatus.NOT_RELEASED,
+                issued_date=issued + datetime.timedelta(days=number),
+                updated_date=issued + datetime.timedelta(days=number),
+                original_description="description",
+                original_title="title",
+                contact_mail="packager@almalinux.org",
+                severity="Important",
+                rights="Copyright",
+            )
+            for number in range(self.RECORD_COUNT)
+        ])
+        await async_session.commit()
+        return platform.id
+
+    async def test_query_without_page_returns_first_page(
+        self,
+        isolated_errata_records: int,
+    ):
+        response = await self.make_request(
+            "get",
+            f"/api/v1/errata/query/?platformId={isolated_errata_records}",
+        )
+        message = f"Cannot query errata records:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
+        payload = response.json()
+
+        message = (
+            f"Got {len(payload['records'])} records without a pageNumber; "
+            "the endpoint is returning more than one page"
+        )
+        assert len(payload["records"]) == ERRATA_RECORDS_PER_PAGE, message
+        assert payload["current_page"] == 1
+        message = "total_records must still count every matching record"
+        assert payload["total_records"] == self.RECORD_COUNT, message
+
+    async def test_query_without_page_matches_explicit_first_page(
+        self,
+        isolated_errata_records: int,
+    ):
+        """Omitting pageNumber must be the same request as pageNumber=1.
+
+        The response is an ErrataListResponse either way, so defaulting the
+        page does not change the shape for a caller that omitted it - only
+        the length of `records`.
+        """
+        implicit, explicit = [
+            (
+                await self.make_request(
+                    "get",
+                    f"/api/v1/errata/query/?platformId="
+                    f"{isolated_errata_records}{suffix}",
+                )
+            ).json()
+            for suffix in ("", "&pageNumber=1")
+        ]
+        assert implicit == explicit
+
+    @pytest.mark.parametrize("page_number", [0, -5])
+    async def test_query_clamps_pages_below_the_first(
+        self,
+        isolated_errata_records: int,
+        page_number: int,
+    ):
+        """A bad page must not fall through to the unpaginated branch.
+
+        `page and not count` treats 0 as "no pagination", and a negative page
+        would build a negative OFFSET, so both are clamped to the first page.
+        """
+        response = await self.make_request(
+            "get",
+            f"/api/v1/errata/query/?platformId={isolated_errata_records}"
+            f"&pageNumber={page_number}",
+        )
+        assert response.status_code == self.status_codes.HTTP_200_OK
+        payload = response.json()
+        assert len(payload["records"]) == ERRATA_RECORDS_PER_PAGE
+        assert payload["current_page"] == 1

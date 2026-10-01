@@ -19,6 +19,8 @@ from alws.perms.authorization import can_perform
 from alws.release_planner import get_releaser_class
 from alws.schemas import release_schema
 
+RELEASES_PER_PAGE = 10
+
 __all__ = [
     "get_releases",
     "create_release",
@@ -40,6 +42,14 @@ async def get_releases(
     typing.Dict[str, typing.Any],
     typing.List[models.Release],
 ]:
+    # Anything below the first page is a bad value rather than a request for
+    # every release, so clamp it instead of falling through to the
+    # unpaginated branch or building a negative OFFSET below. `None` keeps
+    # meaning "no pagination", which is what GET /releases/ passes when
+    # pageNumber is omitted.
+    if page_number is not None and page_number < 1:
+        page_number = 1
+
     def generate_query(count=False):
         query = (
             select(models.Release)
@@ -74,7 +84,10 @@ async def get_releases(
                 models.Release.platform_id == platform_id,
             )
         if page_number and not count:
-            query = query.slice(10 * page_number - 10, 10 * page_number)
+            query = query.slice(
+                RELEASES_PER_PAGE * page_number - RELEASES_PER_PAGE,
+                RELEASES_PER_PAGE * page_number,
+            )
         return query
 
     if release_id:

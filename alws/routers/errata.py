@@ -125,7 +125,18 @@ async def get_oval_xml(
 
 @public_router.get("/query/", response_model=errata_schema.ErrataListResponse)
 async def list_errata_records(
-    pageNumber: Optional[int] = None,
+    # Defaults to the first page instead of "everything": this endpoint is
+    # unauthenticated, and the non-compact branch of list_errata_records()
+    # eager-loads packages -> albs_packages -> build_artifacts -> build_tasks
+    # for every row it returns. Without a page one request pulls the whole
+    # errata data set into memory.
+    #
+    # Safe for callers that omit pageNumber: the response is the same
+    # ErrataListResponse object either way (total_records / records /
+    # current_page), so only the length of `records` changes. total_records
+    # is still computed over the full filter, which is what the "is this
+    # advisory ID taken?" check in the frontend reads.
+    pageNumber: Optional[int] = 1,
     id: Optional[str] = None,
     ids: Annotated[Optional[List[str]], Query()] = None,
     title: Optional[str] = None,

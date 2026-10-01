@@ -211,7 +211,17 @@ async def get_products(
                 models.Product.id.desc(),
             )
             .options(
-                selectinload(models.Product.builds),
+                # product_schema.ProductBuild only serializes the id, but the
+                # default load fetches every column of every build attached to
+                # the product - mock_options is JSONB and dominates the row.
+                #
+                # This is a mitigation, not a fix: the number of rows is still
+                # unbounded (a long-lived product has tens of thousands of
+                # builds, and GET /products/ has no mandatory pagination). The
+                # real fix is to replace `builds` with a count in
+                # product_schema.Product, which needs albs-frontend to stop
+                # reading `product.builds.length` (ProductFeed.vue) first.
+                selectinload(models.Product.builds).load_only(models.Build.id),
                 selectinload(models.Product.owner),
                 selectinload(models.Product.platforms),
                 selectinload(models.Product.repositories),

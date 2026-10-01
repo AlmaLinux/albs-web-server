@@ -83,7 +83,12 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
         .where(
             models.TestTask.status == TestTaskStatus.CREATED,
         )
-        .with_for_update()
+        # SKIP LOCKED so that a second scheduler polling at the same time
+        # takes the next ten free tasks instead of blocking on the batch the
+        # first one is already claiming. The LIMIT below is what keeps the
+        # lock set bounded; without SKIP LOCKED concurrent pollers simply
+        # serialise on it.
+        .with_for_update(skip_locked=True, of=models.TestTask)
         .options(
             selectinload(models.TestTask.build_task)
             .selectinload(models.BuildTask.build)
