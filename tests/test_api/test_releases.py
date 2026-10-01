@@ -1,9 +1,13 @@
+import uuid
+
+import pytest
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alws import models
 from alws.constants import ErrataPackageStatus, ReleaseStatus
-from alws.crud.release import commit_release, revert_release
+from alws.crud.release import RELEASES_PER_PAGE, commit_release, revert_release
+from tests.constants import ADMIN_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
 
@@ -294,3 +298,110 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             for build in product["builds"]
             if build["id"] in release["build_ids"]
         ], "Product still has references to release"
+
+
+class TestReleasesPagination(BaseAsyncTestCase):
+    """GET /releases/ keeps both of its response shapes.
+
+    Omitting pageNumber returns the bare list of every matching release, which
+    API consumers rely on; passing it returns a ReleaseResponse page.
+    """
+
+    RELEASE_COUNT = 12
+
+    @pytest.fixture
+    async def isolated_releases(self, async_session: AsyncSession):
+        """Fillers on a platform and product of their own.
+
+        Releases are committed and the tables are module-scoped, so sharing
+        base_platform/base_product here would put twelve empty releases at the
+        top of the list that the other tests in this module read from.
+        """
+        suffix = uuid.uuid4().hex[:8]
+        platform = models.Platform(
+            name=f"release-paging-{suffix}",
+            type="rpm",
+            distr_type="rhel",
+            distr_version="9",
+            test_dist_name="almalinux",
+            arch_list=["x86_64"],
+            data={},
+            modularity={},
+        )
+        product = models.Product(
+            name=f"release-paging-product-{suffix}",
+            title="release paging",
+            owner_id=ADMIN_USER_ID,
+            is_community=False,
+        )
+        async_session.add_all([platform, product])
+        await async_session.flush()
+        async_session.add_all([
+            models.Release(
+                build_ids=[],
+                build_task_ids=[],
+                platform_id=platform.id,
+                product_id=product.id,
+                owner_id=ADMIN_USER_ID,
+                status=ReleaseStatus.SCHEDULED,
+                plan={"packages": [], "repositories": []},
+            )
+            for _ in range(self.RELEASE_COUNT)
+        ])
+        await async_session.commit()
+        return platform.id
+
+    async def test_releases_without_page_returns_full_list(
+        self,
+        isolated_releases: int,
+    ):
+        response = await self.make_request(
+            "get",
+            f"/api/v1/releases/?platform_id={isolated_releases}",
+        )
+        message = f"Cannot retrieve releases:\n{response.text}"
+        assert response.status_code == self.status_codes.HTTP_200_OK, message
+        payload = response.json()
+
+        message = (
+            "Omitting pageNumber must keep returning a bare list of "
+            f"releases, got {type(payload).__name__}"
+        )
+        assert isinstance(payload, list), message
+        assert len(payload) == self.RELEASE_COUNT
+
+    async def test_releases_with_page_returns_one_page(
+        self,
+        isolated_releases: int,
+    ):
+        response = await self.make_request(
+            "get",
+            f"/api/v1/releases/?platform_id={isolated_releases}&pageNumber=2",
+        )
+        assert response.status_code == self.status_codes.HTTP_200_OK
+        payload = response.json()
+        assert isinstance(payload, dict)
+        message = "Second page must hold the releases left after the first"
+        assert (
+            len(payload["releases"]) == self.RELEASE_COUNT - RELEASES_PER_PAGE
+        ), message
+        assert payload["current_page"] == 2
+        message = "total_releases must still count every matching release"
+        assert payload["total_releases"] == self.RELEASE_COUNT, message
+
+    @pytest.mark.parametrize("page_number", [0, -5])
+    async def test_releases_clamp_pages_below_the_first(
+        self,
+        isolated_releases: int,
+        page_number: int,
+    ):
+        response = await self.make_request(
+            "get",
+            f"/api/v1/releases/?platform_id={isolated_releases}"
+            f"&pageNumber={page_number}",
+        )
+        assert response.status_code == self.status_codes.HTTP_200_OK
+        payload = response.json()
+        assert isinstance(payload, dict)
+        assert len(payload["releases"]) == RELEASES_PER_PAGE
+        assert payload["current_page"] == 1

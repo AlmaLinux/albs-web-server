@@ -33,6 +33,10 @@ public_router = APIRouter(
     ],
 )
 async def get_releases(
+    # Omitting pageNumber returns the bare list[Release] of every matching
+    # release, while passing it returns a ReleaseResponse page. Defaulting it
+    # would change the response shape for API consumers that rely on the
+    # array, so the unpaginated contract stays as it is.
     pageNumber: typing.Optional[int] = None,
     product_id: typing.Optional[int] = None,
     platform_id: typing.Optional[int] = None,

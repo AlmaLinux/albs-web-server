@@ -71,6 +71,8 @@ from alws.utils.pulp_utils import (
     get_uuid_from_pulp_href,
 )
 
+ERRATA_RECORDS_PER_PAGE = 10
+
 try:
     # FIXME: ovallib dependency should stay optional
     #        for web-server until we release it.
@@ -1490,6 +1492,14 @@ async def list_errata_records(
     cve_id: Optional[str] = None,
     status: Optional[ErrataReleaseStatus] = None,
 ):
+    # `page is None` still means "no pagination" for internal callers -
+    # GET /errata/all/ relies on it to stream the compact, three-column
+    # projection to the OVAL cacher. Anything below the first page is a bad
+    # value rather than a request for the whole table, so clamp it instead of
+    # falling through to the unpaginated branch or building a negative OFFSET.
+    if page is not None and page < 1:
+        page = 1
+
     options = []
     if compact:
         options.append(
@@ -1543,7 +1553,10 @@ async def list_errata_records(
                 models.NewErrataRecord.id.desc(),
             )
         if page and not count:
-            query = query.slice(10 * page - 10, 10 * page)
+            query = query.slice(
+                ERRATA_RECORDS_PER_PAGE * page - ERRATA_RECORDS_PER_PAGE,
+                ERRATA_RECORDS_PER_PAGE * page,
+            )
         return query
 
     return {

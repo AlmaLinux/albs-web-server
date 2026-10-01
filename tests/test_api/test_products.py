@@ -267,3 +267,54 @@ class TestProductsEndpoints(BaseAsyncTestCase):
         }
         assert not foreign_hrefs & set(deleted_hrefs)
         assert set(deleted_hrefs) == expected_hrefs
+
+
+@pytest.mark.usefixtures(
+    "base_platform",
+    "create_repo",
+)
+class TestProductBuildsProjection(BaseAsyncTestCase):
+    """`builds` must stay serializable while it is loaded id-only.
+
+    get_products() narrows Product.builds to the id column, which is all
+    product_schema.ProductBuild exposes. Touching any other Build attribute
+    on those instances would now emit a lazy load and blow up under asyncio,
+    so this pins the contract the frontend reads.
+    """
+
+    async def test_product_listing_still_reports_build_ids(
+        self,
+        regular_build: Build,
+        user_product: Product,
+        async_session: AsyncSession,
+    ):
+        build_id = regular_build.id
+        await self.make_request(
+            "post",
+            f"/api/v1/products/add/{build_id}/{user_product.name}/",
+        )
+        await _perform_product_modification(build_id, user_product.id, "add")
+        await async_session.commit()
+
+        for endpoint in (
+            f"/api/v1/products/{user_product.id}/",
+            "/api/v1/products/?pageNumber=1",
+        ):
+            response = await self.make_request("get", endpoint)
+            message = f"Cannot get {endpoint}:\n{response.text}"
+            assert response.status_code == self.status_codes.HTTP_200_OK, (
+                message
+            )
+            payload = response.json()
+            products = (
+                payload["products"] if "pageNumber" in endpoint else [payload]
+            )
+            listed = next(
+                product
+                for product in products
+                if product["id"] == user_product.id
+            )
+            message = f"Build {build_id} is missing from {endpoint}"
+            assert build_id in [
+                build["id"] for build in listed["builds"]
+            ], message
