@@ -8,11 +8,9 @@ Dramatiq new tasks how-to:
        and it's important for all tasks which involves user interaction
        to have priority 0.
     4. If you need to use async function in your dramatiq task - ALWAYS use
-       loop from this __init__.py, since creating multiple loops for tasks
+       loop from this _event_loop.py, since creating multiple loops for tasks
        will break your tasks.
 """
-
-import asyncio
 
 import dramatiq
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
@@ -31,7 +29,6 @@ rabbitmq_broker = RabbitmqBroker(
 # middleware whenever prometheus_client is installed — we do NOT add it here,
 # since a second explicit registration duplicates the collectors and conflicts.
 dramatiq.set_broker(rabbitmq_broker)
-event_loop = asyncio.get_event_loop()
 
 # Tasks import started from here
 from alws.dramatiq.build import (
