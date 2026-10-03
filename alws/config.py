@@ -4,12 +4,17 @@ from typing import Annotated, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+from alws.constants import RpmRepositoryLayout
+
 
 class Settings(BaseSettings):
     pulp_host: str = 'http://pulp'
     pulp_user: str = 'admin'
     pulp_password: str = 'admin'
     pulp_export_path: str = '/srv/exports'
+    # Package layout of the exportable (production and product) repositories.
+    # Build repositories keep the pulp_rpm default.
+    pulp_production_repo_layout: RpmRepositoryLayout = RpmRepositoryLayout.FLAT
     pulp_database_url: str = (
         'postgresql+psycopg2://postgres:password@pulp:5432/pulp'
     )

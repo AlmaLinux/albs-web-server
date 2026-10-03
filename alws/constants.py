@@ -27,6 +27,7 @@ __all__ = [
     "ReleaseStatus",
     "ReleasePackageTrustness",
     "RepoType",
+    "RpmRepositoryLayout",
     "SignStatus",
     "GenKeyStatus",
     "TestTaskStatus",
@@ -193,6 +194,15 @@ class SignStatusEnum(enum.IntEnum):
     READ_ERROR = 2
     NO_SIGNATURE = 3
     WRONG_SIGNATURE = 4
+
+
+class RpmRepositoryLayout(enum.Enum):
+    # Where pulp_rpm places package files within a publication,
+    # e.g. Packages/f/foo.rpm for NESTED_ALPHABETICALLY
+    # and Packages/foo.rpm for FLAT
+    NESTED_ALPHABETICALLY = "nested_alphabetically"
+    FLAT = "flat"
+    NESTED_BY_DIGEST = "nested_by_digest"
 
 
 class GitHubIssueStatus(enum.Enum):
