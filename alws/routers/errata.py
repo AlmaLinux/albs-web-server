@@ -380,7 +380,7 @@ async def reset_matched_erratas_packages_threshold(
         AsyncSessionDependency(key=get_async_db_key())
     ),
 ):
-    records = await get_errata_records_threshold(issued_date, session)
+    records = await get_errata_records_threshold(issued_date, session, limit=1)
     if records:
         reset_records_threshold.send(issued_date)
 
