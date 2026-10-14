@@ -7,7 +7,7 @@ import sys
 import urllib.parse
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import aiohttp
 from plumbum import local
@@ -23,6 +23,10 @@ from alws.utils.pulp_client import get_pulp_client
 
 
 class BasePulpExporter:
+    # Whether to check that the repodata downloaded from a distribution
+    # describes the exported repository version, see _export_repository.
+    verify_repodata_version = False
+
     def __init__(
         self,
         repodata_cache_dir: str,
@@ -36,6 +40,9 @@ class BasePulpExporter:
         self.export_method = export_method
         self.export_path = export_path
         self.createrepo_c = local["createrepo_c"]
+        # Export paths whose downloaded repodata is known to describe
+        # exactly the exported repository version
+        self.repodata_matches_export: Dict[str, bool] = {}
 
         self.repodata_cache_dir = (
             Path(repodata_cache_dir).expanduser().absolute()
@@ -216,12 +223,54 @@ class BasePulpExporter:
             shutil.rmtree(repodata_path)
         repodata_path.mkdir()
         self.logger.info('Downloading repodata from %s', repodata_url)
+        # A distribution serves the publication of the latest repository
+        # version that has one. That's the exported version only if it was
+        # already published before the download and is still the latest one
+        # after it; otherwise the repodata may describe another version.
+        repodata_matches = (
+            self.verify_repodata_version
+            and await self._is_version_published(repository_version)
+        )
         try:
             await self.download_repodata(repodata_path, repodata_url)
         except Exception as e:
             self.logger.exception("Cannot download repodata file: %s", str(e))
+            repodata_matches = False
+        if repodata_matches:
+            repodata_matches = await self._is_latest_version(repository_version)
+        self.repodata_matches_export[export_path] = repodata_matches
 
         return export_path
+
+    async def _is_version_published(self, repository_version: str) -> bool:
+        try:
+            publications = await self.pulp_client.get_rpm_publications(
+                repository_version_href=repository_version,
+                include_fields=["pulp_href"],
+            )
+        except Exception:
+            self.logger.warning(
+                "Cannot get publications of %s",
+                repository_version,
+                exc_info=True,
+            )
+            return False
+        return bool(publications)
+
+    async def _is_latest_version(self, repository_version: str) -> bool:
+        repository_href = repository_version.rsplit("versions/", 1)[0]
+        try:
+            latest_version = await self.pulp_client.get_repo_latest_version(
+                repository_href
+            )
+        except Exception:
+            self.logger.warning(
+                "Cannot get the latest version of %s",
+                repository_href,
+                exc_info=True,
+            )
+            return False
+        return latest_version == repository_version
 
     async def export_repositories(self, repo_ids: List[int]) -> List[str]:
         exporters = await self.create_filesystem_exporters(repo_ids)
