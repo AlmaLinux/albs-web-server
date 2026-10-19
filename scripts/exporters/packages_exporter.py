@@ -6,6 +6,7 @@ import os
 import pwd
 import re
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from time import time
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import aiohttp
+import createrepo_c as cr
 import jmespath
 import rpm
 import sentry_sdk
@@ -135,6 +137,17 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--full-signature-check",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Read the signature of every exported package instead of "
+            "reusing the results of previous exports. The cache is "
+            "refreshed anyway"
+        ),
+    )
+    parser.add_argument(
         "-osv-dir",
         type=str,
         default=settings.pulp_export_path,
@@ -154,7 +167,140 @@ def init_sentry():
     )
 
 
+def read_package_signer(ts, pkg_path: str) -> Optional[str]:
+    """
+    Return the id of the key the package is signed with, the whole
+    signature description if rpm can't tell the key, or None if the
+    package isn't signed at all.
+    """
+    with open(pkg_path, "rb") as fd:
+        header = ts.hdrFromFdno(fd)
+    signature = header.format(SIGNATURE_QUERY_FORMAT)
+    if not signature:
+        return None
+    match = SIGNATURE_KEY_ID_RE.search(signature)
+    return match.group(1) if match else signature
+
+
+def classify_signer(
+    signer: Optional[str],
+    key_ids_lower: List[str],
+    known_subkeys: Dict[str, List[str]],
+) -> Tuple[SignStatusEnum, str]:
+    if signer is None:
+        return SignStatusEnum.NO_SIGNATURE, ""
+    if signer in key_ids_lower:
+        return SignStatusEnum.SUCCESS, signer
+    for key_id in key_ids_lower:
+        if signer in known_subkeys.get(key_id, []):
+            return SignStatusEnum.SUCCESS, signer
+    return SignStatusEnum.WRONG_SIGNATURE, signer
+
+
+def load_primary_checksums(repodata_dir: str) -> Dict[str, Tuple[str, int]]:
+    """
+    Map package file names to the checksum and size primary.xml
+    records for them.
+    """
+    checksums = {}
+    ambiguous = set()
+
+    def add_package(pkg):
+        file_name = os.path.basename(pkg.location_href)
+        record = (f"{pkg.checksum_type}:{pkg.pkgId}", pkg.size_package)
+        if checksums.setdefault(file_name, record) != record:
+            # Same NVRA under different epochs: can't tell which one is
+            # the file on disk
+            ambiguous.add(file_name)
+
+    primary_path = find_metadata(repodata_dir, "primary")
+    if primary_path:
+        cr.xml_parse_primary(primary_path, pkgcb=add_package, do_files=False)
+    for file_name in ambiguous:
+        del checksums[file_name]
+    return checksums
+
+
+# Tells a package missing from SignatureCache apart from a cached unsigned one
+NOT_CACHED = object()
+
+
+class SignatureCache:
+    """
+    Keys packages are signed with, by package checksum and size.
+
+    Reading RPM headers is the slowest part of the signature check, while
+    most packages stay the same between exports. A package rebuilt or
+    re-signed under the same file name gets another checksum, so it's
+    checked again. Only the signer is cached: whether it's allowed is
+    decided anew on every export against the platform keys.
+    """
+
+    version = 1
+
+    def __init__(
+        self,
+        path: Path,
+        logger: logging.Logger,
+        ignore_cached: bool = False,
+    ):
+        self.path = path
+        self.logger = logger
+        self.ignore_cached = ignore_cached
+        self._lock = threading.Lock()
+        self._cached = self._load()
+        self._used = {}
+
+    def _load(self) -> dict:
+        try:
+            with open(self.path, "rt") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            self.logger.warning(
+                "Cannot read signature cache %s, starting from scratch",
+                self.path,
+                exc_info=True,
+            )
+            return {}
+        if not isinstance(data, dict) or data.get("version") != self.version:
+            return {}
+        return data["entries"]
+
+    def get(self, key: str):
+        with self._lock:
+            if key in self._used:
+                return self._used[key]
+            if self.ignore_cached or key not in self._cached:
+                return NOT_CACHED
+            self._used[key] = self._cached[key]
+            return self._used[key]
+
+    def put(self, key: str, signer: Optional[str]):
+        with self._lock:
+            self._used[key] = signer
+
+    def save(self, prune: bool):
+        """
+        Write the cache down. With prune, only the entries used since
+        loading are kept, so packages removed from repositories go away.
+        """
+        entries = self._used if prune else {**self._cached, **self._used}
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self.path.with_name(f"{self.path.name}.tmp")
+        with open(tmp_path, "wt") as f:
+            json.dump(
+                {"version": self.version, "entries": entries},
+                f,
+                separators=(",", ":"),
+            )
+        os.replace(tmp_path, self.path)
+
+
 class PackagesExporter(BasePulpExporter):
+    verify_repodata_version = True
+
     def __init__(
         self,
         repodata_cache_dir: str,
@@ -164,6 +310,7 @@ class PackagesExporter(BasePulpExporter):
         export_method: Literal['write', 'hardlink', 'symlink'] = "hardlink",
         export_path: str = settings.pulp_export_path,
         osv_dir: str = settings.pulp_export_path,
+        full_signature_check: bool = False,
     ):
         super().__init__(
             repodata_cache_dir=repodata_cache_dir,
@@ -175,6 +322,7 @@ class PackagesExporter(BasePulpExporter):
         )
 
         self.osv_dir = osv_dir
+        self.full_signature_check = full_signature_check
         self.current_user = self.get_current_username()
         self.export_error_file = os.path.abspath(
             os.path.expanduser("~/export.err")
@@ -285,39 +433,39 @@ class PackagesExporter(BasePulpExporter):
 
         return feed.rss_str(pretty=True).decode('utf-8')
 
-    def check_rpms_signature(self, repository_path: str, sign_keys: list):
+    def check_rpms_signature(
+        self,
+        repository_path: str,
+        sign_keys: list,
+        signature_cache: Optional[SignatureCache] = None,
+    ):
         self.logger.info("Checking signature for %s repo", repository_path)
         key_ids_lower = [i.keyid.lower() for i in sign_keys]
         ts = rpm.TransactionSet()
         ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES | rpm._RPMVSF_NODIGESTS)
 
-        def check(pkg_path: str) -> Tuple[SignStatusEnum, str]:
-            if not os.path.exists(pkg_path):
-                return SignStatusEnum.READ_ERROR, ""
-
-            with open(pkg_path, "rb") as fd:
-                header = ts.hdrFromFdno(fd)
-            signature = header.format(SIGNATURE_QUERY_FORMAT)
-            if not signature:
-                return SignStatusEnum.NO_SIGNATURE, ""
-
-            match = SIGNATURE_KEY_ID_RE.search(signature)
-            if not match:
-                return SignStatusEnum.WRONG_SIGNATURE, signature
-            sig = match.group(1)
-            if sig in key_ids_lower:
-                return SignStatusEnum.SUCCESS, sig
-            for key_id in key_ids_lower:
-                sub_keys = self.known_subkeys.get(key_id, [])
-                if sig in sub_keys:
-                    return SignStatusEnum.SUCCESS, sig
-
-            return SignStatusEnum.WRONG_SIGNATURE, sig
+        # The checksums are as good as the repodata they come from, so they
+        # are only used when it describes exactly the exported version.
+        primary_checksums = {}
+        if signature_cache is not None and self.repodata_matches_export.get(
+            repository_path
+        ):
+            try:
+                primary_checksums = load_primary_checksums(
+                    str(Path(repository_path).parent / "repodata")
+                )
+            except Exception:
+                self.logger.warning(
+                    "Cannot read primary.xml of %s, checking every package",
+                    repository_path,
+                    exc_info=True,
+                )
 
         errored_packages = set()
-        no_signature_packages = set()
-        wrong_signature_packages = set()
+        signer_by_path = {}
         futures = {}
+        cached_count = 0
+        size_mismatches = 0
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             for package in os.listdir(repository_path):
@@ -328,18 +476,60 @@ class PackagesExporter(BasePulpExporter):
                         package_path,
                     )
                     continue
+                try:
+                    size = os.stat(package_path).st_size
+                except FileNotFoundError:
+                    errored_packages.add(package_path)
+                    continue
 
-                futures[executor.submit(check, package_path)] = package_path
+                cache_key = None
+                if package in primary_checksums:
+                    checksum, primary_size = primary_checksums[package]
+                    if size == primary_size:
+                        cache_key = f"{checksum}:{size}"
+                    else:
+                        size_mismatches += 1
+                if cache_key:
+                    signer = signature_cache.get(cache_key)
+                    if signer is not NOT_CACHED:
+                        signer_by_path[package_path] = signer
+                        cached_count += 1
+                        continue
+
+                future = executor.submit(read_package_signer, ts, package_path)
+                futures[future] = (package_path, cache_key)
 
             for future in as_completed(futures):
-                package_path = futures[future]
-                result, pkg_sig = future.result()
-                if result == SignStatusEnum.READ_ERROR:
-                    errored_packages.add(package_path)
-                elif result == SignStatusEnum.NO_SIGNATURE:
-                    no_signature_packages.add(package_path)
-                elif result == SignStatusEnum.WRONG_SIGNATURE:
-                    wrong_signature_packages.add(f"{package_path} {pkg_sig}")
+                package_path, cache_key = futures[future]
+                signer = future.result()
+                signer_by_path[package_path] = signer
+                if cache_key:
+                    signature_cache.put(cache_key, signer)
+
+        if signature_cache is not None:
+            self.logger.info(
+                "%s: %d package signatures reused, %d read",
+                repository_path,
+                cached_count,
+                len(futures),
+            )
+        if size_mismatches:
+            self.logger.warning(
+                "%s: %d packages differ in size from primary.xml",
+                repository_path,
+                size_mismatches,
+            )
+
+        no_signature_packages = set()
+        wrong_signature_packages = set()
+        for package_path, signer in signer_by_path.items():
+            result, pkg_sig = classify_signer(
+                signer, key_ids_lower, self.known_subkeys
+            )
+            if result == SignStatusEnum.NO_SIGNATURE:
+                no_signature_packages.add(package_path)
+            elif result == SignStatusEnum.WRONG_SIGNATURE:
+                wrong_signature_packages.add(f"{package_path} {pkg_sig}")
 
         if (
             errored_packages
@@ -421,6 +611,13 @@ class PackagesExporter(BasePulpExporter):
                 list(set(repo_ids_to_export))
             )
             final_export_paths.extend(exported_paths)
+            signature_cache = SignatureCache(
+                self.repodata_cache_dir.joinpath(
+                    "signatures", f"{db_platform.name}.json"
+                ),
+                logger=self.logger,
+                ignore_cached=self.full_signature_check,
+            )
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = {}
                 for repo_path in exported_paths:
@@ -432,6 +629,7 @@ class PackagesExporter(BasePulpExporter):
                             self.check_rpms_signature,
                             repo_path,
                             db_platform.sign_keys,
+                            signature_cache,
                         )
                     ] = repo_path
                 for future in as_completed(futures):
@@ -439,6 +637,15 @@ class PackagesExporter(BasePulpExporter):
                     self.logger.info(
                         '%s packages signatures are checked', repo_path
                     )
+            # A partial export leaves the other repositories' entries alone
+            try:
+                signature_cache.save(prune=repo_ids is None and arches is None)
+            except OSError:
+                self.logger.warning(
+                    "Cannot save signature cache %s",
+                    signature_cache.path,
+                    exc_info=True,
+                )
             self.logger.debug(
                 "All repositories exported in following paths:\n%s",
                 "\n".join((str(path) for path in exported_paths)),
@@ -714,6 +921,7 @@ def main():
         verbose=args.verbose,
         export_method=args.export_method,
         osv_dir=args.osv_dir,
+        full_signature_check=args.full_signature_check,
     )
 
     db_sign_keys = sync(exporter.get_sign_keys())
