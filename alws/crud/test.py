@@ -5,7 +5,7 @@ import logging
 import re
 import urllib.parse
 from io import BytesIO
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,13 @@ from alws.pulp_models import RpmPackage
 from alws.schemas import test_schema
 from alws.utils.alts_client import AltsClient
 from alws.utils.file_utils import download_file
+from alws.utils.package_tests import (
+    PackageTestsConfigLookup,
+    evaluate_test_result,
+    get_matched_rules,
+    get_package_tests_config,
+    get_source_package_name,
+)
 from alws.utils.parsing import parse_tap_output, tap_set_status
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
@@ -161,6 +168,8 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
             if test_configuration['tests'] is None:
                 test_configuration['tests'] = []
             payload['test_configuration'] = test_configuration
+        if task.skipped_tests:
+            payload['skipped_tests'] = task.skipped_tests
         response.append(payload)
         updated_tasks.append(task)
     if updated_tasks:
@@ -233,6 +242,15 @@ def get_pulp_packages(
     )
 
 
+async def __get_tests_config(
+    build_task: models.BuildTask,
+) -> PackageTestsConfigLookup:
+    source_package = get_source_package_name(build_task.ref.url)
+    if not source_package:
+        return PackageTestsConfigLookup()
+    return await get_package_tests_config(source_package)
+
+
 async def create_test_tasks(
     db: AsyncSession,
     build_task_id: int,
@@ -243,9 +261,14 @@ async def create_test_tasks(
         .where(
             models.BuildTask.id == build_task_id,
         )
-        .options(selectinload(models.BuildTask.artifacts)),
+        .options(
+            selectinload(models.BuildTask.artifacts),
+            selectinload(models.BuildTask.platform),
+            selectinload(models.BuildTask.ref),
+        ),
     )
     build_task = build_task_query.scalars().first()
+    tests_config = (await __get_tests_config(build_task)).config
 
     latest_revision_query = select(
         func.max(models.TestTask.revision),
@@ -273,6 +296,21 @@ async def create_test_tasks(
             continue
         if artifact_info.arch == 'src':
             continue
+        rules = get_matched_rules(
+            tests_config,
+            artifact_info.name,
+            build_task.platform.name,
+            build_task.arch,
+        )
+        if rules.skipped_package:
+            logging.info(
+                'Package %s is not tested on %s %s: %s',
+                artifact_info.name,
+                build_task.platform.name,
+                build_task.arch,
+                rules.skipped_package.reason,
+            )
+            continue
         task = models.TestTask(
             build_task_id=build_task_id,
             package_name=artifact_info.name,
@@ -281,6 +319,7 @@ async def create_test_tasks(
             status=TestTaskStatus.CREATED,
             revision=new_revision,
             repository_id=repository_id,
+            skipped_tests=rules.skipped_tests or None,
         )
         if artifact_info.release:
             task.package_release = artifact_info.release
@@ -423,10 +462,15 @@ async def update_test_task(
     task_id: int,
     test_result: test_schema.TestTaskResult,
     status: TestTaskStatus = TestTaskStatus.COMPLETED,
+    tests_config: Optional[dict] = None,
 ):
     started_at = test_result.stats.get('started_at', None)
     if started_at:
         started_at = datetime.datetime.fromisoformat(started_at)
+    alts_response = test_result.model_dump()
+    if tests_config:
+        # Which package tests config the status was decided with
+        alts_response['tests_config'] = tests_config
     await db.execute(
         update(models.TestTask)
         .where(models.TestTask.id == task_id)
@@ -434,7 +478,7 @@ async def update_test_task(
             status=status,
             started_at=started_at,
             finished_at=datetime.datetime.utcnow(),
-            alts_response=test_result.model_dump(),
+            alts_response=alts_response,
         )
     )
     await db.execute(
@@ -443,6 +487,36 @@ async def update_test_task(
             statistics=test_result.stats,
         )
     )
+
+
+async def __get_test_task_status(
+    task: models.TestTask,
+    result: dict,
+) -> Tuple[TestTaskStatus, Optional[dict]]:
+    build_task = task.build_task
+    lookup = await __get_tests_config(build_task)
+    rules = get_matched_rules(
+        lookup.config,
+        task.package_name,
+        build_task.platform.name,
+        task.env_arch,
+    )
+    verdict = evaluate_test_result(result, rules)
+    if verdict.expected_failures:
+        logging.info(
+            'Test task %d has expected failures %s according to %s',
+            task.id,
+            verdict.expected_failures,
+            lookup.url,
+        )
+    tests_config = lookup.to_dict()
+    if tests_config is not None:
+        for key in ('skipped', 'expected_failures', 'unexpected_passes'):
+            if getattr(verdict, key):
+                tests_config[key] = getattr(verdict, key)
+    if verdict.failed:
+        return TestTaskStatus.FAILED, tests_config
+    return TestTaskStatus.COMPLETED, tests_config
 
 
 async def complete_test_task(
@@ -465,6 +539,12 @@ async def complete_test_task(
                 .options(
                     selectinload(models.TestTask.repository),
                     selectinload(models.TestTask.performance_stats),
+                    selectinload(models.TestTask.build_task).selectinload(
+                        models.BuildTask.platform
+                    ),
+                    selectinload(models.TestTask.build_task).selectinload(
+                        models.BuildTask.ref
+                    ),
                 )
             )
         )
@@ -477,6 +557,7 @@ async def complete_test_task(
     new_hrefs = []
     conv_tasks = []
     status = TestTaskStatus.COMPLETED
+    tests_config = None
     for log in test_result.result.get('logs', []):
         if log.get('href'):
             conv_tasks.append(__convert_to_file(pulp_client, log))
@@ -506,20 +587,18 @@ async def complete_test_task(
         if test_result.result.get('revoked'):
             status = TestTaskStatus.CANCELLED
         else:
-            for key, item in test_result.result.items():
-                if key == 'tests':
-                    for test_item in item.values():
-                        if not test_item.get('success', False):
-                            status = TestTaskStatus.FAILED
-                            break
-                # Skip logs and skipped_tests list from processing
-                elif key in ['logs', 'skipped_tests']:
-                    continue
-                elif not item.get('success', False):
-                    status = TestTaskStatus.FAILED
-                    break
+            status, tests_config = await __get_test_task_status(
+                task,
+                test_result.result,
+            )
     finally:
-        await update_test_task(db, task_id, test_result, status=status)
+        await update_test_task(
+            db,
+            task_id,
+            test_result,
+            status=status,
+            tests_config=tests_config,
+        )
         if logs:
             db.add_all(logs)
 

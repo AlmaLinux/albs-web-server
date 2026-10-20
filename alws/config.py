@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     alts_token: str
     gitea_host: str = 'https://git.almalinux.org/api/v1/'
 
+    # Tests config of a package is read from
+    # <gitea>/<package_tests_org>/<package>@<package_tests_branch>, where
+    # <package> is the name of the package repository in git.almalinux.org/rpms
+    package_tests_enabled: bool = True
+    package_tests_org: str = 'tests'
+    package_tests_branch: str = 'main'
+    package_tests_config_path: str = 'alts.yaml'
+    package_tests_cache_ttl: int = 300  # seconds
+
     package_beholder_enabled: bool = True
     beholder_host: str = 'http://beholder-web:5000'
     beholder_token: Optional[str] = None
