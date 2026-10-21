@@ -1161,6 +1161,10 @@ class TestTask(TimeMixin, Base):
         nullable=False,
         index=True,
     )
+    # Tests the package tests config told ALTS not to run
+    skipped_tests: Mapped[Optional[List[str]]] = mapped_column(
+        sqlalchemy.ARRAY(sqlalchemy.TEXT, dimensions=1), nullable=True
+    )
     artifacts: Mapped[List["TestTaskArtifact"]] = relationship(
         "TestTaskArtifact", back_populates="test_task"
     )

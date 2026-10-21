@@ -20,6 +20,7 @@ class TestTask(BaseModel):
     package_release: Optional[str] = None
     status: int
     revision: int
+    skipped_tests: Optional[List[str]] = None
     alts_response: Optional[dict] = None
     performance_stats: Optional[List[PerformanceStats]] = None
 
@@ -50,3 +51,5 @@ class TestTaskPayload(BaseModel):
     module_stream: Optional[str] = None
     module_version: Optional[str] = None
     test_configuration: Optional[dict] = None
+    # Tests not to run, as named in the package tests config
+    skipped_tests: Optional[List[str]] = None
