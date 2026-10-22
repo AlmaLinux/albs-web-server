@@ -304,6 +304,18 @@ def get_rpm_packages_by_checksums(
         return result
 
 
+def get_rpm_module_artifacts(
+    pulp_module_ids: typing.List[uuid.UUID],
+) -> typing.Dict[uuid.UUID, typing.List[str]]:
+    with open_session(key="pulp") as pulp_db:
+        modules = pulp_db.execute(
+            select(RpmModulemd.content_ptr_id, RpmModulemd.artifacts).where(
+                RpmModulemd.content_ptr_id.in_(pulp_module_ids),
+            )
+        ).all()
+    return {module_id: artifacts or [] for module_id, artifacts in modules}
+
+
 async def get_module_from_pulp_db(
     pulp_db: AsyncSession,
     module: RpmModule,
