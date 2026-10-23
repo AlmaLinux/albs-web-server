@@ -3,11 +3,10 @@ import asyncio
 import logging
 import os
 import sys
-from contextlib import asynccontextmanager
 
 from fastapi_sqla import open_async_session
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -16,9 +15,9 @@ from alws.dependencies import get_async_db_key
 from alws.models import (
     BuildTask,
     BuildTaskArtifact,
-    ErrataPackage,
-    ErrataRecord,
-    ErrataToALBSPackage,
+    NewErrataPackage,
+    NewErrataRecord,
+    NewErrataToALBSPackage,
 )
 from alws.pulp_models import RpmPackage
 from alws.utils.fastapi_sqla_setup import setup_all
@@ -40,12 +39,13 @@ logging.basicConfig(
 
 async def main(
     advisory_id: str,
+    platform_id: int,
     build_id: int,
     ignore_release: bool,
 ):
-    new_entites = []
+    new_entities = []
     logging.info(
-        'Start updating errata_to_albs_packages for % advisory',
+        'Start updating new_errata_to_albs_packages for %s advisory',
         advisory_id,
     )
     added = not_found = 0
@@ -54,21 +54,30 @@ async def main(
         advisory = (
             (
                 await db.execute(
-                    select(ErrataRecord)
-                    .where(ErrataRecord.id == advisory_id)
-                    .options(
-                        joinedload(ErrataRecord.packages).joinedload(
-                            ErrataPackage.albs_packages
-                        )
-                    ),
+                    select(NewErrataRecord)
+                    .where(
+                        NewErrataRecord.id == advisory_id,
+                        NewErrataRecord.platform_id == platform_id,
+                    )
+                    .options(selectinload(NewErrataRecord.packages)),
                 )
             )
             .scalars()
             .first()
         )
         if not advisory:
-            logging.error('Advisory %s doesn`t exist', advisory_id)
+            logging.error(
+                'Advisory %s doesn`t exist for platform %d',
+                advisory_id,
+                platform_id,
+            )
             return
+        is_issued_by_almalinux = advisory.is_issued_by_almalinux
+        package_status = (
+            ErrataPackageStatus.approved
+            if is_issued_by_almalinux
+            else ErrataPackageStatus.proposal
+        )
         build_artifacts = (
             (
                 await db.execute(
@@ -76,7 +85,10 @@ async def main(
                         BuildTaskArtifact.type == 'rpm',
                         BuildTaskArtifact.build_task_id.in_(
                             select(BuildTask.id)
-                            .where(BuildTask.build_id == build_id)
+                            .where(
+                                BuildTask.build_id == build_id,
+                                BuildTask.platform_id == platform_id,
+                            )
                             .scalar_subquery()
                         ),
                     ),
@@ -101,37 +113,48 @@ async def main(
                 RpmPackage.rpm_sourcerpm,
             ],
         )
+        await db.execute(
+            delete(NewErrataToALBSPackage).where(
+                NewErrataToALBSPackage.errata_package_id.in_(
+                    [errata_pkg.id for errata_pkg in advisory.packages]
+                )
+            )
+        )
         for errata_pkg in advisory.packages:
-            for errata_to_albs_pkg in errata_pkg.albs_packages:
-                await db.delete(errata_to_albs_pkg)
-
             errata_pkg.source_srpm = None
+            errata_release = clean_release(
+                errata_pkg.release, is_issued_by_almalinux
+            )
+            matched = False
             for pulp_pkg in pulp_pkgs.values():
-                pulp_pkg_href = pulp_pkg.content_ptr_id
                 if (
                     errata_pkg.name != pulp_pkg.name
                     or errata_pkg.version != pulp_pkg.version
                     or pulp_pkg.arch not in (errata_pkg.arch, 'noarch')
                     or (
                         not ignore_release
-                        and clean_release(pulp_pkg.release)
-                        != clean_release(errata_pkg.release)
+                        and clean_release(
+                            pulp_pkg.release, is_issued_by_almalinux
+                        )
+                        != errata_release
                     )
                 ):
                     continue
-                new_errata_to_albs_pkg = ErrataToALBSPackage(
-                    errata_package_id=errata_pkg.id,
-                    albs_artifact_id=build_pkgs_mapping[pulp_pkg_href],
-                    status=ErrataPackageStatus.proposal,
-                    name=pulp_pkg.name,
-                    arch=pulp_pkg.arch,
-                    version=pulp_pkg.version,
-                    release=pulp_pkg.release,
-                    epoch=int(pulp_pkg.epoch),
+                new_entities.append(
+                    NewErrataToALBSPackage(
+                        errata_package_id=errata_pkg.id,
+                        albs_artifact_id=build_pkgs_mapping[
+                            pulp_pkg.content_ptr_id
+                        ],
+                        status=package_status,
+                        name=pulp_pkg.name,
+                        arch=pulp_pkg.arch,
+                        version=pulp_pkg.version,
+                        release=pulp_pkg.release,
+                        epoch=int(pulp_pkg.epoch),
+                    )
                 )
-                for collection in (errata_pkg.albs_packages, new_entites):
-                    collection.append(new_errata_to_albs_pkg)
-                if errata_pkg.source_srpm is None:
+                if errata_pkg.source_srpm is None and pulp_pkg.rpm_sourcerpm:
                     nevra = parse_rpm_nevra(pulp_pkg.rpm_sourcerpm)
                     errata_pkg.source_srpm = nevra.name
                 logging.info(
@@ -139,24 +162,26 @@ async def main(
                     pulp_pkg.nevra,
                     advisory_id,
                 )
+                matched = True
                 added += 1
-            if not errata_pkg.albs_packages:
+            if not matched:
                 logging.warning(
                     'Cannot find match for %s',
                     f'{errata_pkg.name}-{errata_pkg.version}-{errata_pkg.release}.{errata_pkg.arch}',
                 )
-            not_found += 1
-        db.add_all(new_entites)
+                not_found += 1
+        db.add_all(new_entities)
     logging.info('Total: added %d, not found %d', added, not_found)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         'errata_pkgs_matcher',
-        description='Removes linked errata_to_albs_packages to advisory and adds packages from build',
+        description='Removes linked new_errata_to_albs_packages to advisory and adds packages from build',
     )
-    parser.add_argument('--advisory-id', type=str)
-    parser.add_argument('--build-id', type=int)
+    parser.add_argument('--advisory-id', type=str, required=True)
+    parser.add_argument('--platform-id', type=int, required=True)
+    parser.add_argument('--build-id', type=int, required=True)
     parser.add_argument(
         '--ignore-release-part',
         action='store_true',
@@ -167,6 +192,7 @@ if __name__ == '__main__':
     asyncio.run(
         main(
             advisory_id=args.advisory_id,
+            platform_id=args.platform_id,
             build_id=args.build_id,
             ignore_release=args.ignore_release_part,
         )
