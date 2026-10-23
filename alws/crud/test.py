@@ -4,8 +4,9 @@ import gzip
 import logging
 import re
 import urllib.parse
+import uuid
 from io import BytesIO
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,12 +28,20 @@ from alws.utils.package_tests import (
     get_package_tests_config,
     get_source_package_name,
 )
-from alws.utils.parsing import parse_tap_output, tap_set_status
+from alws.utils.parsing import (
+    parse_rpm_nevra,
+    parse_tap_output,
+    tap_set_status,
+)
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
+    get_rpm_module_artifacts,
     get_rpm_packages_by_ids,
     get_uuid_from_pulp_href,
 )
+
+# A package of a module, (name, version, release)
+ModulePackage = Tuple[str, str, Optional[str]]
 
 
 def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
@@ -82,6 +91,75 @@ def get_repos_for_test_task(task: models.TestTask) -> List[dict]:
     return repos
 
 
+def get_pulp_module_artifacts(
+    rpm_modules: List[models.RpmModule],
+) -> Dict[uuid.UUID, List[str]]:
+    return get_rpm_module_artifacts(
+        [get_uuid_from_pulp_href(module.pulp_href) for module in rpm_modules]
+    )
+
+
+def get_devel_only_packages(
+    build_tasks: List[models.BuildTask],
+) -> Dict[int, Set[ModulePackage]]:
+    """Packages that only the -devel module of a build task ships.
+
+    A module puts the packages it filters out into its -devel module, so
+    they are filtered out by dnf unless the -devel module is enabled.
+    """
+    rpm_modules = [
+        module
+        for build_task in build_tasks
+        for module in build_task.rpm_modules
+    ]
+    if not rpm_modules:
+        return {}
+    try:
+        artifacts = get_pulp_module_artifacts(rpm_modules)
+    except Exception:
+        # Then every package is tested with the module itself, as before,
+        # which is better than not scheduling the tests at all
+        logging.exception('Cannot get artifacts of modules from Pulp')
+        return {}
+    result = {}
+    for build_task in build_tasks:
+        packages = {False: set(), True: set()}
+        for module in build_task.rpm_modules:
+            module_artifacts = artifacts.get(
+                get_uuid_from_pulp_href(module.pulp_href),
+                [],
+            )
+            for artifact in module_artifacts:
+                nevra = parse_rpm_nevra(artifact)
+                packages[module.name.endswith('-devel')].add(
+                    (nevra.name, nevra.version, nevra.release)
+                )
+        # Multilib packages are in both modules, they belong to the module
+        # itself
+        result[build_task.id] = packages[True] - packages[False]
+    return result
+
+
+def get_test_task_module(
+    task: models.TestTask,
+    devel_only_packages: Dict[int, Set[ModulePackage]],
+) -> Optional[models.RpmModule]:
+    # The -devel module requires the module itself, so dnf enables both
+    is_devel = (
+        task.package_name,
+        task.package_version,
+        task.package_release,
+    ) in devel_only_packages.get(task.build_task_id, set())
+    return next(
+        (
+            module
+            for module in task.build_task.rpm_modules
+            if module.name.endswith('-devel') == is_devel
+        ),
+        None,
+    )
+
+
 async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
     response = []
     updated_tasks = []
@@ -124,12 +202,12 @@ async def get_available_test_tasks(session: AsyncSession) -> List[dict]:
         .order_by(models.TestTask.id.asc())
         .limit(10)
     )
-    for task in test_tasks.scalars().all():
+    test_tasks = test_tasks.scalars().all()
+    build_tasks = {task.build_task_id: task.build_task for task in test_tasks}
+    devel_only_packages = get_devel_only_packages(list(build_tasks.values()))
+    for task in test_tasks:
         platform = task.build_task.platform
-        module_info = next(
-            (i for i in task.build_task.rpm_modules if '-devel' not in i.name),
-            None,
-        )
+        module_info = get_test_task_module(task, devel_only_packages)
         module_name = module_info.name if module_info else None
         module_stream = module_info.stream if module_info else None
         module_version = module_info.version if module_info else None
