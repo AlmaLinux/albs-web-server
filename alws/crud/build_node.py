@@ -44,8 +44,9 @@ async def get_available_build_task(
     db: AsyncSession,
     request: build_node_schema.RequestTask,
 ) -> typing.Optional[models.BuildTask]:
-    # TODO: here should be config value
-    ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
+    ts_expired = datetime.datetime.utcnow() - datetime.timedelta(
+        minutes=settings.build_task_expiration_minutes
+    )
     exclude_condition = (
         sqlalchemy.not_(
             sqlalchemy.or_(*[
