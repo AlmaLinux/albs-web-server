@@ -16,7 +16,11 @@ config = context.config
 
 # Set the DB URL from application settings instead of hardcoding it in
 # alembic.ini, so it can be overridden via environment variables.
-config.set_main_option("sqlalchemy.url", settings.sync_database_url)
+# "%" must be doubled: configparser treats it as interpolation syntax, which
+# breaks on URL-encoded characters in the password.
+config.set_main_option(
+    "sqlalchemy.url", settings.sync_database_url.replace("%", "%%")
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
