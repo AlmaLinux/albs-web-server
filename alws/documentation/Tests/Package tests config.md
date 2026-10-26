@@ -125,4 +125,5 @@ be used. The field is absent when the package has no config.
 
 A config applies to the test tasks created after it and to the test results
 that come after it. To re-check a build that has already been tested,
-restart its tests.
+restart its tests. Restarting only the failed tests re-tests just the packages
+that haven't passed, the others keep their results in the new revision.

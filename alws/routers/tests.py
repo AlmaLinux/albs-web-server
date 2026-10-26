@@ -46,18 +46,24 @@ async def get_test_tasks(
 @router.put('/build/{build_id}/restart')
 async def restart_build_tests(
     build_id: int,
+    only_failed: bool = False,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
-    await test.restart_build_tests(db, build_id)
+    await test.restart_build_tests(db, build_id, only_failed=only_failed)
     return {'ok': True}
 
 
 @router.put('/build_task/{build_task_id}/restart')
 async def restart_build_task_tests(
     build_task_id: int,
+    only_failed: bool = False,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
-    await test.restart_build_task_tests(db, build_task_id)
+    await test.restart_build_task_tests(
+        db,
+        build_task_id,
+        only_failed=only_failed,
+    )
     return {'ok': True}
 
 

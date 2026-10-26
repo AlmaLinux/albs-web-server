@@ -329,10 +329,55 @@ async def __get_tests_config(
     return await get_package_tests_config(source_package)
 
 
+async def __get_passed_test_tasks(
+    db: AsyncSession,
+    build_task_id: int,
+    revision: int,
+) -> Dict[str, models.TestTask]:
+    test_tasks = await db.execute(
+        select(models.TestTask)
+        .where(
+            models.TestTask.build_task_id == build_task_id,
+            models.TestTask.revision == revision,
+            models.TestTask.status == TestTaskStatus.COMPLETED,
+        )
+        .options(selectinload(models.TestTask.artifacts))
+    )
+    return {task.package_name: task for task in test_tasks.scalars().all()}
+
+
+def __carry_over_test_task(
+    task: models.TestTask,
+    revision: int,
+) -> models.TestTask:
+    # The package isn't tested again, the new revision gets
+    # the result and the logs it already has
+    return models.TestTask(
+        build_task_id=task.build_task_id,
+        package_name=task.package_name,
+        package_version=task.package_version,
+        package_release=task.package_release,
+        env_arch=task.env_arch,
+        status=task.status,
+        revision=revision,
+        repository_id=task.repository_id,
+        skipped_tests=task.skipped_tests,
+        alts_response=task.alts_response,
+        scheduled_at=task.scheduled_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+        artifacts=[
+            models.TestTaskArtifact(name=artifact.name, href=artifact.href)
+            for artifact in task.artifacts
+        ],
+    )
+
+
 async def create_test_tasks(
     db: AsyncSession,
     build_task_id: int,
     repository_id: int,
+    only_failed: bool = False,
 ):
     build_task_query = await db.execute(
         select(models.BuildTask)
@@ -358,6 +403,13 @@ async def create_test_tasks(
     new_revision = 1
     if latest_revision:
         new_revision = latest_revision + 1
+    passed_test_tasks = {}
+    if only_failed and latest_revision:
+        passed_test_tasks = await __get_passed_test_tasks(
+            db,
+            build_task_id,
+            latest_revision,
+        )
 
     test_tasks = []
     pulp_packages = get_pulp_packages(build_task.artifacts)
@@ -389,6 +441,12 @@ async def create_test_tasks(
                 rules.skipped_package.reason,
             )
             continue
+        passed_test_task = passed_test_tasks.get(artifact_info.name)
+        if passed_test_task:
+            test_tasks.append(
+                __carry_over_test_task(passed_test_task, new_revision)
+            )
+            continue
         task = models.TestTask(
             build_task_id=build_task_id,
             package_name=artifact_info.name,
@@ -402,12 +460,18 @@ async def create_test_tasks(
         if artifact_info.release:
             task.package_release = artifact_info.release
         test_tasks.append(task)
-    if test_tasks:
-        db.add_all(test_tasks)
-        await db.flush()
+    if not any(task.status == TestTaskStatus.CREATED for task in test_tasks):
+        # Nothing to test, all packages have passed already
+        return
+    db.add_all(test_tasks)
+    await db.flush()
 
 
-async def restart_build_tests(db: AsyncSession, build_id: int):
+async def restart_build_tests(
+    db: AsyncSession,
+    build_id: int,
+    only_failed: bool = False,
+):
     # Note that this functionality is triggered by frontend,
     # which only restarts tests for those builds that already
     # had passed the tests
@@ -446,10 +510,15 @@ async def restart_build_tests(db: AsyncSession, build_id: int):
                 db,
                 build_task.id,
                 test_log_repository.id,
+                only_failed=only_failed,
             )
 
 
-async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
+async def restart_build_task_tests(
+    db: AsyncSession,
+    build_task_id: int,
+    only_failed: bool = False,
+):
     build_task = (
         (
             await db.execute(
@@ -473,7 +542,12 @@ async def restart_build_task_tests(db: AsyncSession, build_task_id: int):
         raise ValueError(
             'Cannot create test tasks: the log repository is not found'
         )
-    await create_test_tasks(db, build_task_id, test_log_repository.id)
+    await create_test_tasks(
+        db,
+        build_task_id,
+        test_log_repository.id,
+        only_failed=only_failed,
+    )
 
 
 async def cancel_build_tests(db: AsyncSession, build_id: int):
