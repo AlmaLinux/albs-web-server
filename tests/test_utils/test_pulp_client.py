@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Tuple
 
 import pytest
@@ -33,6 +34,45 @@ def pulp_requests(monkeypatch) -> List[Tuple[str, str, dict]]:
 
 def make_pulp_client() -> PulpClient:
     return PulpClient('http://pulp', 'admin', 'admin')
+
+
+@pytest.fixture
+def task_polling(monkeypatch):
+    """
+    Serve a task that completes on the fifth poll and record how long
+    wait_for_task sleeps between polls.
+    """
+    states = iter(['waiting', 'running', 'running', 'running', 'completed'])
+    sleeps = []
+    original_sleep = asyncio.sleep
+
+    async def request(_, method, endpoint, **kwargs):
+        assert (method, endpoint) == ('GET', TASK_HREF)
+        return {'pulp_href': endpoint, 'state': next(states)}
+
+    async def sleep(seconds):
+        sleeps.append(seconds)
+        await original_sleep(0)
+
+    monkeypatch.setattr(PulpClient, 'request', request)
+    monkeypatch.setattr(asyncio, 'sleep', sleep)
+    return sleeps
+
+
+@pytest.mark.anyio
+async def test_wait_for_task_polls_at_fixed_interval(task_polling):
+    task = await make_pulp_client().wait_for_task(TASK_HREF, sleep_time=1.0)
+    assert task['state'] == 'completed'
+    assert task_polling == [1.0, 1.0, 1.0, 1.0]
+
+
+@pytest.mark.anyio
+async def test_wait_for_task_backs_off(task_polling):
+    task = await make_pulp_client().wait_for_task(
+        TASK_HREF, sleep_time=1.0, max_sleep_time=4.0
+    )
+    assert task['state'] == 'completed'
+    assert task_polling == [1.0, 2.0, 4.0, 4.0]
 
 
 @pytest.mark.anyio

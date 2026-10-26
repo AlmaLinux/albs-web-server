@@ -1,13 +1,25 @@
 import asyncio
+import json
 import logging
 import os
 import re
 import shutil
 import sys
+import threading
 import urllib.parse
+from datetime import datetime
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import aiohttp
 from plumbum import local
@@ -22,10 +34,99 @@ from alws.utils.exporter import download_file, get_repodata_file_links
 from alws.utils.pulp_client import get_pulp_client
 
 
+def _task_duration(task: dict) -> Optional[float]:
+    """
+    Seconds a Pulp task spent running, or None if the task doesn't
+    report when it started and finished.
+    """
+    try:
+        started = datetime.fromisoformat(
+            task["started_at"].replace("Z", "+00:00")
+        )
+        finished = datetime.fromisoformat(
+            task["finished_at"].replace("Z", "+00:00")
+        )
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
+    return (finished - started).total_seconds()
+
+
+class ExportState:
+    """
+    Repository versions that were fully exported (Pulp export, metadata
+    regeneration and repodata signing) to each export path.
+
+    Pulp re-links every package of a repository on each export and
+    createrepo_c runs on the whole directory afterwards, while most
+    repositories don't change between exports. The state lets the
+    exporter skip the repositories whose version hasn't changed since the
+    last complete export, as long as they are still on the filesystem.
+    """
+
+    version = 1
+
+    def __init__(self, path: Path, logger: logging.Logger):
+        self.path = path
+        self.logger = logger
+        self._lock = threading.Lock()
+        self._entries = self._load()
+
+    def _load(self) -> dict:
+        try:
+            with open(self.path, "rt") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            self.logger.warning(
+                "Cannot read export state %s, starting from scratch",
+                self.path,
+                exc_info=True,
+            )
+            return {}
+        if not isinstance(data, dict) or data.get("version") != self.version:
+            return {}
+        return data["entries"]
+
+    def matches(
+        self, export_path: str, repository_version: str, method: str
+    ) -> bool:
+        with self._lock:
+            entry = self._entries.get(export_path)
+        return bool(entry) and (
+            entry.get("repository_version") == repository_version
+            and entry.get("method") == method
+        )
+
+    def mark(self, export_path: str, repository_version: str, method: str):
+        with self._lock:
+            self._entries[export_path] = {
+                "repository_version": repository_version,
+                "method": method,
+            }
+
+    def save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self.path.with_name(f"{self.path.name}.tmp")
+        with self._lock:
+            entries = dict(self._entries)
+        with open(tmp_path, "wt") as f:
+            json.dump(
+                {"version": self.version, "entries": entries},
+                f,
+                indent=1,
+                sort_keys=True,
+            )
+        os.replace(tmp_path, self.path)
+
+
 class BasePulpExporter:
     # Whether to check that the repodata downloaded from a distribution
     # describes the exported repository version, see _export_repository.
     verify_repodata_version = False
+    # Whether to skip repositories recorded in ExportState whose version
+    # hasn't changed and that are still present on the filesystem.
+    skip_unchanged = False
 
     def __init__(
         self,
@@ -67,6 +168,41 @@ class BasePulpExporter:
         self.web_server_headers = {
             "Authorization": f"Bearer {settings.albs_jwt_token}",
         }
+
+        self.export_state = ExportState(
+            self.repodata_cache_dir.joinpath("export_state.json"),
+            logger=self.logger,
+        )
+        # Export paths skipped in this run because they were already
+        # exported at their current repository version
+        self.unchanged_export_paths: set = set()
+        # Repository version exported to each export path in this run
+        self.exported_versions: Dict[str, str] = {}
+
+    def is_unchanged(self, export_path: str) -> bool:
+        return export_path in self.unchanged_export_paths
+
+    def mark_exported(self, export_path: str):
+        """
+        Record that the export of the path is complete, so that it can be
+        skipped next time if its repository version doesn't change.
+        """
+        repository_version = self.exported_versions.get(export_path)
+        if repository_version is None:
+            return
+        self.export_state.mark(
+            export_path, repository_version, self.export_method
+        )
+
+    @staticmethod
+    def export_is_present(export_path: str) -> bool:
+        """
+        Whether the packages directory and the regenerated repodata of a
+        previous export are still on the filesystem.
+        """
+        packages_dir = Path(export_path)
+        repomd = packages_dir.parent / "repodata" / "repomd.xml"
+        return packages_dir.is_dir() and repomd.is_file()
 
     def regenerate_repo_metadata(self, repo_path: str):
         partial_path = re.sub(
@@ -199,8 +335,28 @@ class BasePulpExporter:
         export_path = exporter["export_path"]
         href = exporter["exporter_href"]
         repository_version = exporter["repo_latest_version"]
+        self.exported_versions[export_path] = repository_version
+        if self.skip_unchanged and self.export_state.matches(
+            export_path, repository_version, self.export_method
+        ):
+            if self.export_is_present(export_path):
+                self.logger.info(
+                    "Repository %s is unchanged since the last export "
+                    "(%s), skipping",
+                    exporter["exporter_name"],
+                    repository_version,
+                )
+                self.unchanged_export_paths.add(export_path)
+                # The repodata on disk was generated from the exported
+                # packages themselves, so it describes them exactly
+                self.repodata_matches_export[export_path] = True
+                return export_path
+            self.logger.info(
+                "Repository %s is missing on the filesystem, re-exporting",
+                exporter["exporter_name"],
+            )
         try:
-            await self.pulp_client.export_to_filesystem(
+            task = await self.pulp_client.export_to_filesystem(
                 href, repository_version
             )
         except Exception:
@@ -209,6 +365,13 @@ class BasePulpExporter:
                 str(exporter),
             )
             return
+        duration = _task_duration(task) if isinstance(task, dict) else None
+        if duration is not None:
+            self.logger.info(
+                "Repository %s is exported by Pulp in %.1fs",
+                exporter["exporter_name"],
+                duration,
+            )
         parent_dir = Path(export_path).parent
         if not parent_dir.exists():
             self.logger.info(
@@ -272,11 +435,26 @@ class BasePulpExporter:
             return False
         return latest_version == repository_version
 
-    async def export_repositories(self, repo_ids: List[int]) -> List[str]:
+    async def export_repositories(
+        self,
+        repo_ids: List[int],
+        on_exported: Optional[Callable[[str], Awaitable[None]]] = None,
+    ) -> List[str]:
+        """
+        Export the repositories and return their paths.
+
+        on_exported is awaited with the path of each repository as soon
+        as it's exported, while the others are still being exported.
+        """
         exporters = await self.create_filesystem_exporters(repo_ids)
-        results = await asyncio.gather(
-            *(self._export_repository(e) for e in exporters)
-        )
+
+        async def export(exporter: dict) -> Optional[str]:
+            path = await self._export_repository(exporter)
+            if path and on_exported is not None:
+                await on_exported(path)
+            return path
+
+        results = await asyncio.gather(*(export(e) for e in exporters))
         return [path for path in results if path]
 
     async def get_sign_keys(self):
@@ -345,14 +523,17 @@ class BasePulpExporter:
             backoff *= 2
         return result
 
-    async def repomd_signer(self, repodata_path, key_id, token):
+    async def repomd_signer(self, repodata_path, key_id, token) -> bool:
+        """
+        Sign repomd.xml in the directory. Returns whether it's signed.
+        """
         string_repodata_path = str(repodata_path)
         if key_id is None:
             self.logger.info(
                 "Cannot sign repomd.xml in %s, missing GPG key",
                 string_repodata_path,
             )
-            return
+            return False
 
         file_path = os.path.join(repodata_path, "repomd.xml")
         result = await self.sign_repomd_xml(file_path, key_id, token)
@@ -365,12 +546,13 @@ class BasePulpExporter:
                 string_repodata_path,
                 result["error"],
             )
-            return
+            return False
 
         repodata_path = os.path.join(repodata_path, "repomd.xml.asc")
         with open(repodata_path, "w") as file:
             file.writelines(result_data)
         self.logger.info("repomd.xml in %s is signed", string_repodata_path)
+        return True
 
     async def make_request(
         self,

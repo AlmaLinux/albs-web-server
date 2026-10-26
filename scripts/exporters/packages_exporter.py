@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -7,7 +8,8 @@ import pwd
 import re
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from time import time
@@ -34,6 +36,8 @@ from alws.config import settings
 from alws.constants import SignStatusEnum
 from alws.dependencies import get_async_db_key
 from alws.utils.errata import (
+    errata_page_file_name,
+    errata_page_template_source,
     extract_errata_metadata,
     extract_errata_metadata_modern,
     find_metadata,
@@ -154,7 +158,31 @@ def parse_args():
         required=False,
         help="The path to the directory where the OSV data will be generated",
     )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Export every repository even if its Pulp version hasn't "
+            "changed since the last complete export, and regenerate every "
+            "HTML errata page. By default such repositories are skipped "
+            "when they are still on the filesystem, and only the pages of "
+            "changed errata are regenerated"
+        ),
+    )
     return parser.parse_args()
+
+
+@contextmanager
+def log_duration(logger: logging.Logger, step: str):
+    start = time()
+    logger.info("%s: started", step)
+    try:
+        yield
+    finally:
+        logger.info("%s: done in %.1fs", step, time() - start)
 
 
 def init_sentry():
@@ -298,6 +326,82 @@ class SignatureCache:
         os.replace(tmp_path, self.path)
 
 
+class ErrataPageCache:
+    """
+    Fingerprints of the HTML errata pages written by the previous export.
+
+    Rendering the pages of every erratum of a platform takes a minute,
+    while only a few errata change between exports. A page is written
+    again when its erratum or the template differ from the previous
+    export, or when the page is missing.
+    """
+
+    version = 1
+
+    def __init__(
+        self,
+        path: Path,
+        logger: logging.Logger,
+        ignore_cached: bool = False,
+    ):
+        self.path = path
+        self.logger = logger
+        self.ignore_cached = ignore_cached
+        self._cached = self._load()
+        self._used = {}
+
+    def _load(self) -> dict:
+        try:
+            with open(self.path, "rt") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            self.logger.warning(
+                "Cannot read errata pages cache %s, starting from scratch",
+                self.path,
+                exc_info=True,
+            )
+            return {}
+        if not isinstance(data, dict) or data.get("version") != self.version:
+            return {}
+        return data["entries"]
+
+    @staticmethod
+    def fingerprint(errata: dict) -> str:
+        digest = hashlib.sha256(errata_page_template_source().encode())
+        digest.update(
+            json.dumps(errata, sort_keys=True, default=str).encode()
+        )
+        return digest.hexdigest()
+
+    def is_current(self, page_path: str, fingerprint: str) -> bool:
+        page_name = os.path.basename(page_path)
+        return (
+            not self.ignore_cached
+            and self._cached.get(page_name) == fingerprint
+            and os.path.isfile(page_path)
+        )
+
+    def put(self, page_path: str, fingerprint: str):
+        self._used[os.path.basename(page_path)] = fingerprint
+
+    def save(self):
+        # The entries of errata that are gone are kept: errata are never
+        # removed in practice, and a stale entry is harmless as a page
+        # is only reused when it is present
+        entries = {**self._cached, **self._used}
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self.path.with_name(f"{self.path.name}.tmp")
+        with open(tmp_path, "wt") as f:
+            json.dump(
+                {"version": self.version, "entries": entries},
+                f,
+                separators=(",", ":"),
+            )
+        os.replace(tmp_path, self.path)
+
+
 class PackagesExporter(BasePulpExporter):
     verify_repodata_version = True
 
@@ -311,6 +415,7 @@ class PackagesExporter(BasePulpExporter):
         export_path: str = settings.pulp_export_path,
         osv_dir: str = settings.pulp_export_path,
         full_signature_check: bool = False,
+        skip_unchanged: bool = True,
     ):
         super().__init__(
             repodata_cache_dir=repodata_cache_dir,
@@ -321,6 +426,7 @@ class PackagesExporter(BasePulpExporter):
             export_path=export_path,
         )
 
+        self.skip_unchanged = skip_unchanged
         self.osv_dir = osv_dir
         self.full_signature_check = full_signature_check
         self.current_user = self.get_current_username()
@@ -556,6 +662,77 @@ class PackagesExporter(BasePulpExporter):
 
         self.logger.info("Signature check is done")
 
+    async def export_and_check_signatures(
+        self,
+        platform_name: str,
+        repo_ids: List[int],
+        sign_keys: list,
+        partial: bool = False,
+    ) -> List[str]:
+        """
+        Export the repositories of a platform and check the signatures of
+        their packages, returning the exported paths.
+
+        The packages of a repository are checked as soon as it's exported,
+        while Pulp is still exporting the others. A repository unchanged
+        since the last complete export holds the same packages that passed
+        the check back then, so it's only checked again on a full
+        signature check.
+        """
+        signature_cache = SignatureCache(
+            self.repodata_cache_dir.joinpath(
+                "signatures", f"{platform_name}.json"
+            ),
+            logger=self.logger,
+            ignore_cached=self.full_signature_check,
+        )
+        skipped = []
+        loop = asyncio.get_running_loop()
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+
+            async def check(repo_path: str):
+                if not os.path.exists(repo_path):
+                    self.logger.error("Path %s does not exist", repo_path)
+                    return
+                if (
+                    self.is_unchanged(repo_path)
+                    and not self.full_signature_check
+                ):
+                    self.logger.info(
+                        "%s is unchanged, its packages signatures were "
+                        "checked at the last export",
+                        repo_path,
+                    )
+                    skipped.append(repo_path)
+                    return
+                await loop.run_in_executor(
+                    executor,
+                    self.check_rpms_signature,
+                    repo_path,
+                    sign_keys,
+                    signature_cache,
+                )
+                self.logger.info(
+                    '%s packages signatures are checked', repo_path
+                )
+
+            exported_paths = await self.export_repositories(
+                repo_ids, on_exported=check
+            )
+
+        # The entries of the skipped repositories weren't used, so they
+        # can only be pruned when every repository is checked
+        try:
+            signature_cache.save(prune=not partial and not skipped)
+        except OSError:
+            self.logger.warning(
+                "Cannot save signature cache %s",
+                signature_cache.path,
+                exc_info=True,
+            )
+        return exported_paths
+
     async def export_repos_from_pulp(
         self,
         platform_names: Optional[List[str]] = None,
@@ -607,45 +784,15 @@ class PackagesExporter(BasePulpExporter):
                 else:
                     platforms_dict[db_platform.id].append(repo.export_path)
                     repo_ids_to_export.append(repo.id)
-            exported_paths = await self.export_repositories(
-                list(set(repo_ids_to_export))
+            exported_paths = await self.export_and_check_signatures(
+                db_platform.name,
+                list(set(repo_ids_to_export)),
+                db_platform.sign_keys,
+                # A partial export leaves the other repositories' entries
+                # alone
+                partial=repo_ids is not None or arches is not None,
             )
             final_export_paths.extend(exported_paths)
-            signature_cache = SignatureCache(
-                self.repodata_cache_dir.joinpath(
-                    "signatures", f"{db_platform.name}.json"
-                ),
-                logger=self.logger,
-                ignore_cached=self.full_signature_check,
-            )
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = {}
-                for repo_path in exported_paths:
-                    if not os.path.exists(repo_path):
-                        self.logger.error("Path %s does not exist", repo_path)
-                        continue
-                    futures[
-                        executor.submit(
-                            self.check_rpms_signature,
-                            repo_path,
-                            db_platform.sign_keys,
-                            signature_cache,
-                        )
-                    ] = repo_path
-                for future in as_completed(futures):
-                    repo_path = futures[future]
-                    self.logger.info(
-                        '%s packages signatures are checked', repo_path
-                    )
-            # A partial export leaves the other repositories' entries alone
-            try:
-                signature_cache.save(prune=repo_ids is None and arches is None)
-            except OSError:
-                self.logger.warning(
-                    "Cannot save signature cache %s",
-                    signature_cache.path,
-                    exc_info=True,
-                )
             self.logger.debug(
                 "All repositories exported in following paths:\n%s",
                 "\n".join((str(path) for path in exported_paths)),
@@ -696,7 +843,8 @@ def get_platform_sign_key_id(
     matched_key_ids = [
         sign_key["keyid"]
         for sign_key in db_sign_keys
-        if platform_id in sign_key["platform_ids"]
+        # A key with no platforms attached has no list at all
+        if platform_id in (sign_key.get("platform_ids") or [])
     ]
     if not matched_key_ids:
         return None
@@ -727,8 +875,13 @@ async def sign_repodata(
     db_sign_keys: list,
     key_id_by_platform: Optional[str] = None,
     override_key_id: Optional[str] = None,
-):
-    tasks = []
+) -> set:
+    """
+    Sign repomd.xml of the exported repositories. Returns the export
+    paths whose repodata is signed, or has no key to be signed with.
+    """
+    tasks = {}
+    signed_paths = set()
     token = await exporter.get_sign_server_token()
 
     for repo_path in exported_paths:
@@ -736,6 +889,15 @@ async def sign_repodata(
         parent_dir = path.parent
         repodata = parent_dir / "repodata"
         if not os.path.exists(repo_path):
+            continue
+        if (
+            exporter.is_unchanged(repo_path)
+            and (repodata / "repomd.xml.asc").is_file()
+        ):
+            exporter.logger.info(
+                "repomd.xml in %s is unchanged and already signed", repodata
+            )
+            signed_paths.add(repo_path)
             continue
 
         key_id = override_key_id or key_id_by_platform or None
@@ -750,9 +912,16 @@ async def sign_repodata(
                         )
                         break
         exporter.logger.info('Key ID: %s', str(key_id))
-        tasks.append(exporter.repomd_signer(repodata, key_id, token))
+        if key_id is None:
+            # Nothing to sign with: the export is as complete as it gets
+            signed_paths.add(repo_path)
+        tasks[repo_path] = exporter.repomd_signer(repodata, key_id, token)
 
-    await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks.values())
+    for repo_path, signed in zip(tasks, results):
+        if signed:
+            signed_paths.add(repo_path)
+    return signed_paths
 
 
 def extract_errata(repo_path: str) -> Tuple[List[dict], List[dict]]:
@@ -779,6 +948,9 @@ def extract_errata(repo_path: str) -> Tuple[List[dict], List[dict]]:
 
 
 def repo_post_processing(exporter: PackagesExporter, repo_path: str) -> bool:
+    if exporter.is_unchanged(repo_path):
+        exporter.logger.info("%s is unchanged, keeping its repodata", repo_path)
+        return True
     result = True
     try:
         exporter.regenerate_repo_metadata(str(Path(repo_path).parent))
@@ -788,13 +960,92 @@ def repo_post_processing(exporter: PackagesExporter, repo_path: str) -> bool:
     return result
 
 
+def generate_errata_pages(
+    exporter: PackagesExporter,
+    errata_cache: List[dict],
+    html_path: str,
+    platform: str,
+) -> int:
+    """
+    Write the HTML pages of the errata that changed since the previous
+    export and return their number.
+    """
+    page_cache = ErrataPageCache(
+        exporter.repodata_cache_dir.joinpath(
+            "errata_pages", f"{platform}.json"
+        ),
+        logger=exporter.logger,
+        ignore_cached=not exporter.skip_unchanged,
+    )
+    generated = 0
+    for record in errata_cache:
+        # The page lists the packages by arch, and errata.json is written
+        # from the same records after the pages: keep the order the same
+        # whether the page is written or reused
+        record["pkglist"]["packages"].sort(key=lambda x: x["arch"])
+        page_path = os.path.join(html_path, errata_page_file_name(record))
+        fingerprint = page_cache.fingerprint(record)
+        if not page_cache.is_current(page_path, fingerprint):
+            generate_errata_page(record, html_path)
+            generated += 1
+        page_cache.put(page_path, fingerprint)
+    try:
+        page_cache.save()
+    except OSError:
+        exporter.logger.warning(
+            "Cannot save errata pages cache %s",
+            page_cache.path,
+            exc_info=True,
+        )
+    return generated
+
+
+def start_oval_requests(
+    exporter: PackagesExporter,
+    platform_names: Optional[List[str]],
+) -> Dict[str, Future]:
+    """
+    Request the OVAL document of each platform from the web server
+    in the background.
+
+    The web server composes it from the database, which takes a minute,
+    and it doesn't depend on the export: let the web server work while
+    the repositories are exported.
+    """
+    if not platform_names:
+        return {}
+    executor = ThreadPoolExecutor(
+        max_workers=len(platform_names),
+        thread_name_prefix="oval",
+    )
+    futures = {}
+    for platform in platform_names:
+        exporter.logger.info(
+            "%s OVAL data: requested from the web server", platform
+        )
+        futures[platform] = executor.submit(
+            asyncio.run,
+            # aiohttp is not able to send booleans in params.
+            # For this reason, we're passing only_released as a
+            # string, which in turn will be converted into boolean
+            # on backend side by fastapi/pydantic.
+            exporter.get_oval_xml(platform, only_released=True),
+        )
+    # The threads finish the requests already submitted
+    executor.shutdown(wait=False)
+    return futures
+
+
 def export_errata_and_oval(
     exporter: PackagesExporter,
     platform_errata_cache: dict,
     platform_names: Optional[List[str]] = None,
+    oval_futures: Optional[Dict[str, Future]] = None,
 ):
     if not platform_names:
         return
+    if oval_futures is None:
+        oval_futures = start_oval_requests(exporter, platform_names)
     exporter.logger.info("Starting export errata.json and oval.xml")
     errata_export_base_path = None
     try:
@@ -815,11 +1066,19 @@ def export_errata_and_oval(
             html_path = os.path.join(platform_path, "html")
             if not os.path.exists(html_path):
                 os.mkdir(html_path)
-            exporter.process_osv_data(errata_cache, platform)
-            exporter.logger.debug("Generating HTML errata pages")
-            for record in errata_cache:
-                generate_errata_page(record, html_path)
-            exporter.logger.debug("HTML pages are generated")
+            with log_duration(exporter.logger, f"{platform} OSV data"):
+                exporter.process_osv_data(errata_cache, platform)
+            with log_duration(exporter.logger, f"{platform} HTML errata pages"):
+                generated = generate_errata_pages(
+                    exporter, errata_cache, html_path, platform
+                )
+                exporter.logger.info(
+                    "%s HTML errata pages: %d of %d written, the others are "
+                    "unchanged since the last export",
+                    platform,
+                    generated,
+                    len(errata_cache),
+                )
             for item in errata_cache:
                 item["issued_date"] = {
                     "$date": int(item["issued_date"].timestamp() * 1000)
@@ -827,36 +1086,44 @@ def export_errata_and_oval(
                 item["updated_date"] = {
                     "$date": int(item["updated_date"].timestamp() * 1000)
                 }
-            exporter.logger.debug("Dumping errata data into JSON")
-            with open(os.path.join(platform_path, "errata.json"), "w") as fd:
-                json.dump(errata_cache, fd)
-            with open(
-                os.path.join(platform_path, "errata.full.json"), "w"
-            ) as fd:
-                json.dump(platform_errata_cache[platform]["modern_cache"], fd)
-            exporter.logger.debug("JSON dump is done")
-            exporter.logger.debug("Generating OVAL data")
-            oval = sync(
-                # aiohttp is not able to send booleans in params.
-                # For this reason, we're passing only_released as a string,
-                # which in turn will be converted into boolean on backend
-                # side by fastapi/pydantic.
-                exporter.get_oval_xml(platform, only_released=True)
+            with log_duration(exporter.logger, f"{platform} errata JSON"):
+                with open(
+                    os.path.join(platform_path, "errata.json"), "w"
+                ) as fd:
+                    json.dump(errata_cache, fd)
+                with open(
+                    os.path.join(platform_path, "errata.full.json"), "w"
+                ) as fd:
+                    json.dump(
+                        platform_errata_cache[platform]["modern_cache"],
+                        fd,
+                    )
+            with log_duration(exporter.logger, f"{platform} RSS feed"):
+                rss = sync(
+                    exporter.generate_rss(
+                        platform,
+                        platform_errata_cache[platform]["modern_cache"],
+                    )
+                )
+                with open(
+                    os.path.join(platform_path, "errata.rss"), "w"
+                ) as fd:
+                    fd.write(rss)
+            oval_future = oval_futures.get(platform)
+            if oval_future is None:
+                oval_future = start_oval_requests(exporter, [platform])[
+                    platform
+                ]
+            wait_start = time()
+            oval = oval_future.result()
+            exporter.logger.info(
+                "%s OVAL data: received from the web server after waiting "
+                "%.1fs for it",
+                platform,
+                time() - wait_start,
             )
             with open(os.path.join(platform_path, "oval.xml"), "w") as fd:
                 fd.write(oval)
-            exporter.logger.debug("OVAL is generated")
-
-            exporter.logger.debug("Generating RSS feed for %s", platform)
-            rss = sync(
-                exporter.generate_rss(
-                    platform,
-                    platform_errata_cache[platform]["modern_cache"],
-                )
-            )
-            with open(os.path.join(platform_path, "errata.rss"), "w") as fd:
-                fd.write(rss)
-            exporter.logger.debug("RSS generation for %s is done", platform)
     except Exception:
         exporter.logger.exception("Error happened:\n")
 
@@ -865,7 +1132,9 @@ def extract_errata_from_exported_paths(
     exporter: PackagesExporter,
     exported_paths: List[str],
 ) -> dict:
-    platform_errata_cache = {}
+    # Records of every repository of a platform, merged once at the end:
+    # merging deep-copies the whole accumulated cache every time
+    platform_records = {}
     with ThreadPoolExecutor(max_workers=4) as executor:
         errata_futures = {
             executor.submit(extract_errata, exp_path): exp_path
@@ -873,36 +1142,40 @@ def extract_errata_from_exported_paths(
         }
 
         exporter.logger.debug("Starting errata extraction")
+        extracted = {}
         for future in as_completed(errata_futures):
             repo_path = errata_futures[future]
-            errata_records, modern_errata_records = future.result()
-            if errata_records or modern_errata_records:
-                exporter.logger.info(
-                    "Extracted errata records from %s",
-                    repo_path,
-                )
-                repo_match = re.search(r"/(almalinux|vault)/(\d+)/", repo_path)
-                if repo_match:
-                    version = repo_match.group(2)
-                    platform = f"AlmaLinux-{version}"
-                else:
-                    platform = "AlmaLinux-8"
-                if platform not in platform_errata_cache:
-                    platform_errata_cache[platform] = {
-                        "cache": [],
-                        "modern_cache": {
-                            "data": [],
-                        },
-                    }
-                platform_cache = platform_errata_cache[platform]
-                platform_cache["cache"] = merge_errata_records(
-                    platform_cache["cache"], errata_records
-                )
-                platform_cache["modern_cache"] = merge_errata_records_modern(
-                    platform_cache["modern_cache"],
-                    {"data": modern_errata_records},
-                )
+            extracted[repo_path] = future.result()
         exporter.logger.debug("Errata extraction completed")
+
+    # The merged record of an erratum takes the collection name and the
+    # module of the first repository it's found in: merge in a fixed
+    # order so that the output doesn't change from one run to another
+    for repo_path in sorted(extracted):
+        errata_records, modern_errata_records = extracted[repo_path]
+        if not errata_records and not modern_errata_records:
+            continue
+        exporter.logger.info("Extracted errata records from %s", repo_path)
+        repo_match = re.search(r"/(almalinux|vault)/(\d+)/", repo_path)
+        if repo_match:
+            version = repo_match.group(2)
+            platform = f"AlmaLinux-{version}"
+        else:
+            platform = "AlmaLinux-8"
+        records, modern_records = platform_records.setdefault(
+            platform, ([], [])
+        )
+        records.extend(errata_records)
+        modern_records.extend(modern_errata_records)
+
+    platform_errata_cache = {}
+    for platform, (records, modern_records) in platform_records.items():
+        platform_errata_cache[platform] = {
+            "cache": merge_errata_records([], records),
+            "modern_cache": merge_errata_records_modern(
+                {"data": []}, {"data": modern_records}
+            ),
+        }
     return platform_errata_cache
 
 
@@ -922,7 +1195,9 @@ def main():
         export_method=args.export_method,
         osv_dir=args.osv_dir,
         full_signature_check=args.full_signature_check,
+        skip_unchanged=not args.force,
     )
+    logger = exporter.logger
 
     db_sign_keys = sync(exporter.get_sign_keys())
 
@@ -942,10 +1217,15 @@ def main():
                 f"the '{args.sign_with}' sign key"
             )
 
+    # The OVAL documents only depend on the database: let the web server
+    # compose them during the export
+    oval_futures = start_oval_requests(exporter, args.platform_names)
+
     if args.release_id:
-        exported_paths, platform_id = sync(
-            exporter.export_repos_from_release(args.release_id)
-        )
+        with log_duration(logger, "Export from Pulp and signature check"):
+            exported_paths, platform_id = sync(
+                exporter.export_repos_from_release(args.release_id)
+            )
         if not sign_key_id:
             key_id_by_platform = get_platform_sign_key_id(
                 db_sign_keys,
@@ -954,13 +1234,14 @@ def main():
             )
 
     if args.platform_names or args.repo_ids:
-        exported_paths, platforms_dict = sync(
-            exporter.export_repos_from_pulp(
-                platform_names=args.platform_names,
-                arches=args.arches,
-                repo_ids=args.repo_ids,
+        with log_duration(logger, "Export from Pulp and signature check"):
+            exported_paths, platforms_dict = sync(
+                exporter.export_repos_from_pulp(
+                    platform_names=args.platform_names,
+                    arches=args.arches,
+                    repo_ids=args.repo_ids,
+                )
             )
-        )
         if not sign_key_id:
             # Fail fast, before the expensive post-processing, if any of the
             # exported platforms has an unresolvable sign key.
@@ -968,50 +1249,79 @@ def main():
                 if platform_repos:
                     get_platform_sign_key_id(db_sign_keys, platform_id)
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        post_processing_futures = {
-            executor.submit(
-                repo_post_processing,
-                exporter,
-                repo_path,
-            ): repo_path
-            for repo_path in exported_paths
-        }
-        for future in as_completed(post_processing_futures):
-            repo_path = post_processing_futures[future]
-            result = future.result()
-            if result:
-                exporter.logger.info(
-                    "%s post-processing is successful",
-                    repo_path,
-                )
-            else:
-                exporter.logger.error(
-                    "%s post-processing has failed",
-                    repo_path,
-                )
-
-    platform_errata_cache = extract_errata_from_exported_paths(
-        exporter=exporter,
-        exported_paths=exported_paths,
+    unchanged_count = sum(
+        exporter.is_unchanged(path) for path in exported_paths
+    )
+    logger.info(
+        "%d repositories exported, %d of them unchanged since the last export",
+        len(exported_paths),
+        unchanged_count,
     )
 
-    sync(
-        sign_repodata(
-            exporter,
-            exported_paths,
-            platforms_dict,
-            db_sign_keys,
-            key_id_by_platform=key_id_by_platform,
-            override_key_id=sign_key_id,
+    post_processed_paths = set()
+    with log_duration(logger, "Repodata regeneration"):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            post_processing_futures = {
+                executor.submit(
+                    repo_post_processing,
+                    exporter,
+                    repo_path,
+                ): repo_path
+                for repo_path in exported_paths
+            }
+            for future in as_completed(post_processing_futures):
+                repo_path = post_processing_futures[future]
+                result = future.result()
+                if result:
+                    post_processed_paths.add(repo_path)
+                    exporter.logger.info(
+                        "%s post-processing is successful",
+                        repo_path,
+                    )
+                else:
+                    exporter.logger.error(
+                        "%s post-processing has failed",
+                        repo_path,
+                    )
+
+    with log_duration(logger, "Errata extraction"):
+        platform_errata_cache = extract_errata_from_exported_paths(
+            exporter=exporter,
+            exported_paths=exported_paths,
         )
-    )
 
-    export_errata_and_oval(
-        exporter=exporter,
-        platform_errata_cache=platform_errata_cache,
-        platform_names=args.platform_names,
-    )
+    with log_duration(logger, "Repodata signing"):
+        signed_paths = sync(
+            sign_repodata(
+                exporter,
+                exported_paths,
+                platforms_dict,
+                db_sign_keys,
+                key_id_by_platform=key_id_by_platform,
+                override_key_id=sign_key_id,
+            )
+        )
+
+    # Only a repository that went through every step can be skipped next
+    # time; a failed one is exported again
+    for repo_path in post_processed_paths & signed_paths:
+        exporter.mark_exported(repo_path)
+    try:
+        exporter.export_state.save()
+    except OSError:
+        logger.warning(
+            "Cannot save export state %s",
+            exporter.export_state.path,
+            exc_info=True,
+        )
+
+    with log_duration(logger, "Errata, OSV, OVAL and RSS export"):
+        export_errata_and_oval(
+            exporter=exporter,
+            platform_errata_cache=platform_errata_cache,
+            platform_names=args.platform_names,
+            oval_futures=oval_futures,
+        )
 
 
 if __name__ == "__main__":
