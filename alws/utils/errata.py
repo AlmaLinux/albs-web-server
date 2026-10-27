@@ -17,6 +17,34 @@ from alws.models import (
 from alws.utils.parsing import clean_release
 
 SCHEMA_VERSION = "1.0"
+DEBRAND_EXCLUDE_RE = re.compile(
+    # URLs
+    r"https?://[^\s<>\"']+"
+    # hostnames, package names, Java properties, D-Bus names, etc.:
+    # access.redhat.com, redhat-rpm-config, com.redhat.fips
+    r"|[\w.-]*(?:[-_.]redhat|redhat[-_.])[\w.-]*"
+    # Jira IDs: JIRA:RHEL-164549, RHEL-13593
+    r"|\bJIRA:[A-Z][A-Z0-9_]*-\d+"
+    r"|\bRHEL-\d{3,}\b"
+    # release tags: rhel-10.2.z, rhel-8.6.0.z, RHEL-9.8.z
+    r"|\brhel-\d+(?:\.(?:\d+|z\d*))*"
+    r"|\bRHEL-\d+(?:\.\d+)*\.z\d*"
+    # Red Hat products and services: Red Hat Product Security,
+    # Red Hat build of OpenJDK, Red Hat Enterprise Linux 8.4 EUS
+    r"|(?i:\bred\s?hat\s+(?:"
+    r"product\s+security|(?:network\s+)?satellite|network"
+    r"|identity\s+management|certificate\s+system|openjdk|builds?\s+of"
+    r"|openshift|enterprise\s+virtualization|quay|customer\s+portal"
+    r"|knowledgebase|security\s+bulletin|container\s+registry"
+    r"|entitlement\s+platform|(?:scope\s+of\s+)?support"
+    r")\b)"
+    r"|(?i:\bred\s?hat\s+enterprise\s+linux(?:\s+\d+(?:\.\d+)*)?,?\s+(?:"
+    r"(?:telco\s+)?extended\s+update\s+support"
+    r"|advanced\s+(?:mission\s+critical\s+)?update\s+support"
+    r"|update\s+services\s+for\s+sap\s+solutions"
+    r"|extended\s+life\s?cycle\s+support"
+    r")\b)"
+)
 
 
 def get_nevra(
@@ -132,22 +160,35 @@ def debrand_comment(comment: str, distro_version: str) -> str:
 
 def debrand_description_and_title(string: str) -> str:
     regex_patterns = (
-        (r"(?is)Red\s?hat(\s+Enterprise(\s+Linux)(\s+\d.\d*)?)?", "AlmaLinux"),
+        (
+            r"(?is)Red\s?hat(\s+Enterprise\s+Linux(?P<ver>\s+\d+(\.\d+)*)?)?",
+            r"AlmaLinux\g<ver>",
+        ),
         (r"^RH", "AL"),
         (r"RHEL", "AlmaLinux"),
         (r"\[rhel", "[almalinux"),
         (r'\(rhel', '(almalinux'),
         (r'connect to rhel server', 'connect to almalinux server'),
         (r'kvm-rhel8.3', 'kvm-almalinux8.3'),
-        ('rhel-9', 'almalinux-9'),
-        ('rhel-8', 'almalinux-8'),
         ('rhel9.2', 'almalinux9.2'),
-        ('rhel-8.5', 'almalinux-8.5'),
         ('rhel 8.4', 'almalinux 8.4'),
     )
+    # URLs, identifiers and upstream Jira IDs must stay intact,
+    # so we hide them behind placeholders while debranding
+    preserved = []
+
+    def preserve(match: re.Match) -> str:
+        preserved.append(match.group(0))
+        return f"\x00{len(preserved) - 1}\x00"
+
+    string = DEBRAND_EXCLUDE_RE.sub(preserve, string)
     for pattern, repl in regex_patterns:
         string = re.sub(pattern, repl, string)
-    return string
+    return re.sub(
+        r"\x00(\d+)\x00",
+        lambda match: preserved[int(match.group(1))],
+        string,
+    )
 
 
 def find_metadata(repodata_dir, key) -> str:
