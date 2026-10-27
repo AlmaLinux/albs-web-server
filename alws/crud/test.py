@@ -391,6 +391,15 @@ async def create_test_tasks(
         ),
     )
     build_task = build_task_query.scalars().first()
+    if build_task.arch in settings.test_skip_arches:
+        logging.info(
+            'Build task %d is not tested: no test workers for %s',
+            build_task.id,
+            build_task.arch,
+        )
+        build_task.tests_skipped = True
+        await db.flush()
+        return
     tests_config = (await __get_tests_config(build_task)).config
 
     latest_revision_query = select(

@@ -1,5 +1,5 @@
 import urllib.parse
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     package_tests_branch: str = 'main'
     package_tests_config_path: str = 'alts.yaml'
     package_tests_cache_ttl: int = 300  # seconds
+    # Architectures without ALTS workers: their build tasks get no test
+    # tasks and are marked with tests_skipped instead
+    test_skip_arches: List[str] = []
 
     package_beholder_enabled: bool = True
     beholder_host: str = 'http://beholder-web:5000'
