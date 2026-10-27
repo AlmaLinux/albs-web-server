@@ -164,7 +164,7 @@ def test_debrand_oval_comment(
             """
             Bug Fix(es) and Enhancement(s):
                 * Update .NET 6.0 to SDK 6.0.107 and Runtime 6.0.7
-                [almalinux-8.6.0.z] (BZ#2105397)
+                [rhel-8.6.0.z] (BZ#2105397)
             """,
             id="description_0",
         ),
@@ -196,9 +196,77 @@ def test_debrand_oval_comment(
             """,
             """
             For detailed information on changes in this release,
-            see the AlmaLinux Release Notes linked
+            see the AlmaLinux 8.1 Release Notes linked
             """,
             id="description_2",
+        ),
+        pytest.param(
+            """
+            For details on how to apply this update, which includes the changes
+            described in this advisory, refer to: <https://access.redhat.com/articles/11258>
+            Security Fix(es):
+
+              * qemu-img can't create a qcow2 overlay with 'data_file' feature on top of a file without destroying the original image [rhel-9.8.z] (JIRA:RHEL-164549)
+              * See access.redhat.com/security/updates/classification for RHEL details
+            """,
+            """
+            For details on how to apply this update, which includes the changes
+            described in this advisory, refer to: <https://access.redhat.com/articles/11258>
+            Security Fix(es):
+
+              * qemu-img can't create a qcow2 overlay with 'data_file' feature on top of a file without destroying the original image [rhel-9.8.z] (JIRA:RHEL-164549)
+              * See access.redhat.com/security/updates/classification for AlmaLinux details
+            """,
+            id="description_urls_and_jira_ids",
+        ),
+        pytest.param(
+            """
+            * use -Dcom.redhat.fips=false (RHEL-118777, RHEL-118778)
+            * D-Bus interface com.redhat.RHSM1 allows local privilege escalation
+            * containers-common is missing RPM-GPG-KEY-redhat-beta
+            * podman pull registry.redhat.io/rhel9/toolbox
+            * An update for redhat-rpm-config is now available
+            * [grafana / rhel-10.2.z] Remove Lua ExclusiveArch macro
+            * [RHEL-9.8.z]: Update the mlx5 drivers, Unable to boot RHEL-8.6
+            """,
+            """
+            * use -Dcom.redhat.fips=false (RHEL-118777, RHEL-118778)
+            * D-Bus interface com.redhat.RHSM1 allows local privilege escalation
+            * containers-common is missing RPM-GPG-KEY-redhat-beta
+            * podman pull registry.redhat.io/rhel9/toolbox
+            * An update for redhat-rpm-config is now available
+            * [grafana / rhel-10.2.z] Remove Lua ExclusiveArch macro
+            * [RHEL-9.8.z]: Update the mlx5 drivers, Unable to boot AlmaLinux-8.6
+            """,
+            id="description_identifiers",
+        ),
+        pytest.param(
+            "module is now available for Red Hat Enterprise Linux 8.\n\n"
+            "Red Hat Product Security has rated this update. "
+            "In Red Hat Enterprise Linux 8 and Red Hat Enterprise Linux 9 "
+            "systems, see the Red Hat Enterprise Linux 9 Release Notes",
+            "module is now available for AlmaLinux 8.\n\n"
+            "Red Hat Product Security has rated this update. "
+            "In AlmaLinux 8 and AlmaLinux 9 "
+            "systems, see the AlmaLinux 9 Release Notes",
+            id="description_versions",
+        ),
+        pytest.param(
+            "An update for httpd is now available for Red Hat Enterprise "
+            "Linux 8, Red Hat Enterprise Linux 8.4 Extended Update Support "
+            "and Red Hat Enterprise Linux 8.2 Update Services for\n"
+            "SAP Solutions. The Red Hat build of OpenJDK packages rely on "
+            "Red Hat Satellite and the Red Hat Customer Portal. "
+            "The Red Hat support for this package is limited. "
+            "Corosync provides C APIs for Red Hat cluster software.",
+            "An update for httpd is now available for AlmaLinux 8, "
+            "Red Hat Enterprise Linux 8.4 Extended Update Support "
+            "and Red Hat Enterprise Linux 8.2 Update Services for\n"
+            "SAP Solutions. The Red Hat build of OpenJDK packages rely on "
+            "Red Hat Satellite and the Red Hat Customer Portal. "
+            "The Red Hat support for this package is limited. "
+            "Corosync provides C APIs for AlmaLinux cluster software.",
+            id="description_products",
         ),
     ],
 )
