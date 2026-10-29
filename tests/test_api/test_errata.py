@@ -25,6 +25,14 @@ async def errata_refs_record(errata_create_payload):
     return payload
 
 
+@pytest.fixture
+async def errata_prune_record(errata_create_payload):
+    payload = copy.deepcopy(errata_create_payload)
+    payload["id"] = "ALSA-2022:9998"
+    await create_errata_record(payload)
+    return payload
+
+
 @pytest.mark.usefixtures("base_platform")
 class TestErrataEndpoints(BaseAsyncTestCase):
     async def test_record_create(
@@ -121,6 +129,79 @@ class TestErrataEndpoints(BaseAsyncTestCase):
             ref["ref_id"] for ref in response.json()["references"]
         ]
         assert sorted(ref_ids_again) == sorted(ref_ids), ref_ids_again
+
+    async def test_update_references_prune_removes_stale(
+        self,
+        errata_prune_record,
+        async_session: AsyncSession,
+    ):
+        record_id = errata_prune_record["id"]
+        platform_id = errata_prune_record["platform_id"]
+        rhsa_ref = errata_prune_record["references"][0]
+        cve_ref = {
+            "href": "https://access.redhat.com/security/cve/CVE-2099-0002",
+            "ref_id": "CVE-2099-0002",
+            "ref_type": "cve",
+            "title": "CVE-2099-0002",
+            "cve": {
+                "id": "CVE-2099-0002",
+                "cvss3": None,
+                "cwe": None,
+                "impact": "Moderate",
+                "public": "2099-01-01T00:00:00Z",
+            },
+        }
+        bugzilla_ref = {
+            "href": "https://bugzilla.redhat.com/2099002",
+            "ref_id": "2099002",
+            "ref_type": "bugzilla",
+            "title": "some bug",
+        }
+
+        async def update_references(references, prune):
+            response = await self.make_request(
+                "post",
+                "/api/v1/errata/update_references/",
+                json={
+                    "errata_record_id": record_id,
+                    "errata_platform_id": platform_id,
+                    "references": references,
+                    "prune": prune,
+                },
+            )
+            assert (
+                response.status_code == self.status_codes.HTTP_200_OK
+            ), response.text
+            return {ref["ref_id"] for ref in response.json()["references"]}
+
+        ref_ids = await update_references(
+            [rhsa_ref, cve_ref, bugzilla_ref], prune=False
+        )
+        assert {"CVE-2099-0002", "2099002"} <= ref_ids, ref_ids
+
+        # Without prune, references missing from the payload are kept
+        ref_ids = await update_references([rhsa_ref], prune=False)
+        assert {"CVE-2099-0002", "2099002"} <= ref_ids, ref_ids
+
+        # Upstream dropped the CVE: only it goes away, the RHSA reference
+        # and our self reference are never pruned.
+        ref_ids = await update_references([rhsa_ref, bugzilla_ref], prune=True)
+        assert "CVE-2099-0002" not in ref_ids, ref_ids
+        assert {rhsa_ref["ref_id"], "2099002", record_id} <= ref_ids, ref_ids
+
+        # Pruning is idempotent
+        assert (
+            await update_references([rhsa_ref, bugzilla_ref], prune=True)
+            == ref_ids
+        )
+
+        # The removal must not cascade into the shared CVE row or the record
+        cve = await async_session.get(models.ErrataCVE, "CVE-2099-0002")
+        assert cve is not None
+        record = await async_session.get(
+            models.NewErrataRecord, (record_id, platform_id)
+        )
+        assert record is not None
 
     async def test_update_references_unknown_record(
         self,

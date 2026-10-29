@@ -1,7 +1,13 @@
 from contextlib import nullcontext as does_not_raise
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
+from alws import models
+from alws.constants import ErrataReferenceType
+from alws.crud.errata import sync_references_in_update_records
+from alws.pulp_models import UpdateRecord, UpdateReference
 from alws.utils.errata import (
     debrand_affected_cpe_list,
     debrand_comment,
@@ -326,3 +332,56 @@ def test_debrand_oval_affected_cpe_list(
     assert (
         debrand_affected_cpe_list(cpe_list, distro_version) == expected_value
     ), message
+
+
+def test_sync_references_in_update_records():
+    def pulp_ref(ref_type, ref_id):
+        return UpdateReference(
+            href=f"https://example.com/{ref_id}",
+            ref_id=ref_id,
+            title=ref_id,
+            ref_type=ref_type,
+        )
+
+    def db_ref(ref_type, ref_id):
+        return models.NewErrataReference(
+            href=f"https://example.com/{ref_id}",
+            ref_id=ref_id,
+            title=ref_id,
+            ref_type=ref_type,
+        )
+
+    stale_cve = pulp_ref("cve", "CVE-2099-0001")
+    stale_bug = pulp_ref("bugzilla", "1")
+    kept_cve = pulp_ref("cve", "CVE-2099-0002")
+    # Only reference types mirroring upstream may be pruned
+    kept_self = pulp_ref("self", "ALSA-2099:0001")
+    pulp_record = UpdateRecord(
+        references=[stale_cve, stale_bug, kept_cve, kept_self]
+    )
+    pulp_db = MagicMock()
+    pulp_db.execute.return_value.scalars.return_value.first.return_value = (
+        pulp_record
+    )
+
+    sync_references_in_update_records(
+        pulp_db=pulp_db,
+        errata_records=[
+            {"pulp_href": f"/pulp/api/v3/content/rpm/advisories/{uuid4()}/"}
+        ],
+        references=[
+            db_ref(ErrataReferenceType.cve, "CVE-2099-0002"),
+            db_ref(ErrataReferenceType.cve, "CVE-2099-0003"),
+            db_ref(ErrataReferenceType.rhsa, "RHSA-2099:0001"),
+        ],
+    )
+
+    deleted = [call.args[0] for call in pulp_db.delete.call_args_list]
+    assert deleted == [stale_cve, stale_bug]
+    added = {
+        (ref.ref_type, ref.ref_id)
+        for ref in pulp_record.references
+        if ref not in (stale_cve, stale_bug, kept_cve, kept_self)
+    }
+    assert added == {("cve", "CVE-2099-0003"), ("rhsa", "RHSA-2099:0001")}
+    assert pulp_record.updated_date

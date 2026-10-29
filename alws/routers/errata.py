@@ -193,7 +193,7 @@ async def update_errata_record_references(
     payload: errata_schema.UpdateErrataReferencesRequest,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
 ):
-    result = await errata_crud.add_missing_errata_references(db, payload)
+    result = await errata_crud.sync_errata_references(db, payload)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -203,11 +203,12 @@ async def update_errata_record_references(
                 f"platform_id={payload.errata_platform_id}"
             ),
         )
-    record, added_ref_ids = result
-    # References are populated in the DB for every record regardless of its
+    record, added_ref_ids, removed_ref_ids = result
+    # References are reconciled in the DB for every record regardless of its
     # release state; only already-released advisories need their Pulp records
-    # reconciled, and only when something was actually added.
-    if added_ref_ids and record.release_status == ErrataReleaseStatus.RELEASED:
+    # reconciled, and only when something actually changed.
+    changed = added_ref_ids or removed_ref_ids
+    if changed and record.release_status == ErrataReleaseStatus.RELEASED:
         update_errata_references.send(record.id, record.platform_id)
     return record
 
