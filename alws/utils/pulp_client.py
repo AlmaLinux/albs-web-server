@@ -938,8 +938,9 @@ class PulpClient:
         endpoint = urllib.parse.urljoin(fse_pulp_href, "exports/")
         params = {"repository_version": fse_repository_version}
         fse_task = await self.request("POST", endpoint, json=params)
-        await self.wait_for_task(fse_task["task"])
-        return fse_repository_version
+        # Exports of big repositories run for minutes and many of them are
+        # awaited at once: polling every second would only load the API
+        return await self.wait_for_task(fse_task["task"], max_sleep_time=10.0)
 
     async def get_repo_latest_version(
         self,
@@ -1004,10 +1005,22 @@ class PulpClient:
         info = await self.get_artifact(entity_href, include_fields=["sha256"])
         return entity_href, info["sha256"], artifact
 
-    async def wait_for_task(self, task_href: str, sleep_time: float = 1.0):
+    async def wait_for_task(
+        self,
+        task_href: str,
+        sleep_time: float = 1.0,
+        max_sleep_time: Optional[float] = None,
+    ):
+        """
+        Poll the task until it ends. With max_sleep_time, the interval
+        between polls doubles after each one up to that limit.
+        """
+        if max_sleep_time is None:
+            max_sleep_time = sleep_time
         task = await self.request("GET", task_href)
         while task["state"] not in ("failed", "completed"):
             await asyncio.sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, max_sleep_time)
             task = await self.request("GET", task_href)
         if task["state"] == "failed":
             error = task.get("error")

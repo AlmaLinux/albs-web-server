@@ -1,4 +1,5 @@
 import copy
+import functools
 import itertools
 import os
 import pathlib
@@ -399,19 +400,38 @@ def merge_errata_records_modern(a, b):
     return {"schema_version": SCHEMA_VERSION, "data": result}
 
 
+ERRATA_PAGE_TEMPLATE = (
+    pathlib.Path(__file__).absolute().parent
+    / "templates"
+    / "errata_alma_page.j2"
+)
+
+
+@functools.lru_cache(maxsize=1)
+def errata_page_template_source() -> str:
+    return ERRATA_PAGE_TEMPLATE.read_text()
+
+
+@functools.lru_cache(maxsize=1)
+def _errata_page_template() -> jinja2.Template:
+    # Compiled once: the pages of every erratum of a platform are
+    # generated in a row
+    return jinja2.Template(errata_page_template_source())
+
+
+def errata_page_file_name(errata) -> str:
+    return "{0}.html".format(errata["updateinfo_id"].replace(":", "-"))
+
+
 def dump_errata_to_html(errata):
     # sort package list by arch
     packages = errata["pkglist"]["packages"]
     errata["pkglist"]["packages"] = sorted(packages, key=lambda x: x["arch"])
-
-    template_dir = pathlib.Path(__file__).absolute().parent / "templates"
-    template = (template_dir / "errata_alma_page.j2").read_text()
-    return jinja2.Template(template).render(errata=errata)
+    return _errata_page_template().render(errata=errata)
 
 
 def generate_errata_page(errata, errata_dir):
-    errata_file = "{0}.html".format(errata["updateinfo_id"].replace(":", "-"))
-    errata_path = os.path.join(errata_dir, errata_file)
+    errata_path = os.path.join(errata_dir, errata_page_file_name(errata))
     with open(errata_path, "wb") as fd:
         fd.write(dump_errata_to_html(errata).encode("utf-8"))
     return errata_path
