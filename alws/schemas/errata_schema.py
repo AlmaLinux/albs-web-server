@@ -166,6 +166,9 @@ class UpdateErrataReferencesRequest(BaseModel):
     errata_record_id: str
     errata_platform_id: int
     references: List[BaseErrataReference]
+    # When set, the payload is the advisory's complete set of upstream
+    # references: stored CVE/bugzilla references missing from it are removed.
+    prune: bool = False
 
 
 class ReleaseErrataRecordResponse(BaseModel):

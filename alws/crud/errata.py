@@ -813,24 +813,44 @@ async def update_errata_record(
     return record
 
 
+# Reference types that mirror the upstream advisory and must follow its
+# revisions, including removals.
+PRUNABLE_REFERENCE_TYPES = (
+    ErrataReferenceType.cve.value,
+    ErrataReferenceType.bugzilla.value,
+)
+
+
 def _normalize_ref_type(ref_type) -> str:
     if isinstance(ref_type, ErrataReferenceType):
         return ref_type.value
     return str(ref_type)
 
 
-async def add_missing_errata_references(
+def _is_stale_reference(ref, current_refs: typing.Set[Tuple[str, str]]):
+    ref_type = _normalize_ref_type(ref.ref_type)
+    return (
+        ref_type in PRUNABLE_REFERENCE_TYPES
+        and (ref_type, ref.ref_id) not in current_refs
+    )
+
+
+async def sync_errata_references(
     db: AsyncSession,
     update_record: errata_schema.UpdateErrataReferencesRequest,
-) -> Optional[Tuple[models.NewErrataRecord, List[str]]]:
-    """Add references present in the payload but missing from the DB record.
+) -> Optional[Tuple[models.NewErrataRecord, List[str], List[str]]]:
+    """Reconcile the DB record references with the ones in the payload.
 
-    Add-only: references already stored (matched by ref_type + ref_id) are left
-    untouched, and nothing is ever removed. CVE-type references create/link the
+    References present in the payload but missing from the record are added
+    (matched by ref_type + ref_id). CVE-type references create/link the
     corresponding ``ErrataCVE`` row, mirroring ``process_new_errata_references``.
 
+    With ``prune`` the payload is taken as the complete upstream reference
+    set, and stored CVE/bugzilla references missing from it are removed.
+    Other reference types (i.e., our own self reference) are never removed.
+
     Returns ``None`` if the record doesn't exist, otherwise the record together
-    with the list of ``ref_id``s that were added (empty when nothing was missing).
+    with the lists of ``ref_id``s that were added and removed.
     """
     record = await get_errata_record(
         db,
@@ -849,8 +869,19 @@ async def add_missing_errata_references(
         for ref in update_record.references
         if (_normalize_ref_type(ref.ref_type), ref.ref_id) not in existing_refs
     ]
-    if not new_refs:
-        return record, []
+    stale_refs = []
+    if update_record.prune:
+        payload_refs = {
+            (_normalize_ref_type(ref.ref_type), ref.ref_id)
+            for ref in update_record.references
+        }
+        stale_refs = [
+            ref
+            for ref in record.references
+            if _is_stale_reference(ref, payload_refs)
+        ]
+    if not new_refs and not stale_refs:
+        return record, [], []
 
     db_cves = {}
     cve_ids = [ref.cve.id for ref in new_refs if ref.cve]
@@ -897,10 +928,29 @@ async def add_missing_errata_references(
         )
         record.references.append(db_reference)
         added_ref_ids.append(ref.ref_id)
-
     await db.flush()
-    await db.refresh(record)
-    return record, added_ref_ids
+
+    removed_ref_ids = [ref.ref_id for ref in stale_refs]
+    if stale_refs:
+        # Bulk delete on purpose: both relationships of NewErrataReference
+        # cascade deletes, so an ORM delete would also take the advisory and
+        # the ErrataCVE row (shared with other advisories) along with it.
+        await db.execute(
+            delete(models.NewErrataReference).where(
+                models.NewErrataReference.id.in_(
+                    [ref.id for ref in stale_refs]
+                )
+            )
+        )
+        db.expire(record, ["references"])
+        record = await get_errata_record(
+            db,
+            update_record.errata_record_id,
+            update_record.errata_platform_id,
+        )
+    else:
+        await db.refresh(record)
+    return record, added_ref_ids, removed_ref_ids
 
 
 async def get_matching_albs_packages(
@@ -1868,18 +1918,22 @@ def append_update_packages_in_update_records(
             pulp_db.flush()
 
 
-def append_references_in_update_records(
+def sync_references_in_update_records(
     pulp_db: Session,
     errata_records: List[Dict[str, Any]],
     references: List[models.NewErrataReference],
 ):
-    """Append missing references to already-released Pulp UpdateRecords in place.
+    """Reconcile references of already-released Pulp UpdateRecords in place.
 
     Mirrors ``append_update_packages_in_update_records`` but for references:
-    it mutates the Pulp advisory rows directly (add-only, matched by
-    ref_type + ref_id) so a subsequent repository publication regenerates
-    ``updateinfo.xml`` with the corrected reference list.
+    it mutates the Pulp advisory rows directly (matched by ref_type + ref_id),
+    appending the missing references and dropping the CVE/bugzilla ones no
+    longer in the DB record, so a subsequent repository publication
+    regenerates ``updateinfo.xml`` with the corrected reference list.
     """
+    db_refs = {
+        (_normalize_ref_type(ref.ref_type), ref.ref_id) for ref in references
+    }
     for record in errata_records:
         record_uuid = uuid.UUID(record["pulp_href"].split("/")[-2])
         pulp_record = pulp_db.execute(
@@ -1890,10 +1944,14 @@ def append_references_in_update_records(
         pulp_record: UpdateRecord = pulp_record.scalars().first()
         if not pulp_record:
             continue
+        changed = False
+        for ref in pulp_record.references:
+            if _is_stale_reference(ref, db_refs):
+                pulp_db.delete(ref)
+                changed = True
         existing_refs = {
             (ref.ref_type, ref.ref_id) for ref in pulp_record.references
         }
-        changed = False
         for ref in references:
             ref_type = _normalize_ref_type(ref.ref_type)
             if (ref_type, ref.ref_id) in existing_refs:
@@ -2385,9 +2443,9 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
 async def update_errata_references_in_pulp(record_id: str, platform_id: int):
     """Propagate DB reference changes of a released advisory into Pulp.
 
-    Reuses the release machinery for repo discovery, then appends the record's
-    references (add-only) to the advisory in each repo's latest version and
-    re-publishes so the served ``updateinfo.xml`` reflects them.
+    Reuses the release machinery for repo discovery, then reconciles the
+    advisory references in each repo's latest version with the record's ones
+    and re-publishes so the served ``updateinfo.xml`` reflects them.
     """
     pulp = PulpClient(
         settings.pulp_host,
@@ -2438,7 +2496,7 @@ async def update_errata_references_in_pulp(record_id: str, platform_id: int):
             if not errata_records:
                 continue
             with open_session(key="pulp") as pulp_db:
-                append_references_in_update_records(
+                sync_references_in_update_records(
                     pulp_db=pulp_db,
                     errata_records=errata_records,
                     references=db_record.references,
