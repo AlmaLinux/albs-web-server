@@ -2826,15 +2826,24 @@ async def reset_matched_errata_packages(
     record_id: str,
     platform_id: int,
     session: AsyncSession,
+    only_not_released: bool = False,
 ):
+    conditions = [
+        models.NewErrataRecord.id == record_id,
+        models.NewErrataRecord.platform_id == platform_id,
+    ]
+    if only_not_released:
+        # Evaluated under the row lock, so a record released after
+        # it was picked up for resetting is skipped
+        conditions.append(
+            models.NewErrataRecord.release_status
+            == ErrataReleaseStatus.NOT_RELEASED
+        )
     record = (
         (
             await session.execute(
                 select(models.NewErrataRecord)
-                .where(
-                    models.NewErrataRecord.id == record_id,
-                    models.NewErrataRecord.platform_id == platform_id,
-                )
+                .where(*conditions)
                 .options(
                     selectinload(models.NewErrataRecord.platform).selectinload(
                         models.Platform.repos
@@ -2858,31 +2867,28 @@ async def reset_matched_errata_packages(
 
 
 async def get_errata_records_threshold(
-    issued_date_str: str, session: AsyncSession
-):
+    issued_date_str: str,
+    session: AsyncSession,
+    limit: Optional[int] = None,
+) -> List[Tuple[str, int]]:
     issued_date = datetime.datetime.strptime(
         issued_date_str, '%Y-%m-%d %H:%M:%S'
     )
     stmt = (
-        select(models.NewErrataRecord)
+        select(
+            models.NewErrataRecord.id,
+            models.NewErrataRecord.platform_id,
+        )
         .where(models.NewErrataRecord.issued_date >= issued_date)
         .where(
             models.NewErrataRecord.release_status
             == ErrataReleaseStatus.NOT_RELEASED
         )
-        .options(
-            selectinload(models.NewErrataRecord.platform).selectinload(
-                models.Platform.repos
-            ),
-            selectinload(models.NewErrataRecord.packages).selectinload(
-                models.NewErrataPackage.albs_packages
-            ),
-        )
-        .with_for_update()
+        .order_by(models.NewErrataRecord.issued_date)
     )
-
-    records = (await session.execute(stmt)).scalars().all()
-    return records
+    if limit:
+        stmt = stmt.limit(limit)
+    return [tuple(row) for row in (await session.execute(stmt)).all()]
 
 
 async def reset_matched_erratas_packages_threshold(
@@ -2890,14 +2896,33 @@ async def reset_matched_erratas_packages_threshold(
 ):
     async with open_async_session(key=get_async_db_key()) as session:
         records = await get_errata_records_threshold(issued_date, session)
-        items_to_insert = []
-        for record in records:
-            await prepare_resetting(items_to_insert, record, session)
-        session.add_all(items_to_insert)
-        await session.flush()
+    # Every record is reset in its own short transaction: keeps the session
+    # small (autoflush cost doesn't grow with each processed record), holds
+    # the row lock only while that record is being processed, and doesn't
+    # roll back already processed records if one of them fails.
+    failed = []
+    for record_id, platform_id in records:
+        try:
+            async with open_async_session(key=get_async_db_key()) as session:
+                await reset_matched_errata_packages(
+                    record_id,
+                    platform_id,
+                    session,
+                    only_not_released=True,
+                )
+        except Exception:
+            logging.exception(
+                'Cannot reset matched packages for %s (platform %s)',
+                record_id,
+                platform_id,
+            )
+            failed.append(record_id)
     logging.info(
-        f'Packages for records {[record.id for record in records]}'
-        f' have been matched if their date is later than {issued_date}'
+        'Packages for %d records issued after %s have been matched, '
+        'failed: %s',
+        len(records) - len(failed),
+        issued_date,
+        failed,
     )
 
 
