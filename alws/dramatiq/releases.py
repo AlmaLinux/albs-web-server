@@ -17,9 +17,7 @@ sentry_init()
 
 async def _commit_release(release_id, user_id):
     async with open_async_session(key=get_async_db_key()) as db:
-        errata_to_release = await r_crud.commit_release(
-            db, release_id, user_id
-        )
+        errata_to_release = await r_crud.commit_release(db, release_id, user_id)
     # errata release reads committed packages statuses,
     # so it has to be started after the session is closed
     for record_id, platform_id in errata_to_release:
