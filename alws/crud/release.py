@@ -203,7 +203,7 @@ async def commit_release(
     db: AsyncSession,
     release_id: int,
     user_id: int,
-):
+) -> typing.List[typing.Tuple[str, int]]:
     release = (
         (
             await db.execute(
@@ -221,6 +221,7 @@ async def commit_release(
         new_stats.update(**releaser.stats)
         perf_stat.statistics = new_stats
     await db.flush()
+    return releaser.errata_to_release
 
 
 async def revert_release(
