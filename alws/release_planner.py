@@ -44,6 +44,7 @@ from alws.pulp_models import RpmPackage
 from alws.schemas import release_schema
 from alws.utils.beholder_client import BeholderClient
 from alws.utils.debuginfo import clean_debug_name, is_debuginfo_rpm
+from alws.utils.errata import get_nevra, is_errata_package_matched
 from alws.utils.github_integration_helper import (
     close_issues,
 )
@@ -85,6 +86,9 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 public_key_file=settings.immudb_public_key_file,
             )
         self.stats = {}
+        # (record_id, platform_id) of errata records that should be released
+        # once the release commit is stored in the DB
+        self.errata_to_release: typing.List[typing.Tuple[str, int]] = []
 
     async def revert_release(
         self,
@@ -1310,13 +1314,27 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             priority = ReleasePackageTrustness.MEDIUM.value
         return priority
 
-    @class_measure_work_time_async("get_release_plan")
     async def get_release_plan(
         self,
         build_ids: typing.List[int],
         base_platform: models.Platform,
         build_tasks: typing.Optional[typing.List[int]] = None,
         product: typing.Optional[models.Product] = None,
+    ) -> dict:
+        plan = await self.get_packages_release_plan(
+            build_ids=build_ids,
+            base_platform=base_platform,
+            build_tasks=build_tasks,
+        )
+        plan["errata"] = await self.get_release_errata(plan, base_platform.id)
+        return plan
+
+    @class_measure_work_time_async("get_release_plan")
+    async def get_packages_release_plan(
+        self,
+        build_ids: typing.List[int],
+        base_platform: models.Platform,
+        build_tasks: typing.Optional[typing.List[int]] = None,
     ) -> dict:
         packages = []
         rpm_modules = []
@@ -1831,6 +1849,178 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         await asyncio.gather(*publication_tasks)
         return additional_messages
 
+    @staticmethod
+    def get_plan_rpms(plan: dict) -> typing.List[dict]:
+        # packages are repeated in the plan for every release repository
+        rpms = {}
+        for pkg_dict in plan.get("packages", []):
+            package = pkg_dict["package"]
+            if package["arch"] == "src":
+                continue
+            rpms[package["artifact_href"]] = package
+        return list(rpms.values())
+
+    async def get_errata_records_for_plan(
+        self,
+        plan: dict,
+        platform_id: int,
+        for_update: bool = False,
+    ) -> typing.List[models.NewErrataRecord]:
+        rpms = self.get_plan_rpms(plan)
+        if not rpms:
+            return []
+        errata_pkgs = await self.db.execute(
+            select(models.NewErrataPackage).where(
+                models.NewErrataPackage.platform_id == platform_id,
+                models.NewErrataPackage.name.in_({rpm["name"] for rpm in rpms}),
+            )
+        )
+        record_ids = {
+            errata_pkg.errata_record_id
+            for errata_pkg in errata_pkgs.scalars().all()
+            if any(is_errata_package_matched(errata_pkg, rpm) for rpm in rpms)
+        }
+        if not record_ids:
+            return []
+        query = (
+            select(models.NewErrataRecord)
+            .where(
+                models.NewErrataRecord.id.in_(record_ids),
+                models.NewErrataRecord.platform_id == platform_id,
+            )
+            .options(
+                selectinload(models.NewErrataRecord.packages).selectinload(
+                    models.NewErrataPackage.albs_packages
+                ),
+            )
+            .order_by(models.NewErrataRecord.id)
+        )
+        if for_update:
+            query = query.with_for_update()
+        records = (await self.db.execute(query)).scalars().all()
+        # errata for a module stream must be released only with that module
+        plan_modules = {
+            f"{module['module']['name']}:{module['module']['stream']}"
+            for module in plan.get("modules", [])
+        }
+        return [
+            record
+            for record in records
+            if not record.module or record.module in plan_modules
+        ]
+
+    @staticmethod
+    def get_missing_errata_packages(
+        record: models.NewErrataRecord,
+        rpms: typing.List[dict],
+    ) -> typing.List[str]:
+        # errata package is covered when the release brings it or
+        # it is already released to production repositories
+        return [
+            get_nevra(errata_pkg, clean=False)
+            for errata_pkg in record.packages
+            if not any(is_errata_package_matched(errata_pkg, rpm) for rpm in rpms)
+            and not any(
+                albs_pkg.status == ErrataPackageStatus.released
+                for albs_pkg in errata_pkg.albs_packages
+            )
+        ]
+
+    @class_measure_work_time_async("get_release_errata")
+    async def get_release_errata(
+        self,
+        plan: dict,
+        platform_id: int,
+        previous_errata: typing.Optional[typing.List[dict]] = None,
+    ) -> typing.List[dict]:
+        rpms = self.get_plan_rpms(plan)
+        # keep records that user has excluded from the release
+        excluded = {
+            (errata["id"], errata["platform_id"])
+            for errata in previous_errata or []
+            if not errata.get("release", True)
+        }
+        release_errata = []
+        for record in await self.get_errata_records_for_plan(plan, platform_id):
+            # released and being released errata have nothing to do
+            # with this release
+            if record.release_status not in (
+                ErrataReleaseStatus.NOT_RELEASED,
+                ErrataReleaseStatus.FAILED,
+            ):
+                continue
+            missing_packages = self.get_missing_errata_packages(record, rpms)
+            ready = not missing_packages
+            release_errata.append({
+                "id": record.id,
+                "platform_id": record.platform_id,
+                "title": record.get_title(),
+                "severity": record.severity,
+                "release_status": record.release_status.value,
+                "packages_count": len(record.packages),
+                "missing_packages": missing_packages,
+                "ready": ready,
+                "release": (
+                    ready and (record.id, record.platform_id) not in excluded
+                ),
+            })
+        return release_errata
+
+    async def match_released_errata_packages(
+        self,
+        release: models.Release,
+        records: typing.List[models.NewErrataRecord],
+    ):
+        # errata could come after the build was done, so the released
+        # packages aren't matched to errata packages yet
+        rpms = self.get_plan_rpms(release.plan)
+        artifact_ids = dict(
+            (
+                await self.db.execute(
+                    select(
+                        models.BuildTaskArtifact.href,
+                        models.BuildTaskArtifact.id,
+                    ).where(
+                        models.BuildTaskArtifact.href.in_(
+                            [rpm["artifact_href"] for rpm in rpms]
+                        )
+                    )
+                )
+            ).all()
+        )
+        for record in records:
+            if record.release_status == ErrataReleaseStatus.RELEASED:
+                continue
+            for errata_pkg in record.packages:
+                matched_ids = {
+                    albs_pkg.albs_artifact_id
+                    for albs_pkg in errata_pkg.albs_packages
+                }
+                matched_hrefs = {
+                    albs_pkg.pulp_href for albs_pkg in errata_pkg.albs_packages
+                }
+                for rpm in rpms:
+                    artifact_id = artifact_ids.get(rpm["artifact_href"])
+                    if (
+                        artifact_id is None
+                        or artifact_id in matched_ids
+                        or rpm["artifact_href"] in matched_hrefs
+                        or not is_errata_package_matched(errata_pkg, rpm)
+                    ):
+                        continue
+                    errata_pkg.albs_packages.append(
+                        models.NewErrataToALBSPackage(
+                            albs_artifact_id=artifact_id,
+                            status=ErrataPackageStatus.released,
+                            name=rpm["name"],
+                            version=rpm["version"],
+                            release=rpm["release"],
+                            epoch=int(rpm["epoch"]),
+                            arch=rpm["arch"],
+                        )
+                    )
+        await self.db.flush()
+
     @class_measure_work_time_async("check_released_errata_packages")
     async def check_released_errata_packages(
         self,
@@ -1864,27 +2054,101 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         if not albs_pkgs:
             return
 
-        # We assume that a release involves only one errata.
-        # If it is not the case, we need to check the errata record status
-        # of every errata_to_albs_packages and taking them into account when
-        # iterating them below.
-        any_errata_package = albs_pkgs[0].errata_package
-        errata_record_status = (
-            await self.db.execute(
-                select(models.NewErrataRecord.release_status).where(
-                    models.NewErrataRecord.id
-                    == any_errata_package.errata_record_id,
-                    models.NewErrataRecord.platform_id
-                    == any_errata_package.platform_id,
+        released_records = set(
+            (
+                await self.db.execute(
+                    select(
+                        models.NewErrataRecord.id,
+                        models.NewErrataRecord.platform_id,
+                    ).where(
+                        models.NewErrataRecord.id.in_({
+                            albs_pkg.errata_package.errata_record_id
+                            for albs_pkg in albs_pkgs
+                        }),
+                        models.NewErrataRecord.release_status
+                        == ErrataReleaseStatus.RELEASED,
+                    )
                 )
-            )
-        ).scalar()
+            ).all()
+        )
 
         # Only set their status to 'released' if errata_record is not released
-        if errata_record_status != ErrataReleaseStatus.RELEASED:
-            for albs_pkg in albs_pkgs:
-                albs_pkg.status = ErrataPackageStatus.released
-            await self.db.flush()
+        for albs_pkg in albs_pkgs:
+            errata_pkg = albs_pkg.errata_package
+            record_key = (errata_pkg.errata_record_id, errata_pkg.platform_id)
+            if record_key in released_records:
+                continue
+            albs_pkg.status = ErrataPackageStatus.released
+        await self.db.flush()
+
+    def schedule_errata_release(
+        self,
+        release: models.Release,
+        records: typing.List[models.NewErrataRecord],
+    ) -> typing.List[str]:
+        messages = []
+        selected = {
+            (errata["id"], errata["platform_id"])
+            for errata in release.plan.get("errata", [])
+            if errata.get("release")
+        }
+        for record in records:
+            if (record.id, record.platform_id) not in selected:
+                continue
+            if record.release_status not in (
+                ErrataReleaseStatus.NOT_RELEASED,
+                ErrataReleaseStatus.FAILED,
+            ):
+                messages.append(
+                    f"Errata {record.id} skipped, "
+                    f"it is {record.release_status.value}"
+                )
+                continue
+            missing_packages = [
+                get_nevra(errata_pkg, clean=False)
+                for errata_pkg in record.packages
+                if not any(
+                    albs_pkg.status == ErrataPackageStatus.released
+                    for albs_pkg in errata_pkg.albs_packages
+                )
+            ]
+            if missing_packages:
+                messages.append(
+                    f"Errata {record.id} skipped, the following packages "
+                    f"are not released: {', '.join(missing_packages)}"
+                )
+                continue
+            record.release_status = ErrataReleaseStatus.IN_PROGRESS
+            record.last_release_log = None
+            self.errata_to_release.append((record.id, record.platform_id))
+            messages.append(f"Errata {record.id} release has been scheduled")
+        return messages
+
+    async def process_release_errata(
+        self,
+        release: models.Release,
+    ) -> typing.List[str]:
+        if release.status != ReleaseStatus.COMPLETED:
+            return []
+        try:
+            async with self.db.begin_nested():
+                records = await self.get_errata_records_for_plan(
+                    release.plan,
+                    release.platform_id,
+                    for_update=True,
+                )
+                await self.match_released_errata_packages(release, records)
+                await self.check_released_errata_packages(release)
+                messages = self.schedule_errata_release(release, records)
+                await self.db.flush()
+        except Exception:
+            logging.exception(
+                "Cannot process errata for release %d",
+                release.id,
+            )
+            self.errata_to_release = []
+            return [f"Cannot process errata:\n{traceback.format_exc()}"]
+        return messages
 
     @class_measure_work_time_async("update_release_plan")
     async def update_release_plan(
@@ -1902,6 +2166,11 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         )
         updated_plan["packages_from_repos"] = pkgs_from_repos
         updated_plan["packages_in_repos"] = pkgs_in_repos
+        updated_plan["errata"] = await self.get_release_errata(
+            updated_plan,
+            release.platform_id,
+            previous_errata=plan.get("errata"),
+        )
         return updated_plan
 
     @class_measure_work_time_async("commit_release")
@@ -1911,9 +2180,20 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         user_id: int,
     ) -> typing.Tuple[models.Release, str]:
         release, message = await super().commit_release(release_id, user_id)
-        await self.check_released_errata_packages(release)
+        errata_messages = await self.process_release_errata(release)
+        if errata_messages:
+            message += "\nERRATA:\n" + "\n".join(errata_messages)
+            release_plan = copy.deepcopy(release.plan)
+            release_plan["last_log"] = message
+            scheduled = set(self.errata_to_release)
+            for errata in release_plan.get("errata", []):
+                if (errata["id"], errata["platform_id"]) in scheduled:
+                    errata["release_status"] = (
+                        ErrataReleaseStatus.IN_PROGRESS.value
+                    )
+            release.plan = release_plan
+            await self.db.flush()
         return release, message
-
 
 def get_releaser_class(
     product: models.Product,

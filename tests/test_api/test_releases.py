@@ -3,10 +3,16 @@ import uuid
 import pytest
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from alws import models
-from alws.constants import ErrataPackageStatus, ReleaseStatus
+from alws.constants import (
+    ErrataPackageStatus,
+    ErrataReleaseStatus,
+    ReleaseStatus,
+)
 from alws.crud.release import RELEASES_PER_PAGE, commit_release, revert_release
+from alws.release_planner import AlmaLinuxReleasePlanner
 from tests.constants import ADMIN_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
@@ -25,6 +31,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         base_platform: models.Platform,
         base_product: models.Product,
         create_errata,
+        create_release_errata: models.NewErrataRecord,
         build_done,
         build_for_release: models.Build,
         get_pulp_packages_info,
@@ -45,6 +52,62 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot create release:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
+        release_errata = {
+            errata["id"]: errata for errata in response.json()["plan"]["errata"]
+        }
+        errata = release_errata.get(create_release_errata.id)
+        assert errata, f"Errata is missing in release plan: {release_errata}"
+        assert errata["missing_packages"] == [], errata
+        assert errata["ready"] and errata["release"], errata
+
+    async def test_release_errata_skips_released(
+        self,
+        async_session: AsyncSession,
+        base_platform: models.Platform,
+        create_release_errata: models.NewErrataRecord,
+    ):
+        record = (
+            await async_session.execute(
+                select(models.NewErrataRecord)
+                .where(
+                    models.NewErrataRecord.id == create_release_errata.id,
+                    models.NewErrataRecord.platform_id == base_platform.id,
+                )
+                .options(selectinload(models.NewErrataRecord.packages))
+            )
+        ).scalars().first()
+        plan = {
+            "packages": [
+                {
+                    "package": {
+                        "name": errata_pkg.name,
+                        "version": errata_pkg.version,
+                        "release": errata_pkg.release,
+                        "arch": errata_pkg.arch,
+                        "artifact_href": f"/rpm/packages/{idx}/",
+                    }
+                }
+                for idx, errata_pkg in enumerate(record.packages)
+            ],
+        }
+        planner = AlmaLinuxReleasePlanner(async_session)
+        try:
+            release_errata = await planner.get_release_errata(
+                plan,
+                base_platform.id,
+            )
+            assert record.id in [errata["id"] for errata in release_errata]
+            record.release_status = ErrataReleaseStatus.RELEASED
+            await async_session.flush()
+            release_errata = await planner.get_release_errata(
+                plan,
+                base_platform.id,
+            )
+            assert record.id not in [
+                errata["id"] for errata in release_errata
+            ], release_errata
+        finally:
+            await async_session.rollback()
 
     async def test_create_community_release(
         self,
@@ -77,6 +140,7 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         self,
         async_session: AsyncSession,
         base_product: models.Product,
+        create_release_errata: models.NewErrataRecord,
         disable_packages_check_in_prod_repos,
         disable_sign_verify,
         modify_repository,
@@ -99,7 +163,12 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         )
         message = f"Cannot commit release:\n{response.text}"
         assert response.status_code == self.status_codes.HTTP_200_OK, message
-        await commit_release(async_session, release_id, self.user_id)
+        errata_key = (create_release_errata.id, create_release_errata.platform_id)
+        errata_to_release = await commit_release(
+            async_session,
+            release_id,
+            self.user_id,
+        )
         await async_session.commit()
         response = await self.make_request(
             "get",
@@ -108,6 +177,36 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
         release = response.json()
         last_log = release["plan"]["last_log"]
         assert release["status"] == ReleaseStatus.COMPLETED, last_log
+
+        assert errata_key in errata_to_release, last_log
+        plan_errata = {
+            (errata["id"], errata["platform_id"]): errata
+            for errata in release["plan"]["errata"]
+        }
+        assert (
+            plan_errata[errata_key]["release_status"]
+            == ErrataReleaseStatus.IN_PROGRESS.value
+        ), plan_errata
+        async_session.expire_all()
+        record = (
+            await async_session.execute(
+                select(models.NewErrataRecord)
+                .where(
+                    models.NewErrataRecord.id == errata_key[0],
+                    models.NewErrataRecord.platform_id == errata_key[1],
+                )
+                .options(
+                    selectinload(models.NewErrataRecord.packages).selectinload(
+                        models.NewErrataPackage.albs_packages
+                    )
+                )
+            )
+        ).scalars().first()
+        assert record.release_status == ErrataReleaseStatus.IN_PROGRESS
+        for errata_pkg in record.packages:
+            statuses = [albs_pkg.status for albs_pkg in errata_pkg.albs_packages]
+            message = f"{errata_pkg.name}.{errata_pkg.arch} is not matched"
+            assert statuses == [ErrataPackageStatus.released], message
 
     async def test_commit_community_release(
         self,

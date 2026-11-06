@@ -4,7 +4,7 @@ import itertools
 import os
 import pathlib
 import re
-from typing import List, Union
+from typing import Any, Dict, List, Union
 
 import createrepo_c as cr
 import jinja2
@@ -66,6 +66,21 @@ def get_nevra(
     # see alws.crud.errata.load_platform_packages()
     pkg_arch = arch if arch else pkg.arch
     return f"{pkg.epoch}:{pkg.name}-{pkg.version}-{release}.{pkg_arch}"
+
+
+def is_errata_package_matched(
+    errata_package: Union[ErrataPackage, NewErrataPackage],
+    package: Dict[str, Any],
+) -> bool:
+    # package is a release plan package, the comparison follows
+    # alws.crud.errata.get_matching_albs_packages()
+    return (
+        package["name"] == errata_package.name
+        and package["version"] == errata_package.version
+        and clean_release(package["release"])
+        == clean_release(errata_package.release)
+        and package["arch"] in (errata_package.arch, "noarch")
+    )
 
 
 def clean_errata_title(title: str, severity: str = "") -> str:

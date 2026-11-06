@@ -2,12 +2,14 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 
+from alws.models import NewErrataPackage
 from alws.utils.errata import (
     debrand_affected_cpe_list,
     debrand_comment,
     debrand_description_and_title,
     debrand_id,
     debrand_reference,
+    is_errata_package_matched,
 )
 
 
@@ -326,3 +328,79 @@ def test_debrand_oval_affected_cpe_list(
     assert (
         debrand_affected_cpe_list(cpe_list, distro_version) == expected_value
     ), message
+
+
+@pytest.mark.parametrize(
+    "package, expected",
+    [
+        pytest.param(
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "arch": "x86_64",
+            },
+            True,
+            id="same_nvra",
+        ),
+        pytest.param(
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8.alma.1",
+                "arch": "x86_64",
+            },
+            True,
+            id="alma_suffix",
+        ),
+        pytest.param(
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "arch": "noarch",
+            },
+            True,
+            id="noarch",
+        ),
+        pytest.param(
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "arch": "i686",
+            },
+            False,
+            id="other_arch",
+        ),
+        pytest.param(
+            {
+                "name": "chan",
+                "version": "0.0.4",
+                "release": "4.el8",
+                "arch": "x86_64",
+            },
+            False,
+            id="other_release",
+        ),
+        pytest.param(
+            {
+                "name": "chan-devel",
+                "version": "0.0.4",
+                "release": "3.el8",
+                "arch": "x86_64",
+            },
+            False,
+            id="other_name",
+        ),
+    ],
+)
+def test_is_errata_package_matched(package, expected):
+    errata_package = NewErrataPackage(
+        name="chan",
+        version="0.0.4",
+        release="3.el8",
+        epoch=0,
+        arch="x86_64",
+    )
+    assert is_errata_package_matched(errata_package, package) is expected

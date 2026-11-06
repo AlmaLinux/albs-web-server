@@ -5,6 +5,7 @@ from alws.constants import DRAMATIQ_TASK_TIMEOUT
 from alws.crud import release as r_crud
 from alws.dependencies import get_async_db_key
 from alws.dramatiq import event_loop
+from alws.dramatiq.errata import release_new_errata
 from alws.utils.fastapi_sqla_setup import setup_all
 from alws.utils.sentry import sentry_init
 
@@ -16,7 +17,11 @@ sentry_init()
 
 async def _commit_release(release_id, user_id):
     async with open_async_session(key=get_async_db_key()) as db:
-        await r_crud.commit_release(db, release_id, user_id)
+        errata_to_release = await r_crud.commit_release(db, release_id, user_id)
+    # errata release reads committed packages statuses,
+    # so it has to be started after the session is closed
+    for record_id, platform_id in errata_to_release:
+        release_new_errata.send(record_id, platform_id)
 
 
 async def _revert_release(release_id, user_id):

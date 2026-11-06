@@ -1,3 +1,4 @@
+import copy
 import datetime
 from pathlib import Path
 import typing
@@ -115,6 +116,36 @@ async def create_errata(
     await async_session.commit()
     yield
     await async_session.rollback()
+
+
+@pytest.fixture
+async def create_release_errata(
+    async_session: AsyncSession,
+    errata_create_payload: typing.Dict[str, typing.Any],
+    base_platform,
+) -> typing.AsyncIterable[NewErrataRecord]:
+    # errata for the packages of build_done, its packages aren't matched
+    # to build artifacts since pulp packages are mocked
+    payload = copy.deepcopy(errata_create_payload)
+    payload["id"] = "ALSA-2022:0124"
+    payload["platform_id"] = base_platform.id
+    payload["packages"] = [
+        package
+        for package in payload["packages"]
+        if package["name"] == "chan"
+    ]
+    record = await async_session.get(
+        NewErrataRecord,
+        (payload["id"], payload["platform_id"]),
+    )
+    if not record:
+        await create_new_errata_record(payload)
+        await async_session.commit()
+        record = await async_session.get(
+            NewErrataRecord,
+            (payload["id"], payload["platform_id"]),
+        )
+    yield record
 
 
 @pytest.fixture
