@@ -6,7 +6,6 @@ from alws.constants import BuildTaskStatus
 from alws.crud.build import BUILDS_PER_PAGE
 from alws.models import Build, BuildTask, BuildTaskArtifact, BuildTaskRef
 from alws.utils.modularity import IndexWrapper
-from alws.utils.pulp_client import PulpClient
 from tests.constants import ADMIN_USER_ID, CUSTOM_USER_ID
 from tests.mock_classes import BaseAsyncTestCase
 
@@ -131,7 +130,15 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         "query, expected",
         [
             ("project=chan", True),
+            ("project=ch", True),
             ("project=definitely-not-a-project", False),
+            # parts of the URL before the repository name
+            ("project=rpm", False),
+            ("project=rpms", False),
+            ("project=git", False),
+            ("project=almalinux", False),
+            # the name is matched from its beginning
+            ("project=han", False),
             ("ref=c8", True),
             ("ref=definitely-not-a-ref", False),
             ("build_task_arch=x86_64", True),
@@ -235,9 +242,9 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         monkeypatch,
     ):
         """
-        The rpm_* filters resolve package hrefs through Pulp and then match
-        them against build_artifacts, so Pulp answers with the hrefs that are
-        really in the database.
+        The rpm_* filters resolve package hrefs in the Pulp database and then
+        match them against build_artifacts, so the lookup answers with the
+        hrefs that are really in the database.
         """
         hrefs = (
             (
@@ -260,14 +267,14 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
 
         asked = []
 
-        async def get_rpm_packages(self, **params):
+        async def get_rpm_package_hrefs(pulp_db, **params):
             asked.append(params)
             if params.get("name") == "chan":
-                return [{"pulp_href": href} for href in hrefs]
+                return hrefs
             return []
 
         monkeypatch.setattr(
-            PulpClient, "get_rpm_packages", get_rpm_packages
+            "alws.crud.build.get_rpm_package_hrefs", get_rpm_package_hrefs
         )
 
         for query, expected in (
@@ -297,11 +304,11 @@ class TestBuildsEndpoints(BaseAsyncTestCase):
         start_build,
         monkeypatch,
     ):
-        async def get_rpm_packages(self, **params):
+        async def get_rpm_package_hrefs(pulp_db, **params):
             raise AssertionError("Pulp must not be queried without rpm_*")
 
         monkeypatch.setattr(
-            PulpClient, "get_rpm_packages", get_rpm_packages
+            "alws.crud.build.get_rpm_package_hrefs", get_rpm_package_hrefs
         )
         response = await self.make_request(
             "get",

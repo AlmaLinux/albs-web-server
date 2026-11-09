@@ -1,8 +1,10 @@
 import logging
+import re
 import typing
 
 import redis.asyncio as aioredis
 import sqlalchemy
+from fastapi_sqla import open_async_session
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -10,14 +12,13 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func
 
 from alws import models
-from alws.config import settings
 from alws.crud.repository import remove_repos_from_pulp
 from alws.dramatiq import start_build
 from alws.errors import BuildError, DataNotFoundError, PermissionDenied
 from alws.perms import actions
 from alws.perms.authorization import can_perform
 from alws.schemas import build_schema
-from alws.utils.pulp_client import PulpClient
+from alws.utils.pulp_utils import get_rpm_package_hrefs
 
 BUILDS_PER_PAGE = 10
 
@@ -152,8 +153,13 @@ def _build_tasks_exists(
         )
     subquery = subquery.where(models.BuildTask.build_id == models.Build.id)
     if project is not None:
+        # match the beginning of the repository (or SRPM file) name only,
+        # i.e. the last part of the URL, otherwise "rpm" or "git" match
+        # every build through ".../rpms/..." or "//git.almalinux.org"
         subquery = subquery.where(
-            models.BuildTaskRef.url.like(f"%/{project}%"),
+            models.BuildTaskRef.url.regexp_match(
+                f"/{re.escape(project)}[^/]*$",
+            ),
         )
     if ref is not None:
         subquery = subquery.where(
@@ -196,22 +202,10 @@ async def _get_pulp_hrefs(
     }
     if not any(rpm_params.values()):
         return None
-    pulp_client = PulpClient(
-        settings.pulp_host,
-        settings.pulp_user,
-        settings.pulp_password,
-    )
-    pulp_params = {
-        "fields": ["pulp_href"],
-        **{
-            key: value
-            for key, value in rpm_params.items()
-            if value is not None
-        },
-    }
-    # TODO: we can get packages from pulp database
-    packages = await pulp_client.get_rpm_packages(**pulp_params)
-    return [row["pulp_href"] for row in packages]
+    # read the Pulp database instead of paging through the Pulp API,
+    # 100 packages per request
+    async with open_async_session(key="pulp_async") as pulp_db:
+        return await get_rpm_package_hrefs(pulp_db, **rpm_params)
 
 
 async def get_builds(
