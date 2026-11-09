@@ -208,6 +208,40 @@ class TestReleasesEndpoints(BaseAsyncTestCase):
             message = f"{errata_pkg.name}.{errata_pkg.arch} is not matched"
             assert statuses == [ErrataPackageStatus.released], message
 
+        # errata is released in background after the release commit,
+        # the release has to show its actual status
+        record.release_status = ErrataReleaseStatus.RELEASED
+        await async_session.commit()
+        response = await self.make_request(
+            "get",
+            f"/api/v1/releases/{release_id}/",
+        )
+        plan_errata = {
+            (errata["id"], errata["platform_id"]): errata
+            for errata in response.json()["plan"]["errata"]
+        }
+        assert (
+            plan_errata[errata_key]["release_status"]
+            == ErrataReleaseStatus.RELEASED.value
+        ), plan_errata
+        async_session.expire_all()
+        stored_plan = (
+            await async_session.execute(
+                select(models.Release.plan).where(
+                    models.Release.id == release_id
+                )
+            )
+        ).scalar()
+        stored_errata = next(
+            errata
+            for errata in stored_plan["errata"]
+            if (errata["id"], errata["platform_id"]) == errata_key
+        )
+        assert (
+            stored_errata["release_status"]
+            == ErrataReleaseStatus.IN_PROGRESS.value
+        ), "Errata status must be refreshed only in the response"
+
     async def test_commit_community_release(
         self,
         async_session: AsyncSession,
