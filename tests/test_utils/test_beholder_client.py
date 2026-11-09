@@ -1,3 +1,4 @@
+import asyncio
 import typing
 
 import pytest
@@ -71,3 +72,15 @@ async def test_nested_context_keeps_session_open(beholder_server):
     assert session.closed
     assert client._session is None
     assert len(set(beholder_server["client_ports"])) == 1
+
+
+async def test_concurrent_requests_share_session(beholder_server):
+    client = BeholderClient(beholder_server["host"])
+    async with client:
+        responses = await asyncio.gather(
+            *(client.get(f"/api/v1/{i}/") for i in range(5)),
+        )
+
+    assert responses == [{"path": f"/api/v1/{i}/"} for i in range(5)]
+    assert len(beholder_server["client_ports"]) == 5
+    assert client._session is None
