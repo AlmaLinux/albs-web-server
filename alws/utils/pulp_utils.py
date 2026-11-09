@@ -316,6 +316,46 @@ def get_rpm_module_artifacts(
     return {module_id: artifacts or [] for module_id, artifacts in modules}
 
 
+async def get_rpm_package_hrefs(
+    pulp_db: AsyncSession,
+    name: typing.Optional[str] = None,
+    epoch: typing.Optional[str] = None,
+    version: typing.Optional[str] = None,
+    release: typing.Optional[str] = None,
+    arch: typing.Optional[str] = None,
+) -> typing.List[str]:
+    """
+    hrefs of the RPM packages with the given NEVRA fields.
+
+    The same as listing pulp/api/v3/content/rpm/packages/ with these
+    filters: exact matches, and empty values don't filter.
+    """
+    conditions = [
+        column == value
+        for column, value in (
+            (RpmPackage.name, name),
+            (RpmPackage.epoch, epoch),
+            (RpmPackage.version, version),
+            (RpmPackage.release, release),
+            (RpmPackage.arch, arch),
+        )
+        if value
+    ]
+    package_ids = (
+        (
+            await pulp_db.execute(
+                select(RpmPackage.content_ptr_id).where(*conditions)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        RpmPackage(content_ptr_id=package_id).pulp_href
+        for package_id in package_ids
+    ]
+
+
 async def get_module_from_pulp_db(
     pulp_db: AsyncSession,
     module: RpmModule,
