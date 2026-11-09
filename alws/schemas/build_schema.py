@@ -554,7 +554,8 @@ async def get_module_refs(
                             devel=module_is_devel,
                         )
                     )
-        beholder_results = await asyncio.gather(*checking_tasks)
+        async with beholder_client:
+            beholder_results = await asyncio.gather(*checking_tasks)
 
     platform_prefix_list = platform.modularity['git_tag_prefix']
     for flavor in flavors:

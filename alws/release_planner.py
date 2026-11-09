@@ -1321,11 +1321,13 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         build_tasks: typing.Optional[typing.List[int]] = None,
         product: typing.Optional[models.Product] = None,
     ) -> dict:
-        plan = await self.get_packages_release_plan(
-            build_ids=build_ids,
-            base_platform=base_platform,
-            build_tasks=build_tasks,
-        )
+        # all Beholder requests of the plan reuse one connection pool
+        async with self._beholder_client:
+            plan = await self.get_packages_release_plan(
+                build_ids=build_ids,
+                base_platform=base_platform,
+                build_tasks=build_tasks,
+            )
         plan["errata"] = await self.get_release_errata(plan, base_platform.id)
         return plan
 

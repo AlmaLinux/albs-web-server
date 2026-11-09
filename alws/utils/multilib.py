@@ -206,10 +206,11 @@ class MultilibProcessor:
         platforms = self._build_task.platform.reference_platforms + [
             self._build_task.platform
         ]
-        for ref_platform in platforms:
-            packages = await self.call_for_packages(ref_platform, src_rpm)
-            if packages:
-                break
+        async with self._beholder_client:
+            for ref_platform in platforms:
+                packages = await self.call_for_packages(ref_platform, src_rpm)
+                if packages:
+                    break
         if not packages:
             return {}
         return {
@@ -225,10 +226,11 @@ class MultilibProcessor:
         platforms = self._build_task.platform.reference_platforms + [
             self._build_task.platform
         ]
-        for ref_platform in platforms:
-            artifacts = await self.call_for_module_artifacts(ref_platform)
-            if artifacts:
-                break
+        async with self._beholder_client:
+            for ref_platform in platforms:
+                artifacts = await self.call_for_module_artifacts(ref_platform)
+                if artifacts:
+                    break
         if not artifacts:
             return []
         return [i for i in artifacts if i.get("is_multilib")]
