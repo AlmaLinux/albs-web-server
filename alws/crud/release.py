@@ -4,7 +4,8 @@ import typing
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.expression import func
+from sqlalchemy.orm.attributes import set_committed_value
+from sqlalchemy.sql.expression import func, tuple_
 
 from alws import models
 from alws.constants import ReleaseStatus
@@ -27,6 +28,51 @@ __all__ = [
     "commit_release",
     "update_release",
 ]
+
+
+async def refresh_release_errata_statuses(
+    db: AsyncSession,
+    releases: typing.List[models.Release],
+):
+    # The release plan keeps a snapshot of errata statuses taken when the
+    # release was planned or committed, while errata are released later
+    # in background, so the actual statuses are taken from the DB
+    errata_keys = {
+        (errata["id"], errata["platform_id"])
+        for release in releases
+        for errata in (release.plan or {}).get("errata", [])
+    }
+    if not errata_keys:
+        return
+    statuses = {
+        (record_id, platform_id): status.value
+        for record_id, platform_id, status in (
+            await db.execute(
+                select(
+                    models.NewErrataRecord.id,
+                    models.NewErrataRecord.platform_id,
+                    models.NewErrataRecord.release_status,
+                ).where(
+                    tuple_(
+                        models.NewErrataRecord.id,
+                        models.NewErrataRecord.platform_id,
+                    ).in_(errata_keys)
+                )
+            )
+        ).all()
+    }
+    for release in releases:
+        plan_errata = (release.plan or {}).get("errata")
+        if not plan_errata:
+            continue
+        plan = copy.deepcopy(release.plan)
+        for errata in plan["errata"]:
+            status = statuses.get((errata["id"], errata["platform_id"]))
+            if status:
+                errata["release_status"] = status
+        # the plan is changed only for the response and
+        # must not be written back to the DB
+        set_committed_value(release, "plan", plan)
 
 
 async def get_releases(
@@ -91,16 +137,21 @@ async def get_releases(
         return query
 
     if release_id:
-        return (await db.execute(generate_query())).scalars().first()
+        release = (await db.execute(generate_query())).scalars().first()
+        if release:
+            await refresh_release_errata_statuses(db, [release])
+        return release
+    releases = (await db.execute(generate_query())).scalars().all()
+    await refresh_release_errata_statuses(db, releases)
     if page_number:
         return {
-            "releases": (await db.execute(generate_query())).scalars().all(),
+            "releases": releases,
             "total_releases": (
                 await db.execute(generate_query(count=True))
             ).scalar(),
             "current_page": page_number,
         }
-    return (await db.execute(generate_query())).scalars().all()
+    return releases
 
 
 async def __get_product(db: AsyncSession, product_id: int) -> models.Product:
