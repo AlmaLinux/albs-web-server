@@ -9,7 +9,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
 from immudb_wrapper import ImmudbWrapper
-from sqlalchemy import or_, update
+from sqlalchemy import or_, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -54,7 +54,7 @@ from alws.utils.measurements import (
     record_stage,
 )
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
-from alws.utils.parsing import get_clean_distr_name
+from alws.utils.parsing import clean_release, get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
     get_rpm_packages_by_ids,
@@ -68,6 +68,9 @@ BEHOLDER_PLAN_STAGES = (
     "beholder_cache_build",
     "release_repos_matching",
 )
+
+# plan packages grouped by name, version and cleaned release
+GroupedRpms = typing.Dict[typing.Tuple[str, str, str], typing.List[dict]]
 
 __all__ = [
     "CommunityReleasePlanner",
@@ -1921,6 +1924,35 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             rpms[package["artifact_href"]] = package
         return list(rpms.values())
 
+    @staticmethod
+    def group_rpms_for_errata(
+        rpms: typing.List[dict],
+    ) -> GroupedRpms:
+        # is_errata_package_matched() requires the same name, version and
+        # cleaned release, so an errata package needs to be compared only
+        # with the packages of its group instead of the whole plan
+        grouped_rpms = defaultdict(list)
+        for rpm in rpms:
+            key = (rpm["name"], rpm["version"], clean_release(rpm["release"]))
+            grouped_rpms[key].append(rpm)
+        return grouped_rpms
+
+    @staticmethod
+    def get_errata_package_rpms(
+        errata_pkg: models.NewErrataPackage,
+        grouped_rpms: GroupedRpms,
+    ) -> typing.List[dict]:
+        key = (
+            errata_pkg.name,
+            errata_pkg.version,
+            clean_release(errata_pkg.release),
+        )
+        return [
+            rpm
+            for rpm in grouped_rpms.get(key, [])
+            if is_errata_package_matched(errata_pkg, rpm)
+        ]
+
     async def get_errata_records_for_plan(
         self,
         plan: dict,
@@ -1930,16 +1962,22 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         rpms = self.get_plan_rpms(plan)
         if not rpms:
             return []
+        # only the same name and version can match, so don't load errata
+        # packages of the other versions (e.g. the whole kernel history)
         errata_pkgs = await self.db.execute(
             select(models.NewErrataPackage).where(
                 models.NewErrataPackage.platform_id == platform_id,
-                models.NewErrataPackage.name.in_({rpm["name"] for rpm in rpms}),
+                tuple_(
+                    models.NewErrataPackage.name,
+                    models.NewErrataPackage.version,
+                ).in_(sorted({(rpm["name"], rpm["version"]) for rpm in rpms})),
             )
         )
+        grouped_rpms = self.group_rpms_for_errata(rpms)
         record_ids = {
             errata_pkg.errata_record_id
             for errata_pkg in errata_pkgs.scalars().all()
-            if any(is_errata_package_matched(errata_pkg, rpm) for rpm in rpms)
+            if self.get_errata_package_rpms(errata_pkg, grouped_rpms)
         }
         if not record_ids:
             return []
@@ -1970,17 +2008,18 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             if not record.module or record.module in plan_modules
         ]
 
-    @staticmethod
+    @classmethod
     def get_missing_errata_packages(
+        cls,
         record: models.NewErrataRecord,
-        rpms: typing.List[dict],
+        grouped_rpms: GroupedRpms,
     ) -> typing.List[str]:
         # errata package is covered when the release brings it or
         # it is already released to production repositories
         return [
             get_nevra(errata_pkg, clean=False)
             for errata_pkg in record.packages
-            if not any(is_errata_package_matched(errata_pkg, rpm) for rpm in rpms)
+            if not cls.get_errata_package_rpms(errata_pkg, grouped_rpms)
             and not any(
                 albs_pkg.status == ErrataPackageStatus.released
                 for albs_pkg in errata_pkg.albs_packages
@@ -1994,7 +2033,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         platform_id: int,
         previous_errata: typing.Optional[typing.List[dict]] = None,
     ) -> typing.List[dict]:
-        rpms = self.get_plan_rpms(plan)
+        grouped_rpms = self.group_rpms_for_errata(self.get_plan_rpms(plan))
         # keep records that user has excluded from the release
         excluded = {
             (errata["id"], errata["platform_id"])
@@ -2010,7 +2049,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 ErrataReleaseStatus.FAILED,
             ):
                 continue
-            missing_packages = self.get_missing_errata_packages(record, rpms)
+            missing_packages = self.get_missing_errata_packages(
+                record,
+                grouped_rpms,
+            )
             ready = not missing_packages
             release_errata.append({
                 "id": record.id,
@@ -2049,6 +2091,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 )
             ).all()
         )
+        grouped_rpms = self.group_rpms_for_errata(rpms)
         for record in records:
             if record.release_status == ErrataReleaseStatus.RELEASED:
                 continue
@@ -2060,13 +2103,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 matched_hrefs = {
                     albs_pkg.pulp_href for albs_pkg in errata_pkg.albs_packages
                 }
-                for rpm in rpms:
+                for rpm in self.get_errata_package_rpms(
+                    errata_pkg,
+                    grouped_rpms,
+                ):
                     artifact_id = artifact_ids.get(rpm["artifact_href"])
                     if (
                         artifact_id is None
                         or artifact_id in matched_ids
                         or rpm["artifact_href"] in matched_hrefs
-                        or not is_errata_package_matched(errata_pkg, rpm)
                     ):
                         continue
                     errata_pkg.albs_packages.append(
