@@ -48,7 +48,11 @@ from alws.utils.errata import get_nevra, is_errata_package_matched
 from alws.utils.github_integration_helper import (
     close_issues,
 )
-from alws.utils.measurements import class_measure_work_time_async
+from alws.utils.measurements import (
+    class_measure_work_time_async,
+    measure_stage,
+    record_stage,
+)
 from alws.utils.modularity import IndexWrapper, ModuleWrapper
 from alws.utils.parsing import get_clean_distr_name
 from alws.utils.pulp_client import PulpClient
@@ -57,6 +61,12 @@ from alws.utils.pulp_utils import (
     get_rpm_packages_from_repositories,
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
+)
+
+BEHOLDER_PLAN_STAGES = (
+    "beholder_requests",
+    "beholder_cache_build",
+    "release_repos_matching",
 )
 
 __all__ = [
@@ -250,6 +260,38 @@ class BaseReleasePlanner(metaclass=ABCMeta):
     ) -> bool:
         return artifact_platform in self.compatible_release_platforms
 
+    def iter_module_repos(
+        self,
+        task: models.BuildTask,
+    ) -> typing.Iterator[models.Repository]:
+        return (
+            build_repo
+            for build_repo in task.build.repos
+            if build_repo.arch == task.arch
+            and not build_repo.debug
+            and build_repo.type == "rpm"
+            and self.can_be_released_to_target_platform(
+                artifact_platform=build_repo.platform,
+            )
+        )
+
+    async def get_modules_templates(
+        self,
+        repo_urls: typing.Iterable[str],
+    ) -> typing.Dict[str, typing.Union[str, None, BaseException]]:
+        """
+        Downloads modules.yaml of the repositories concurrently.
+
+        A failed download is returned as its exception, so the caller
+        raises it only if it really needs that template.
+        """
+        urls = list(dict.fromkeys(repo_urls))
+        templates = await asyncio.gather(
+            *(self.pulp_client.get_repo_modules_yaml(url) for url in urls),
+            return_exceptions=True,
+        )
+        return dict(zip(urls, templates))
+
     @class_measure_work_time_async("get_packages_info_pulp_and_db")
     async def get_pulp_packages(
         self,
@@ -297,7 +339,7 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                     artifact_platform=build_rpm.artifact.build_task.platform,
                 )
             ]
-            logging.info('Build RPMs "%s"', build_rpms)
+            logging.debug('Build RPMs "%s"', build_rpms)
             pulp_artifacts = await self.get_pulp_packages_info(
                 build_rpms,
                 build_tasks,
@@ -334,60 +376,66 @@ class BaseReleasePlanner(metaclass=ABCMeta):
                 pkg_info["source"] = source_name
                 pulp_packages.append(pkg_info)
 
-            for task in build.tasks:
+            module_tasks = [
+                task
+                for task in build.tasks
+                if task.rpm_modules and task.id in build_tasks
+            ]
+            # download modules.yaml of all tasks at once instead of one by
+            # one; a task that turns out to be skipped below or a failed
+            # download that isn't used doesn't change the result
+            modules_templates = await self.get_modules_templates(
+                module_repo.url
+                for module_repo in (
+                    next(self.iter_module_repos(task), None)
+                    for task in module_tasks
+                )
+                if module_repo is not None
+            )
+            for task in module_tasks:
                 skip_modules_processing = True
-                if task.rpm_modules and task.id in build_tasks:
-                    for module in task.rpm_modules:
-                        key = (
-                            module.name,
-                            module.stream,
-                            module.version,
-                            module.arch,
-                        )
-                        if key not in modules_to_release:
-                            skip_modules_processing = False
-                    if skip_modules_processing:
-                        continue
-                    module_repo = next(
-                        build_repo
-                        for build_repo in task.build.repos
-                        if build_repo.arch == task.arch
-                        and not build_repo.debug
-                        and build_repo.type == "rpm"
-                        and self.can_be_released_to_target_platform(
-                            artifact_platform=build_repo.platform,
-                        )
+                for module in task.rpm_modules:
+                    key = (
+                        module.name,
+                        module.stream,
+                        module.version,
+                        module.arch,
                     )
-                    template = await self.pulp_client.get_repo_modules_yaml(
-                        module_repo.url
+                    if key not in modules_to_release:
+                        skip_modules_processing = False
+                if skip_modules_processing:
+                    continue
+                module_repo = next(self.iter_module_repos(task))
+                template = modules_templates[module_repo.url]
+                if isinstance(template, BaseException):
+                    raise template
+                module_index = IndexWrapper()
+                if template:
+                    module_index = IndexWrapper.from_template(template)
+                for module in module_index.iter_modules():
+                    key = (
+                        module.name,
+                        module.stream,
+                        str(module.version),
+                        module.arch,
                     )
-                    module_index = IndexWrapper()
-                    if template:
-                        module_index = IndexWrapper.from_template(template)
-                    for module in module_index.iter_modules():
-                        key = (
-                            module.name,
-                            module.stream,
-                            str(module.version),
-                            module.arch,
-                        )
-                        # in some cases we have also devel module in template,
-                        # we should add all modules from template
-                        modules_to_release[key] = {
-                            "build_id": build.id,
-                            "name": module.name,
-                            "stream": module.stream,
-                            # Module version needs to be converted into
-                            # string because it's going to be involved later
-                            # in release plan. When interacting with API
-                            # via Swagger or albs-frontend, we'll lose
-                            # precision as described here:
-                            # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
-                            "version": str(module.version),
-                            "context": module.context,
-                            "arch": module.arch,
-                            "template": module.render(),
-                        }
+                    # in some cases we have also devel module in template,
+                    # we should add all modules from template
+                    modules_to_release[key] = {
+                        "build_id": build.id,
+                        "name": module.name,
+                        "stream": module.stream,
+                        # Module version needs to be converted into
+                        # string because it's going to be involved later
+                        # in release plan. When interacting with API
+                        # via Swagger or albs-frontend, we'll lose
+                        # precision as described here:
+                        # https://github.com/tiangolo/fastapi/issues/2483#issuecomment-744576007
+                        "version": str(module.version),
+                        "context": module.context,
+                        "arch": module.arch,
+                        "template": module.render(),
+                    }
 
         pulp_rpm_modules = list(modules_to_release.values())
         return pulp_packages, src_rpm_names, pulp_rpm_modules
@@ -529,7 +577,6 @@ class BaseReleasePlanner(metaclass=ABCMeta):
         new_release.finished_at = datetime.datetime.utcnow()
         self.db.add(new_release)
         await self.db.flush()
-        await self.db.refresh(new_release)
 
         logging.info("New release %d successfully created", new_release.id)
         return await self.get_final_release(new_release.id)
@@ -1257,7 +1304,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         beholder_key = generate_key(is_beta)
         logging.debug(
             "At find_release_repos - beholder_key: %s",
-            str(beholder_key),
+            beholder_key,
         )
         predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info from stable/beta,
@@ -1266,7 +1313,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             beholder_key = generate_key(not is_beta)
             logging.debug(
                 "Not predicted_package, beholder_key: %s",
-                str(beholder_key),
+                beholder_key,
             )
             predicted_package = beholder_cache.get(beholder_key, {})
         # if we doesn't found info by current version,
@@ -1283,7 +1330,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
             ]
             logging.debug(
                 "Still not predicted_package, beholder_keys: %s",
-                str(beholder_keys),
+                beholder_keys,
             )
             predicted_package = next(
                 (beholder_cache[key] for key in beholder_keys),
@@ -1343,6 +1390,10 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
         strong_arches = defaultdict(list)
         added_packages = set()
         prod_repos = []
+        # these stages are summed up across the calls inside this method,
+        # so the values left from a previous plan shouldn't be added to
+        for stage in BEHOLDER_PLAN_STAGES:
+            self.stats.pop(stage, None)
         self.base_platform = base_platform
         self.compatible_release_platforms = (
             await base_platform.get_compatible_release_platforms(self._db)
@@ -1402,12 +1453,15 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 if module["arch"] in weak_arches:
                     module_arch_list.append(strong_arch)
 
-            module_responses = await self._beholder_client.retrieve_responses(
-                self.base_platform.platforms_list_for_beholder,
-                module_name=module_name,
-                module_stream=module_stream,
-                module_arch_list=module_arch_list,
-            )
+            with measure_stage(self.stats, "beholder_requests"):
+                module_responses = (
+                    await self._beholder_client.retrieve_responses(
+                        self.base_platform.platforms_list_for_beholder,
+                        module_name=module_name,
+                        module_stream=module_stream,
+                        module_arch_list=module_arch_list,
+                    )
+                )
             module_info = {"module": module, "repositories": []}
             if not module_responses:
                 devel_repo = self.get_devel_repo(
@@ -1477,14 +1531,16 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                     continue
                 module_info["repositories"].append(module_repo_dict)
 
-        beholder_responses = await self._beholder_client.retrieve_responses(
-            self.base_platform.platforms_list_for_beholder,
-            data={
-                "source_rpms": src_rpm_names,
-                "match": BeholderMatchMethod.all(),
-            },
-        )
+        with measure_stage(self.stats, "beholder_requests"):
+            beholder_responses = await self._beholder_client.retrieve_responses(
+                self.base_platform.platforms_list_for_beholder,
+                data={
+                    "source_rpms": src_rpm_names,
+                    "match": BeholderMatchMethod.all(),
+                },
+            )
 
+        cache_build_start = datetime.datetime.utcnow()
         for beholder_response in beholder_responses:
             distr = beholder_response["distribution"]
             is_beta = distr["version"].endswith("-beta")
@@ -1508,6 +1564,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                         response_priority,
                         matched,
                     )
+        record_stage(self.stats, "beholder_cache_build", cache_build_start)
         if not beholder_cache:
             return await self.get_pulp_based_response(
                 pulp_packages=pulp_packages,
@@ -1515,9 +1572,12 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 repos_mapping=repos_mapping,
                 prod_repos=prod_repos,
             )
-        logging.debug("beholder_cache: %s", str(beholder_cache))
-        logging.debug("pulp_packages: %s", str(pulp_packages))
-        logging.debug("repos_mapping: %s", str(repos_mapping))
+        # pass the objects as is: logging formats them only when DEBUG
+        # is enabled, while str() would build these huge strings anyway
+        logging.debug("beholder_cache: %s", beholder_cache)
+        logging.debug("pulp_packages: %s", pulp_packages)
+        logging.debug("repos_mapping: %s", repos_mapping)
+        matching_start = datetime.datetime.utcnow()
         for package in pulp_packages:
             pkg_name = package["name"]
             pkg_version = package["version"]
@@ -1637,6 +1697,7 @@ class AlmaLinuxReleasePlanner(BaseReleasePlanner):
                 packages.append(copy_pkg_info)
                 processed_repos.append(repo_name)
             added_packages.add(full_name)
+        record_stage(self.stats, "release_repos_matching", matching_start)
 
         (
             pkgs_from_repos,
