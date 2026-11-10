@@ -267,17 +267,18 @@ class BuildPlanner:
         )
         multilib_artifacts = {}
 
-        for platform in self._platforms:
-            platform_name = get_clean_distr_name(platform.name)
-            multilib_artifacts[platform.name] = (
-                await self.get_platform_multilib_artifacts(
-                    beholder_client,
-                    platform_name,
-                    platform.distr_version,
-                    task,
-                    has_devel=has_devel,
+        async with beholder_client:
+            for platform in self._platforms:
+                platform_name = get_clean_distr_name(platform.name)
+                multilib_artifacts[platform.name] = (
+                    await self.get_platform_multilib_artifacts(
+                        beholder_client,
+                        platform_name,
+                        platform.distr_version,
+                        task,
+                        has_devel=has_devel,
+                    )
                 )
-            )
 
         return multilib_artifacts
 
@@ -347,27 +348,29 @@ class BuildPlanner:
         arch = task_arch
         if task_arch == 'i686':
             arch = 'x86_64'
-        artifacts = await beholder.get_module_artifacts(
-            clean_name,
-            platform_version,
-            task.module_name,
-            task.module_stream,
-            arch,
-        )
-
-        # Include data from beta flavor for partial updates
-        if self.is_beta_build():
-            beta_artifacts = await beholder.get_module_artifacts(
-                f'{clean_name}-beta',
+        async with beholder:
+            artifacts = await beholder.get_module_artifacts(
+                clean_name,
                 platform_version,
                 task.module_name,
                 task.module_stream,
                 arch,
             )
-            if beta_artifacts:
-                artifacts = self.merge_beta_module_artifacts(
-                    artifacts, beta_artifacts
+
+            # Include data from beta flavor for partial updates
+            beta_artifacts = None
+            if self.is_beta_build():
+                beta_artifacts = await beholder.get_module_artifacts(
+                    f'{clean_name}-beta',
+                    platform_version,
+                    task.module_name,
+                    task.module_stream,
+                    arch,
                 )
+        if beta_artifacts:
+            artifacts = self.merge_beta_module_artifacts(
+                artifacts, beta_artifacts
+            )
 
         reprocessed = {}
         for module_name, projects in artifacts.items():

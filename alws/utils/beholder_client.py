@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import logging
@@ -12,6 +13,14 @@ from alws.utils.parsing import get_clean_distr_name
 
 
 class BeholderClient:
+    """
+    Beholder API client.
+
+    Requests made inside `async with client:` share one HTTP session,
+    so connections to Beholder are kept alive and reused between them.
+    Outside of it every request opens and closes its own session.
+    """
+
     def __init__(
         self,
         host: str,
@@ -26,6 +35,36 @@ class BeholderClient:
                 }
             )
         self.__timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+        self._session: typing.Optional[aiohttp.ClientSession] = None
+        self._session_users = 0
+
+    async def __aenter__(self) -> "BeholderClient":
+        if self._session_users == 0:
+            self._session = self._create_session()
+        self._session_users += 1
+        return self
+
+    async def __aexit__(self, *exc_info):
+        self._session_users -= 1
+        if self._session_users == 0:
+            session, self._session = self._session, None
+            await session.close()
+
+    def _create_session(self) -> aiohttp.ClientSession:
+        return aiohttp.ClientSession(
+            headers=self._headers,
+            raise_for_status=True,
+        )
+
+    @contextlib.asynccontextmanager
+    async def _get_session(
+        self,
+    ) -> typing.AsyncIterator[aiohttp.ClientSession]:
+        if self._session is not None:
+            yield self._session
+            return
+        async with self._create_session() as session:
+            yield session
 
     @staticmethod
     def create_endpoints(
@@ -142,16 +181,13 @@ class BeholderClient:
         headers: typing.Optional[dict] = None,
         params: typing.Optional[dict] = None,
     ):
-        req_headers = self._headers.copy()
-        if headers:
-            req_headers.update(**headers)
         full_url = self._get_url(endpoint)
-        async with aiohttp.ClientSession(
-            headers=req_headers,
-            raise_for_status=True,
-        ) as session:
+        async with self._get_session() as session:
+            # the session already sends self._headers,
+            # these are merged into them for this request only
             async with session.get(
                 full_url,
+                headers=headers,
                 params=params,
                 timeout=self.__timeout,
             ) as response:
@@ -164,10 +200,7 @@ class BeholderClient:
         endpoint: str,
         data: typing.Union[dict, list],
     ):
-        async with aiohttp.ClientSession(
-            headers=self._headers,
-            raise_for_status=True,
-        ) as session:
+        async with self._get_session() as session:
             async with session.post(
                 self._get_url(endpoint),
                 json=data,
