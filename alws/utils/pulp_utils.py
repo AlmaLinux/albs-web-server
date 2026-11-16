@@ -247,6 +247,50 @@ def get_rpm_packages_from_repository(
         return pulp_db.execute(query).scalars().all()
 
 
+def get_rpm_packages_from_repositories(
+    repo_ids: typing.List[uuid.UUID],
+    pkg_names: typing.Optional[typing.List[str]] = None,
+    pkg_versions: typing.Optional[typing.List[str]] = None,
+    pkg_epochs: typing.Optional[typing.List[str]] = None,
+    pkg_arches: typing.Optional[typing.List[str]] = None,
+    pkg_releases: typing.Optional[typing.List[str]] = None,
+) -> typing.Dict[uuid.UUID, typing.List[RpmPackage]]:
+    """Same as get_rpm_packages_from_repository() for several repositories.
+
+    Runs a single query and returns packages grouped by repository id.
+    A package present in several repositories is listed under each of
+    them (as the same ORM instance).
+    """
+    result = {repo_id: [] for repo_id in repo_ids}
+    if not repo_ids:
+        return result
+
+    conditions = [
+        CoreRepositoryContent.repository_id.in_(repo_ids),
+        CoreRepositoryContent.version_removed_id.is_(None),
+        CoreRepositoryContent.content_id == RpmPackage.content_ptr_id,
+    ]
+    if pkg_names:
+        conditions.append(RpmPackage.name.in_(pkg_names))
+    if pkg_versions:
+        conditions.append(RpmPackage.version.in_(pkg_versions))
+    if pkg_epochs:
+        conditions.append(RpmPackage.epoch.in_(pkg_epochs))
+    if pkg_arches:
+        conditions.append(RpmPackage.arch.in_(pkg_arches))
+    if pkg_releases:
+        conditions.append(RpmPackage.release.in_(pkg_releases))
+
+    query = select(CoreRepositoryContent.repository_id, RpmPackage).where(
+        *conditions
+    )
+    with open_session(key="pulp") as pulp_db:
+        pulp_db.expire_on_commit = False
+        for repo_id, pkg in pulp_db.execute(query).all():
+            result.setdefault(repo_id, []).append(pkg)
+    return result
+
+
 def get_rpm_packages_by_ids(
     pulp_pkg_ids: typing.List[uuid.UUID],
     pkg_fields: typing.List[typing.Any],

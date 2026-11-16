@@ -100,6 +100,17 @@ def mock_get_packages_from_pulp_repo(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def mock_get_packages_from_pulp_repos(monkeypatch):
+    def func(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(
+        "alws.crud.errata.get_rpm_packages_from_repositories",
+        func,
+    )
+
+
+@pytest.fixture(autouse=True)
 def mock_get_packages_from_pulp_by_ids(monkeypatch):
     def func(*args, **kwargs):
         return {}

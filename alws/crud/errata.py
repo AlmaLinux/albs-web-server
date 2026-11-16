@@ -67,6 +67,7 @@ from alws.utils.pulp_client import PulpClient
 from alws.utils.pulp_utils import (
     get_rpm_module_packages_from_repository,
     get_rpm_packages_by_ids,
+    get_rpm_packages_from_repositories,
     get_rpm_packages_from_repository,
     get_uuid_from_pulp_href,
 )
@@ -732,12 +733,26 @@ async def load_platform_packages(
     module: Optional[str] = None,
 ) -> Dict[str, Any]:
     cache = {}
-    for repo in platform.repos:
-        if not repo.production:
-            continue
-
-        repo_id = get_uuid_from_pulp_href(repo.pulp_href)
+    prod_repos = [repo for repo in platform.repos if repo.production]
+    repo_ids = {
+        repo.pulp_href: get_uuid_from_pulp_href(repo.pulp_href)
+        for repo in prod_repos
+    }
+    pkgs_by_repo_id = {}
+    if not module:
+        # Non-modular packages of all production repos in a single query
+        pkgs_by_repo_id = get_rpm_packages_from_repositories(
+            repo_ids=list(repo_ids.values()),
+            pkg_names=search_params["name"],
+            pkg_versions=search_params["version"],
+            pkg_epochs=search_params["epoch"],
+            pkg_releases=search_params.get("release", None),
+        )
+    for repo in prod_repos:
+        repo_id = repo_ids[repo.pulp_href]
         if module:
+            # Modular lookups need the modules.yaml of each repository,
+            # so they still go one repository at a time
             pkgs = get_rpm_module_packages_from_repository(
                 repo_id=repo_id,
                 module=module,
@@ -746,13 +761,7 @@ async def load_platform_packages(
                 pkg_epochs=search_params["epoch"],
             )
         else:
-            pkgs = get_rpm_packages_from_repository(
-                repo_id=repo_id,
-                pkg_names=search_params["name"],
-                pkg_versions=search_params["version"],
-                pkg_epochs=search_params["epoch"],
-                pkg_releases=search_params.get("release", None),
-            )
+            pkgs = pkgs_by_repo_id.get(repo_id, [])
 
         if not pkgs:
             continue
@@ -903,16 +912,27 @@ async def add_missing_errata_references(
     return record, added_ref_ids
 
 
-async def get_matching_albs_packages(
-    db: AsyncSession,
+# Fields of a Pulp RPM package needed to match it against an errata package
+ALBS_MATCH_PULP_PKG_FIELDS = [
+    RpmPackage.content_ptr_id,
+    RpmPackage.name,
+    RpmPackage.epoch,
+    RpmPackage.version,
+    RpmPackage.release,
+    RpmPackage.arch,
+    RpmPackage.rpm_sourcerpm,
+]
+
+# name_query -> [(build artifact, matching Pulp package or None), ...]
+AlbsPackagesCache = Dict[
+    str, List[Tuple[models.BuildTaskArtifact, Optional[RpmPackage]]]
+]
+
+
+def get_errata_package_clean_name(
     errata_package: models.NewErrataPackage,
-    prod_repos_cache: typing.Dict,
-    module: Optional[str] = None,
-    build_id: Optional[int] = None,
     is_issued_by_almalinux: Optional[bool] = False,
-) -> Tuple[List[models.NewErrataToALBSPackage], dict]:
-    package_type = {}
-    items_to_insert = []
+) -> str:
     # We're going to check packages that match name-version-clean_release
     # Note that clean_release doesn't include the .module... str, we match:
     #   - my-pkg-2.0-2
@@ -920,11 +940,115 @@ async def get_matching_albs_packages(
     #   - etc
     # Also, note that when processing erratas issued by almalinux, we don't
     # clean the package release
-    clean_package_name = "-".join((
+    return "-".join((
         errata_package.name,
         errata_package.version,
         clean_release(errata_package.release, is_issued_by_almalinux),
     ))
+
+
+def get_errata_package_name_query(
+    errata_package: models.NewErrataPackage,
+) -> str:
+    # Prefix of build_task_artifacts.name for every build of name-version
+    return f"{errata_package.name}-{errata_package.version}"
+
+
+async def query_albs_packages(
+    db: AsyncSession,
+    name_queries: List[str],
+    module: Optional[str] = None,
+    build_id: Optional[int] = None,
+) -> AlbsPackagesCache:
+    """Load ALBS build artifacts whose name starts with any of name_queries,
+    together with their Pulp package, in two queries (one per database).
+    """
+    cache: AlbsPackagesCache = {name_query: [] for name_query in name_queries}
+    if not name_queries:
+        return cache
+    conditions = [
+        models.BuildTaskArtifact.type == "rpm",
+        or_(*[
+            models.BuildTaskArtifact.name.startswith(name_query)
+            for name_query in name_queries
+        ]),
+    ]
+    if build_id:
+        conditions.append(models.BuildTask.build_id == build_id)
+    query = (
+        select(models.BuildTaskArtifact)
+        .join(models.BuildTaskArtifact.build_task)
+        .where(and_(*conditions))
+        .options(
+            selectinload(models.BuildTaskArtifact.build_task),
+        )
+    )
+    # If the errata record references a module, then we'll get
+    # only packages that belong to the right module:stream
+    if module:
+        module_name, module_stream = module.split(":")
+        query = query.join(models.BuildTask.rpm_modules).filter(
+            models.RpmModule.name == module_name,
+            models.RpmModule.stream == module_stream,
+        )
+    artifacts = (await db.execute(query)).scalars().all()
+    if not artifacts:
+        return cache
+    pulp_pkgs = get_rpm_packages_by_ids(
+        [get_uuid_from_pulp_href(artifact.href) for artifact in artifacts],
+        ALBS_MATCH_PULP_PKG_FIELDS,
+    )
+    for artifact in artifacts:
+        for name_query in name_queries:
+            if artifact.name.startswith(name_query):
+                cache[name_query].append(
+                    (artifact, pulp_pkgs.get(artifact.href))
+                )
+    return cache
+
+
+async def load_albs_packages(
+    db: AsyncSession,
+    errata_packages: List[models.NewErrataPackage],
+    prod_repos_cache: typing.Dict,
+    module: Optional[str] = None,
+    is_issued_by_almalinux: Optional[bool] = False,
+) -> AlbsPackagesCache:
+    """Preload ALBS build artifacts for get_matching_albs_packages().
+
+    Only errata packages without a candidate in production repositories
+    need an ALBS lookup, so those are batched here into two queries
+    instead of two queries per package. Must be built with the same
+    module and is_issued_by_almalinux values that are later passed to
+    get_matching_albs_packages().
+    """
+    name_queries = set()
+    for errata_package in errata_packages:
+        clean_package_name = get_errata_package_clean_name(
+            errata_package, is_issued_by_almalinux
+        )
+        if prod_repos_cache.get(clean_package_name, {}).get(
+            errata_package.arch
+        ):
+            continue
+        name_queries.add(get_errata_package_name_query(errata_package))
+    return await query_albs_packages(db, sorted(name_queries), module)
+
+
+async def get_matching_albs_packages(
+    db: AsyncSession,
+    errata_package: models.NewErrataPackage,
+    prod_repos_cache: typing.Dict,
+    module: Optional[str] = None,
+    build_id: Optional[int] = None,
+    is_issued_by_almalinux: Optional[bool] = False,
+    albs_pkgs_cache: Optional[AlbsPackagesCache] = None,
+) -> Tuple[List[models.NewErrataToALBSPackage], dict]:
+    package_type = {}
+    items_to_insert = []
+    clean_package_name = get_errata_package_clean_name(
+        errata_package, is_issued_by_almalinux
+    )
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
     for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
@@ -959,62 +1083,27 @@ async def get_matching_albs_packages(
     # If we couldn't find any pkg in production repos
     # we'll look for every package that matches name-version
     # inside the ALBS, this is, build_task_artifacts.
-    name_query = f"{errata_package.name}-{errata_package.version}"
+    name_query = get_errata_package_name_query(errata_package)
+    if (
+        albs_pkgs_cache is not None
+        and build_id is None
+        and name_query in albs_pkgs_cache
+    ):
+        albs_packages = albs_pkgs_cache[name_query]
+    else:
+        albs_packages = (
+            await query_albs_packages(db, [name_query], module, build_id)
+        )[name_query]
 
-    conditions = [
-        models.BuildTaskArtifact.type == "rpm",
-        models.BuildTaskArtifact.name.startswith(name_query),
-    ]
-    if build_id:
-        conditions.append(models.BuildTask.build_id == build_id)
-    query = (
-        select(models.BuildTaskArtifact)
-        .join(models.BuildTaskArtifact.build_task)
-        .where(and_(*conditions))
-        .options(
-            selectinload(models.BuildTaskArtifact.build_task),
-        )
-    )
-    # If the errata record references a module, then we'll get
-    # only packages that belong to the right module:stream
-    if module:
-        module_name, module_stream = module.split(":")
-        filters = [
-            models.RpmModule.name == module_name,
-            models.RpmModule.stream == module_stream,
-        ]
-
-        query = (
-            query.join(models.BuildTaskArtifact.build_task)
-            .join(models.BuildTask.rpm_modules)
-            .filter(*filters)
-        )
-
-    result = (await db.execute(query)).scalars().all()
-
-    pulp_pkg_ids = []
     build_ids = set()
-    for pkg in result:
-        pulp_pkg_ids.append(get_uuid_from_pulp_href(pkg.href))
-        build_ids.add(pkg.build_task.build_id)
-    pkg_fields = [
-        RpmPackage.content_ptr_id,
-        RpmPackage.name,
-        RpmPackage.epoch,
-        RpmPackage.version,
-        RpmPackage.release,
-        RpmPackage.arch,
-        RpmPackage.rpm_sourcerpm,
-    ]
-    pulp_pkgs = get_rpm_packages_by_ids(pulp_pkg_ids, pkg_fields)
     errata_record_ids = set()
     package_status = (
         ErrataPackageStatus.approved
         if is_issued_by_almalinux
         else ErrataPackageStatus.proposal
     )
-    for package in result:
-        pulp_rpm_package = pulp_pkgs.get(package.href)
+    for package, pulp_rpm_package in albs_packages:
+        build_ids.add(package.build_task.build_id)
         if not pulp_rpm_package:
             continue
         clean_pulp_package_name = "-".join((
@@ -1049,6 +1138,28 @@ async def get_matching_albs_packages(
     return items_to_insert, package_type
 
 
+async def load_errata_cves(
+    db: AsyncSession,
+    references: List[errata_schema.BaseErrataReference],
+) -> Dict[str, models.ErrataCVE]:
+    """Load the existing ErrataCVE rows of the references in one query."""
+    cve_ids = {ref.cve.id for ref in references if ref.cve}
+    if not cve_ids:
+        return {}
+    cves = (
+        (
+            await db.execute(
+                select(models.ErrataCVE).where(
+                    models.ErrataCVE.id.in_(cve_ids)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {cve.id: cve for cve in cves}
+
+
 async def process_new_errata_references(
     db: AsyncSession,
     errata: BaseErrataRecord,
@@ -1058,21 +1169,7 @@ async def process_new_errata_references(
     references = []
     self_ref_exists = False
 
-    db_cves = collections.defaultdict()
-    cve_ids = [ref.cve.id for ref in errata.references if ref.cve]
-    if cve_ids:
-        db_cves = {
-            cve.id: cve
-            for cve in (
-                await db.execute(
-                    select(models.ErrataCVE).where(
-                        models.ErrataCVE.id.in_(cve_ids)
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        }
+    db_cves = await load_errata_cves(db, errata.references)
 
     for ref in errata.references:
         db_cve = None
@@ -1086,6 +1183,7 @@ async def process_new_errata_references(
                     impact=ref.cve.impact,
                     public=ref.cve.public,
                 )
+                db_cves[ref.cve.id] = db_cve
                 references.append(db_cve)
         ref_title = ""
         if ref.ref_type in (
@@ -1139,6 +1237,7 @@ async def process_new_errata_packages(
             False,
             db_errata.module,
         )
+    pending_packages = []
     for package in errata.packages:
         # Just in case
         if package.arch == "src":
@@ -1155,14 +1254,30 @@ async def process_new_errata_packages(
         )
         db_errata.packages.append(db_package)
         db_packages.append(db_package)
+        pending_packages.append((db_package, package.build_id))
+    # Packages pinned to a build are looked up individually,
+    # the rest share a preloaded ALBS lookup
+    albs_pkgs_cache = await load_albs_packages(
+        db,
+        [
+            db_package
+            for db_package, build_id in pending_packages
+            if build_id is None
+        ],
+        prod_repos_cache,
+        db_errata.module,
+        errata.is_issued_by_almalinux,
+    )
+    for db_package, build_id in pending_packages:
         # Create ErrataToAlbsPackages
         matching_packages, pkg_type = await get_matching_albs_packages(
             db,
             db_package,
             prod_repos_cache,
             db_errata.module,
-            package.build_id,
+            build_id,
             errata.is_issued_by_almalinux,
+            albs_pkgs_cache=albs_pkgs_cache,
         )
         db_packages.extend(matching_packages)
         pkg_types.append(pkg_type)
@@ -1349,15 +1464,11 @@ async def create_errata_record(errata: typing.Dict):
 
         # References
         self_ref_exists = False
+        db_cves = await load_errata_cves(session, errata.references)
         for ref in errata.references:
             db_cve = None
             if ref.cve:
-                db_cve = await session.execute(
-                    select(models.ErrataCVE).where(
-                        models.ErrataCVE.id == ref.cve.id
-                    )
-                )
-                db_cve = db_cve.scalars().first()
+                db_cve = db_cves.get(ref.cve.id)
                 if db_cve is None:
                     db_cve = models.ErrataCVE(
                         id=ref.cve.id,
@@ -1366,6 +1477,7 @@ async def create_errata_record(errata: typing.Dict):
                         impact=ref.cve.impact,
                         public=ref.cve.public,
                     )
+                    db_cves[ref.cve.id] = db_cve
                     items_to_insert.append(db_cve)
             ref_title = ""
             if ref.ref_type in (
@@ -1408,6 +1520,7 @@ async def create_errata_record(errata: typing.Dict):
             db_errata.module,
         )
         pkg_types = []
+        db_packages = []
         for package in errata.packages:
             db_package = models.NewErrataPackage(
                 name=package.name,
@@ -1420,9 +1533,21 @@ async def create_errata_record(errata: typing.Dict):
             )
             db_errata.packages.append(db_package)
             items_to_insert.append(db_package)
+            db_packages.append(db_package)
+        albs_pkgs_cache = await load_albs_packages(
+            session,
+            db_packages,
+            prod_repos_cache,
+            db_errata.module,
+        )
+        for db_package in db_packages:
             # Create ErrataToAlbsPackages
             matching_packages, pkg_type = await get_matching_albs_packages(
-                session, db_package, prod_repos_cache, db_errata.module
+                session,
+                db_package,
+                prod_repos_cache,
+                db_errata.module,
+                albs_pkgs_cache=albs_pkgs_cache,
             )
             pkg_types.append(pkg_type)
             items_to_insert.extend(matching_packages)
@@ -1605,6 +1730,20 @@ async def update_package_status(
     return True
 
 
+# Fields of a Pulp RPM package needed to build updateinfo collections
+UPDATEINFO_PULP_PKG_FIELDS = [
+    "pulp_href",
+    "name",
+    "version",
+    "release",
+    "epoch",
+    "arch",
+    "location_href",
+    "sha256",
+    "rpm_sourcerpm",
+]
+
+
 async def release_errata_packages(
     session: AsyncSession,
     pulp_client: PulpClient,
@@ -1613,12 +1752,18 @@ async def release_errata_packages(
     platform: models.Platform,
     repo_href: str,
     publish: bool = True,
+    repo: Optional[Dict[str, Any]] = None,
+    released_record: Optional[List[Dict[str, Any]]] = None,
 ):
-    repo = await pulp_client.get_by_href(repo_href)
-    released_record = await pulp_client.list_updateinfo_records(
-        id__in=[record.id],
-        repository_version=repo["latest_version_href"],
-    )
+    # The caller may pass the repository data and the result of the
+    # "already released" check to avoid fetching them a second time
+    if repo is None:
+        repo = await pulp_client.get_by_href(repo_href)
+    if released_record is None:
+        released_record = await pulp_client.list_updateinfo_records(
+            id__in=[record.id],
+            repository_version=repo["latest_version_href"],
+        )
     if released_record:
         # Errata record was already released to corresponding repo
         return
@@ -1630,8 +1775,20 @@ async def release_errata_packages(
     reboot_suggested = False
     dict_packages = []
     released_pkgs = set()
+    pkg_hrefs = [pkg.get_pulp_href() for pkg in packages]
+    pulp_pkgs_by_href = await pulp_client.get_rpm_packages_by_hrefs(
+        pkg_hrefs,
+        include_fields=UPDATEINFO_PULP_PKG_FIELDS,
+    )
+    missing_hrefs = [h for h in set(pkg_hrefs) if h not in pulp_pkgs_by_href]
+    if missing_hrefs:
+        raise ValueError(
+            f"Cannot release {record.id} to {repo_href}: "
+            "the following packages are missing from Pulp:\n"
+            + "\n".join(sorted(missing_hrefs))
+        )
     for errata_pkg in packages:
-        pulp_pkg = await pulp_client.get_by_href(errata_pkg.get_pulp_href())
+        pulp_pkg = pulp_pkgs_by_href[errata_pkg.get_pulp_href()]
         pkg_name_arch = "_".join([pulp_pkg["name"], pulp_pkg["arch"]])
         if errata_pkg.errata_package.reboot_suggested:
             reboot_suggested = True
@@ -1748,32 +1905,48 @@ async def prepare_updateinfo_mapping(
     List[Tuple[models.BuildTaskArtifact, dict, models.NewErrataToALBSPackage]],
 ]:
     updateinfo_mapping = collections.defaultdict(list)
-    for pkg_href in set(package_hrefs):
-        db_pkg_list = (
-            (
-                await db.execute(
-                    select(models.BuildTaskArtifact)
-                    .where(
-                        models.BuildTaskArtifact.href == pkg_href,
-                    )
-                    .options(
-                        selectinload(
-                            models.BuildTaskArtifact.build_task
-                        ).selectinload(models.BuildTask.rpm_modules)
-                    )
+    unique_hrefs = list(set(package_hrefs))
+    if not unique_hrefs:
+        return updateinfo_mapping
+
+    pulp_pkgs_by_href = await pulp.get_rpm_packages_by_hrefs(
+        unique_hrefs,
+        include_fields=UPDATEINFO_PULP_PKG_FIELDS,
+    )
+
+    db_pkgs = (
+        (
+            await db.execute(
+                select(models.BuildTaskArtifact)
+                .where(models.BuildTaskArtifact.href.in_(unique_hrefs))
+                .options(
+                    selectinload(
+                        models.BuildTaskArtifact.build_task
+                    ).selectinload(models.BuildTask.rpm_modules)
                 )
             )
-            .scalars()
-            .all()
         )
-        for db_pkg in db_pkg_list:
-            errata_pkgs = await db.execute(
+        .scalars()
+        .all()
+    )
+    if not db_pkgs:
+        return updateinfo_mapping
+    db_pkgs_by_href = collections.defaultdict(list)
+    for db_pkg in db_pkgs:
+        db_pkgs_by_href[db_pkg.href].append(db_pkg)
+
+    errata_pkgs = (
+        (
+            await db.execute(
                 select(models.NewErrataToALBSPackage)
                 .where(
                     or_(
-                        models.NewErrataToALBSPackage.albs_artifact_id
-                        == db_pkg.id,
-                        models.NewErrataToALBSPackage.pulp_href == pkg_href,
+                        models.NewErrataToALBSPackage.albs_artifact_id.in_(
+                            [db_pkg.id for db_pkg in db_pkgs]
+                        ),
+                        models.NewErrataToALBSPackage.pulp_href.in_(
+                            unique_hrefs
+                        ),
                     )
                 )
                 .options(
@@ -1781,20 +1954,38 @@ async def prepare_updateinfo_mapping(
                     selectinload(models.NewErrataToALBSPackage.build_artifact),
                 )
             )
-            pulp_pkg = await pulp.get_rpm_package(
-                db_pkg.href,
-                include_fields=[
-                    "name",
-                    "version",
-                    "release",
-                    "epoch",
-                    "arch",
-                    "location_href",
-                    "sha256",
-                    "rpm_sourcerpm",
-                ],
+        )
+        .scalars()
+        .all()
+    )
+    errata_pkgs_by_artifact_id = collections.defaultdict(list)
+    errata_pkgs_by_href = collections.defaultdict(list)
+    for errata_pkg in errata_pkgs:
+        if errata_pkg.albs_artifact_id is not None:
+            errata_pkgs_by_artifact_id[errata_pkg.albs_artifact_id].append(
+                errata_pkg
             )
-            for errata_pkg in errata_pkgs.scalars().all():
+        if errata_pkg.pulp_href is not None:
+            errata_pkgs_by_href[errata_pkg.pulp_href].append(errata_pkg)
+
+    for pkg_href, href_db_pkgs in db_pkgs_by_href.items():
+        for db_pkg in href_db_pkgs:
+            pulp_pkg = pulp_pkgs_by_href.get(db_pkg.href)
+            if pulp_pkg is None:
+                raise ValueError(
+                    f"Package {db_pkg.href} is missing from Pulp, "
+                    "cannot prepare updateinfo mapping"
+                )
+            # Same match set as the former per-package query:
+            # albs_artifact_id == db_pkg.id OR pulp_href == pkg_href
+            matched = {
+                errata_pkg.id: errata_pkg
+                for errata_pkg in (
+                    errata_pkgs_by_artifact_id[db_pkg.id]
+                    + errata_pkgs_by_href[pkg_href]
+                )
+            }
+            for errata_pkg in matched.values():
                 errata_id = errata_pkg.errata_package.errata_record_id
                 if errata_id in blacklist_updateinfo:
                     continue
@@ -1829,25 +2020,21 @@ def append_update_packages_in_update_records(
             )
         )
         pulp_record: UpdateRecord = pulp_record.scalars().first()
+        collection = pulp_record.collections[0]
+        collection_arch = re.search(
+            r"i686|x86_64|aarch64|ppc64le|s390x|riscv64",
+            collection.name,
+        ).group()
+        released_filenames = {
+            package.filename for package in collection.packages
+        }
+        changed = False
         for _, pulp_pkg, pkg in packages:
-            already_released = False
-            collection = pulp_record.collections[0]
-            collection_arch = re.search(
-                r"i686|x86_64|aarch64|ppc64le|s390x|riscv64",
-                collection.name,
-            ).group()
             if pulp_pkg["arch"] not in (collection_arch, "noarch"):
                 continue
-            already_released = next(
-                (
-                    package
-                    for package in collection.packages
-                    if package.filename == pulp_pkg["location_href"]
-                ),
-                None,
-            )
-            if already_released:
+            if pulp_pkg["location_href"] in released_filenames:
                 continue
+            released_filenames.add(pulp_pkg["location_href"])
             collection.packages.append(
                 UpdatePackage(
                     name=pulp_pkg["name"],
@@ -1862,6 +2049,8 @@ def append_update_packages_in_update_records(
                     sum_type=cr.checksum_type("sha256"),
                 )
             )
+            changed = True
+        if changed:
             pulp_record.updated_date = datetime.datetime.utcnow().strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
@@ -1982,22 +2171,23 @@ async def process_errata_release_for_repos(
         for pkg in packages:
             pkg.status = ErrataPackageStatus.released
             pkg_hrefs.append(pkg.get_pulp_href())
-        logging.info("Preparing udpateinfo mapping")
-        updateinfo_mapping = await prepare_updateinfo_mapping(
-            db=session,
-            pulp=pulp,
-            package_hrefs=pkg_hrefs,
-            blacklist_updateinfo=[],
-        )
-        latest_repo_version = await pulp.get_repo_latest_version(repo_href)
+        repo = await pulp.get_by_href(repo_href)
+        latest_repo_version = repo.get("latest_version_href")
+        errata_records = []
         if latest_repo_version:
             errata_records = await pulp.list_updateinfo_records(
-                id__in=[
-                    record_id
-                    for record_id in updateinfo_mapping.keys()
-                    if record_id == db_record.id
-                ],
+                id__in=[db_record.id],
                 repository_version=latest_repo_version,
+            )
+        if errata_records:
+            # The record is already in this repo: append any packages
+            # that are not yet part of its collection.
+            logging.info("Preparing updateinfo mapping")
+            updateinfo_mapping = await prepare_updateinfo_mapping(
+                db=session,
+                pulp=pulp,
+                package_hrefs=pkg_hrefs,
+                blacklist_updateinfo=[],
             )
             logging.info("Appending packages to existing errata records")
             with open_session(key="pulp") as pulp_db:
@@ -2015,11 +2205,15 @@ async def process_errata_release_for_repos(
                 db_record.platform,
                 repo_href,
                 publish=False,
+                repo=repo,
+                released_record=errata_records,
             )
         )
         if publish:
             publish_tasks.append(
-                pulp.create_rpm_publication(repo_href, sleep_time=30.0)
+                pulp.create_rpm_publication(
+                    repo_href, sleep_time=5.0, max_sleep_time=30.0
+                )
             )
     if not publish:
         return release_tasks
@@ -2444,13 +2638,50 @@ async def update_errata_references_in_pulp(record_id: str, platform_id: int):
                     references=db_record.references,
                 )
             publish_tasks.append(
-                pulp.create_rpm_publication(repo_href, sleep_time=30.0)
+                pulp.create_rpm_publication(
+                    repo_href, sleep_time=5.0, max_sleep_time=30.0
+                )
             )
         if publish_tasks:
             await asyncio.gather(*publish_tasks)
     logging.info(
         "References for record %s successfully updated in pulp", record_id
     )
+
+
+async def load_platform_packages_for_records(
+    records: List[models.NewErrataRecord],
+) -> Dict[int, Dict[str, Any]]:
+    """Platform packages for a release of several records, grouped by
+    platform id, with one Pulp database lookup per platform.
+
+    The search params of all records of a platform are merged, so each
+    result is a superset of what load_platform_packages() returns for a
+    single record. The release filter is only kept when every record of
+    the platform is issued by AlmaLinux, otherwise it would hide the
+    packages of the other records.
+    """
+    records_by_platform = collections.defaultdict(list)
+    for record in records:
+        records_by_platform[record.platform_id].append(record)
+    result = {}
+    for platform_id, platform_records in records_by_platform.items():
+        merged = collections.defaultdict(dict)
+        for record in platform_records:
+            for attr, values in prepare_search_params(record).items():
+                # dict keys keep insertion order and deduplicate
+                merged[attr].update(dict.fromkeys(values))
+        if not all(rec.is_issued_by_almalinux for rec in platform_records):
+            merged.pop("release", None)
+        search_params = collections.defaultdict(list)
+        for attr, values in merged.items():
+            search_params[attr] = list(values)
+        result[platform_id] = await load_platform_packages(
+            platform_records[0].platform,
+            search_params,
+            for_release=True,
+        )
+    return result
 
 
 async def bulk_new_errata_records_release(
@@ -2489,14 +2720,12 @@ async def bulk_new_errata_records_release(
             albs_oval_cache[platform] = await get_albs_oval_cache(
                 session, platform
             )
+        logging.info("Retrieving platform packages from pulp")
+        platform_packages = await load_platform_packages_for_records(
+            db_records
+        )
         for db_record in db_records:
-            search_params = prepare_search_params(db_record)
-            logging.info("Retrieving platform packages from pulp")
-            pulp_packages = await load_platform_packages(
-                db_record.platform,
-                search_params,
-                for_release=True,
-            )
+            pulp_packages = platform_packages[db_record.platform_id]
             try:
                 repo_mapping, missing_pkg_names = get_albs_packages_from_record(
                     db_record,
@@ -2612,14 +2841,13 @@ async def bulk_errata_records_release(
             " locked: %s",
             [rec.id for rec in db_records],
         )
+        logging.info("Retrieving platform packages from pulp")
+        platform_packages = await load_platform_packages_for_records(
+            db_records
+        )
         for db_record in db_records:
             logging.info("Preparing data for %s", db_record.id)
-            search_params = prepare_search_params(db_record)
-            pulp_packages = await load_platform_packages(
-                db_record.platform,
-                search_params,
-                for_release=True,
-            )
+            pulp_packages = platform_packages[db_record.platform_id]
             try:
                 (
                     repo_mapping,
@@ -2812,12 +3040,19 @@ async def prepare_resetting(
             )
         )
     )
+    albs_pkgs_cache = await load_albs_packages(
+        session,
+        record.packages,
+        prod_repos_cache,
+        record.module,
+    )
     for package in record.packages:
         matching_packages, _ = await get_matching_albs_packages(
             session,
             package,
             prod_repos_cache,
             record.module,
+            albs_pkgs_cache=albs_pkgs_cache,
         )
         items_to_insert.extend(matching_packages)
 
