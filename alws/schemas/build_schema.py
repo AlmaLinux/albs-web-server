@@ -207,6 +207,7 @@ class BuildTask(BaseModel):
     mock_options: typing.Optional[typing.Dict[str, typing.Any]] = None
     is_secure_boot: typing.Optional[bool] = None
     test_tasks: typing.List[BuildTaskTestTask]
+    tests_skipped: typing.Optional[bool] = None
     error: typing.Optional[str] = None
     performance_stats: typing.Optional[typing.List[PerformanceStats]] = None
 

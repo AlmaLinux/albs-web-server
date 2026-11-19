@@ -613,6 +613,9 @@ class BuildTask(TimeMixin, Base):
     error: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True, default=None
     )
+    tests_skipped: Mapped[Optional[bool]] = mapped_column(
+        sqlalchemy.Boolean, default=False, nullable=True
+    )
 
 
 class BuildTaskRef(Base):

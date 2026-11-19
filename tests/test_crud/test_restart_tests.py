@@ -133,6 +133,40 @@ async def tested_build(
     return await get_latest_test_tasks(async_session, regular_build)
 
 
+async def test_no_test_tasks_on_skipped_arch(
+    async_session: AsyncSession,
+    regular_build: models.Build,
+    build_done,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        'alws.crud.test.settings.test_skip_arches',
+        ['x86_64'],
+    )
+    await create_test_tasks_for_build_id(async_session, regular_build.id)
+    await async_session.commit()
+    tasks = await get_latest_test_tasks(async_session, regular_build)
+    assert sorted(tasks) == [('chan', 'i686')]
+    build_tasks = (
+        (
+            await async_session.execute(
+                select(models.BuildTask)
+                .where(
+                    models.BuildTask.build_id == regular_build.id,
+                    models.BuildTask.arch != 'src',
+                )
+                .execution_options(populate_existing=True)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert {task.arch: task.tests_skipped for task in build_tasks} == {
+        'i686': False,
+        'x86_64': True,
+    }
+
+
 async def test_restart_all_tests(
     async_session: AsyncSession,
     regular_build: models.Build,
