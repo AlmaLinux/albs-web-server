@@ -6,18 +6,18 @@ from fastapi import APIRouter, Depends, Response, status
 from fastapi_sqla import AsyncSessionDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alws import dramatiq
-from alws.auth import get_current_user
+from alws import dramatiq, models
+from alws.auth import check_build_node_name, get_current_build_node
 from alws.config import settings
 from alws.constants import BuildTaskRefType, BuildTaskStatus
-from alws.crud import build_node
+from alws.crud import build_node, build_nodes
 from alws.dependencies import get_async_db_key
 from alws.schemas import build_node_schema
 
 router = APIRouter(
     prefix="/build_node",
     tags=["builds"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_build_node)],
 )
 
 
@@ -25,7 +25,12 @@ router = APIRouter(
 async def ping(
     node_status: build_node_schema.Ping,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: models.User = Depends(get_current_build_node),
 ):
+    check_build_node_name(user, node_status.node_name)
+    if node_status.node_name:
+        await build_node.ping_build_node(db, node_status)
+        return {}
     if not node_status.active_tasks:
         return {}
     await build_node.ping_tasks(db, node_status.active_tasks)
@@ -37,16 +42,47 @@ async def build_done(
     build_done_: build_node_schema.BuildDone,
     response: Response,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: models.User = Depends(get_current_build_node),
 ):
-    build_task = await build_node.get_build_task(db, build_done_.task_id)
+    check_build_node_name(user, build_done_.node_name)
+    # The row is locked, so the check below can't race with the ping
+    # of the node returning the task to the queue or with a retried request
+    build_task = await build_node.get_build_task(
+        db,
+        build_done_.task_id,
+        for_update=True,
+    )
     if BuildTaskStatus.is_finished(build_task.status):
         response.status_code = status.HTTP_409_CONFLICT
         return {"ok": False}
+    # The node retries build_done after a read timeout, the results
+    # are already sent to dramatiq and mustn't be processed twice
+    if build_task.node_reported_at is not None:
+        return {"ok": True}
+    if build_done_.node_name:
+        node = await build_nodes.get_build_node_by_name(
+            db, build_done_.node_name
+        )
+        # The task was returned to the queue (this node was considered
+        # dead or didn't report the task in ping) or handed out to another
+        # node meanwhile, its results are ignored. Tasks claimed by nodes
+        # without node_name aren't bound to any node, so they're accepted.
+        if build_task.status != BuildTaskStatus.STARTED or (
+            build_task.build_node_id is not None
+            and (node is None or node.id != build_task.build_node_id)
+        ):
+            response.status_code = status.HTTP_409_CONFLICT
+            return {"ok": False}
+        if build_task.build_node_id is None and node is not None:
+            build_task.build_node_id = node.id
+    now = datetime.datetime.utcnow()
     # We're setting build task timestamp to 3 hours upwards, so
     # dramatiq can have a time to complete task and build node
     # won't rebuild task again and again while it's in the queue
     # in the future this probably should be handled somehow better
-    build_task.ts = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+    build_task.ts = now + datetime.timedelta(hours=3)
+    # The task doesn't occupy a slot on the node anymore
+    build_task.node_reported_at = now
     await db.flush()
     actor = dramatiq.build_done
     if build_task.arch == 'src':
@@ -62,7 +98,9 @@ async def build_done(
 async def get_task(
     request: build_node_schema.RequestTask,
     db: AsyncSession = Depends(AsyncSessionDependency(key=get_async_db_key())),
+    user: models.User = Depends(get_current_build_node),
 ):
+    check_build_node_name(user, request.node_name)
     task = await build_node.get_available_build_task(db, request)
     if not task:
         return
