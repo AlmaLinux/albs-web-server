@@ -711,7 +711,17 @@ def errata_records_to_oval(
 
 def prepare_search_params(
     errata_record: Union[models.NewErrataRecord, BaseErrataRecord],
+    include_albs_releases: bool = False,
 ) -> DefaultDict[str, List[str]]:
+    """Build the Pulp search filters for an errata record's packages.
+
+    For AlmaLinux-issued records the raw release is part of the filter.
+    With ``include_albs_releases`` the releases of the record's released
+    or approved ALBS package mappings are added too, so packages mapped
+    from another build of the same NEVR (e.g. a different module context
+    or ``.alma.N`` suffix) are still found. The record must have
+    ``packages.albs_packages`` loaded in that case.
+    """
     search_params = collections.defaultdict(list)
     attrs = ["name", "version", "epoch"]
     if errata_record.is_issued_by_almalinux:
@@ -722,6 +732,17 @@ def prepare_search_params(
             if value in search_params[attr]:
                 continue
             search_params[attr].append(value)
+        if not (include_albs_releases and "release" in attrs):
+            continue
+        for albs_package in package.albs_packages:
+            if albs_package.status not in (
+                ErrataPackageStatus.released,
+                ErrataPackageStatus.approved,
+            ):
+                continue
+            if albs_package.release in search_params["release"]:
+                continue
+            search_params["release"].append(albs_package.release)
     return search_params
 
 
@@ -2258,7 +2279,9 @@ async def release_new_errata_record(
             return
 
         logging.info("Record release %s has been started", record_id)
-        search_params = prepare_search_params(db_record)
+        search_params = prepare_search_params(
+            db_record, include_albs_releases=True
+        )
         logging.info("Retrieving platform packages from pulp")
         pulp_packages = await load_platform_packages(
             db_record.platform,
@@ -2333,7 +2356,9 @@ async def release_errata_record(record_id: str, platform_id: int, force: bool):
             return
 
         logging.info("Record release %s has been started", record_id)
-        search_params = prepare_search_params(db_record)
+        search_params = prepare_search_params(
+            db_record, include_albs_releases=True
+        )
         logging.info("Retrieving platform packages from pulp")
         pulp_packages = await load_platform_packages(
             db_record.platform,
@@ -2412,7 +2437,9 @@ async def update_errata_references_in_pulp(record_id: str, platform_id: int):
             )
             return
 
-        search_params = prepare_search_params(db_record)
+        search_params = prepare_search_params(
+            db_record, include_albs_releases=True
+        )
         pulp_packages = await load_platform_packages(
             db_record.platform,
             search_params,
@@ -2490,7 +2517,9 @@ async def bulk_new_errata_records_release(
                 session, platform
             )
         for db_record in db_records:
-            search_params = prepare_search_params(db_record)
+            search_params = prepare_search_params(
+                db_record, include_albs_releases=True
+            )
             logging.info("Retrieving platform packages from pulp")
             pulp_packages = await load_platform_packages(
                 db_record.platform,
@@ -2614,7 +2643,9 @@ async def bulk_errata_records_release(
         )
         for db_record in db_records:
             logging.info("Preparing data for %s", db_record.id)
-            search_params = prepare_search_params(db_record)
+            search_params = prepare_search_params(
+                db_record, include_albs_releases=True
+            )
             pulp_packages = await load_platform_packages(
                 db_record.platform,
                 search_params,
