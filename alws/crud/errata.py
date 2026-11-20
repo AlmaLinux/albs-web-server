@@ -2,6 +2,7 @@ import asyncio
 import collections
 import copy
 import datetime
+import functools
 import json
 import logging
 import re
@@ -21,6 +22,7 @@ from typing import (
 import aioredis
 import createrepo_c as cr
 import jinja2
+import rpm
 from fastapi_sqla import open_async_session, open_session
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -924,6 +926,44 @@ async def add_missing_errata_references(
     return record, added_ref_ids
 
 
+def _compare_evr(left: Any, right: Any) -> int:
+    return rpm.labelCompare(
+        (str(left.epoch), left.version, left.release),
+        (str(right.epoch), right.version, right.release),
+    )
+
+
+def select_prod_package(
+    errata_package: models.NewErrataPackage,
+    candidates: List[Any],
+) -> Optional[Any]:
+    """Pick the production package an errata package should map to.
+
+    Production repositories can hold several builds sharing the same
+    name-version-clean_release, e.g. different versions of a module stream
+    or ``.alma.N`` rebuilds. Prefer the build whose raw release equals the
+    errata package release; otherwise take the highest EVR so the result
+    doesn't depend on the order Pulp returns rows in.
+    """
+    usable = []
+    for package in candidates:
+        # src and some noarch packages are coming with an empty
+        # rpm_sourcerpm field, which makes parse_rpm_nevra() fail.
+        if not package.rpm_sourcerpm:
+            logging.warning(
+                "Skipping '%s' with empty sourcerpm field in pulp href '%s'",
+                package.name,
+                package.pulp_href,
+            )
+            continue
+        if package.release == errata_package.release:
+            return package
+        usable.append(package)
+    if not usable:
+        return None
+    return max(usable, key=functools.cmp_to_key(_compare_evr))
+
+
 async def get_matching_albs_packages(
     db: AsyncSession,
     errata_package: models.NewErrataPackage,
@@ -948,19 +988,13 @@ async def get_matching_albs_packages(
     ))
     # We add ErrataToALBSPackage if we find a matching package already
     # in production repositories.
-    for prod_package in prod_repos_cache.get(clean_package_name, {}).get(
-        errata_package.arch, []
-    ):
-        # src and some noarch packages are coming with an empty rpm_sourcerpm,
-        # field which makes parse_rpm_nevra(prod_package.rpm_sourcerpm) below
-        # to fail.
-        if not prod_package.rpm_sourcerpm:
-            logging.warning(
-                "Skipping '%s' with empty sourcerpm field in pulp href '%s'",
-                prod_package.name,
-                prod_package.pulp_href,
-            )
-            continue
+    prod_package = select_prod_package(
+        errata_package,
+        prod_repos_cache.get(clean_package_name, {}).get(
+            errata_package.arch, []
+        ),
+    )
+    if prod_package:
         mapping = models.NewErrataToALBSPackage(
             pulp_href=prod_package.pulp_href,
             status=ErrataPackageStatus.released,
