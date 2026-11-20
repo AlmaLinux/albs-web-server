@@ -41,6 +41,23 @@ class Settings(BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
 
+    # Build nodes registry and balancing, all values are in seconds.
+    # A node is shown as offline when it wasn't seen for this long
+    build_node_offline_timeout: int = 120
+    # Unfinished tasks of a node that wasn't seen for this long
+    # are handed out to other nodes
+    build_node_task_reclaim_timeout: int = 300
+    # A task waiting for this long is handed out to any node with
+    # a free slot, even if the node already has its fair share of tasks
+    build_node_balancer_max_wait: int = 30
+    # A task handed out to a node isn't returned to the queue for missing
+    # from the node's ping during this time after it was claimed
+    build_node_reconcile_grace: int = 60
+    # A task handed out this many times without a result (the node can't
+    # parse it, crashes on it, etc.) is failed instead of being handed out
+    # again, 0 - no limit. Not in seconds.
+    build_node_task_max_dispatches: int = 5
+
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
     test_database_url: str = (
         'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'

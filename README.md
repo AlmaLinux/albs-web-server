@@ -112,6 +112,40 @@ Web-server works with multiple parts of the Build System. Web-server works with 
 
 ## Build-node
 
+### Build node tokens
+
+The build nodes call `/api/v1/build_node/*` with the JWT of a build node
+service user (`users.is_build_node`). Such a token is accepted there only:
+every other endpoint answers 403 to it. A user may be bound to one node
+(`users.build_node_name`), then its token is accepted with this `node_name`
+only (a request with another `node_name` or without one gets 403), or be shared
+by any nodes. Regular users get 403 on `/api/v1/build_node/*`. Superusers are
+still accepted there for the nodes deployed with a superuser token, the server
+logs a warning about it every 10 minutes; replace such tokens.
+
+Issue the tokens with `scripts/build_node_token.py` in the web-server
+container (the JWT secret is taken from the settings, the token is printed to
+stdout). A new user is shared by any nodes unless `-n` binds it to one node.
+The tokens don't expire unless `--lifetime-days` is given: revoke the user to
+reject them.
+
+```bash
+# A token shared by several nodes
+python3 scripts/build_node_token.py -u build-nodes
+# A token of one node, accepted with node_name node-a only
+python3 scripts/build_node_token.py -u build-node-a -n node-a
+# A token that expires in 90 days
+python3 scripts/build_node_token.py -u build-nodes --lifetime-days 90
+# Revoke all the tokens of a user (deactivates it)
+python3 scripts/build_node_token.py -u build-node-a --revoke
+```
+
+Put the token into `jwt_token` of the node config. Running the script again
+for an existing user issues one more token of it, bound like the user is; the
+earlier tokens stay valid. A revoked user is rejected with 401 and can't get
+new tokens; create another user instead. A superuser can also deactivate the
+user with `PUT /api/v1/users/{id}` and `{"id": <id>, "is_active": false}`.
+
 **`POST /ping`** endpoint accepts the following payload: 
 
 ```ruby

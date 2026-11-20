@@ -42,6 +42,7 @@ from alws.database import Base
 
 __all__ = [
     "Build",
+    "BuildNode",
     "BuildTask",
     "ErrataRecord",
     "NewErrataRecord",
@@ -535,6 +536,143 @@ BuildTaskRpmModuleMapping = sqlalchemy.Table(
 )
 
 
+class BuildNode(Base):
+    """A build node known to the server.
+
+    Rows are created and refreshed by the nodes themselves: every
+    ``ping``/``get_task`` that carries ``node_name`` upserts the row.
+    ``enabled``, ``drain`` and ``capacity_override`` are set by admins.
+    """
+
+    __tablename__ = "build_nodes"
+
+    id: Mapped[int] = mapped_column(sqlalchemy.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(
+        sqlalchemy.Text,
+        nullable=False,
+        unique=True,
+    )
+    enabled: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=False,
+        default=True,
+        server_default=sqlalchemy.true(),
+    )
+    drain: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sqlalchemy.false(),
+    )
+    # The node itself reports it, when /tmp/graceful_stop is present there
+    maintenance: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sqlalchemy.false(),
+    )
+    version: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text,
+        nullable=True,
+    )
+    # The last instance of the node process that sent ping (hostname.pid),
+    # it tells a restart from two instances running with the same name
+    instance_id: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text,
+        nullable=True,
+    )
+    # When another instance of the online node showed up, the node's
+    # tasks aren't reconciled for build_node_offline_timeout after that.
+    # A confirmed restart of the node doesn't set it.
+    instance_changed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+    )
+    supported_arches: Mapped[List[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=sqlalchemy.text("'[]'::jsonb"),
+    )
+    node_type: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text,
+        nullable=True,
+    )
+    pesign_support: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sqlalchemy.false(),
+    )
+    # Number of build threads reported by the node, 0 - not reported yet
+    capacity: Mapped[int] = mapped_column(
+        sqlalchemy.Integer,
+        nullable=False,
+        default=0,
+        server_default=sqlalchemy.text("0"),
+    )
+    # Manual limit set from the UI, NULL - no limit
+    capacity_override: Mapped[Optional[int]] = mapped_column(
+        sqlalchemy.Integer,
+        nullable=True,
+    )
+    # The last list sent by the node in get_task
+    excluded_packages: Mapped[Optional[List[str]]] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    # The last host resources snapshot sent by the node in ping
+    resources: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    resources_updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+    )
+    last_seen: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+    )
+
+    @property
+    def effective_capacity(self) -> int:
+        override = self.capacity_override
+        if self.capacity <= 0:
+            # A node that didn't report its capacity still gets one task
+            # at a time instead of nothing, unless an admin set a limit.
+            return max(override, 0) if override is not None else 1
+        if override is not None:
+            return max(min(self.capacity, override), 0)
+        return self.capacity
+
+    def is_online(self, now: datetime.datetime) -> bool:
+        if self.last_seen is None:
+            return False
+        offline_after = datetime.timedelta(
+            seconds=settings.build_node_offline_timeout
+        )
+        return now - self.last_seen < offline_after
+
+    def instance_changed_recently(self, now: datetime.datetime) -> bool:
+        """Another instance of the node was seen less than the offline
+        timeout ago, so the instances may still be running in parallel."""
+        if self.instance_changed_at is None:
+            return False
+        window = datetime.timedelta(
+            seconds=settings.build_node_offline_timeout
+        )
+        return now - self.instance_changed_at < window
+
+    def accepts_tasks(self) -> bool:
+        return self.enabled and not self.drain and not self.maintenance
+
+
 class BuildTask(TimeMixin, Base):
     __tablename__ = "build_tasks"
 
@@ -612,6 +750,58 @@ class BuildTask(TimeMixin, Base):
     )
     error: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.Text, nullable=True, default=None
+    )
+    # The node the task was handed out to. It's kept after the task is
+    # finished, so it also tells on which node the task was built.
+    build_node_id: Mapped[Optional[int]] = mapped_column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            "build_nodes.id",
+            name="build_tasks_build_node_id_fkey",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+    build_node: Mapped[Optional["BuildNode"]] = relationship("BuildNode")
+    claimed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+    )
+    # The instance of the node process the task was handed out to,
+    # it tells the tasks of a restarted process from the ones of the new one
+    claimed_by_instance: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text,
+        nullable=True,
+    )
+    # Set when the node sent build_done for the task. The task stays
+    # STARTED until dramatiq processes the results, but it doesn't
+    # occupy a slot on the node anymore.
+    node_reported_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+    )
+    # When the task became ready to be handed out: creation, removal of
+    # its last dependency or return to the queue.
+    queued_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        sqlalchemy.DateTime,
+        nullable=True,
+        default=datetime.datetime.utcnow,
+    )
+    # How many times the task was handed out to the nodes since it was
+    # created or restarted by a user. Returns to the queue don't reset it,
+    # see BUILD_NODE_TASK_MAX_DISPATCHES.
+    dispatch_count: Mapped[int] = mapped_column(
+        sqlalchemy.Integer,
+        nullable=False,
+        default=0,
+        server_default=sqlalchemy.text("0"),
+    )
+    # Names of the last nodes the task was handed out to,
+    # null for a node without node_name
+    dispatch_nodes: Mapped[Optional[List[Optional[str]]]] = mapped_column(
+        JSONB,
+        nullable=True,
     )
 
 
@@ -966,6 +1156,21 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     )
     hashed_password: Mapped[Optional[str]] = mapped_column(
         sqlalchemy.String(length=1024),
+        nullable=True,
+    )
+    # A service user of the build nodes: its tokens are accepted by
+    # /build_node/* only and rejected everywhere else
+    is_build_node: Mapped[bool] = mapped_column(
+        sqlalchemy.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sqlalchemy.false(),
+    )
+    # The node the tokens of a build node user are bound to, the requests
+    # with another node_name are rejected. NULL for a token shared by
+    # several nodes
+    build_node_name: Mapped[Optional[str]] = mapped_column(
+        sqlalchemy.Text,
         nullable=True,
     )
     roles: Mapped[List["UserRole"]] = relationship(
