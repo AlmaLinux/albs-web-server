@@ -41,6 +41,30 @@ class Settings(BaseSettings):
 
     redis_url: str = 'redis://redis:6379'
 
+    # Build nodes registry and balancing, all values are in seconds.
+    # A node is shown as offline when it wasn't seen for this long
+    build_node_offline_timeout: int = 120
+    # Unfinished tasks of a node that wasn't seen for this long are handed
+    # out to other nodes. Only the time when the server was working counts
+    # (other nodes were coming all this time): after a downtime of the
+    # server the nodes get this long to come back
+    build_node_task_reclaim_timeout: int = 300
+    # A task waiting for this long is handed out to any node with
+    # a free slot, even if the node already has its fair share of tasks
+    build_node_balancer_max_wait: int = 30
+    # A task handed out to a node isn't returned to the queue for missing
+    # from the node's ping during this time after it was claimed
+    build_node_reconcile_grace: int = 60
+    # A task taken by the nodes this many times without a result (a node
+    # crashes on it, loses it, etc.) is failed instead of being handed out
+    # again, 0 - no limit. Only the handouts the node confirmed are counted:
+    # the task was in its ping or its build_done came. Not in seconds.
+    build_node_task_max_dispatches: int = 5
+    # How long get_task of a node waits while get_task of another node holds
+    # the dispatch lock. The node gets no task then and asks again later,
+    # so the waiting requests don't take all the database connections.
+    build_node_dispatch_lock_timeout: float = 5
+
     database_url: str = 'postgresql+asyncpg://postgres:password@db/almalinux-bs'
     test_database_url: str = (
         'postgresql+asyncpg://postgres:password@db/test-almalinux-bs'
