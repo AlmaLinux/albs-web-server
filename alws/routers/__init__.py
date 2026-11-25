@@ -1,5 +1,6 @@
 __all__ = [
     'build_node',
+    'build_nodes',
     'builds',
     'coprs',
     'docs',

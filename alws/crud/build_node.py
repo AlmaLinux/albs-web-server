@@ -7,7 +7,8 @@ from collections import defaultdict
 
 import sqlalchemy
 from fastapi_sqla import open_async_session
-from sqlalchemy import delete, insert, update
+from sqlalchemy import delete, func, insert, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -18,6 +19,7 @@ from alws.constants import (
     BuildTaskStatus,
     GitHubIssueStatus,
 )
+from alws.crud import build_nodes as build_nodes_crud
 from alws.errors import (
     ArtifactChecksumError,
     ArtifactConversionError,
@@ -39,24 +41,148 @@ from alws.utils.pulp_client import PulpClient, get_pulp_client
 from alws.utils.pulp_utils import get_module_from_pulp_db
 from alws.utils.rpm_package import get_rpm_packages_info
 
+# pg_advisory_xact_lock key serializing the node-aware task dispatch
+BUILD_TASKS_DISPATCH_LOCK_ID = 0x616C627364697370
+# SQLSTATE of lock_timeout expiration, lock_not_available
+LOCK_NOT_AVAILABLE = '55P03'
+# How many of the dispatchable tasks the balancer fetches at once
+BALANCER_CANDIDATES_LIMIT = 100
+# How many of the last nodes a task was handed out to are kept
+DISPATCH_NODES_LIMIT = 10
+
+
+def _build_task_load_options():
+    return (
+        selectinload(models.BuildTask.ref),
+        selectinload(models.BuildTask.build).selectinload(models.Build.repos),
+        selectinload(models.BuildTask.platform).selectinload(
+            models.Platform.repos
+        ),
+        selectinload(models.BuildTask.build).selectinload(models.Build.owner),
+        selectinload(models.BuildTask.build)
+        .selectinload(models.Build.linked_builds)
+        .selectinload(models.Build.repos),
+        selectinload(models.BuildTask.build)
+        .selectinload(models.Build.platform_flavors)
+        .selectinload(models.PlatformFlavour.repos),
+        selectinload(models.BuildTask.artifacts),
+        selectinload(models.BuildTask.rpm_modules),
+    )
+
+
+def _excluded_packages_condition(
+    excluded_packages: typing.Optional[typing.List[str]],
+):
+    if not excluded_packages:
+        return sqlalchemy.true()
+    return sqlalchemy.not_(
+        sqlalchemy.or_(*[
+            models.BuildTaskRef.url.ilike(f"%{project}%")
+            for project in excluded_packages
+        ])
+    )
+
+
+def _is_excluded(
+    url: str,
+    excluded_packages: typing.Optional[typing.List[str]],
+) -> bool:
+    url = url.lower()
+    return any(project.lower() in url for project in excluded_packages or [])
+
+
+def _record_dispatch(
+    task: models.BuildTask,
+    node_name: typing.Optional[str],
+):
+    # dispatch_count isn't increased here: the handout is counted when the
+    # node confirms it (see build_nodes.confirmed_dispatch_count), a task
+    # the node never got mustn't get closer to being failed.
+    # A new list, so the change of the JSONB column is detected
+    task.dispatch_nodes = [*(task.dispatch_nodes or []), node_name][
+        -DISPATCH_NODES_LIMIT:
+    ]
+
+
+def _dispatches_exhausted(task: models.BuildTask) -> bool:
+    limit = settings.build_node_task_max_dispatches
+    return limit > 0 and task.dispatch_count >= limit
+
+
+async def _fail_undeliverable_task(
+    db: AsyncSession,
+    task: models.BuildTask,
+    now: datetime.datetime,
+):
+    """Fail the task the nodes never sent a result for.
+
+    The nodes took the task, but crash on it, lose it, etc., so it would go
+    from node to node forever. It's failed the way the failed build_done
+    of a node is, so the dependent tasks, the build and its test tasks
+    are processed as usual.
+    """
+    # alws.dramatiq imports this module
+    from alws import dramatiq
+
+    # The names of the nodes are a part of the nodes registry, which is
+    # shown to superusers only, and the error of the task is public
+    nodes = ', '.join(
+        name or '(no node_name)' for name in task.dispatch_nodes or []
+    )
+    logging.warning(
+        'Build task %d was taken by build nodes %d times without '
+        'a result, the last nodes it was handed out to: %s. Failing it',
+        task.id,
+        task.dispatch_count,
+        nodes or '(unknown)',
+    )
+    task.error = (
+        f'The task was taken by build nodes {task.dispatch_count} '
+        'times without a result'
+    )
+    # The same state as after build_done: it's not handed out again
+    # while dramatiq processes the result
+    task.status = BuildTaskStatus.STARTED
+    task.ts = now + datetime.timedelta(hours=3)
+    task.node_reported_at = now
+    await db.flush()
+    request = build_node_schema.BuildDone(
+        task_id=task.id,
+        status='failed',
+        artifacts=[],
+        stats={},
+    )
+    actor = dramatiq.build_done
+    if task.arch == 'src':
+        actor = dramatiq.sources_build_done
+    actor.send(request.model_dump())
+
 
 async def get_available_build_task(
     db: AsyncSession,
     request: build_node_schema.RequestTask,
 ) -> typing.Optional[models.BuildTask]:
+    """Hand out a task to the node.
+
+    A task the nodes took BUILD_NODE_TASK_MAX_DISPATCHES times already is
+    failed instead (see _fail_undeliverable_task), and the next one is
+    looked for. It covers every way a task goes back to the queue: the
+    ping of the node, the reclaim from a dead node and the ts timeout.
+    Only the handouts the nodes confirmed are counted (see dispatch_count).
+    """
+    if request.node_name:
+        return await _get_balanced_build_task(db, request)
+    return await _get_any_build_task(db, request)
+
+
+async def _get_any_build_task(
+    db: AsyncSession,
+    request: build_node_schema.RequestTask,
+) -> typing.Optional[models.BuildTask]:
+    """Hand out the oldest available task to a node without node_name."""
     # TODO: here should be config value
     ts_expired = datetime.datetime.utcnow() - datetime.timedelta(minutes=20)
-    exclude_condition = (
-        sqlalchemy.not_(
-            sqlalchemy.or_(*[
-                models.BuildTaskRef.url.ilike(f"%{project}%")
-                for project in request.excluded_packages
-            ])
-        )
-        if request.excluded_packages
-        else True
-    )
-    db_task = await db.execute(
+    query = (
         select(models.BuildTask)
         .where(~models.BuildTask.dependencies.any())
         .join(
@@ -82,38 +208,283 @@ async def get_available_build_task(
                     models.BuildTask.ts < ts_expired,
                     models.BuildTask.ts.is_(None),
                 ),
-                exclude_condition,
+                _excluded_packages_condition(request.excluded_packages),
             )
         )
-        .options(
-            selectinload(models.BuildTask.ref),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.repos
-            ),
-            selectinload(models.BuildTask.platform).selectinload(
-                models.Platform.repos
-            ),
-            selectinload(models.BuildTask.build).selectinload(
-                models.Build.owner
-            ),
-            selectinload(models.BuildTask.build)
-            .selectinload(models.Build.linked_builds)
-            .selectinload(models.Build.repos),
-            selectinload(models.BuildTask.build)
-            .selectinload(models.Build.platform_flavors)
-            .selectinload(models.PlatformFlavour.repos),
-            selectinload(models.BuildTask.artifacts),
-            selectinload(models.BuildTask.rpm_modules),
-        )
+        .options(*_build_task_load_options())
         .order_by(models.BuildTask.id.asc())
     )
-    db_task = db_task.scalars().first()
-    if not db_task:
-        return
-    db_task.ts = datetime.datetime.utcnow()
+    while True:
+        db_task = (await db.execute(query)).scalars().first()
+        if not db_task:
+            return
+        now = datetime.datetime.utcnow()
+        if not _dispatches_exhausted(db_task):
+            break
+        # Its ts is in the future now, so the query skips it
+        await _fail_undeliverable_task(db, db_task, now)
+    _record_dispatch(db_task, None)
+    db_task.ts = now
     db_task.status = BuildTaskStatus.STARTED
+    # The node is unknown, so the task isn't held by any node and
+    # its ts is the only thing that keeps it from being handed out again
+    db_task.build_node_id = None
+    db_task.claimed_at = now
+    db_task.claimed_by_instance = None
+    db_task.node_reported_at = None
     await db.flush()
     return db_task
+
+
+def _is_lock_not_available(error: DBAPIError) -> bool:
+    # asyncpg errors are wrapped twice: by the SQLAlchemy adapter of the
+    # DBAPI and by sqlalchemy.exc.DBAPIError
+    for cause in (error.orig, getattr(error.orig, '__cause__', None)):
+        if getattr(cause, 'sqlstate', None) == LOCK_NOT_AVAILABLE:
+            return True
+    return False
+
+
+async def _lock_dispatch(db: AsyncSession) -> bool:
+    """Take the dispatch lock, waiting BUILD_NODE_DISPATCH_LOCK_TIMEOUT.
+
+    Every request waiting for the lock holds a database connection, so it
+    can't wait forever: when the lock is busy for that long, False is
+    returned and the node asks again later. The lock is held until the end
+    of the transaction.
+
+    lock_timeout is set in a savepoint: the failed wait aborts the savepoint
+    only, the transaction stays usable and lock_timeout goes back to what it
+    was. After the lock is taken lock_timeout is restored, so it doesn't
+    limit the other statements of the request.
+    """
+    timeout_ms = max(1, int(settings.build_node_dispatch_lock_timeout * 1000))
+    previous_timeout = (
+        await db.execute(select(func.current_setting('lock_timeout')))
+    ).scalar_one()
+    try:
+        async with db.begin_nested():
+            await db.execute(
+                select(
+                    func.set_config('lock_timeout', f'{timeout_ms}ms', True)
+                )
+            )
+            await db.execute(
+                select(
+                    func.pg_advisory_xact_lock(BUILD_TASKS_DISPATCH_LOCK_ID)
+                )
+            )
+    except DBAPIError as error:
+        if not _is_lock_not_available(error):
+            raise
+        return False
+    # The setting of the released savepoint stays in the transaction
+    await db.execute(
+        select(func.set_config('lock_timeout', previous_timeout, True))
+    )
+    return True
+
+
+def _fair_share(
+    node: models.BuildNode,
+    pool: typing.List[models.BuildNode],
+    active_by_node: typing.Dict[int, int],
+    queued: int,
+) -> int:
+    """How many tasks the node may hold while others wait for theirs.
+
+    Nodes that can take the task get slots in proportion to their
+    capacity: share = ceil(capacity * min(1, demand / total)), where demand
+    is the tasks being built on these nodes plus the queued ones and total
+    is their summary capacity. With a long queue the share is the whole
+    capacity, so no slot stays idle.
+    """
+    total = sum(pool_node.effective_capacity for pool_node in pool)
+    if total <= 0:
+        return 0
+    demand = queued + sum(
+        active_by_node.get(pool_node.id, 0) for pool_node in pool
+    )
+    demand = min(demand, total)
+    # ceil() in integers
+    return -(-node.effective_capacity * demand // total)
+
+
+async def _claim_build_task(
+    db: AsyncSession,
+    task_id: int,
+    node: models.BuildNode,
+    now: datetime.datetime,
+    instance_id: typing.Optional[str],
+) -> typing.Optional[models.BuildTask]:
+    # Nodes without node_name don't take the advisory lock, so the task
+    # could be claimed by one of them since it was picked as a candidate
+    result = await db.execute(
+        select(models.BuildTask)
+        .where(
+            models.BuildTask.id == task_id,
+            ~models.BuildTask.dependencies.any(),
+            build_nodes_crud.dispatchable_task_condition(now),
+        )
+        .with_for_update(skip_locked=True, of=models.BuildTask)
+        .options(*_build_task_load_options())
+        .execution_options(populate_existing=True)
+    )
+    db_task = result.scalars().first()
+    if not db_task:
+        return
+    if _dispatches_exhausted(db_task):
+        await _fail_undeliverable_task(db, db_task, now)
+        return
+    _record_dispatch(db_task, node.name)
+    db_task.status = BuildTaskStatus.STARTED
+    db_task.ts = now
+    db_task.build_node_id = node.id
+    db_task.claimed_at = now
+    db_task.claimed_by_instance = instance_id
+    db_task.node_reported_at = None
+    await db.flush()
+    return db_task
+
+
+async def _get_balanced_build_task(
+    db: AsyncSession,
+    request: build_node_schema.RequestTask,
+) -> typing.Optional[models.BuildTask]:
+    """Hand out a task to a registered node, balancing the nodes load.
+
+    The node gets the oldest task it can build only while it holds less
+    than its fair share of tasks (see _fair_share). A task waiting longer
+    than BUILD_NODE_BALANCER_MAX_WAIT goes to any node with a free slot.
+    """
+    # The decision depends on what the other nodes hold,
+    # so the node-aware dispatch is serialized
+    if not await _lock_dispatch(db):
+        logging.warning(
+            'Build node %s gets no task: the dispatch lock is busy '
+            'for longer than %s seconds',
+            request.node_name,
+            settings.build_node_dispatch_lock_timeout,
+        )
+        return
+    now = datetime.datetime.utcnow()
+    node = await build_nodes_crud.register_build_node(
+        db,
+        request.node_name,
+        now,
+        node_info=request.node_info,
+        supported_arches=request.supported_arches,
+        excluded_packages=request.excluded_packages or [],
+    )
+    if not node.accepts_tasks():
+        return
+    # Not saved in the node, the instance change is handled by ping
+    instance_id = request.node_info.instance_id if request.node_info else None
+    active_by_node = await build_nodes_crud.count_active_tasks_by_node(db)
+    node_active = active_by_node.get(node.id, 0)
+    if node_active >= node.effective_capacity:
+        return
+
+    secure_boot_condition = sqlalchemy.true()
+    if not node.pesign_support:
+        secure_boot_condition = sqlalchemy.or_(
+            models.BuildTask.is_secure_boot.is_(None),
+            models.BuildTask.is_secure_boot.is_(False),
+        )
+    dispatchable = build_nodes_crud.dispatchable_task_condition(now)
+    candidates_query = (
+        select(
+            models.BuildTask.id,
+            models.BuildTask.arch,
+            models.BuildTask.is_secure_boot,
+            models.BuildTask.queued_at,
+            models.BuildTaskRef.url,
+        )
+        .join(models.BuildTask.ref)
+        .where(
+            ~models.BuildTask.dependencies.any(),
+            models.BuildTask.arch.in_(request.supported_arches),
+            _excluded_packages_condition(request.excluded_packages),
+            secure_boot_condition,
+            dispatchable,
+        )
+        .order_by(models.BuildTask.id.asc())
+        .limit(BALANCER_CANDIDATES_LIMIT)
+    )
+    candidates = (await db.execute(candidates_query)).all()
+    if not candidates:
+        return
+
+    queued_by_arch = await db.execute(
+        select(models.BuildTask.arch, func.count())
+        .where(
+            ~models.BuildTask.dependencies.any(),
+            models.BuildTask.arch.in_(request.supported_arches),
+            dispatchable,
+        )
+        .group_by(models.BuildTask.arch)
+    )
+    queued_by_arch = dict(queued_by_arch.all())
+    other_nodes = [
+        other
+        for other in await build_nodes_crud.get_all_build_nodes(db)
+        if other.id != node.id
+        and other.accepts_tasks()
+        and other.is_online(now)
+    ]
+    max_wait_border = now - datetime.timedelta(
+        seconds=settings.build_node_balancer_max_wait,
+    )
+    shares = {}
+    # The node may be at its share for the oldest tasks while a task further
+    # in the queue is starving or has a pool of its own (an arch, a secure
+    # boot or an excluded package the other nodes can't take), so the whole
+    # queue is looked through. A task is skipped only while the queue of its
+    # arch is shorter than the pool capacity (otherwise the share is the
+    # whole capacity, see _fair_share), so the scan is bounded by the nodes
+    # capacity per arch and not by the queue length.
+    while candidates:
+        for task in candidates:
+            starving = (
+                task.queued_at is None or task.queued_at <= max_wait_border
+            )
+            if not starving:
+                # The pool of nodes that could build the task right now
+                pool = [node] + [
+                    other
+                    for other in other_nodes
+                    if task.arch in (other.supported_arches or [])
+                    and (not task.is_secure_boot or other.pesign_support)
+                    and not _is_excluded(task.url, other.excluded_packages)
+                ]
+                pool_key = (task.arch, tuple(other.id for other in pool))
+                if pool_key not in shares:
+                    shares[pool_key] = _fair_share(
+                        node,
+                        pool,
+                        active_by_node,
+                        queued_by_arch.get(task.arch, 0),
+                    )
+                if node_active >= shares[pool_key]:
+                    continue
+            db_task = await _claim_build_task(
+                db,
+                task.id,
+                node,
+                now,
+                instance_id,
+            )
+            if db_task:
+                return db_task
+        if len(candidates) < BALANCER_CANDIDATES_LIMIT:
+            return
+        candidates = (
+            await db.execute(
+                candidates_query.where(
+                    models.BuildTask.id > candidates[-1].id,
+                )
+            )
+        ).all()
 
 
 def add_build_task_dependencies(
@@ -188,6 +559,10 @@ async def update_failed_build_items_in_parallel(
                 task.built_srpm_url = None
             task.status = BuildTaskStatus.IDLE
             task.ts = None
+            task.queued_at = datetime.datetime.utcnow()
+            # A user restarted the task, it gets all the attempts again
+            task.dispatch_count = 0
+            task.dispatch_nodes = None
             if first_index_dep:
                 await db.run_sync(
                     add_build_task_dependencies, task, first_index_dep
@@ -227,6 +602,10 @@ async def update_failed_build_items(db: AsyncSession, build_id: int):
                 task.built_srpm_url = None
             task.status = BuildTaskStatus.IDLE
             task.ts = None
+            task.queued_at = datetime.datetime.utcnow()
+            # A user restarted the task, it gets all the attempts again
+            task.dispatch_count = 0
+            task.dispatch_nodes = None
             if last_task is not None:
                 await db.run_sync(add_build_task_dependencies, task, last_task)
             last_task = task
@@ -296,18 +675,226 @@ async def create_build_log_repo(db: AsyncSession, task: models.BuildTask):
 
 
 async def ping_tasks(db: AsyncSession, task_list: typing.List[int]):
+    """Refresh the tasks reported by a node without node_name.
+
+    The first report of a task confirms its handout (see dispatch_count).
+    """
     query = models.BuildTask.id.in_(task_list)
     now = datetime.datetime.utcnow()
-    await db.execute(update(models.BuildTask).where(query).values(ts=now))
+    await db.execute(
+        update(models.BuildTask)
+        .where(query)
+        .values(
+            ts=now,
+            dispatch_count=build_nodes_crud.confirmed_dispatch_count(),
+        )
+    )
     await db.flush()
 
 
-async def get_build_task(db: AsyncSession, task_id: int) -> models.BuildTask:
-    build_tasks = await db.execute(
+async def ping_build_node(db: AsyncSession, ping: build_node_schema.Ping):
+    """Register the node and reconcile its tasks with what it reported.
+
+    Only the tasks held by the node get their ts refreshed, the first report
+    of a task confirms its handout (see dispatch_count). Its tasks that
+    the node doesn't report anymore (it was restarted, lost them, etc.)
+    go back to the queue, unless they were handed out too recently to be
+    in the ping yet.
+
+    Nothing is returned to the queue while another instance of the node
+    may be running: two instances run with the same name and each of them
+    would return the tasks of the other one. The instance is considered
+    another one when it differs from the last one, unless the node was
+    silent for the offline timeout while the server was working, and
+    the reconciliation is off for the offline timeout after the last such
+    change. Two instances running in parallel keep it off for as long as
+    they run, a warning is logged on each change.
+
+    A restart is confirmed when the new instance names the last one as
+    its previous_instance_id (the node keeps it in a file, which another
+    host with the same name doesn't have). The reconciliation stays on
+    then, and the tasks the new instance didn't claim (the tasks of the
+    previous one) are returned to the queue at once, without the grace.
+
+    get_task doesn't save the instance, so the change is always seen here,
+    even when the new instance asked for a task before its first ping.
+    The tasks it got are told by claimed_by_instance and keep the grace.
+    """
+    now = datetime.datetime.utcnow()
+    instance_id = None
+    previous_instance_id = None
+    if ping.node_info:
+        instance_id = ping.node_info.instance_id
+        previous_instance_id = ping.node_info.previous_instance_id
+    # Locked, so concurrent pings of two instances see each other
+    previous = await build_nodes_crud.get_build_node_by_name(
+        db,
+        ping.node_name,
+        for_update=True,
+    )
+    instance_changed_at = None
+    confirmed_restart = False
+    if previous is not None:
+        instance_changed_at = previous.instance_changed_at
+        if (
+            instance_id is not None
+            # A node that didn't send its instance before isn't another one
+            and previous.instance_id is not None
+            and instance_id != previous.instance_id
+        ):
+            confirmed_restart = previous_instance_id == previous.instance_id
+            # Not just "isn't online": after a downtime of the server
+            # every node looks offline, while both instances may be alive
+            if previous.is_silent_for(
+                now,
+                settings.build_node_offline_timeout,
+                await build_nodes_crud.server_seen_since(db, now),
+            ):
+                # Just a restart of the node, the previous instance is gone
+                instance_changed_at = None
+            elif confirmed_restart:
+                # instance_changed_at is kept: if another instance showed
+                # up recently, it may still be running
+                logging.info(
+                    "Build node %s was restarted, instance %s replaced %s",
+                    ping.node_name,
+                    instance_id,
+                    previous.instance_id,
+                )
+            else:
+                instance_changed_at = now
+                logging.warning(
+                    "Build node %s was seen with instance %s, but ping "
+                    "came from instance %s. Two instances of the node may "
+                    "be running with the same name, its tasks aren't "
+                    "returned to the queue",
+                    ping.node_name,
+                    previous.instance_id,
+                    instance_id,
+                )
+    node = await build_nodes_crud.register_build_node(
+        db,
+        ping.node_name,
+        now,
+        node_info=ping.node_info,
+        resources=ping.resources,
+        instance_id=instance_id,
+        instance_changed_at=instance_changed_at,
+    )
+    reconcile = not node.instance_changed_recently(now)
+    active_tasks = set(ping.active_tasks)
+    if active_tasks:
+        # Tasks the node took before it started to send node_name
+        await db.execute(
+            update(models.BuildTask)
+            .where(
+                models.BuildTask.id.in_(active_tasks),
+                models.BuildTask.build_node_id.is_(None),
+                models.BuildTask.status == BuildTaskStatus.STARTED,
+                models.BuildTask.node_reported_at.is_(None),
+            )
+            .values(
+                build_node_id=node.id,
+                claimed_at=func.coalesce(models.BuildTask.claimed_at, now),
+                claimed_by_instance=instance_id,
+            )
+        )
+        await db.execute(
+            update(models.BuildTask)
+            .where(
+                models.BuildTask.id.in_(active_tasks),
+                models.BuildTask.build_node_id == node.id,
+                build_nodes_crud.held_by_node_condition(),
+            )
+            # The first report of a task confirms the node got it
+            .values(
+                ts=now,
+                dispatch_count=build_nodes_crud.confirmed_dispatch_count(),
+            )
+        )
+    if not reconcile:
+        await db.flush()
+        return
+    grace_border = now - datetime.timedelta(
+        seconds=settings.build_node_reconcile_grace,
+    )
+    out_of_grace = [
+        models.BuildTask.claimed_at.is_(None),
+        models.BuildTask.claimed_at < grace_border,
+    ]
+    if confirmed_restart:
+        # The previous instance is gone, it won't report its tasks
+        out_of_grace.append(
+            models.BuildTask.claimed_by_instance.is_distinct_from(instance_id)
+        )
+    lost_tasks_condition = [
+        models.BuildTask.build_node_id == node.id,
+        build_nodes_crud.held_by_node_condition(),
+        sqlalchemy.or_(*out_of_grace),
+    ]
+    if active_tasks:
+        lost_tasks_condition.append(
+            models.BuildTask.id.not_in(active_tasks),
+        )
+    lost_tasks = await db.execute(
+        update(models.BuildTask)
+        .where(*lost_tasks_condition)
+        .values(
+            status=BuildTaskStatus.IDLE,
+            build_node_id=None,
+            ts=None,
+            claimed_at=None,
+            claimed_by_instance=None,
+            queued_at=now,
+        )
+        .returning(models.BuildTask.id)
+    )
+    lost_tasks = lost_tasks.scalars().all()
+    if lost_tasks:
+        logging.warning(
+            "Build node %s doesn't report tasks %s anymore, "
+            "returning them to the queue",
+            node.name,
+            lost_tasks,
+        )
+    await db.flush()
+
+
+async def mark_dependent_tasks_queued(
+    db: AsyncSession,
+    task_ids: typing.Iterable[int],
+):
+    """Tasks waiting for the given ones may become ready to be handed out.
+
+    Has to be called before the dependencies are removed. A task is ready
+    once its last dependency is removed, so the latest call wins.
+    """
+    dependent_tasks = select(models.BuildTaskDependency.c.build_task_id).where(
+        models.BuildTaskDependency.c.build_task_dependency.in_(list(task_ids)),
+    )
+    await db.execute(
+        update(models.BuildTask)
+        .where(models.BuildTask.id.in_(dependent_tasks))
+        .values(queued_at=datetime.datetime.utcnow())
+        .execution_options(synchronize_session=False)
+    )
+
+
+async def get_build_task(
+    db: AsyncSession,
+    task_id: int,
+    for_update: bool = False,
+) -> models.BuildTask:
+    query = (
         select(models.BuildTask)
         .where(models.BuildTask.id == task_id)
         .options(selectinload(models.BuildTask.platform))
     )
+    if for_update:
+        query = query.with_for_update(of=models.BuildTask).execution_options(
+            populate_existing=True,
+        )
+    build_tasks = await db.execute(query)
     return build_tasks.scalars().first()
 
 
@@ -515,6 +1102,9 @@ async def __process_logs(
     task_artifacts: list,
     repository: models.Repository,
 ):
+    # A task failed by the server has no logs, Pulp needn't be called
+    if not task_artifacts:
+        return []
     if not repository:
         logging.error("Log repository is absent, skipping logs processing")
         return
@@ -914,6 +1504,7 @@ async def __update_built_srpm_url(
         )
         await db.execute(update_query)
 
+        await mark_dependent_tasks_queued(db, uncompleted_tasks_ids)
         remove_query = delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency.in_(
                 uncompleted_tasks_ids
@@ -992,6 +1583,7 @@ async def fast_fail_other_tasks_by_ref(
         )
         .values(status=BuildTaskStatus.FAILED, error=fast_fail_msg)
     )
+    await mark_dependent_tasks_queued(db, uncompleted_tasks_ids)
     await db.execute(
         delete(models.BuildTaskDependency).where(
             models.BuildTaskDependency.c.build_task_dependency.in_(
@@ -1068,6 +1660,7 @@ async def safe_build_done(
                 statistics=build_task_stats,
             ),
         )
+        await mark_dependent_tasks_queued(db, [request.task_id])
         await db.execute(remove_dep_query)
         await db.flush()
     logging.info("Build task: %d, processing is finished", request.task_id)
